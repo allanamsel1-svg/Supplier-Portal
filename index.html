@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factory Registration — Supplier Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; min-height: 100vh; padding: 2rem 1rem; }
+    .form-wrap { max-width: 640px; margin: 0 auto; }
+    .logo-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
+    .logo-mark { width: 36px; height: 36px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .logo-mark span { color: #fff; font-size: 16px; font-weight: 500; }
+    .logo-text { font-size: 15px; font-weight: 500; color: #1a1a2e; }
+    .logo-sub { font-size: 12px; color: #888; }
+    h1 { font-size: 24px; font-weight: 600; color: #1a1a2e; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 14px; color: #666; margin-bottom: 2rem; }
+    .section { background: #fff; border: 1px solid #e8e8e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .section-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #f0f0e8; }
+    .field { margin-bottom: 0.875rem; }
+    .field:last-child { margin-bottom: 0; }
+    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+    .required { color: #E24B4A; }
+    input[type=text], input[type=email], input[type=tel], textarea, select {
+      width: 100%; padding: 9px 11px; font-size: 14px;
+      border: 1px solid #ddd; border-radius: 8px;
+      background: #fff; color: #1a1a2e;
+      font-family: inherit; transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #378ADD; box-shadow: 0 0 0 3px rgba(55,138,221,0.1); }
+    textarea { resize: vertical; min-height: 80px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+    .cert-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+    .cert-item { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    .cert-item input[type=checkbox] { width: 14px; height: 14px; cursor: pointer; }
+    .file-upload { border: 1.5px dashed #ccc; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; transition: background 0.15s; }
+    .file-upload:hover { background: #f8f8f4; border-color: #aaa; }
+    .file-upload strong { font-size: 14px; color: #1a1a2e; }
+    .file-upload p { font-size: 13px; color: #888; margin-top: 4px; }
+    .file-name { font-size: 13px; color: #378ADD; margin-top: 8px; font-weight: 500; }
+    .submit-btn { width: 100%; padding: 13px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 1rem; transition: opacity 0.15s; font-family: inherit; letter-spacing: 0.01em; }
+    .submit-btn:hover { opacity: 0.85; }
+    .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .msg { padding: 14px 16px; border-radius: 10px; font-size: 14px; margin-top: 1rem; display: none; }
+    .msg.success { background: #eaf3de; color: #3B6D11; border: 1px solid #c0dd97; }
+    .msg.error { background: #fcebeb; color: #A32D2D; border: 1px solid #f7c1c1; }
+    .progress { display: none; font-size: 13px; color: #888; text-align: center; margin-top: 0.75rem; }
+    @media (max-width: 500px) {
+      .row2, .row3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="form-wrap">
+  <div class="logo-bar">
+    <div class="logo-mark"><span>S</span></div>
+    <div>
+      <div class="logo-text">Supplier Portal</div>
+      <div class="logo-sub">Factory Registration</div>
+    </div>
+  </div>
+
+  <h1>Register Your Factory</h1>
+  <p class="subtitle">Please complete all required fields marked with <span style="color:#E24B4A">*</span>. Your information will be reviewed by our team.</p>
+
+  <div class="section">
+    <div class="section-title">Factory Information</div>
+    <div class="field"><label>Factory Name (English) <span class="required">*</span></label><input type="text" id="name_en" placeholder="e.g. Guangzhou Best Products Co., Ltd." /></div>
+    <div class="field"><label>Factory Name (Chinese or Local Language)</label><input type="text" id="name_local" placeholder="e.g. 广州优质产品有限公司" /></div>
+    <div class="field"><label>Telephone Number <span class="required">*</span></label><input type="tel" id="telephone" placeholder="+86 20 1234 5678" /></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Address</div>
+    <div class="field"><label>Street Address <span class="required">*</span></label><input type="text" id="address" placeholder="Building, Street, District" /></div>
+    <div class="row2 field">
+      <div><label>City <span class="required">*</span></label><input type="text" id="city" placeholder="City" /></div>
+      <div><label>State / Province</label><input type="text" id="state" placeholder="Province" /></div>
+    </div>
+    <div class="row2 field">
+      <div><label>Postal Code</label><input type="text" id="postal" placeholder="000000" /></div>
+      <div><label>Country <span class="required">*</span></label><input type="text" id="country" placeholder="China" /></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Sales Contact</div>
+    <div class="row2 field">
+      <div><label>Contact Name <span class="required">*</span></label><input type="text" id="contact_name" placeholder="Full Name" /></div>
+      <div><label>Mobile Number <span class="required">*</span></label><input type="tel" id="contact_mobile" placeholder="+86 138 0000 0000" /></div>
+    </div>
+    <div class="row3 field">
+      <div><label>Email Address <span class="required">*</span></label><input type="email" id="contact_email" placeholder="name@factory.com" /></div>
+      <div><label>WeChat ID</label><input type="text" id="contact_wechat" placeholder="WeChat" /></div>
+      <div><label>WhatsApp</label><input type="tel" id="contact_whatsapp" placeholder="+86..." /></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Certifications</div>
+    <div class="cert-grid">
+      <label class="cert-item"><input type="checkbox" value="ISO 9001" /> ISO 9001</label>
+      <label class="cert-item"><input type="checkbox" value="ISO 14001" /> ISO 14001</label>
+      <label class="cert-item"><input type="checkbox" value="ISO 45001" /> ISO 45001</label>
+      <label class="cert-item"><input type="checkbox" value="ETL" /> ETL</label>
+      <label class="cert-item"><input type="checkbox" value="BSCI" /> BSCI</label>
+      <label class="cert-item"><input type="checkbox" value="Sedex" /> Sedex</label>
+      <label class="cert-item"><input type="checkbox" value="CE" /> CE</label>
+      <label class="cert-item"><input type="checkbox" value="FCC" /> FCC</label>
+      <label class="cert-item"><input type="checkbox" value="FDA" /> FDA</label>
+      <label class="cert-item"><input type="checkbox" value="RoHS" /> RoHS</label>
+      <label class="cert-item"><input type="checkbox" value="UL" /> UL</label>
+      <label class="cert-item"><input type="checkbox" value="GRS" /> GRS</label>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Other Certifications</label><input type="text" id="cert_other" placeholder="List any other certifications" /></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Product Categories</div>
+    <div class="field"><label>What products do you manufacture at this facility? <span class="required">*</span></label><textarea id="product_categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics, Kitchenware..."></textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Company Catalog</div>
+    <div class="file-upload" onclick="document.getElementById('catalog_file').click()">
+      <div style="font-size:28px;">📄</div>
+      <strong>Upload Company Catalog</strong>
+      <p>PDF files only — click to browse</p>
+      <div class="file-name" id="file-name-display"></div>
+    </div>
+    <input type="file" id="catalog_file" accept=".pdf" style="display:none" onchange="handleFile(this)" />
+  </div>
+
+  <button class="submit-btn" id="submit-btn" onclick="submitForm()">Submit Registration</button>
+  <div class="progress" id="progress-msg">Submitting your registration, please wait...</div>
+  <div class="msg success" id="success-msg">✓ Registration submitted successfully! Our team will review your details and be in touch shortly.</div>
+  <div class="msg error" id="error-msg">Something went wrong. Please try again or contact support.</div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+  let selectedFile = null;
+
+  function handleFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Please upload a PDF file only.');
+      input.value = '';
+      return;
+    }
+    selectedFile = file;
+    document.getElementById('file-name-display').textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + ' MB)';
+  }
+
+  function getCheckedCerts() {
+    const boxes = document.querySelectorAll('.cert-grid input[type=checkbox]:checked');
+    const certs = Array.from(boxes).map(b => b.value);
+    const other = document.getElementById('cert_other').value.trim();
+    if (other) certs.push(other);
+    return certs;
+  }
+
+  function val(id) { return document.getElementById(id).value.trim(); }
+
+  async function submitForm() {
+    const required = ['name_en','telephone','address','city','country','contact_name','contact_mobile','contact_email','product_categories'];
+    for (const id of required) {
+      if (!val(id)) {
+        alert('Please fill in all required fields.');
+        document.getElementById(id).focus();
+        return;
+      }
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    document.getElementById('progress-msg').style.display = 'block';
+
+    let catalog_url = null;
+
+    if (selectedFile) {
+      const fileName = Date.now() + '_' + selectedFile.name.replace(/\s+/g,'_');
+      const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/catalogs/${fileName}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/pdf',
+          'x-upsert': 'true'
+        },
+        body: selectedFile
+      });
+      if (uploadRes.ok) {
+        catalog_url = `${SUPABASE_URL}/storage/v1/object/public/catalogs/${fileName}`;
+      }
+    }
+
+    const payload = {
+      factory_name_english: val('name_en'),
+      factory_name_local: val('name_local'),
+      telephone: val('telephone'),
+      address: val('address'),
+      city: val('city'),
+      state_province: val('state'),
+      postal_code: val('postal'),
+      country: val('country'),
+      sales_contact_name: val('contact_name'),
+      sales_mobile: val('contact_mobile'),
+      sales_email: val('contact_email'),
+      sales_wechat: val('contact_wechat'),
+      sales_whatsapp: val('contact_whatsapp'),
+      certifications: getCheckedCerts(),
+      product_categories: [val('product_categories')],
+      catalog_url,
+      status: 'pending'
+    };
+
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/factories`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      document.getElementById('progress-msg').style.display = 'none';
+      if (res.ok) {
+        document.getElementById('success-msg').style.display = 'block';
+        btn.style.display = 'none';
+      } else {
+        const err = await res.json();
+        console.error(err);
+        document.getElementById('error-msg').style.display = 'block';
+        document.getElementById('error-msg').textContent = 'Error: ' + (err.message || 'Submission failed. Please try again.');
+        btn.disabled = false;
+      }
+    } catch(e) {
+      document.getElementById('progress-msg').style.display = 'none';
+      document.getElementById('error-msg').style.display = 'block';
+      btn.disabled = false;
+    }
+  }
+</script>
+</body>
+</html>
