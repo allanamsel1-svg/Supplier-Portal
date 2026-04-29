@@ -195,7 +195,7 @@ function renderCard(card){
   else if(card.status==='done'){stText='✓ Extracted — review and save below';stCls='ok';}
   else if(card.status==='done_err'){stText='Partial read — review what was found';stCls='err';}
   else if(card.status==='saved'){stText='✓ Saved as draft factory';stCls='ok';}
-  else if(card.status==='error'){stText='Could not read card';stCls='err';}
+  else if(card.status==='error'){stText='Error: '+(card.errorMsg||'Could not read card — check API key in Admin Settings');stCls='err';}
 
   var topHTML='<div class="ci-top">'+
     (card.dataUrl?'<img class="ci-thumb" src="'+card.dataUrl+'" />':'<div class="ci-thumb" style="background:#f0f0e8;display:flex;align-items:center;justify-content:center;font-size:20px;">📇</div>')+
@@ -294,18 +294,27 @@ async function scanCard(card,apiKey){
       })
     });
     var d=await r.json();
-    if(d.content&&d.content[0]&&d.content[0].text){
-      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+    if(d.error){
+      card.status="error";
+      card.errorMsg="API error: "+d.error.message+" ("+d.error.type+")";
+    }else if(d.content&&d.content[0]&&d.content[0].text){
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,"").replace(/^```\s*/,"").replace(/\s*```$/,"");
       try{
         card.data=JSON.parse(raw);
-        card.status='done';
+        card.status="done";
       }catch(e){
         var match=raw.match(/\{[\s\S]*\}/);
-        if(match){try{card.data=JSON.parse(match[0]);card.status='done';}catch(e2){card.data={notes:raw};card.status='done_err';}}
-        else{card.data={notes:raw};card.status='done_err';}
+        if(match){try{card.data=JSON.parse(match[0]);card.status="done";}catch(e2){card.data={notes:raw};card.status="done_err";}}
+        else{card.data={notes:raw};card.status="done_err";}
       }
-    }else{card.status='error';}
-  }catch(e){card.status='error';}
+    }else{
+      card.status="error";
+      card.errorMsg="Unexpected response: "+JSON.stringify(d).slice(0,300);
+    }
+  }catch(e){
+    card.status="error";
+    card.errorMsg="Connection error: "+e.message;
+  }
 
   renderCard(card);
 }
