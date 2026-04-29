@@ -146,15 +146,17 @@ function g(id){return document.getElementById(id);}
 
 window.addEventListener('load',function(){
   if(!localStorage.getItem('anthropic_key'))g('api-warn').style.display='block';
+  // Drag & drop — init inside load so DOM is ready
+  var dz=g('drop-zone');
+  if(dz){
+    dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag-over');});
+    dz.addEventListener('dragleave',function(){dz.classList.remove('drag-over');});
+    dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files);});
+    // Also wire the file input explicitly in case onchange attr doesn't fire
+    var fi=g('file-input');
+    if(fi)fi.addEventListener('change',function(){handleFiles(this.files);});
+  }
 });
-
-// Drag & drop
-var dz=g('drop-zone');
-if(dz){
-  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag-over');});
-  dz.addEventListener('dragleave',function(){dz.classList.remove('drag-over');});
-  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files);});
-}
 
 function handleFiles(files){
   if(!files||!files.length)return;
