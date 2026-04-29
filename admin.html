@@ -44,7 +44,8 @@
     .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
     .stat-val { font-size: 28px; font-weight: 600; color: #1a1a2e; }
     .factory-list { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 10px; }
-    .fc { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1rem 1.25rem; }
+    .fc { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s; }
+    .fc:hover { border-color: #bbb; }
     .fc-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
     .fc-name { font-size: 14px; font-weight: 600; color: #1a1a2e; }
     .fc-local { font-size: 12px; color: #aaa; margin-top: 2px; }
@@ -62,8 +63,11 @@
     .fc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
     .btn-approve { font-size: 11px; padding: 5px 12px; background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
     .btn-approve:hover { background: #d0f0d0; }
+    .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-rfq { font-size: 11px; padding: 5px 12px; background: #f0f4ff; color: #2266cc; border: 1px solid #c0d0f0; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
     .btn-rfq:hover { background: #e0ecff; }
+    .btn-view { font-size: 11px; padding: 5px 12px; background: #f5f5f0; color: #555; border: 1px solid #e0e0d8; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    .btn-view:hover { background: #eee; }
     .empty { padding: 2rem; text-align: center; color: #bbb; font-size: 14px; }
     .sbar { padding: 1rem 1.5rem; border-bottom: 1px solid #e0e0d8; background: #fff; display: flex; gap: 10px; }
     .sbar input, .sbar select { background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; padding: 8px 12px; color: #1a1a2e; font-size: 13px; font-family: inherit; }
@@ -100,6 +104,8 @@
     .set-section p { font-size: 12px; color: #aaa; margin-top: 4px; }
     .save { padding: 8px 16px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .saved { font-size: 12px; color: #1a7a1a; margin-left: 10px; display: none; }
+
+    /* ── RFQ Modal ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: none; align-items: center; justify-content: center; }
     .modal-overlay.on { display: flex; }
     .modal { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; width: 90%; max-width: 600px; max-height: 85vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
@@ -115,6 +121,47 @@
     .btn-send { padding: 9px 18px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-send:hover { opacity: 0.87; }
     .modal-msg { font-size: 13px; color: #1a7a1a; margin-top: 10px; display: none; background: #e8f8e8; padding: 8px 12px; border-radius: 7px; }
+
+    /* ── Supplier Detail Drawer ── */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 200; display: none; }
+    .drawer-overlay.on { display: block; }
+    .drawer { position: fixed; top: 0; right: -600px; width: 580px; max-width: 100vw; height: 100vh; background: #fff; border-left: 1px solid #e0e0d8; z-index: 201; overflow-y: auto; transition: right 0.25s ease; box-shadow: -4px 0 24px rgba(0,0,0,0.08); }
+    .drawer.open { right: 0; }
+    .drawer-header { position: sticky; top: 0; background: #fff; border-bottom: 1px solid #e0e0d8; padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+    .drawer-header-l { display: flex; flex-direction: column; gap: 2px; }
+    .drawer-factory-name { font-size: 16px; font-weight: 600; color: #1a1a2e; }
+    .drawer-factory-local { font-size: 12px; color: #aaa; }
+    .drawer-header-r { display: flex; align-items: center; gap: 8px; }
+    .drawer-close { background: none; border: none; font-size: 20px; color: #aaa; cursor: pointer; line-height: 1; padding: 4px; }
+    .drawer-close:hover { color: #1a1a2e; }
+    .drawer-body { padding: 1.25rem; }
+    .d-section { margin-bottom: 1.25rem; }
+    .d-section-title { font-size: 10px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #f0f0e8; }
+    .d-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; }
+    .d-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 12px; }
+    .d-field { display: flex; flex-direction: column; gap: 2px; }
+    .d-label { font-size: 11px; color: #aaa; }
+    .d-value { font-size: 13px; color: #1a1a2e; font-weight: 500; }
+    .d-value.empty { color: #ccc; font-weight: 400; }
+    .d-certs { display: flex; flex-wrap: wrap; gap: 5px; }
+    .d-cert { font-size: 11px; background: #f0f0e8; color: #555; padding: 3px 8px; border-radius: 4px; border: 1px solid #e0e0d8; }
+    .d-cert.has-detail { background: #eef2ff; color: #2244aa; border-color: #c0ccee; }
+    .d-files { display: flex; flex-wrap: wrap; gap: 6px; }
+    .d-file { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #2266cc; background: #f0f4ff; border: 1px solid #c0d0f0; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
+    .d-file:hover { background: #e0ecff; }
+    .d-location { background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+    .d-location-name { font-size: 12px; font-weight: 600; color: #1a1a2e; margin-bottom: 6px; }
+    .d-location-type { font-size: 10px; background: #e8e8e0; color: #888; padding: 2px 6px; border-radius: 3px; margin-left: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .d-cap-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+    .d-cap-item { font-size: 11px; color: #888; }
+    .d-cap-item strong { color: #1a1a2e; }
+    .d-actions { display: flex; gap: 8px; padding: 1rem 1.25rem; border-top: 1px solid #e0e0d8; position: sticky; bottom: 0; background: #fff; }
+    .d-btn-approve { flex: 1; padding: 10px; background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .d-btn-approve:hover { background: #d0f0d0; }
+    .d-btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
+    .d-btn-rfq { flex: 1; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .d-btn-rfq:hover { opacity: 0.87; }
+    .no-data { font-size: 13px; color: #ccc; font-style: italic; }
   </style>
 </head>
 <body>
@@ -172,8 +219,11 @@
         <input type="text" id="search-input" placeholder="Search by name, country, category..." oninput="filterFactories()" />
         <select id="cert-filter" onchange="filterFactories()">
           <option value="">All Certifications</option>
-          <option>ISO 9001</option><option>ISO 14001</option><option>ETL</option><option>BSCI</option>
-          <option>Sedex</option><option>CE</option><option>FCC</option><option>FDA</option><option>RoHS</option><option>UL</option>
+          <option>ISO 9001</option><option>ISO 14001</option><option>ISO 45001</option><option>ISO 13485</option>
+          <option>ETL</option><option>UL</option><option>CE</option><option>FCC</option><option>FDA</option>
+          <option>RoHS</option><option>REACH</option><option>BSCI</option><option>Sedex</option>
+          <option>SA8000</option><option>GRS</option><option>OEKO-TEX</option><option>FSC</option>
+          <option>HACCP</option><option>BRC</option><option>CCC</option>
         </select>
       </div>
       <div class="factory-list" id="all-list"><div class="empty">Loading...</div></div>
@@ -223,27 +273,127 @@
       </div>
       <div class="set-section">
         <h3>Your Email Address</h3>
-        <input type="email" id="set-email" placeholder="your@email.com" />
+        <input type="email" id="set-email" placeholder="your@outlook.com" />
         <button class="save" onclick="saveEmail()">Save</button>
         <span class="saved" id="email-saved">Saved!</span>
-        <p>Used when opening RFQs in Apple Mail.</p>
+        <p>Used as the From address when sending RFQs via Outlook.</p>
       </div>
     </div>
   </div>
 </div>
 
+<!-- ── RFQ Modal ── -->
 <div class="modal-overlay" id="rfq-modal">
   <div class="modal">
-    <h2>Send RFQ to Factory</h2>
+    <h2>Send RFQ via Outlook</h2>
     <div class="modal-to" id="rfq-to"></div>
     <button class="gen-btn" onclick="generateRFQ()">✦ Regenerate with AI</button>
     <div class="gen-prog" id="gen-prog">AI is generating your RFQ...</div>
     <textarea id="rfq-body" placeholder="Your RFQ will appear here. You can edit before sending."></textarea>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeRFQ()">Cancel</button>
-      <button class="btn-send" onclick="sendRFQ()">Open in Apple Mail</button>
+      <button class="btn-send" onclick="sendRFQ()">Open in Outlook</button>
     </div>
-    <div class="modal-msg" id="rfq-msg">RFQ opened in Apple Mail!</div>
+    <div class="modal-msg" id="rfq-msg">✓ Outlook is opening with your RFQ ready to send.</div>
+  </div>
+</div>
+
+<!-- ── Supplier Detail Drawer ── -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="supplier-drawer">
+  <div class="drawer-header">
+    <div class="drawer-header-l">
+      <div class="drawer-factory-name" id="d-name">—</div>
+      <div class="drawer-factory-local" id="d-local"></div>
+    </div>
+    <div class="drawer-header-r">
+      <span class="fc-status" id="d-status-badge">—</span>
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+    </div>
+  </div>
+  <div class="drawer-body">
+
+    <div class="d-section">
+      <div class="d-section-title">Factory Information</div>
+      <div class="d-grid-3">
+        <div class="d-field"><div class="d-label">Years in Business</div><div class="d-value" id="d-years">—</div></div>
+        <div class="d-field"><div class="d-label">Annual Revenue</div><div class="d-value" id="d-revenue">—</div></div>
+        <div class="d-field"><div class="d-label">Export %</div><div class="d-value" id="d-export">—</div></div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Contact</div>
+      <div class="d-grid">
+        <div class="d-field"><div class="d-label">Contact Name</div><div class="d-value" id="d-contact">—</div></div>
+        <div class="d-field"><div class="d-label">Mobile</div><div class="d-value" id="d-mobile">—</div></div>
+        <div class="d-field"><div class="d-label">Email</div><div class="d-value" id="d-email">—</div></div>
+        <div class="d-field"><div class="d-label">Telephone</div><div class="d-value" id="d-tel">—</div></div>
+        <div class="d-field"><div class="d-label">WeChat</div><div class="d-value" id="d-wechat">—</div></div>
+        <div class="d-field"><div class="d-label">WhatsApp</div><div class="d-value" id="d-whatsapp">—</div></div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Main Factory Address</div>
+      <div class="d-grid">
+        <div class="d-field"><div class="d-label">Address</div><div class="d-value" id="d-address">—</div></div>
+        <div class="d-field"><div class="d-label">City</div><div class="d-value" id="d-city">—</div></div>
+        <div class="d-field"><div class="d-label">State / Province</div><div class="d-value" id="d-state">—</div></div>
+        <div class="d-field"><div class="d-label">Postal Code</div><div class="d-value" id="d-postal">—</div></div>
+        <div class="d-field"><div class="d-label">Country</div><div class="d-value" id="d-country">—</div></div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Factory Capacity</div>
+      <div class="d-grid-3">
+        <div class="d-field"><div class="d-label">Total Employees</div><div class="d-value" id="d-emp">—</div></div>
+        <div class="d-field"><div class="d-label">Engineers / R&D</div><div class="d-value" id="d-eng">—</div></div>
+        <div class="d-field"><div class="d-label">QC Staff</div><div class="d-value" id="d-qc">—</div></div>
+        <div class="d-field"><div class="d-label">Production Lines</div><div class="d-value" id="d-lines">—</div></div>
+        <div class="d-field"><div class="d-label">Floor Space (m²)</div><div class="d-value" id="d-sqm">—</div></div>
+        <div class="d-field"><div class="d-label">Injection Machines</div><div class="d-value" id="d-inj">—</div></div>
+        <div class="d-field"><div class="d-label">Monthly Capacity</div><div class="d-value" id="d-cap">—</div></div>
+      </div>
+      <div style="margin-top:8px;" id="d-cap-notes-wrap">
+        <div class="d-label">Capacity Notes</div>
+        <div class="d-value" id="d-cap-notes" style="margin-top:3px;font-weight:400;line-height:1.5;"></div>
+      </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Product Categories</div>
+      <div class="d-value" id="d-categories" style="font-weight:400;line-height:1.6;">—</div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Certifications</div>
+      <div class="d-certs" id="d-certs"><span class="no-data">None on file</span></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Additional Locations</div>
+      <div id="d-locations"><span class="no-data">None on file</span></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Uploaded Files</div>
+      <div class="d-files" id="d-files"><span class="no-data">No files uploaded</span></div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Registration</div>
+      <div class="d-grid">
+        <div class="d-field"><div class="d-label">Registered</div><div class="d-value" id="d-created">—</div></div>
+        <div class="d-field"><div class="d-label">Status</div><div class="d-value" id="d-status-text">—</div></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="d-actions">
+    <button class="d-btn-approve" id="d-approve-btn" onclick="approveFromDrawer()">✓ Approve Factory</button>
+    <button class="d-btn-rfq" onclick="rfqFromDrawer()">✉ Send RFQ</button>
   </div>
 </div>
 
@@ -254,9 +404,14 @@ var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
 var factoryFiles={};
+var factoryLocations={};
+var factoryCerts={};
 var currentRFQFactory=null;
+var currentDrawerFactory=null;
 
 function g(id){return document.getElementById(id);}
+function v(id){var e=g(id);return e?e.textContent:'—';}
+function dv(id,val){var e=g(id);if(e)e.textContent=val||'—';}
 
 function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value;
@@ -271,12 +426,15 @@ function showPanel(name){
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
 }
 
+// ── Load all data ──
 async function loadData(){
   try{
     var r=await fetch(SB+'/rest/v1/factories?select=*&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var d=await r.json();
     allFactories=Array.isArray(d)?d:[];
     await loadAllFiles();
+    await loadAllLocations();
+    await loadAllCerts();
     renderAll();
   }catch(e){console.log('load error:',e);}
 }
@@ -299,8 +457,33 @@ async function loadAllFiles(){
   }
 }
 
+async function loadAllLocations(){
+  for(var i=0;i<allFactories.length;i++){
+    var f=allFactories[i];
+    if(!f.id)continue;
+    try{
+      var r=await fetch(SB+'/rest/v1/factory_locations?factory_id=eq.'+f.id+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var rows=await r.json();
+      factoryLocations[f.id]=Array.isArray(rows)?rows:[];
+    }catch(e){factoryLocations[f.id]=[];}
+  }
+}
+
+async function loadAllCerts(){
+  for(var i=0;i<allFactories.length;i++){
+    var f=allFactories[i];
+    if(!f.id)continue;
+    try{
+      var r=await fetch(SB+'/rest/v1/factory_certifications?factory_id=eq.'+f.id+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var rows=await r.json();
+      factoryCerts[f.id]=Array.isArray(rows)?rows:[];
+    }catch(e){factoryCerts[f.id]=[];}
+  }
+}
+
 function fileURL(userId,folder,name){return SB+'/storage/v1/object/public/factory-files/'+userId+'/'+folder+'/'+name;}
 
+// ── Render cards ──
 function renderAll(){
   var total=allFactories.length;
   var pending=allFactories.filter(function(f){return f.status==='pending';}).length;
@@ -320,19 +503,24 @@ function renderAll(){
 }
 
 function factoryCard(f){
-  var certs=(f.certifications||[]).slice(0,8).map(function(c){return '<span class="ctag">'+c+'</span>';}).join('');
+  var certs=(f.certifications||[]).slice(0,6).map(function(c){return '<span class="ctag">'+c+'</span>';}).join('');
+  var moreCerts=(f.certifications||[]).length>6?'<span class="ctag">+'+(f.certifications.length-6)+' more</span>':'';
   var files=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
-  var fileHTML='';
-  if(files.catalogs.length||files.overview.length||files.quotes.length){
-    fileHTML='<div class="fc-files"><div class="fc-files-title">Uploaded Files</div>';
-    files.catalogs.forEach(function(x){fileHTML+='<a class="ffile" href="'+fileURL(f.user_id,'catalogs',x.name)+'" target="_blank">📄 '+x.name+'</a>';});
-    files.overview.forEach(function(x){fileHTML+='<a class="ffile" href="'+fileURL(f.user_id,'overview',x.name)+'" target="_blank">📊 '+x.name+'</a>';});
-    files.quotes.forEach(function(x){fileHTML+='<a class="ffile" href="'+fileURL(f.user_id,'quotes',x.name)+'" target="_blank">📋 '+x.name+'</a>';});
-    fileHTML+='</div>';
-  }
-  var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approve(\''+f.id+'\',event)">✓ Approve</button>':'';
+  var fileCount=files.catalogs.length+files.overview.length+files.quotes.length;
+  var filesSummary=fileCount?'<span>📎 '+fileCount+' file'+(fileCount===1?'':'s')+'</span>':'';
+  var locCount=(factoryLocations[f.id]||[]).length;
+  var locSummary=locCount?'<span>📍 '+locCount+' additional location'+(locCount===1?'':'s')+'</span>':'';
+  var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(\''+f.id+'\',event)">✓ Approve</button>':'';
   var rfqBtn='<button class="btn-rfq" onclick="openRFQ(\''+f.id+'\',event)">✉ Send RFQ</button>';
-  return '<div class="fc"><div class="fc-top"><div><div class="fc-name">'+(f.factory_name_english||'—')+'</div><div class="fc-local">'+(f.factory_name_local||'&nbsp;')+'</div></div><span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div><div class="fc-meta"><span>📍 '+([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span><span>✉ '+(f.sales_email||'—')+'</span><span>📞 '+(f.telephone||'—')+'</span></div>'+(certs?'<div class="fc-certs">'+certs+'</div>':'')+fileHTML+'<div class="fc-actions">'+approveBtn+rfqBtn+'</div></div>';
+  var viewBtn='<button class="btn-view" onclick="openDrawer(\''+f.id+'\',event)">View Details →</button>';
+  return '<div class="fc" onclick="openDrawer(\''+f.id+'\',event)">'+
+    '<div class="fc-top"><div><div class="fc-name">'+(f.factory_name_english||'—')+'</div><div class="fc-local">'+(f.factory_name_local||'&nbsp;')+'</div></div>'+
+    '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
+    '<div class="fc-meta"><span>📍 '+([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
+    '<span>✉ '+(f.sales_email||'—')+'</span>'+
+    (filesSummary||'')+(locSummary||'')+'</div>'+
+    (certs?'<div class="fc-certs">'+certs+moreCerts+'</div>':'')+
+    '<div class="fc-actions">'+approveBtn+rfqBtn+viewBtn+'</div></div>';
 }
 
 function filterFactories(){
@@ -345,14 +533,170 @@ function filterFactories(){
   g('all-list').innerHTML=filtered.map(factoryCard).join('')||'<div class="empty">No factories match your search.</div>';
 }
 
-async function approve(id,e){
-  e.stopPropagation();
-  await fetch(SB+'/rest/v1/factories?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved'})});
-  await loadData();
+// ── Approve ──
+async function approveCard(id,e){
+  if(e)e.stopPropagation();
+  var btn=e&&e.target;if(btn){btn.disabled=true;btn.textContent='Approving...';}
+  var ok=await doApprove(id);
+  if(!ok&&btn){btn.disabled=false;btn.textContent='✓ Approve';}
+}
+async function approveFromDrawer(){
+  var f=currentDrawerFactory;if(!f)return;
+  var btn=g('d-approve-btn');btn.disabled=true;btn.textContent='Approving...';
+  var ok=await doApprove(f.id);
+  if(ok){
+    btn.textContent='✓ Approved';
+    g('d-status-badge').textContent='approved';g('d-status-badge').className='fc-status st-approved';
+    g('d-status-text').textContent='approved';
+  }else{btn.disabled=false;btn.textContent='✓ Approve Factory';}
+}
+async function doApprove(id){
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'approved'})
+    });
+    if(r.ok){await loadData();return true;}
+    else{
+      var err=await r.json().catch(function(){return{};});
+      alert('Approve failed: '+(err.message||err.details||r.status)+'\n\nMake sure you have added an UPDATE RLS policy for anon on the factories table in Supabase.');
+      return false;
+    }
+  }catch(e){alert('Error: '+e.message);return false;}
 }
 
+// ── Supplier Detail Drawer ──
+async function openDrawer(id,e){
+  if(e)e.stopPropagation();
+  var f=allFactories.find(function(x){return x.id===id;});
+  if(!f)return;
+  currentDrawerFactory=f;
+
+  // Header
+  g('d-name').textContent=f.factory_name_english||'—';
+  g('d-local').textContent=f.factory_name_local||'';
+  var badge=g('d-status-badge');
+  badge.textContent=f.status||'pending';
+  badge.className='fc-status '+(f.status==='approved'?'st-approved':'st-pending');
+
+  // Factory info
+  dv('d-years',f.years_in_business?f.years_in_business+' years':null);
+  dv('d-revenue',f.annual_revenue_usd);
+  dv('d-export',f.export_percentage!=null?f.export_percentage+'%':null);
+
+  // Contact
+  dv('d-contact',f.sales_contact_name);
+  dv('d-mobile',f.sales_mobile);
+  dv('d-email',f.sales_email);
+  dv('d-tel',f.telephone);
+  dv('d-wechat',f.sales_wechat);
+  dv('d-whatsapp',f.sales_whatsapp);
+
+  // Address
+  dv('d-address',f.address);
+  dv('d-city',f.city);
+  dv('d-state',f.state_province);
+  dv('d-postal',f.postal_code);
+  dv('d-country',f.country);
+
+  // Capacity (from main factory record)
+  dv('d-emp',f.employees_total!=null?f.employees_total.toLocaleString():null);
+  dv('d-eng',f.employees_engineers!=null?f.employees_engineers.toLocaleString():null);
+  dv('d-qc',f.employees_qc!=null?f.employees_qc.toLocaleString():null);
+  dv('d-lines',f.production_lines);
+  dv('d-sqm',f.floor_space_sqm!=null?f.floor_space_sqm.toLocaleString()+' m²':null);
+  dv('d-inj',f.injection_machines);
+  dv('d-cap',f.monthly_capacity_units!=null?f.monthly_capacity_units.toLocaleString()+' units/mo':null);
+  var notesEl=g('d-cap-notes');
+  notesEl.textContent=f.monthly_capacity_notes||'';
+  g('d-cap-notes-wrap').style.display=f.monthly_capacity_notes?'block':'none';
+
+  // Categories
+  dv('d-categories',(f.product_categories||[]).join(', '));
+
+  // Certifications — use detailed records if available, fallback to array
+  var certsEl=g('d-certs');
+  var certRows=factoryCerts[f.id]||[];
+  var certNames=f.certifications||[];
+  if(certRows.length){
+    certsEl.innerHTML=certRows.map(function(c){
+      var detail='';
+      if(c.certificate_number)detail+=' #'+c.certificate_number;
+      if(c.expiry_date){
+        var expired=new Date(c.expiry_date)<new Date();
+        detail+=' · '+(expired?'<span style="color:#c00;">Expired '+c.expiry_date+'</span>':'Expires '+c.expiry_date);
+      }
+      return '<span class="d-cert has-detail">'+c.certification_name+(detail?'<span style="font-weight:400;color:#667;">'+detail+'</span>':'')+'</span>';
+    }).join('');
+  }else if(certNames.length){
+    certsEl.innerHTML=certNames.map(function(c){return '<span class="d-cert">'+c+'</span>';}).join('');
+  }else{
+    certsEl.innerHTML='<span class="no-data">None on file</span>';
+  }
+
+  // Additional locations
+  var locsEl=g('d-locations');
+  var locs=factoryLocations[f.id]||[];
+  if(locs.length){
+    locsEl.innerHTML=locs.map(function(loc){
+      var typeLabel=loc.location_type?loc.location_type.charAt(0).toUpperCase()+loc.location_type.slice(1):'Location';
+      var addr=[loc.address,loc.city,loc.country].filter(Boolean).join(', ');
+      var caps=[];
+      if(loc.employees_total)caps.push('<strong>'+loc.employees_total.toLocaleString()+'</strong> employees');
+      if(loc.production_lines)caps.push('<strong>'+loc.production_lines+'</strong> lines');
+      if(loc.floor_space_sqm)caps.push('<strong>'+loc.floor_space_sqm.toLocaleString()+'</strong> m²');
+      if(loc.monthly_capacity_units)caps.push('<strong>'+loc.monthly_capacity_units.toLocaleString()+'</strong> units/mo');
+      return '<div class="d-location">'+
+        '<div class="d-location-name">'+(loc.location_name||typeLabel)+'<span class="d-location-type">'+typeLabel+'</span></div>'+
+        (addr?'<div style="font-size:12px;color:#666;margin-bottom:4px;">'+addr+'</div>':'')+
+        (caps.length?'<div class="d-cap-row">'+caps.map(function(c){return '<span class="d-cap-item">'+c+'</span>';}).join('')+'</div>':'')+
+        '</div>';
+    }).join('');
+  }else{
+    locsEl.innerHTML='<span class="no-data">No additional locations</span>';
+  }
+
+  // Files
+  var filesEl=g('d-files');
+  var ff=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
+  var fileLinks=[];
+  ff.catalogs.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'catalogs',x.name)+'" target="_blank">📄 '+x.name+'</a>');});
+  ff.overview.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'overview',x.name)+'" target="_blank">📊 '+x.name+'</a>');});
+  ff.quotes.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'quotes',x.name)+'" target="_blank">📋 '+x.name+'</a>');});
+  filesEl.innerHTML=fileLinks.length?fileLinks.join(''):'<span class="no-data">No files uploaded</span>';
+
+  // Registration date
+  var created=f.created_at?new Date(f.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}):'—';
+  dv('d-created',created);
+  dv('d-status-text',f.status||'pending');
+
+  // Approve button state
+  var approveBtn=g('d-approve-btn');
+  if(f.status==='approved'){approveBtn.disabled=true;approveBtn.textContent='✓ Already Approved';}
+  else{approveBtn.disabled=false;approveBtn.textContent='✓ Approve Factory';}
+
+  // Open drawer
+  g('drawer-overlay').classList.add('on');
+  g('supplier-drawer').classList.add('open');
+  g('supplier-drawer').scrollTop=0;
+}
+
+function closeDrawer(){
+  g('drawer-overlay').classList.remove('on');
+  g('supplier-drawer').classList.remove('open');
+  currentDrawerFactory=null;
+}
+
+function rfqFromDrawer(){
+  if(!currentDrawerFactory)return;
+  closeDrawer();
+  openRFQ(currentDrawerFactory.id,null);
+}
+
+// ── RFQ ──
 function openRFQ(id,e){
-  e.stopPropagation();
+  if(e)e.stopPropagation();
   currentRFQFactory=allFactories.find(function(f){return f.id===id;});
   if(!currentRFQFactory)return;
   g('rfq-to').textContent='To: '+(currentRFQFactory.sales_contact_name||'Factory Contact')+' <'+(currentRFQFactory.sales_email||'')+'>'; 
@@ -368,7 +712,8 @@ async function generateRFQ(){
   var f=currentRFQFactory;
   g('gen-prog').style.display='block';g('rfq-body').value='';
   var cats=(f.product_categories||[]).join(', ')||'general products';
-  var prompt='Generate a professional RFQ (Request for Quotation) email body to send to a factory.\n\nFactory: '+(f.factory_name_english||'')+'\nContact: '+(f.sales_contact_name||'')+'\nProducts they manufacture: '+cats+'\n\nThe email body should:\n- Open with a professional greeting\n- Briefly introduce our company as a US-based product sourcing company\n- Request detailed product specifications\n- Ask for FOB pricing with port details\n- Ask for MOQ (minimum order quantities)\n- Ask for lead times\n- Ask for available certifications and certificate numbers\n- Ask for packaging details\n- Request high resolution product images\n- Direct them to upload their quote at: https://project-7o416.vercel.app\n- Close professionally\n\nWrite ONLY the email body, no subject line.';
+  var certs=(f.certifications||[]).join(', ')||'none listed';
+  var prompt='Generate a professional RFQ (Request for Quotation) email body to send to a factory.\n\nFactory: '+(f.factory_name_english||'')+'\nContact: '+(f.sales_contact_name||'')+'\nCountry: '+(f.country||'')+'\nProducts they manufacture: '+cats+'\nCertifications they hold: '+certs+'\n\nThe email body should:\n- Open with a professional greeting\n- Briefly introduce our company as a US-based product sourcing company\n- Request detailed product specifications and available models\n- Ask for FOB pricing with port of departure\n- Ask for MOQ (minimum order quantities)\n- Ask for lead times for samples and production\n- Ask about packaging options and details\n- Request high resolution product images and spec sheets\n- Direct them to upload their quote sheet at: https://project-7o416.vercel.app\n- Close professionally with our contact details placeholder\n\nWrite ONLY the email body, no subject line, no markdown formatting.';
   try{
     var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     var d=await r.json();g('gen-prog').style.display='none';
@@ -381,14 +726,18 @@ function sendRFQ(){
   var f=currentRFQFactory;
   if(!f||!f.sales_email){alert('This factory does not have an email address on file.');return;}
   var cats=(f.product_categories||[]).join(', ')||'Products';
-  var subject='Request for Quotation — '+cats;
+  var subject='Request for Quotation — '+cats+' — '+(f.factory_name_english||'');
   var body=g('rfq-body').value;
-  var link=document.createElement('a');
-  link.href='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  link.style.display='none';document.body.appendChild(link);link.click();document.body.removeChild(link);
-  g('rfq-msg').style.display='block';setTimeout(function(){g('rfq-msg').style.display='none';},4000);
+  // mailto: works for Outlook on both Windows and Mac
+  var mailto='mailto:'+encodeURIComponent(f.sales_email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  var a=document.createElement('a');
+  a.href=mailto;a.style.display='none';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  g('rfq-msg').style.display='block';
+  setTimeout(function(){g('rfq-msg').style.display='none';},5000);
 }
 
+// ── AI Chat ──
 function addMsg(content,role){
   var wrap=document.createElement('div');wrap.className='mw '+role;
   wrap.innerHTML='<div class="av '+role+'">'+(role==='ai'?'AI':'A')+'</div><div class="mb '+role+'">'+content+'</div>';
@@ -405,7 +754,21 @@ async function sendMsg(){
   input.value='';g('send-btn').disabled=true;addMsg(text,'user');showTyping();
   var db=JSON.stringify(allFactories.map(function(f){
     var ff=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
-    return{name:f.factory_name_english,local:f.factory_name_local,city:f.city,country:f.country,email:f.sales_email,contact:f.sales_contact_name,phone:f.telephone,wechat:f.sales_wechat,whatsapp:f.sales_whatsapp,certs:f.certifications,categories:f.product_categories,status:f.status,catalogs:ff.catalogs.map(function(x){return x.name;}),overview:ff.overview.map(function(x){return x.name;}),quotes:ff.quotes.map(function(x){return x.name;})};
+    var locs=factoryLocations[f.id]||[];
+    var certs=factoryCerts[f.id]||[];
+    return{
+      name:f.factory_name_english,local:f.factory_name_local,
+      city:f.city,country:f.country,
+      email:f.sales_email,contact:f.sales_contact_name,
+      phone:f.telephone,wechat:f.sales_wechat,whatsapp:f.sales_whatsapp,
+      certs:f.certifications,cert_details:certs.map(function(c){return c.certification_name+(c.certificate_number?' #'+c.certificate_number:'')+(c.expiry_date?' exp:'+c.expiry_date:'');}),
+      categories:f.product_categories,status:f.status,
+      years:f.years_in_business,revenue:f.annual_revenue_usd,export_pct:f.export_percentage,
+      employees:f.employees_total,locations:locs.length,
+      catalogs:ff.catalogs.map(function(x){return x.name;}),
+      overview:ff.overview.map(function(x){return x.name;}),
+      quotes:ff.quotes.map(function(x){return x.name;})
+    };
   }));
   var sys='You are an expert supplier intelligence assistant for a US-based product sourcing company. FACTORY DATABASE ('+allFactories.length+' factories):\n'+db+'\n\nHelp search, filter, analyze suppliers, draft RFQs, and provide sourcing recommendations. Be concise and professional.';
   try{
