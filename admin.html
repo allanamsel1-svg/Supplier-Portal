@@ -244,6 +244,7 @@
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
       <div class="slabel">System</div>
+      <button class="sitem" id="nav-upload" onclick="showPanel('upload')"><span class="sicon">📤</span> Upload Files</button>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
     </div>
 
@@ -303,6 +304,46 @@
       <div class="chat-bar">
         <textarea id="chat-input" placeholder="Ask about your suppliers..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
         <button class="send" id="send-btn" onclick="sendMsg()">Send</button>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-upload">
+      <div class="ph"><div class="ph-title">Upload Files</div><div class="ph-sub">Upload catalogs, presentations, and quote sheets on behalf of a factory</div></div>
+      <div style="padding:1.25rem 1.5rem;max-width:600px;">
+        <div style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;padding:1.25rem;">
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:12px;color:#888;margin-bottom:5px;">Select Factory</label>
+            <select id="upload-factory-select" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ddd;border-radius:8px;font-family:inherit;color:#1a1a2e;background:#fff;">
+              <option value="">— Choose a factory —</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:12px;color:#888;margin-bottom:5px;">File Type</label>
+            <select id="upload-file-type" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ddd;border-radius:8px;font-family:inherit;color:#1a1a2e;background:#fff;">
+              <option value="Catalog">Catalog</option>
+              <option value="Company Presentation">Company Presentation</option>
+              <option value="Quote Sheet">Quote Sheet</option>
+            </select>
+          </div>
+
+          <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:12px;color:#888;margin-bottom:5px;">File</label>
+            <div id="admin-drop-zone" style="border:2px dashed #d0d0c8;border-radius:10px;padding:2rem 1rem;text-align:center;cursor:pointer;transition:all 0.15s;">
+              <div style="font-size:28px;margin-bottom:6px;">📁</div>
+              <div style="font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">Drop file here or click to browse</div>
+              <div style="font-size:12px;color:#999;">PDF, PowerPoint, Excel supported</div>
+              <div id="admin-file-chosen" style="font-size:13px;color:#2266cc;margin-top:6px;font-weight:500;"></div>
+            </div>
+            <input type="file" id="admin-file-input" accept=".pdf,.pptx,.ppt,.xlsx,.xls" style="display:none;" />
+          </div>
+
+          <button onclick="adminUpload()" id="admin-upload-btn" style="width:100%;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Upload File</button>
+          <div id="admin-upload-prog" style="font-size:13px;color:#999;text-align:center;margin-top:8px;display:none;">Uploading...</div>
+          <div id="admin-upload-ok" style="font-size:13px;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;padding:9px 12px;margin-top:10px;display:none;"></div>
+          <div id="admin-upload-err" style="font-size:13px;color:#b00;background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:9px 12px;margin-top:10px;display:none;"></div>
+        </div>
       </div>
     </div>
 
@@ -485,6 +526,7 @@ function showPanel(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
+  if(name==='upload')initAdminUpload();
 }
 
 // ── Load all data ──
@@ -562,6 +604,7 @@ function renderAll(){
   var pend=allFactories.filter(function(f){return f.status==='pending';});
   g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
   renderFollowUps();
+  populateUploadDropdown();
 }
 
 function factoryCard(f){
@@ -878,6 +921,109 @@ async function sendMsg(){
     else{addMsg('Could not get a response. Check your API key in Settings.','ai');}
   }catch(e){hideTyping();addMsg('Connection error. Please try again.','ai');}
   g('send-btn').disabled=false;
+}
+
+// ── Admin File Upload ──
+function populateUploadDropdown(){
+  var sel=g('upload-factory-select');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Choose a factory —</option>';
+  allFactories.forEach(function(f){
+    var opt=document.createElement('option');
+    opt.value=f.id;
+    opt.textContent=(f.factory_name_english||'Unknown')+(f.city?' — '+f.city:'');
+    opt.dataset.name=f.factory_name_english||'Factory';
+    opt.dataset.userId=f.user_id||'';
+    sel.appendChild(opt);
+  });
+}
+
+function initAdminUpload(){
+  var dz=g('admin-drop-zone');
+  var fi=g('admin-file-input');
+  if(!dz||!fi)return;
+  dz.addEventListener('click',function(){fi.click();});
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.style.borderColor='#1a1a2e';dz.style.background='#f8f8f4';});
+  dz.addEventListener('dragleave',function(){dz.style.borderColor='#d0d0c8';dz.style.background='';});
+  dz.addEventListener('drop',function(e){
+    e.preventDefault();dz.style.borderColor='#d0d0c8';dz.style.background='';
+    if(e.dataTransfer.files[0])setAdminFile(e.dataTransfer.files[0]);
+  });
+  fi.addEventListener('change',function(){if(this.files[0])setAdminFile(this.files[0]);});
+}
+
+function setAdminFile(file){
+  g('admin-file-input')._selectedFile=file;
+  g('admin-file-chosen').textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
+}
+
+function dateStamp(){
+  var d=new Date();
+  return String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getFullYear()).slice(-2);
+}
+
+async function adminUpload(){
+  var sel=g('upload-factory-select');
+  var factoryId=sel.value;
+  if(!factoryId){alert('Please select a factory.');return;}
+  var selectedOpt=sel.options[sel.selectedIndex];
+  var factoryName=selectedOpt.dataset.name||'Factory';
+  var userId=selectedOpt.dataset.userId;
+  if(!userId){alert('This factory has no user account yet. They need to register first before files can be uploaded to their folder.');return;}
+  var fileType=g('upload-file-type').value;
+  var file=g('admin-file-input')._selectedFile;
+  if(!file){alert('Please select a file to upload.');return;}
+
+  // Build folder path
+  var folderMap={'Catalog':'catalogs','Company Presentation':'overview','Quote Sheet':'quotes'};
+  var folder=folderMap[fileType]||'catalogs';
+
+  // Format file name
+  var ext=file.name.split('.').pop();
+  var safeName=factoryName.replace(/[^a-zA-Z0-9\s]/g,'').trim();
+  var fileName=safeName+'_'+fileType+'_'+dateStamp()+'.'+ext;
+  var storagePath=userId+'/'+folder+'/'+fileName;
+
+  // Content type
+  var ct='application/octet-stream';
+  var n=file.name.toLowerCase();
+  if(n.endsWith('.pdf'))ct='application/pdf';
+  else if(n.endsWith('.pptx'))ct='application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  else if(n.endsWith('.ppt'))ct='application/vnd.ms-powerpoint';
+  else if(n.endsWith('.xlsx'))ct='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  else if(n.endsWith('.xls'))ct='application/vnd.ms-excel';
+
+  var btn=g('admin-upload-btn');
+  btn.disabled=true;btn.textContent='Uploading...';
+  g('admin-upload-prog').style.display='block';
+  g('admin-upload-ok').style.display='none';
+  g('admin-upload-err').style.display='none';
+
+  try{
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+storagePath,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+KEY,'Content-Type':ct,'x-upsert':'true'},
+      body:file
+    });
+    g('admin-upload-prog').style.display='none';
+    btn.disabled=false;btn.textContent='Upload File';
+    if(r.ok){
+      g('admin-upload-ok').textContent='✓ Uploaded as "'+fileName+'" to '+factoryName+' folder.';
+      g('admin-upload-ok').style.display='block';
+      g('admin-file-chosen').textContent='';
+      g('admin-file-input')._selectedFile=null;
+      setTimeout(function(){g('admin-upload-ok').style.display='none';},6000);
+    }else{
+      var err=await r.json().catch(function(){return{};});
+      g('admin-upload-err').textContent='Upload failed: '+(err.message||err.error||r.status);
+      g('admin-upload-err').style.display='block';
+    }
+  }catch(e){
+    g('admin-upload-prog').style.display='none';
+    btn.disabled=false;btn.textContent='Upload File';
+    g('admin-upload-err').textContent='Error: '+e.message;
+    g('admin-upload-err').style.display='block';
+  }
 }
 
 function saveCreds(){var u=g('set-user').value.trim(),p=g('set-pass').value;if(u){localStorage.setItem('admin_user',u);ADMIN_USER=u;}if(p){localStorage.setItem('admin_pass',p);ADMIN_PASS=p;}flash('cred-saved');}
