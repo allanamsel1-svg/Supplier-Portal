@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Business Card Scanner — Supplier Portal</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
+    .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
+    .topbar-l { display: flex; align-items: center; gap: 10px; }
+    .tm { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .topbar-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+    .back-link { font-size: 13px; color: #888; text-decoration: none; }
+    .back-link:hover { color: #1a1a2e; }
+    .main { max-width: 760px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    .page-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .page-sub { font-size: 13px; color: #999; margin-bottom: 1.5rem; }
+
+    /* Upload */
+    .upload-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
+    .drop-zone { border: 2px dashed #d0d0c8; border-radius: 10px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; position: relative; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #1a1a2e; background: #f8f8f4; }
+    .drop-icon { font-size: 36px; margin-bottom: 10px; }
+    .drop-title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+    .drop-sub { font-size: 13px; color: #999; }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .mobile-btns { display: none; gap: 10px; }
+    .mob-btn { flex: 1; padding: 16px 10px; border: 1px solid #e0e0d8; border-radius: 10px; background: #f8f8f4; font-size: 13px; font-weight: 500; color: #1a1a2e; cursor: pointer; font-family: inherit; text-align: center; position: relative; }
+    .mob-btn input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+    .mob-btn-icon { font-size: 24px; display: block; margin-bottom: 6px; }
+    @media(max-width:600px){ .drop-zone{display:none;} .mobile-btns{display:flex;} .main{padding:1rem 0.75rem 4rem;} }
+
+    /* Scan bar */
+    .scan-bar { display: none; align-items: center; gap: 12px; margin-bottom: 1rem; }
+    .btn-scan-all { padding: 11px 20px; background: #1a1a2e; color: #fff; border: none; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-scan-all:hover { opacity: 0.87; }
+    .btn-scan-all:disabled { opacity: 0.4; cursor: not-allowed; }
+    .scan-count { font-size: 13px; color: #999; }
+
+    /* Queue */
+    .queue { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Card item */
+    .card-item { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; overflow: hidden; transition: border-color 0.15s; }
+    .card-item.processing { border-color: #c0d0f0; }
+    .card-item.done { border-color: #b8ddb8; }
+    .card-item.saved { border-color: #a0d8a0; opacity: 0.7; }
+    .card-item.error { border-color: #f0c0c0; }
+    .ci-top { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+    .ci-thumb { width: 64px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #e0e0d8; flex-shrink: 0; }
+    .ci-info { flex: 1; min-width: 0; }
+    .ci-filename { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ci-status { font-size: 12px; color: #999; margin-top: 3px; }
+    .ci-status.reading { color: #2266cc; }
+    .ci-status.ok { color: #1a7a1a; }
+    .ci-status.err { color: #b00; }
+    .ci-remove { background: none; border: none; font-size: 20px; color: #ccc; cursor: pointer; padding: 2px 6px; flex-shrink: 0; line-height: 1; }
+    .ci-remove:hover { color: #b00; }
+
+    /* Spinner */
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #c0d0f0; border-top-color: #2266cc; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 5px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Review form */
+    .ci-review { padding: 0 14px 14px; border-top: 1px solid #f0f0e8; margin-top: 2px; }
+    .ci-review-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 0 10px; }
+    .rf { margin-bottom: 8px; }
+    .rf label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
+    .rf input { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .rf input:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 2px rgba(26,26,46,0.06); }
+    .rg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .rg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    @media(max-width:560px){ .rg2,.rg3{ grid-template-columns:1fr; } }
+    .ci-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-save { flex: 1; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-save:hover { opacity: 0.87; }
+    .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-discard { padding: 10px 14px; background: #f5f5f0; color: #888; border: 1px solid #e0e0d8; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .btn-discard:hover { background: #eee; }
+    .ci-msg { font-size: 12px; border-radius: 6px; padding: 7px 10px; margin-top: 8px; display: none; }
+    .ci-msg.ok { color: #1a7a1a; background: #edfaed; border: 1px solid #a0d8a0; }
+    .ci-msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
+
+    /* Banners */
+    .api-warn { background: #fffbea; border: 1px solid #f0d840; border-radius: 9px; padding: 12px 14px; font-size: 13px; color: #7a6000; margin-bottom: 1.25rem; display: none; }
+    .api-warn a { color: #7a6000; font-weight: 600; }
+    .top-banner { background: #edfaed; border: 1px solid #a0d8a0; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #1a6a1a; margin-bottom: 1rem; display: none; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">S</div>
+    <div class="topbar-title">Business Card Scanner</div>
+  </div>
+  <a class="back-link" href="admin.html">← Admin Dashboard</a>
+</div>
+
+<div class="main">
+  <div class="page-title">Business Card Scanner</div>
+  <div class="page-sub">Upload or photograph business cards. Claude reads each one and extracts all contact details for you to review before saving.</div>
+
+  <div class="api-warn" id="api-warn">
+    ⚠ No Anthropic API key found. <a href="admin.html">Add your key in Admin Settings →</a>
+  </div>
+  <div class="top-banner" id="top-banner"></div>
+
+  <div class="upload-card">
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">📇</div>
+      <div class="drop-title">Drop business card photos here</div>
+      <div class="drop-sub">or click to browse &nbsp;·&nbsp; JPG, PNG, HEIC &nbsp;·&nbsp; multiple files at once</div>
+      <input type="file" id="file-input" accept="image/*" multiple onchange="handleFiles(this.files)" />
+    </div>
+    <div class="mobile-btns">
+      <div class="mob-btn">
+        <span class="mob-btn-icon">📷</span>
+        Take Photo
+        <input type="file" accept="image/*" capture="environment" onchange="handleFiles(this.files)" />
+      </div>
+      <div class="mob-btn">
+        <span class="mob-btn-icon">🖼</span>
+        Choose Photo
+        <input type="file" accept="image/*" multiple onchange="handleFiles(this.files)" />
+      </div>
+    </div>
+  </div>
+
+  <div class="scan-bar" id="scan-bar">
+    <button class="btn-scan-all" id="scan-btn" onclick="scanAll()">✦ Scan All Cards with AI</button>
+    <span class="scan-count" id="scan-count"></span>
+  </div>
+
+  <div class="queue" id="queue"></div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var cards=[];
+var counter=0;
+
+function g(id){return document.getElementById(id);}
+
+window.addEventListener('load',function(){
+  if(!localStorage.getItem('anthropic_key'))g('api-warn').style.display='block';
+});
+
+// Drag & drop
+var dz=g('drop-zone');
+if(dz){
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag-over');});
+  dz.addEventListener('dragleave',function(){dz.classList.remove('drag-over');});
+  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files);});
+}
+
+function handleFiles(files){
+  if(!files||!files.length)return;
+  Array.from(files).forEach(function(file){
+    if(!file.type.startsWith('image/'))return;
+    var id='c'+(++counter);
+    var card={id:id,file:file,dataUrl:null,status:'pending',data:null};
+    cards.push(card);
+    var reader=new FileReader();
+    reader.onload=function(e){card.dataUrl=e.target.result;renderCard(card);updateBar();};
+    reader.readAsDataURL(file);
+  });
+}
+
+function updateBar(){
+  var pending=cards.filter(function(c){return c.status==='pending';}).length;
+  var bar=g('scan-bar');
+  if(cards.length){bar.style.display='flex';}else{bar.style.display='none';}
+  g('scan-count').textContent=pending+' card'+(pending===1?'':'s')+' ready to scan';
+  g('scan-btn').disabled=pending===0;
+}
+
+function renderCard(card){
+  var old=g(card.id);if(old)old.remove();
+  var el=document.createElement('div');
+  el.id=card.id;
+  var cls='card-item';
+  if(card.status==='processing')cls+=' processing';
+  else if(card.status==='done'||card.status==='done_err')cls+=' done';
+  else if(card.status==='saved')cls+=' saved';
+  else if(card.status==='error')cls+=' error';
+  el.className=cls;
+
+  // Status label
+  var stText='',stCls='';
+  if(card.status==='pending'){stText='Ready to scan';}
+  else if(card.status==='processing'){stText='<span class="spinner"></span>Reading card with AI...';;stCls='reading';}
+  else if(card.status==='done'){stText='✓ Extracted — review and save below';stCls='ok';}
+  else if(card.status==='done_err'){stText='Partial read — review what was found';stCls='err';}
+  else if(card.status==='saved'){stText='✓ Saved as draft factory';stCls='ok';}
+  else if(card.status==='error'){stText='Could not read card';stCls='err';}
+
+  var topHTML='<div class="ci-top">'+
+    (card.dataUrl?'<img class="ci-thumb" src="'+card.dataUrl+'" />':'<div class="ci-thumb" style="background:#f0f0e8;display:flex;align-items:center;justify-content:center;font-size:20px;">📇</div>')+
+    '<div class="ci-info">'+
+      '<div class="ci-filename">'+esc(card.file.name)+'</div>'+
+      '<div class="ci-status '+stCls+'">'+stText+'</div>'+
+    '</div>'+
+    (card.status==='pending'||card.status==='error'?'<button class="ci-remove" onclick="removeCard(\''+card.id+'\')">×</button>':'')+
+  '</div>';
+
+  var reviewHTML='';
+  if((card.status==='done'||card.status==='done_err')&&card.data){
+    var d=card.data;
+    reviewHTML='<div class="ci-review">'+
+      '<div class="ci-review-title">Review Extracted Details — Edit if Needed</div>'+
+      '<div class="rg2">'+
+        field(card.id,'name_en','Company Name (English)',d.factory_name_english)+
+        field(card.id,'name_local','Company Name (Local Language)',d.factory_name_local)+
+      '</div>'+
+      '<div class="rg3">'+
+        field(card.id,'contact','Contact Name',d.sales_contact_name)+
+        field(card.id,'title','Title / Position',d.contact_title)+
+        field(card.id,'email','Email',d.sales_email,'email')+
+      '</div>'+
+      '<div class="rg3">'+
+        field(card.id,'mobile','Mobile',d.sales_mobile,'tel')+
+        field(card.id,'telephone','Telephone',d.telephone,'tel')+
+        field(card.id,'wechat','WeChat',d.sales_wechat)+
+      '</div>'+
+      '<div class="rg3">'+
+        field(card.id,'whatsapp','WhatsApp',d.sales_whatsapp,'tel')+
+        field(card.id,'website','Website',d.website)+
+        field(card.id,'country','Country',d.country)+
+      '</div>'+
+      '<div class="rg2">'+
+        field(card.id,'city','City',d.city)+
+        field(card.id,'address','Street Address',d.address)+
+      '</div>'+
+      field(card.id,'categories','Products / What They Make',d.product_categories)+
+      field(card.id,'notes','Additional Notes (slogans, other info)',d.notes)+
+      '<div class="ci-actions">'+
+        '<button class="btn-save" id="'+card.id+'_savebtn" onclick="saveDraft(\''+card.id+'\')">✓ Save as Draft Factory</button>'+
+        '<button class="btn-discard" onclick="removeCard(\''+card.id+'\')">Discard</button>'+
+      '</div>'+
+      '<div class="ci-msg ok" id="'+card.id+'_ok"></div>'+
+      '<div class="ci-msg err" id="'+card.id+'_err"></div>'+
+    '</div>';
+  }
+
+  el.innerHTML=topHTML+reviewHTML;
+  g('queue').appendChild(el);
+}
+
+function field(cid,key,label,val,type){
+  return '<div class="rf"><label>'+label+'</label><input type="'+(type||'text')+'" id="'+cid+'_'+key+'" value="'+esc(val||'')+'" /></div>';
+}
+
+function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function removeCard(id){
+  cards=cards.filter(function(c){return c.id!==id;});
+  var el=g(id);if(el)el.remove();
+  updateBar();
+}
+
+// Scan all pending
+async function scanAll(){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(!apiKey){g('api-warn').style.display='block';window.scrollTo(0,0);return;}
+  var pending=cards.filter(function(c){return c.status==='pending';});
+  g('scan-btn').disabled=true;
+  for(var i=0;i<pending.length;i++){await scanCard(pending[i],apiKey);}
+  updateBar();
+}
+
+async function scanCard(card,apiKey){
+  card.status='processing';
+  renderCard(card);
+
+  var base64=card.dataUrl.split(',')[1];
+  var mediaType=card.file.type||'image/jpeg';
+
+  var prompt='This is a photo of a business card. It may be in English, Chinese, Vietnamese, Korean, Japanese, or another language. Extract every piece of information visible and return ONLY a JSON object with these exact keys (empty string if not found):\n{\n  "factory_name_english": "",\n  "factory_name_local": "",\n  "sales_contact_name": "",\n  "contact_title": "",\n  "sales_email": "",\n  "sales_mobile": "",\n  "telephone": "",\n  "sales_wechat": "",\n  "sales_whatsapp": "",\n  "website": "",\n  "address": "",\n  "city": "",\n  "country": "",\n  "product_categories": "",\n  "notes": ""\n}\nRules:\n- factory_name_english: English company name, or romanized version of local name\n- factory_name_local: company name in Chinese/Korean/etc if present\n- notes: anything else on the card (slogans, certifications mentioned, QR code info, etc)\n- Return ONLY the raw JSON object, no markdown, no explanation';
+
+  try{
+    var r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+          {type:'text',text:prompt}
+        ]}]
+      })
+    });
+    var d=await r.json();
+    if(d.content&&d.content[0]&&d.content[0].text){
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+      try{
+        card.data=JSON.parse(raw);
+        card.status='done';
+      }catch(e){
+        var match=raw.match(/\{[\s\S]*\}/);
+        if(match){try{card.data=JSON.parse(match[0]);card.status='done';}catch(e2){card.data={notes:raw};card.status='done_err';}}
+        else{card.data={notes:raw};card.status='done_err';}
+      }
+    }else{card.status='error';}
+  }catch(e){card.status='error';}
+
+  renderCard(card);
+}
+
+// Save draft to Supabase
+async function saveDraft(id){
+  var card=cards.find(function(c){return c.id===id;});
+  if(!card)return;
+  var btn=g(id+'_savebtn');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+
+  var gv=function(k){var el=g(id+'_'+k);return el?el.value.trim():'';};
+  var nameEn=gv('name_en');
+  if(!nameEn){
+    showMsg(id,'err','Company name (English) is required before saving.');
+    if(btn){btn.disabled=false;btn.textContent='✓ Save as Draft Factory';}
+    return;
+  }
+
+  // Pack title, website, notes into internal_notes
+  var extras=[gv('title')?'Title: '+gv('title'):'',gv('website')?'Website: '+gv('website'):'',gv('notes')||''].filter(Boolean).join(' | ');
+  var cats=gv('categories');
+
+  var payload={
+    factory_name_english:nameEn,
+    factory_name_local:gv('name_local')||null,
+    sales_contact_name:gv('contact')||null,
+    sales_email:gv('email')||null,
+    sales_mobile:gv('mobile')||null,
+    telephone:gv('telephone')||null,
+    sales_wechat:gv('wechat')||null,
+    sales_whatsapp:gv('whatsapp')||null,
+    address:gv('address')||null,
+    city:gv('city')||null,
+    country:gv('country')||null,
+    product_categories:cats?[cats]:[],
+    internal_notes:extras||null,
+    status:'pending'
+  };
+
+  try{
+    var r=await fetch(SB+'/rest/v1/factories',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    if(r.ok){
+      card.status='saved';
+      showMsg(id,'ok','✓ Saved! Find "'+nameEn+'" in Admin Dashboard under Pending.');
+      if(btn){btn.disabled=true;btn.textContent='✓ Saved';}
+      var banner=g('top-banner');
+      banner.textContent='✓ '+nameEn+' saved as a draft factory.';
+      banner.style.display='block';
+      setTimeout(function(){banner.style.display='none';},6000);
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      showMsg(id,'err','Save failed: '+(e.message||e.details||r.status));
+      if(btn){btn.disabled=false;btn.textContent='✓ Save as Draft Factory';}
+    }
+  }catch(e){
+    showMsg(id,'err','Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='✓ Save as Draft Factory';}
+  }
+}
+
+function showMsg(id,type,text){
+  var el=g(id+'_'+type);
+  if(el){el.textContent=text;el.style.display='block';}
+}
+</script>
+</body>
+</html>

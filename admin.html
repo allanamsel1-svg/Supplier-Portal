@@ -197,6 +197,7 @@
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
+      <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
       <div class="slabel">System</div>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
     </div>
@@ -294,7 +295,7 @@
       <button class="btn-cancel" onclick="closeRFQ()">Cancel</button>
       <button class="btn-send" onclick="sendRFQ()">Open in Outlook</button>
     </div>
-    <div class="modal-msg" id="rfq-msg">✓ Outlook is opening with your RFQ ready to send.</div>
+    <div class="modal-msg" id="rfq-msg">✓ Opening in Outlook desktop...</div>
   </div>
 </div>
 
@@ -728,11 +729,8 @@ function sendRFQ(){
   var cats=(f.product_categories||[]).join(', ')||'Products';
   var subject='Request for Quotation — '+cats+' — '+(f.factory_name_english||'');
   var body=g('rfq-body').value;
-  // mailto: works for Outlook on both Windows and Mac
-  var mailto='mailto:'+encodeURIComponent(f.sales_email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  var a=document.createElement('a');
-  a.href=mailto;a.style.display='none';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  var mailto='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  window.location.href=mailto;
   g('rfq-msg').style.display='block';
   setTimeout(function(){g('rfq-msg').style.display='none';},5000);
 }
