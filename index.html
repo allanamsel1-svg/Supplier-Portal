@@ -3,394 +3,479 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Supplier Portal — Factory Login</title>
+  <title>Supplier Portal</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; min-height: 100vh; }
-    #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f5f5f0; padding: 1rem; }
-    .auth-box { background: #fff; border: 1px solid #e8e8e0; border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; }
-    .auth-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
-    .auth-logo-mark { width: 36px; height: 36px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-    .auth-logo-mark span { color: #fff; font-size: 16px; font-weight: 600; }
-    .auth-logo-text { font-size: 15px; font-weight: 600; color: #1a1a2e; }
-    .auth-logo-sub { font-size: 12px; color: #888; }
-    .auth-tabs { display: flex; border-bottom: 1px solid #e8e8e0; margin-bottom: 1.5rem; }
-    .auth-tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
-    .auth-tab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
-    .auth-form { display: none; }
-    .auth-form.active { display: block; }
-    .auth-form h2 { font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 0.25rem; }
-    .auth-form p { font-size: 13px; color: #888; margin-bottom: 1.25rem; }
-    .field { margin-bottom: 0.875rem; }
-    label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
-    input[type=text], input[type=email], input[type=password], input[type=tel], textarea, select { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; background: #fff; color: #1a1a2e; font-family: inherit; transition: border-color 0.15s; }
-    input:focus, textarea:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 3px rgba(26,26,46,0.08); }
-    .auth-btn { width: 100%; padding: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; transition: opacity 0.15s; }
-    .auth-btn:hover { opacity: 0.85; }
-    .auth-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .auth-msg { font-size: 13px; margin-top: 10px; padding: 10px 12px; border-radius: 8px; display: none; }
-    .auth-msg.error { background: #fcebeb; color: #A32D2D; border: 1px solid #f7c1c1; }
-    .auth-msg.success { background: #eaf3de; color: #3B6D11; border: 1px solid #c0dd97; }
-    .forgot-link { font-size: 12px; color: #888; text-align: right; cursor: pointer; margin-top: 4px; display: block; }
-    .forgot-link:hover { color: #1a1a2e; }
-    #portal-screen { display: none; }
-    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; height: 52px; border-bottom: 1px solid #e8e8e0; background: #fff; position: sticky; top: 0; z-index: 100; }
-    .topbar-left { display: flex; align-items: center; gap: 10px; }
-    .topbar-logo { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
-    .topbar-logo span { color: #fff; font-size: 13px; font-weight: 700; }
-    .topbar h1 { font-size: 14px; font-weight: 600; color: #1a1a2e; }
-    .topbar-right { display: flex; align-items: center; gap: 12px; }
-    .user-email { font-size: 12px; color: #888; }
-    .signout-btn { font-size: 12px; color: #888; cursor: pointer; background: none; border: none; font-family: inherit; }
-    .signout-btn:hover { color: #1a1a2e; }
-    .portal-tabs { display: flex; border-bottom: 1px solid #e8e8e0; background: #fff; padding: 0 1.5rem; }
-    .portal-tab { padding: 12px 16px; font-size: 13px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
-    .portal-tab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
-    .portal-content { max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-    .section { background: #fff; border: 1px solid #e8e8e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-    .section-title { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #f0f0e8; }
-    .required { color: #E24B4A; }
-    textarea { resize: vertical; min-height: 80px; }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
-    .cert-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-    .cert-item { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
-    .cert-item input[type=checkbox] { width: 14px; height: 14px; }
-    .file-upload { border: 1.5px dashed #ccc; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; transition: background 0.15s; }
-    .file-upload:hover { background: #f8f8f4; border-color: #aaa; }
-    .file-upload strong { font-size: 14px; color: #1a1a2e; }
-    .file-upload p { font-size: 13px; color: #888; margin-top: 4px; }
-    .file-name { font-size: 13px; color: #378ADD; margin-top: 8px; font-weight: 500; }
-    .upload-card { background: #fff; border: 1px solid #e8e8e0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
-    .upload-card h3 { font-size: 14px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
-    .upload-card p { font-size: 13px; color: #888; margin-bottom: 1rem; }
-    .uploaded-file { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8f8f4; border-radius: 8px; margin-bottom: 6px; }
-    .uploaded-file-name { font-size: 13px; color: #1a1a2e; }
-    .uploaded-file-date { font-size: 11px; color: #888; }
-    .view-link { font-size: 12px; color: #378ADD; text-decoration: none; }
-    .submit-btn { width: 100%; padding: 13px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 1rem; transition: opacity 0.15s; font-family: inherit; }
-    .submit-btn:hover { opacity: 0.85; }
-    .submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .upload-btn { width: 100%; padding: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 0.75rem; font-family: inherit; transition: opacity 0.15s; }
-    .upload-btn:hover { opacity: 0.85; }
-    .upload-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-    .msg { padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-top: 1rem; display: none; }
-    .msg.success { background: #eaf3de; color: #3B6D11; border: 1px solid #c0dd97; }
-    .msg.error { background: #fcebeb; color: #A32D2D; border: 1px solid #f7c1c1; }
-    .progress { display: none; font-size: 13px; color: #888; text-align: center; margin-top: 0.75rem; }
-    .status-banner { background: #fff8e6; border: 1px solid #f0d060; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #7a5a00; margin-bottom: 1.25rem; }
-    .status-banner.approved { background: #eaf3de; border-color: #c0dd97; color: #3B6D11; }
-    @media (max-width: 500px) { .row2, .row3 { grid-template-columns: 1fr; } .portal-tab { padding: 10px 10px; font-size: 12px; } }
+    #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+    .auth-box { background: #fff; border: 1px solid #e0e0d8; border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
+    .brand-mark { width: 36px; height: 36px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700; }
+    .brand-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
+    .brand-sub { font-size: 12px; color: #999; }
+    .tabs { display: flex; border-bottom: 1px solid #e0e0d8; margin-bottom: 1.5rem; }
+    .tab { flex: 1; padding: 10px; text-align: center; font-size: 14px; color: #999; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tab.on { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
+    .pane { display: none; }
+    .pane.on { display: block; }
+    .pane h2 { font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
+    .pane > p { font-size: 13px; color: #999; margin-bottom: 1.25rem; }
+    .f { margin-bottom: 12px; }
+    .f label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+    .f input { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; color: #1a1a2e; }
+    .f input:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 3px rgba(26,26,46,0.07); }
+    .btn-main { width: 100%; padding: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+    .btn-main:hover { opacity: 0.87; }
+    .btn-main:disabled { opacity: 0.4; cursor: not-allowed; }
+    .aerr { font-size: 13px; color: #b00; background: #fff0f0; border: 1px solid #fdd; border-radius: 7px; padding: 9px 12px; margin-top: 10px; display: none; }
+    .aok { font-size: 13px; color: #2a7a2a; background: #f0fff0; border: 1px solid #c0e8c0; border-radius: 7px; padding: 9px 12px; margin-top: 10px; display: none; }
+    .small-link { font-size: 12px; color: #999; cursor: pointer; display: block; margin-top: 6px; text-align: right; }
+    .small-link:hover { color: #1a1a2e; }
+    #portal { display: none; }
+    .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; position: sticky; top: 0; z-index: 50; }
+    .topbar-l { display: flex; align-items: center; gap: 10px; }
+    .topbar-mark { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+    .topbar-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+    .topbar-r { display: flex; align-items: center; gap: 12px; }
+    .user-tag { font-size: 12px; color: #999; }
+    .signout { font-size: 12px; color: #999; cursor: pointer; background: none; border: none; font-family: inherit; }
+    .signout:hover { color: #1a1a2e; }
+    .ptabs { display: flex; background: #fff; border-bottom: 1px solid #e0e0d8; padding: 0 1.5rem; overflow-x: auto; }
+    .ptab { padding: 12px 14px; font-size: 13px; color: #999; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+    .ptab.on { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
+    .pcontent { max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem; }
+    .ppane { display: none; }
+    .ppane.on { display: block; }
+    .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-title { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 1px solid #f0f0e8; }
+    .pf { margin-bottom: 12px; }
+    .pf:last-child { margin-bottom: 0; }
+    .pf label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
+    .req { color: #e04040; }
+    .pf input, .pf textarea { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; color: #1a1a2e; }
+    .pf input:focus, .pf textarea:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 3px rgba(26,26,46,0.07); }
+    .pf textarea { resize: vertical; min-height: 80px; }
+    .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .g3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+    .certs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .cert { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 6px; padding: 5px 9px; cursor: pointer; }
+    .cert input { width: 14px; height: 14px; }
+    .save-btn { width: 100%; padding: 13px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 1rem; font-family: inherit; }
+    .save-btn:hover { opacity: 0.87; }
+    .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .banner { padding: 11px 14px; border-radius: 9px; font-size: 13px; margin-bottom: 1rem; }
+    .banner.pending { background: #fffbea; border: 1px solid #f0d840; color: #7a6000; }
+    .banner.approved { background: #edfaed; border: 1px solid #8dd88d; color: #1a6a1a; }
+    .pmsg { padding: 11px 14px; border-radius: 9px; font-size: 13px; margin-top: 1rem; display: none; }
+    .pmsg.ok { background: #edfaed; border: 1px solid #8dd88d; color: #1a6a1a; }
+    .pmsg.err { background: #fff0f0; border: 1px solid #fdd; color: #b00; }
+    .upload-zone { border: 1.5px dashed #ccc; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; margin-bottom: 10px; }
+    .upload-zone:hover { background: #f8f8f4; border-color: #aaa; }
+    .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-zone strong { font-size: 14px; color: #1a1a2e; display: block; }
+    .upload-zone small { font-size: 12px; color: #999; }
+    .file-chosen { font-size: 13px; color: #2266cc; margin-top: 6px; font-weight: 500; }
+    .up-btn { width: 100%; padding: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .up-btn:hover { opacity: 0.87; }
+    .up-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .file-list { margin-top: 1rem; }
+    .file-list-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 8px; }
+    .file-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; background: #f8f8f4; border-radius: 8px; margin-bottom: 6px; }
+    .file-row-name { font-size: 13px; color: #1a1a2e; }
+    .file-row-link { font-size: 12px; color: #2266cc; text-decoration: none; }
+    .prog { font-size: 13px; color: #999; text-align: center; margin-top: 8px; display: none; }
+    @media(max-width:500px) { .g2,.g3 { grid-template-columns: 1fr; } .ptab { font-size: 12px; padding: 10px 10px; } }
   </style>
 </head>
 <body>
-
 <div id="auth-screen">
   <div class="auth-box">
-    <div class="auth-logo">
-      <div class="auth-logo-mark"><span>S</span></div>
-      <div><div class="auth-logo-text">Supplier Portal</div><div class="auth-logo-sub">Factory Account</div></div>
+    <div class="brand">
+      <div class="brand-mark">S</div>
+      <div><div class="brand-name">Supplier Portal</div><div class="brand-sub">Factory Account</div></div>
     </div>
-    <div class="auth-tabs">
-      <div class="auth-tab active" onclick="switchAuthTab('login')">Sign In</div>
-      <div class="auth-tab" onclick="switchAuthTab('register')">Create Account</div>
+    <div class="tabs">
+      <div class="tab on" onclick="authTab('login')">Sign In</div>
+      <div class="tab" onclick="authTab('signup')">Create Account</div>
     </div>
-    <div class="auth-form active" id="login-form">
+    <div class="pane on" id="pane-login">
       <h2>Welcome back</h2>
       <p>Sign in to your factory account</p>
-      <div class="field"><label>Email Address</label><input type="email" id="login-email" placeholder="name@factory.com" /></div>
-      <div class="field"><label>Password</label><input type="password" id="login-password" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()" /></div>
-      <span class="forgot-link" onclick="showForgot()">Forgot password?</span>
-      <button class="auth-btn" onclick="doLogin()" id="login-btn">Sign In</button>
-      <div class="auth-msg" id="login-msg"></div>
+      <div class="f"><label>Email</label><input type="email" id="l-email" placeholder="name@factory.com" /></div>
+      <div class="f"><label>Password</label><input type="password" id="l-pass" placeholder="Your password" onkeydown="if(event.key==='Enter')login()" /></div>
+      <span class="small-link" onclick="authTab('forgot')">Forgot password?</span>
+      <button class="btn-main" id="l-btn" onclick="login()">Sign In</button>
+      <div class="aerr" id="l-err"></div>
     </div>
-    <div class="auth-form" id="register-form">
+    <div class="pane" id="pane-signup">
       <h2>Create your account</h2>
       <p>Set up your factory account to get started</p>
-      <div class="field"><label>Email Address</label><input type="email" id="reg-email" placeholder="name@factory.com" /></div>
-      <div class="field"><label>Password</label><input type="password" id="reg-password" placeholder="Create a password (min 6 characters)" /></div>
-      <div class="field"><label>Confirm Password</label><input type="password" id="reg-password2" placeholder="Confirm your password" onkeydown="if(event.key==='Enter')doRegister()" /></div>
-      <button class="auth-btn" onclick="doRegister()" id="register-btn">Create Account</button>
-      <div class="auth-msg" id="register-msg"></div>
+      <div class="f"><label>Email</label><input type="email" id="s-email" placeholder="name@factory.com" /></div>
+      <div class="f"><label>Password</label><input type="password" id="s-pass" placeholder="Min 6 characters" /></div>
+      <div class="f"><label>Confirm Password</label><input type="password" id="s-pass2" placeholder="Confirm password" onkeydown="if(event.key==='Enter')signup()" /></div>
+      <button class="btn-main" id="s-btn" onclick="signup()">Create Account</button>
+      <div class="aerr" id="s-err"></div>
     </div>
-    <div class="auth-form" id="forgot-form">
+    <div class="pane" id="pane-forgot">
       <h2>Reset password</h2>
-      <p>Enter your email and we'll send a reset link</p>
-      <div class="field"><label>Email Address</label><input type="email" id="forgot-email" placeholder="name@factory.com" /></div>
-      <button class="auth-btn" onclick="doForgot()">Send Reset Link</button>
-      <div class="auth-msg" id="forgot-msg"></div>
-      <span class="forgot-link" onclick="switchAuthTab('login')" style="text-align:left;margin-top:10px;">Back to sign in</span>
+      <p>We will send a reset link to your email</p>
+      <div class="f"><label>Email</label><input type="email" id="f-email" placeholder="name@factory.com" /></div>
+      <button class="btn-main" onclick="forgot()">Send Reset Link</button>
+      <div class="aok" id="f-ok">Reset link sent! Check your inbox.</div>
+      <span class="small-link" onclick="authTab('login')" style="text-align:left;margin-top:8px;">Back to sign in</span>
     </div>
   </div>
 </div>
 
-<div id="portal-screen">
+<div id="portal">
   <div class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-logo"><span>S</span></div>
-      <h1>Supplier Portal</h1>
+    <div class="topbar-l">
+      <div class="topbar-mark">S</div>
+      <div class="topbar-title">Supplier Portal</div>
     </div>
-    <div class="topbar-right">
-      <span class="user-email" id="user-email-display"></span>
-      <button class="signout-btn" onclick="doSignout()">Sign out</button>
+    <div class="topbar-r">
+      <span class="user-tag" id="u-email"></span>
+      <button class="signout" onclick="signout()">Sign out</button>
     </div>
   </div>
-  <div class="portal-tabs">
-    <div class="portal-tab active" onclick="showTab('registration')">Factory Details</div>
-    <div class="portal-tab" onclick="showTab('catalogs')">Catalogs</div>
-    <div class="portal-tab" onclick="showTab('quotes')">Quote Sheets</div>
+  <div class="ptabs">
+    <div class="ptab on" onclick="ptab('details')">Factory Details</div>
+    <div class="ptab" onclick="ptab('catalogs')">Catalogs</div>
+    <div class="ptab" onclick="ptab('overview')">Company Overview</div>
+    <div class="ptab" onclick="ptab('quotes')">Quote Sheets</div>
   </div>
-  <div class="portal-content">
-
-    <div class="tab-panel active" id="tab-registration">
-      <div class="status-banner" id="reg-status-banner" style="display:none">Your registration is under review. Our team will be in touch shortly.</div>
-      <div class="section">
-        <div class="section-title">Factory Information</div>
-        <div class="field"><label>Factory Name (English) <span class="required">*</span></label><input type="text" id="name_en" placeholder="e.g. Guangzhou Best Products Co., Ltd." /></div>
-        <div class="field"><label>Factory Name (Chinese or Local Language)</label><input type="text" id="name_local" placeholder="e.g. 广州优质产品有限公司" /></div>
-        <div class="field"><label>Telephone Number <span class="required">*</span></label><input type="tel" id="telephone" placeholder="+86 20 1234 5678" /></div>
+  <div class="pcontent">
+    <div class="ppane on" id="ppane-details">
+      <div class="banner pending" id="status-banner" style="display:none"></div>
+      <div class="card">
+        <div class="card-title">Factory Information</div>
+        <div class="pf"><label>Factory Name (English) <span class="req">*</span></label><input type="text" id="p-name_en" placeholder="e.g. Guangzhou Best Products Co., Ltd." /></div>
+        <div class="pf"><label>Factory Name (Chinese / Local Language)</label><input type="text" id="p-name_local" placeholder="e.g. Chinese name" /></div>
+        <div class="pf"><label>Telephone <span class="req">*</span></label><input type="tel" id="p-telephone" placeholder="+86 20 1234 5678" /></div>
       </div>
-      <div class="section">
-        <div class="section-title">Address</div>
-        <div class="field"><label>Street Address <span class="required">*</span></label><input type="text" id="address" placeholder="Building, Street, District" /></div>
-        <div class="row2 field">
-          <div><label>City <span class="required">*</span></label><input type="text" id="city" placeholder="City" /></div>
-          <div><label>State / Province</label><input type="text" id="state" placeholder="Province" /></div>
+      <div class="card">
+        <div class="card-title">Address</div>
+        <div class="pf"><label>Street Address <span class="req">*</span></label><input type="text" id="p-address" placeholder="Building, Street, District" /></div>
+        <div class="g2 pf">
+          <div><label>City <span class="req">*</span></label><input type="text" id="p-city" placeholder="City" /></div>
+          <div><label>State / Province</label><input type="text" id="p-state" placeholder="Province" /></div>
         </div>
-        <div class="row2 field">
-          <div><label>Postal Code</label><input type="text" id="postal" placeholder="000000" /></div>
-          <div><label>Country <span class="required">*</span></label><input type="text" id="country" placeholder="China" /></div>
-        </div>
-      </div>
-      <div class="section">
-        <div class="section-title">Sales Contact</div>
-        <div class="row2 field">
-          <div><label>Contact Name <span class="required">*</span></label><input type="text" id="contact_name" placeholder="Full Name" /></div>
-          <div><label>Mobile Number <span class="required">*</span></label><input type="tel" id="contact_mobile" placeholder="+86 138 0000 0000" /></div>
-        </div>
-        <div class="row3 field">
-          <div><label>Email Address <span class="required">*</span></label><input type="email" id="contact_email" placeholder="name@factory.com" /></div>
-          <div><label>WeChat ID</label><input type="text" id="contact_wechat" placeholder="WeChat" /></div>
-          <div><label>WhatsApp</label><input type="tel" id="contact_whatsapp" placeholder="+86..." /></div>
+        <div class="g2 pf">
+          <div><label>Postal Code</label><input type="text" id="p-postal" placeholder="000000" /></div>
+          <div><label>Country <span class="req">*</span></label><input type="text" id="p-country" placeholder="China" /></div>
         </div>
       </div>
-      <div class="section">
-        <div class="section-title">Certifications</div>
-        <div class="cert-grid">
-          <label class="cert-item"><input type="checkbox" value="ISO 9001" /> ISO 9001</label>
-          <label class="cert-item"><input type="checkbox" value="ISO 14001" /> ISO 14001</label>
-          <label class="cert-item"><input type="checkbox" value="ISO 45001" /> ISO 45001</label>
-          <label class="cert-item"><input type="checkbox" value="ETL" /> ETL</label>
-          <label class="cert-item"><input type="checkbox" value="BSCI" /> BSCI</label>
-          <label class="cert-item"><input type="checkbox" value="Sedex" /> Sedex</label>
-          <label class="cert-item"><input type="checkbox" value="CE" /> CE</label>
-          <label class="cert-item"><input type="checkbox" value="FCC" /> FCC</label>
-          <label class="cert-item"><input type="checkbox" value="FDA" /> FDA</label>
-          <label class="cert-item"><input type="checkbox" value="RoHS" /> RoHS</label>
-          <label class="cert-item"><input type="checkbox" value="UL" /> UL</label>
-          <label class="cert-item"><input type="checkbox" value="GRS" /> GRS</label>
+      <div class="card">
+        <div class="card-title">Sales Contact</div>
+        <div class="g2 pf">
+          <div><label>Contact Name <span class="req">*</span></label><input type="text" id="p-contact_name" placeholder="Full Name" /></div>
+          <div><label>Mobile <span class="req">*</span></label><input type="tel" id="p-contact_mobile" placeholder="+86 138 0000 0000" /></div>
         </div>
-        <div class="field" style="margin-top:10px"><label>Other Certifications</label><input type="text" id="cert_other" placeholder="List any other certifications" /></div>
+        <div class="g3 pf">
+          <div><label>Email <span class="req">*</span></label><input type="email" id="p-contact_email" placeholder="name@factory.com" /></div>
+          <div><label>WeChat</label><input type="text" id="p-wechat" placeholder="WeChat ID" /></div>
+          <div><label>WhatsApp</label><input type="tel" id="p-whatsapp" placeholder="+86..." /></div>
+        </div>
       </div>
-      <div class="section">
-        <div class="section-title">Product Categories</div>
-        <div class="field"><label>What products do you manufacture at this facility? <span class="required">*</span></label><textarea id="product_categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics, Kitchenware..."></textarea></div>
+      <div class="card">
+        <div class="card-title">Certifications</div>
+        <div class="certs">
+          <label class="cert"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
+          <label class="cert"><input type="checkbox" value="ISO 14001"> ISO 14001</label>
+          <label class="cert"><input type="checkbox" value="ISO 45001"> ISO 45001</label>
+          <label class="cert"><input type="checkbox" value="ETL"> ETL</label>
+          <label class="cert"><input type="checkbox" value="BSCI"> BSCI</label>
+          <label class="cert"><input type="checkbox" value="Sedex"> Sedex</label>
+          <label class="cert"><input type="checkbox" value="CE"> CE</label>
+          <label class="cert"><input type="checkbox" value="FCC"> FCC</label>
+          <label class="cert"><input type="checkbox" value="FDA"> FDA</label>
+          <label class="cert"><input type="checkbox" value="RoHS"> RoHS</label>
+          <label class="cert"><input type="checkbox" value="UL"> UL</label>
+          <label class="cert"><input type="checkbox" value="GRS"> GRS</label>
+        </div>
+        <div class="pf" style="margin-top:10px"><label>Other</label><input type="text" id="p-cert_other" placeholder="Any other certifications" /></div>
       </div>
-      <button class="submit-btn" id="reg-submit-btn" onclick="submitRegistration()">Save Factory Details</button>
-      <div class="progress" id="reg-progress">Saving your details...</div>
-      <div class="msg success" id="reg-success">✓ Factory details saved successfully!</div>
-      <div class="msg error" id="reg-error">Something went wrong. Please try again.</div>
+      <div class="card">
+        <div class="card-title">Product Categories</div>
+        <div class="pf"><label>What do you manufacture at this facility? <span class="req">*</span></label><textarea id="p-categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics..."></textarea></div>
+      </div>
+      <button class="save-btn" id="save-btn" onclick="saveDetails()">Save Factory Details</button>
+      <div class="prog" id="save-prog">Saving...</div>
+      <div class="pmsg ok" id="save-ok">Factory details saved successfully!</div>
+      <div class="pmsg err" id="save-err"></div>
     </div>
 
-    <div class="tab-panel" id="tab-catalogs">
-      <div class="upload-card">
-        <h3>Company Catalog</h3>
-        <p>Upload your company product catalog in PDF format. You can update this at any time.</p>
-        <div class="file-upload" onclick="document.getElementById('catalog-input').click()">
-          <div style="font-size:28px;">📄</div>
-          <strong>Upload PDF Catalog</strong>
-          <p>Click to browse — PDF files only</p>
-          <div class="file-name" id="catalog-file-name"></div>
+    <div class="ppane" id="ppane-catalogs">
+      <div class="card">
+        <div class="card-title">Product Catalog</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your product catalog. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
+        <div class="upload-zone" onclick="document.getElementById('cat-input').click()">
+          <div class="icon">&#128196;</div>
+          <strong>Upload Catalog</strong>
+          <small>PDF or PowerPoint files</small>
+          <div class="file-chosen" id="cat-chosen"></div>
         </div>
-        <input type="file" id="catalog-input" accept=".pdf" style="display:none" onchange="handleCatalogFile(this)" />
-        <button class="upload-btn" id="catalog-upload-btn" onclick="uploadCatalog()">Upload Catalog</button>
-        <div class="progress" id="catalog-progress">Uploading...</div>
-        <div class="msg success" id="catalog-success">✓ Catalog uploaded successfully!</div>
-        <div class="msg error" id="catalog-error">Upload failed. Please try again.</div>
+        <input type="file" id="cat-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'cat-chosen','cat')">
+        <button class="up-btn" onclick="uploadFile('cat','catalogs')">Upload</button>
+        <div class="prog" id="cat-prog">Uploading...</div>
+        <div class="pmsg ok" id="cat-ok">Catalog uploaded successfully!</div>
+        <div class="pmsg err" id="cat-err">Upload failed. Please try again.</div>
       </div>
-      <div id="catalog-list"></div>
+      <div class="file-list" id="cat-list"></div>
     </div>
 
-    <div class="tab-panel" id="tab-quotes">
-      <div class="upload-card">
-        <h3>Quote Sheet</h3>
-        <p>Upload your pricing and product quote sheets in Excel format (.xlsx or .xls).</p>
-        <div class="file-upload" onclick="document.getElementById('quote-input').click()">
-          <div style="font-size:28px;">📊</div>
+    <div class="ppane" id="ppane-overview">
+      <div class="card">
+        <div class="card-title">Company Overview</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your company overview or presentation. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
+        <div class="upload-zone" onclick="document.getElementById('ov-input').click()">
+          <div class="icon">&#128202;</div>
+          <strong>Upload Overview</strong>
+          <small>PDF or PowerPoint files</small>
+          <div class="file-chosen" id="ov-chosen"></div>
+        </div>
+        <input type="file" id="ov-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'ov-chosen','ov')">
+        <button class="up-btn" onclick="uploadFile('ov','overview')">Upload</button>
+        <div class="prog" id="ov-prog">Uploading...</div>
+        <div class="pmsg ok" id="ov-ok">Overview uploaded successfully!</div>
+        <div class="pmsg err" id="ov-err">Upload failed. Please try again.</div>
+      </div>
+      <div class="file-list" id="ov-list"></div>
+    </div>
+
+    <div class="ppane" id="ppane-quotes">
+      <div class="card">
+        <div class="card-title">Quote Sheet</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your pricing and quote sheets. Accepted: Excel (.xlsx, .xls)</p>
+        <div class="upload-zone" onclick="document.getElementById('qt-input').click()">
+          <div class="icon">&#128202;</div>
           <strong>Upload Quote Sheet</strong>
-          <p>Click to browse — Excel files only (.xlsx, .xls)</p>
-          <div class="file-name" id="quote-file-name"></div>
+          <small>Excel files only (.xlsx, .xls)</small>
+          <div class="file-chosen" id="qt-chosen"></div>
         </div>
-        <input type="file" id="quote-input" accept=".xlsx,.xls" style="display:none" onchange="handleQuoteFile(this)" />
-        <button class="upload-btn" id="quote-upload-btn" onclick="uploadQuote()">Upload Quote Sheet</button>
-        <div class="progress" id="quote-progress">Uploading...</div>
-        <div class="msg success" id="quote-success">✓ Quote sheet uploaded successfully!</div>
-        <div class="msg error" id="quote-error">Upload failed. Please try again.</div>
+        <input type="file" id="qt-input" accept=".xlsx,.xls" style="display:none" onchange="chooseFile(this,'qt-chosen','qt')">
+        <button class="up-btn" onclick="uploadFile('qt','quotes')">Upload</button>
+        <div class="prog" id="qt-prog">Uploading...</div>
+        <div class="pmsg ok" id="qt-ok">Quote sheet uploaded successfully!</div>
+        <div class="pmsg err" id="qt-err">Upload failed. Please try again.</div>
       </div>
-      <div id="quote-list"></div>
+      <div class="file-list" id="qt-list"></div>
     </div>
-
   </div>
 </div>
 
 <script>
-const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
-let currentUser = null, currentSession = null, selectedCatalog = null, selectedQuote = null;
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var USER=null,TOKEN=null;
+var selFiles={cat:null,ov:null,qt:null};
 
-function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
-  if (tab === 'login') { document.querySelectorAll('.auth-tab')[0].classList.add('active'); document.getElementById('login-form').classList.add('active'); }
-  else if (tab === 'register') { document.querySelectorAll('.auth-tab')[1].classList.add('active'); document.getElementById('register-form').classList.add('active'); }
-  else if (tab === 'forgot') { document.getElementById('forgot-form').classList.add('active'); }
-}
-function showForgot() { document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active')); document.getElementById('forgot-form').classList.add('active'); }
-function showMsg(id, text, type) { const el = document.getElementById(id); el.textContent = text; el.className = 'auth-msg ' + type; el.style.display = 'block'; }
+function g(id){return document.getElementById(id);}
 
-async function doRegister() {
-  const email = document.getElementById('reg-email').value.trim();
-  const pass = document.getElementById('reg-password').value;
-  const pass2 = document.getElementById('reg-password2').value;
-  if (!email || !pass) return showMsg('register-msg', 'Please fill in all fields.', 'error');
-  if (pass.length < 6) return showMsg('register-msg', 'Password must be at least 6 characters.', 'error');
-  if (pass !== pass2) return showMsg('register-msg', 'Passwords do not match.', 'error');
-  const btn = document.getElementById('register-btn'); btn.disabled = true; btn.textContent = 'Creating account...';
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY }, body: JSON.stringify({ email, password: pass }) });
-  const data = await res.json(); btn.disabled = false; btn.textContent = 'Create Account';
-  if (data.user) { currentUser = data.user; currentSession = data.session; enterPortal(); }
-  else showMsg('register-msg', data.error_description || 'Registration failed. Please try again.', 'error');
+function authTab(t){
+  var tabs=document.querySelectorAll('.tabs .tab');
+  var names=['login','signup','forgot'];
+  tabs.forEach(function(el,i){el.classList.toggle('on',names[i]===t);});
+  document.querySelectorAll('.pane').forEach(function(el){el.classList.remove('on');});
+  g('pane-'+t).classList.add('on');
 }
 
-async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pass = document.getElementById('login-password').value;
-  if (!email || !pass) return showMsg('login-msg', 'Please enter your email and password.', 'error');
-  const btn = document.getElementById('login-btn'); btn.disabled = true; btn.textContent = 'Signing in...';
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY }, body: JSON.stringify({ email, password: pass }) });
-  const data = await res.json(); btn.disabled = false; btn.textContent = 'Sign In';
-  if (data.access_token) { currentUser = data.user; currentSession = data; enterPortal(); }
-  else showMsg('login-msg', 'Incorrect email or password. Please try again.', 'error');
+function showAerr(id,msg){var el=g(id);el.textContent=msg;el.style.display='block';}
+
+async function signup(){
+  var email=g('s-email').value.trim();
+  var pass=g('s-pass').value;
+  var pass2=g('s-pass2').value;
+  g('s-err').style.display='none';
+  if(!email||!pass)return showAerr('s-err','Please fill in all fields.');
+  if(pass.length<6)return showAerr('s-err','Password must be at least 6 characters.');
+  if(pass!==pass2)return showAerr('s-err','Passwords do not match.');
+  var btn=g('s-btn');btn.disabled=true;btn.textContent='Creating...';
+  try{
+    var r=await fetch(SB+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email,password:pass})});
+    var d=await r.json();
+    if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
+    else if(d.user&&d.session){TOKEN=d.session.access_token;USER=d.user;enterPortal();}
+    else showAerr('s-err',d.error_description||d.msg||'Signup failed. Please try again.');
+  }catch(e){showAerr('s-err','Connection error: '+e.message);}
+  btn.disabled=false;btn.textContent='Create Account';
 }
 
-async function doForgot() {
-  const email = document.getElementById('forgot-email').value.trim();
-  if (!email) return showMsg('forgot-msg', 'Please enter your email address.', 'error');
-  await fetch(`${SUPABASE_URL}/auth/v1/recover`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY }, body: JSON.stringify({ email }) });
-  showMsg('forgot-msg', 'Reset link sent! Check your email inbox.', 'success');
+async function login(){
+  var email=g('l-email').value.trim();
+  var pass=g('l-pass').value;
+  g('l-err').style.display='none';
+  if(!email||!pass)return showAerr('l-err','Please enter your email and password.');
+  var btn=g('l-btn');btn.disabled=true;btn.textContent='Signing in...';
+  try{
+    var r=await fetch(SB+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email,password:pass})});
+    var d=await r.json();
+    if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
+    else showAerr('l-err','Incorrect email or password.');
+  }catch(e){showAerr('l-err','Connection error: '+e.message);}
+  btn.disabled=false;btn.textContent='Sign In';
 }
 
-function doSignout() { currentUser = null; currentSession = null; document.getElementById('portal-screen').style.display = 'none'; document.getElementById('auth-screen').style.display = 'flex'; switchAuthTab('login'); }
-
-async function enterPortal() {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('portal-screen').style.display = 'block';
-  document.getElementById('user-email-display').textContent = currentUser.email;
-  await loadFactoryData();
-  await loadUploadedFiles();
+async function forgot(){
+  var email=g('f-email').value.trim();
+  if(!email)return;
+  await fetch(SB+'/auth/v1/recover',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email})});
+  g('f-ok').style.display='block';
 }
 
-function showTab(name) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.portal-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  const idx = ['registration','catalogs','quotes'].indexOf(name);
-  document.querySelectorAll('.portal-tab')[idx].classList.add('active');
+function signout(){USER=null;TOKEN=null;g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
+
+async function enterPortal(){
+  g('auth-screen').style.display='none';
+  g('portal').style.display='block';
+  g('u-email').textContent=USER.email;
+  await loadDetails();
+  await loadAllFileLists();
 }
 
-async function loadFactoryData() {
-  if (!currentSession) return;
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/factories?user_id=eq.${currentUser.id}&select=*`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token } });
-  const data = await res.json();
-  if (data && data.length > 0) {
-    const f = data[0];
-    ['name_en','name_local','telephone','address','city','state','postal','country','contact_name','contact_mobile','contact_email','contact_wechat','contact_whatsapp'].forEach(id => {
-      const map = { name_en:'factory_name_english', name_local:'factory_name_local', state:'state_province', postal:'postal_code', contact_name:'sales_contact_name', contact_mobile:'sales_mobile', contact_email:'sales_email', contact_wechat:'sales_wechat', contact_whatsapp:'sales_whatsapp' };
-      const key = map[id] || id;
-      if (document.getElementById(id)) document.getElementById(id).value = f[key] || '';
-    });
-    document.getElementById('product_categories').value = (f.product_categories || []).join(', ');
-    (f.certifications || []).forEach(c => { document.querySelectorAll('.cert-grid input[type=checkbox]').forEach(cb => { if (cb.value === c) cb.checked = true; }); });
-    const banner = document.getElementById('reg-status-banner');
-    banner.style.display = 'block';
-    if (f.status === 'approved') { banner.textContent = '✓ Your factory is approved and active in our supplier network.'; banner.className = 'status-banner approved'; }
-    document.getElementById('reg-submit-btn').textContent = 'Update Factory Details';
+function ptab(t){
+  var names=['details','catalogs','overview','quotes'];
+  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',names[i]===t);});
+  document.querySelectorAll('.ppane').forEach(function(el){el.classList.remove('on');});
+  g('ppane-'+t).classList.add('on');
+}
+
+async function loadDetails(){
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var d=await r.json();
+    if(Array.isArray(d)&&d.length>0){
+      var f=d[0];
+      g('p-name_en').value=f.factory_name_english||'';
+      g('p-name_local').value=f.factory_name_local||'';
+      g('p-telephone').value=f.telephone||'';
+      g('p-address').value=f.address||'';
+      g('p-city').value=f.city||'';
+      g('p-state').value=f.state_province||'';
+      g('p-postal').value=f.postal_code||'';
+      g('p-country').value=f.country||'';
+      g('p-contact_name').value=f.sales_contact_name||'';
+      g('p-contact_mobile').value=f.sales_mobile||'';
+      g('p-contact_email').value=f.sales_email||'';
+      g('p-wechat').value=f.sales_wechat||'';
+      g('p-whatsapp').value=f.sales_whatsapp||'';
+      g('p-categories').value=(f.product_categories||[]).join(', ');
+      (f.certifications||[]).forEach(function(c){document.querySelectorAll('.certs input[type=checkbox]').forEach(function(cb){if(cb.value===c)cb.checked=true;});});
+      var banner=g('status-banner');banner.style.display='block';
+      if(f.status==='approved'){banner.textContent='Your factory is approved and active in our supplier network.';banner.className='banner approved';}
+      else{banner.textContent='Your registration is under review. Our team will be in touch shortly.';banner.className='banner pending';}
+      g('save-btn').textContent='Update Factory Details';
+    }
+  }catch(e){console.log('loadDetails error:',e);}
+}
+
+async function saveDetails(){
+  var reqFields=['p-name_en','p-telephone','p-address','p-city','p-country','p-contact_name','p-contact_mobile','p-contact_email','p-categories'];
+  for(var i=0;i<reqFields.length;i++){if(!g(reqFields[i]).value.trim()){alert('Please fill in all required fields.');g(reqFields[i]).focus();return;}}
+  var btn=g('save-btn');btn.disabled=true;
+  g('save-prog').style.display='block';
+  g('save-ok').style.display='none';
+  g('save-err').style.display='none';
+  var certs=[];
+  document.querySelectorAll('.certs input:checked').forEach(function(c){certs.push(c.value);});
+  var other=g('p-cert_other').value.trim();if(other)certs.push(other);
+  var payload={
+    user_id:USER.id,
+    factory_name_english:g('p-name_en').value.trim(),
+    factory_name_local:g('p-name_local').value.trim(),
+    telephone:g('p-telephone').value.trim(),
+    address:g('p-address').value.trim(),
+    city:g('p-city').value.trim(),
+    state_province:g('p-state').value.trim(),
+    postal_code:g('p-postal').value.trim(),
+    country:g('p-country').value.trim(),
+    sales_contact_name:g('p-contact_name').value.trim(),
+    sales_mobile:g('p-contact_mobile').value.trim(),
+    sales_email:g('p-contact_email').value.trim(),
+    sales_wechat:g('p-wechat').value.trim(),
+    sales_whatsapp:g('p-whatsapp').value.trim(),
+    certifications:certs,
+    product_categories:[g('p-categories').value.trim()],
+    status:'pending'
+  };
+  try{
+    var chk=await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var existing=await chk.json();
+    var exists=Array.isArray(existing)&&existing.length>0;
+    var method=exists?'PATCH':'POST';
+    var url=exists?SB+'/rest/v1/factories?user_id=eq.'+USER.id:SB+'/rest/v1/factories';
+    var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    g('save-prog').style.display='none';btn.disabled=false;
+    if(r.ok){
+      g('save-ok').style.display='block';
+      g('save-btn').textContent='Update Factory Details';
+      g('status-banner').style.display='block';
+      setTimeout(function(){g('save-ok').style.display='none';},4000);
+    }else{
+      var errData=await r.json().catch(function(){return {};});
+      g('save-err').textContent='Save failed: '+(errData.message||errData.details||r.status);
+      g('save-err').style.display='block';
+    }
+  }catch(e){
+    g('save-prog').style.display='none';btn.disabled=false;
+    g('save-err').textContent='Error: '+e.message;
+    g('save-err').style.display='block';
   }
 }
 
-function getCheckedCerts() { const boxes = document.querySelectorAll('.cert-grid input[type=checkbox]:checked'); const certs = Array.from(boxes).map(b => b.value); const other = document.getElementById('cert_other').value.trim(); if (other) certs.push(other); return certs; }
-function val(id) { return document.getElementById(id).value.trim(); }
-
-async function submitRegistration() {
-  const required = ['name_en','telephone','address','city','country','contact_name','contact_mobile','contact_email','product_categories'];
-  for (const id of required) { if (!val(id)) { alert('Please fill in all required fields.'); document.getElementById(id).focus(); return; } }
-  const btn = document.getElementById('reg-submit-btn'); btn.disabled = true;
-  document.getElementById('reg-progress').style.display = 'block';
-  const payload = { user_id: currentUser.id, factory_name_english: val('name_en'), factory_name_local: val('name_local'), telephone: val('telephone'), address: val('address'), city: val('city'), state_province: val('state'), postal_code: val('postal'), country: val('country'), sales_contact_name: val('contact_name'), sales_mobile: val('contact_mobile'), sales_email: val('contact_email'), sales_wechat: val('contact_wechat'), sales_whatsapp: val('contact_whatsapp'), certifications: getCheckedCerts(), product_categories: [val('product_categories')], status: 'pending' };
-  const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/factories?user_id=eq.${currentUser.id}`, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token } });
-  const existing = await checkRes.json();
-  let res;
-  if (existing && existing.length > 0) { res = await fetch(`${SUPABASE_URL}/rest/v1/factories?user_id=eq.${currentUser.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token, 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) }); }
-  else { res = await fetch(`${SUPABASE_URL}/rest/v1/factories`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token, 'Prefer': 'return=minimal' }, body: JSON.stringify(payload) }); }
-  document.getElementById('reg-progress').style.display = 'none'; btn.disabled = false;
-  if (res.ok) { document.getElementById('reg-success').style.display = 'block'; document.getElementById('reg-status-banner').style.display = 'block'; setTimeout(() => document.getElementById('reg-success').style.display = 'none', 4000); }
-  else { document.getElementById('reg-error').style.display = 'block'; }
+function chooseFile(input,displayId,key){
+  var file=input.files[0];if(!file)return;
+  selFiles[key]=file;
+  g(displayId).textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
 }
 
-function handleCatalogFile(input) { const file = input.files[0]; if (!file) return; if (file.type !== 'application/pdf') { alert('PDF files only.'); input.value = ''; return; } selectedCatalog = file; document.getElementById('catalog-file-name').textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)'; }
-function handleQuoteFile(input) { const file = input.files[0]; if (!file) return; if (!file.name.match(/\.(xlsx|xls)$/i)) { alert('Excel files only (.xlsx or .xls).'); input.value = ''; return; } selectedQuote = file; document.getElementById('quote-file-name').textContent = file.name + ' (' + (file.size/1024/1024).toFixed(1) + ' MB)'; }
-
-async function uploadCatalog() {
-  if (!selectedCatalog) { alert('Please select a PDF file first.'); return; }
-  const btn = document.getElementById('catalog-upload-btn'); btn.disabled = true;
-  document.getElementById('catalog-progress').style.display = 'block';
-  document.getElementById('catalog-success').style.display = 'none';
-  document.getElementById('catalog-error').style.display = 'none';
-  const fileName = currentUser.id + '/catalogs/' + Date.now() + '_' + selectedCatalog.name.replace(/\s+/g,'_');
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/factory-files/${fileName}`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + currentSession.access_token, 'Content-Type': 'application/pdf', 'x-upsert': 'true' }, body: selectedCatalog });
-  document.getElementById('catalog-progress').style.display = 'none'; btn.disabled = false;
-  if (res.ok) { const url = `${SUPABASE_URL}/storage/v1/object/public/factory-files/${fileName}`; await fetch(`${SUPABASE_URL}/rest/v1/factories?user_id=eq.${currentUser.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token, 'Prefer': 'return=minimal' }, body: JSON.stringify({ catalog_url: url }) }); document.getElementById('catalog-success').style.display = 'block'; selectedCatalog = null; document.getElementById('catalog-file-name').textContent = ''; await loadUploadedFiles(); }
-  else { document.getElementById('catalog-error').style.display = 'block'; }
+async function uploadFile(key,folder){
+  var file=selFiles[key];
+  if(!file){alert('Please select a file first.');return;}
+  var progId=key+'-prog',okId=key+'-ok',errId=key+'-err';
+  g(progId).style.display='block';g(okId).style.display='none';g(errId).style.display='none';
+  var fileName=USER.id+'/'+folder+'/'+Date.now()+'_'+file.name.replace(/\s+/g,'_');
+  var ct='application/octet-stream';
+  var n=file.name.toLowerCase();
+  if(n.endsWith('.pdf'))ct='application/pdf';
+  else if(n.endsWith('.pptx'))ct='application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  else if(n.endsWith('.ppt'))ct='application/vnd.ms-powerpoint';
+  else if(n.endsWith('.xlsx'))ct='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  else if(n.endsWith('.xls'))ct='application/vnd.ms-excel';
+  try{
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+fileName,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':ct,'x-upsert':'true'},body:file});
+    g(progId).style.display='none';
+    if(r.ok){
+      g(okId).style.display='block';selFiles[key]=null;
+      g(key+'-chosen').textContent='';
+      await loadAllFileLists();
+      setTimeout(function(){g(okId).style.display='none';},4000);
+    }else{
+      var e=await r.json().catch(function(){return {};});
+      g(errId).textContent='Upload failed: '+(e.message||r.status);g(errId).style.display='block';
+    }
+  }catch(e){g(progId).style.display='none';g(errId).textContent='Error: '+e.message;g(errId).style.display='block';}
 }
 
-async function uploadQuote() {
-  if (!selectedQuote) { alert('Please select an Excel file first.'); return; }
-  const btn = document.getElementById('quote-upload-btn'); btn.disabled = true;
-  document.getElementById('quote-progress').style.display = 'block';
-  document.getElementById('quote-success').style.display = 'none';
-  document.getElementById('quote-error').style.display = 'none';
-  const fileName = currentUser.id + '/quotes/' + Date.now() + '_' + selectedQuote.name.replace(/\s+/g,'_');
-  const contentType = selectedQuote.name.endsWith('.xls') ? 'application/vnd.ms-excel' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/factory-files/${fileName}`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + currentSession.access_token, 'Content-Type': contentType, 'x-upsert': 'true' }, body: selectedQuote });
-  document.getElementById('quote-progress').style.display = 'none'; btn.disabled = false;
-  if (res.ok) { document.getElementById('quote-success').style.display = 'block'; selectedQuote = null; document.getElementById('quote-file-name').textContent = ''; await loadUploadedFiles(); }
-  else { document.getElementById('quote-error').style.display = 'block'; }
-}
-
-async function loadUploadedFiles() {
-  if (!currentSession) return;
-  try {
-    const catRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/factory-files`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token }, body: JSON.stringify({ prefix: currentUser.id + '/catalogs/', limit: 20 }) });
-    const catalogs = await catRes.json();
-    const quoteRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/factory-files`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + currentSession.access_token }, body: JSON.stringify({ prefix: currentUser.id + '/quotes/', limit: 20 }) });
-    const quotes = await quoteRes.json();
-    const catList = document.getElementById('catalog-list');
-    catList.innerHTML = Array.isArray(catalogs) && catalogs.filter(f=>f.name).length ? '<div style="font-size:13px;font-weight:500;color:#1a1a2e;margin-bottom:8px;">Uploaded Catalogs</div>' + catalogs.filter(f=>f.name).map(f => { const url = `${SUPABASE_URL}/storage/v1/object/public/factory-files/${currentUser.id}/catalogs/${f.name}`; return `<div class="uploaded-file"><div><div class="uploaded-file-name">📄 ${f.name}</div></div><a class="view-link" href="${url}" target="_blank">View</a></div>`; }).join('') : '';
-    const quoteList = document.getElementById('quote-list');
-    quoteList.innerHTML = Array.isArray(quotes) && quotes.filter(f=>f.name).length ? '<div style="font-size:13px;font-weight:500;color:#1a1a2e;margin-bottom:8px;">Uploaded Quote Sheets</div>' + quotes.filter(f=>f.name).map(f => { const url = `${SUPABASE_URL}/storage/v1/object/public/factory-files/${currentUser.id}/quotes/${f.name}`; return `<div class="uploaded-file"><div><div class="uploaded-file-name">📊 ${f.name}</div></div><a class="view-link" href="${url}" target="_blank">Download</a></div>`; }).join('') : '';
-  } catch(e) {}
+async function loadAllFileLists(){
+  var map={cat:'catalogs',ov:'overview',qt:'quotes'};
+  for(var key in map){
+    var folder=map[key];
+    try{
+      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN},body:JSON.stringify({prefix:USER.id+'/'+folder+'/',limit:20})});
+      var items=await r.json();
+      var listEl=g(key+'-list');
+      if(Array.isArray(items)&&items.filter(function(f){return f.name;}).length){
+        var html='<div class="file-list-title">Uploaded Files</div>';
+        items.filter(function(f){return f.name;}).forEach(function(f){
+          var url=SB+'/storage/v1/object/public/factory-files/'+USER.id+'/'+folder+'/'+f.name;
+          var icon=f.name.endsWith('.pdf')?'PDF':f.name.match(/\.pptx?$/i)?'PPT':'XLS';
+          html+='<div class="file-row"><span class="file-row-name">['+icon+'] '+f.name+'</span><a class="file-row-link" href="'+url+'" target="_blank">View / Download</a></div>';
+        });
+        listEl.innerHTML=html;
+      }else{listEl.innerHTML='';}
+    }catch(e){console.log('file list error:',e);}
+  }
 }
 </script>
 </body>
