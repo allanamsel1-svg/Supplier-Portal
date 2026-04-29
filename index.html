@@ -7,7 +7,16 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; min-height: 100vh; }
-    #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
+
+    /* ── Language Bar ── */
+    .lang-bar { background: #1a1a2e; padding: 10px 1rem; display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+    .lang-bar-label { font-size: 12px; color: rgba(255,255,255,0.5); margin-right: 4px; }
+    .lang-btn { font-size: 12px; color: rgba(255,255,255,0.7); background: none; border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; padding: 4px 9px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+    .lang-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .lang-btn.on { background: rgba(255,255,255,0.18); color: #fff; border-color: rgba(255,255,255,0.5); }
+
+    /* ── Auth ── */
+    #auth-screen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 44px); padding: 1rem; }
     .auth-box { background: #fff; border: 1px solid #e0e0d8; border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
     .brand-mark { width: 36px; height: 36px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700; }
@@ -31,6 +40,8 @@
     .aok { font-size: 13px; color: #2a7a2a; background: #f0fff0; border: 1px solid #c0e8c0; border-radius: 7px; padding: 9px 12px; margin-top: 10px; display: none; }
     .small-link { font-size: 12px; color: #999; cursor: pointer; display: block; margin-top: 6px; text-align: right; }
     .small-link:hover { color: #1a1a2e; }
+
+    /* ── Portal ── */
     #portal { display: none; }
     .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem; position: sticky; top: 0; z-index: 50; }
     .topbar-l { display: flex; align-items: center; gap: 10px; }
@@ -43,23 +54,46 @@
     .ptabs { display: flex; background: #fff; border-bottom: 1px solid #e0e0d8; padding: 0 1.5rem; overflow-x: auto; }
     .ptab { padding: 12px 14px; font-size: 13px; color: #999; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
     .ptab.on { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 500; }
-    .pcontent { max-width: 680px; margin: 0 auto; padding: 1.5rem 1rem; }
+    .pcontent { max-width: 720px; margin: 0 auto; padding: 1.5rem 1rem; }
     .ppane { display: none; }
     .ppane.on { display: block; }
+
+    /* ── Cards & Forms ── */
     .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
     .card-title { font-size: 11px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 1px solid #f0f0e8; }
     .pf { margin-bottom: 12px; }
     .pf:last-child { margin-bottom: 0; }
     .pf label { display: block; font-size: 13px; color: #666; margin-bottom: 4px; }
     .req { color: #e04040; }
-    .pf input, .pf textarea { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; color: #1a1a2e; }
-    .pf input:focus, .pf textarea:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 3px rgba(26,26,46,0.07); }
+    .pf input, .pf textarea, .pf select { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #ddd; border-radius: 8px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .pf input:focus, .pf textarea:focus, .pf select:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 3px rgba(26,26,46,0.07); }
     .pf textarea { resize: vertical; min-height: 80px; }
+    .pf .hint { font-size: 12px; color: #aaa; margin-top: 3px; }
     .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .g3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+    .g3b { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .g4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+
+    /* ── Certifications ── */
+    .cert-groups { display: flex; flex-direction: column; gap: 12px; }
+    .cert-group-label { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
     .certs { display: flex; flex-wrap: wrap; gap: 6px; }
     .cert { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 6px; padding: 5px 9px; cursor: pointer; }
-    .cert input { width: 14px; height: 14px; }
+    .cert input { width: 14px; height: 14px; flex-shrink: 0; }
+    .cert:has(input:checked) { background: #eef2ff; border-color: #b0bcf0; color: #1a1a2e; }
+
+    /* ── Location blocks ── */
+    .location-block { border: 1px solid #e0e0d8; border-radius: 10px; padding: 1rem; margin-bottom: 10px; background: #fafaf8; position: relative; }
+    .location-block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .location-block-title { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .remove-btn { font-size: 12px; color: #999; background: none; border: none; cursor: pointer; font-family: inherit; }
+    .remove-btn:hover { color: #b00; }
+    .add-btn { width: 100%; padding: 9px; background: none; border: 1.5px dashed #ccc; border-radius: 8px; font-size: 13px; color: #999; cursor: pointer; font-family: inherit; margin-top: 4px; }
+    .add-btn:hover { border-color: #1a1a2e; color: #1a1a2e; }
+    .same-as-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #666; cursor: pointer; margin-bottom: 10px; }
+    .same-as-check input { width: 14px; height: 14px; }
+
+    /* ── Save / Misc ── */
     .save-btn { width: 100%; padding: 13px; background: #1a1a2e; color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 1rem; font-family: inherit; }
     .save-btn:hover { opacity: 0.87; }
     .save-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -69,6 +103,9 @@
     .pmsg { padding: 11px 14px; border-radius: 9px; font-size: 13px; margin-top: 1rem; display: none; }
     .pmsg.ok { background: #edfaed; border: 1px solid #8dd88d; color: #1a6a1a; }
     .pmsg.err { background: #fff0f0; border: 1px solid #fdd; color: #b00; }
+    .prog { font-size: 13px; color: #999; text-align: center; margin-top: 8px; display: none; }
+
+    /* ── Upload ── */
     .upload-zone { border: 1.5px dashed #ccc; border-radius: 10px; padding: 1.5rem; text-align: center; cursor: pointer; margin-bottom: 10px; }
     .upload-zone:hover { background: #f8f8f4; border-color: #aaa; }
     .upload-zone .icon { font-size: 28px; margin-bottom: 6px; }
@@ -83,223 +120,702 @@
     .file-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; background: #f8f8f4; border-radius: 8px; margin-bottom: 6px; }
     .file-row-name { font-size: 13px; color: #1a1a2e; }
     .file-row-link { font-size: 12px; color: #2266cc; text-decoration: none; }
-    .prog { font-size: 13px; color: #999; text-align: center; margin-top: 8px; display: none; }
-    @media(max-width:500px) { .g2,.g3 { grid-template-columns: 1fr; } .ptab { font-size: 12px; padding: 10px 10px; } }
+    .section-divider { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; margin: 1rem 0 0.5rem; }
+
+    @media(max-width:560px) {
+      .g2,.g3,.g3b,.g4 { grid-template-columns: 1fr; }
+      .ptab { font-size: 12px; padding: 10px 10px; }
+      .lang-btn { font-size: 11px; padding: 3px 7px; }
+    }
   </style>
 </head>
 <body>
+
+<!-- ── Language Bar ── -->
+<div class="lang-bar">
+  <span class="lang-bar-label">&#127760;</span>
+  <button class="lang-btn on" onclick="setLang('en')">English</button>
+  <button class="lang-btn" onclick="setLang('zh-s')">简体中文</button>
+  <button class="lang-btn" onclick="setLang('zh-t')">繁體中文</button>
+  <button class="lang-btn" onclick="setLang('vi')">Tiếng Việt</button>
+  <button class="lang-btn" onclick="setLang('ko')">한국어</button>
+  <button class="lang-btn" onclick="setLang('ja')">日本語</button>
+  <button class="lang-btn" onclick="setLang('hi')">हिन्दी</button>
+  <button class="lang-btn" onclick="setLang('es')">Español</button>
+  <button class="lang-btn" onclick="setLang('de')">Deutsch</button>
+</div>
+
+<!-- ── Auth Screen ── -->
 <div id="auth-screen">
   <div class="auth-box">
     <div class="brand">
       <div class="brand-mark">S</div>
-      <div><div class="brand-name">Supplier Portal</div><div class="brand-sub">Factory Account</div></div>
+      <div><div class="brand-name" data-t="brand_name">Supplier Portal</div><div class="brand-sub" data-t="brand_sub">Factory Account</div></div>
     </div>
     <div class="tabs">
-      <div class="tab on" onclick="authTab('login')">Sign In</div>
-      <div class="tab" onclick="authTab('signup')">Create Account</div>
+      <div class="tab on" onclick="authTab('login')" data-t="tab_signin">Sign In</div>
+      <div class="tab" onclick="authTab('signup')" data-t="tab_create">Create Account</div>
     </div>
     <div class="pane on" id="pane-login">
-      <h2>Welcome back</h2>
-      <p>Sign in to your factory account</p>
-      <div class="f"><label>Email</label><input type="email" id="l-email" placeholder="name@factory.com" /></div>
-      <div class="f"><label>Password</label><input type="password" id="l-pass" placeholder="Your password" onkeydown="if(event.key==='Enter')login()" /></div>
-      <span class="small-link" onclick="authTab('forgot')">Forgot password?</span>
-      <button class="btn-main" id="l-btn" onclick="login()">Sign In</button>
+      <h2 data-t="login_title">Welcome back</h2>
+      <p data-t="login_sub">Sign in to your factory account</p>
+      <div class="f"><label data-t="lbl_email">Email</label><input type="email" id="l-email" placeholder="name@factory.com" /></div>
+      <div class="f"><label data-t="lbl_password">Password</label><input type="password" id="l-pass" onkeydown="if(event.key==='Enter')login()" /></div>
+      <span class="small-link" onclick="authTab('forgot')" data-t="forgot_link">Forgot password?</span>
+      <button class="btn-main" id="l-btn" onclick="login()" data-t="btn_signin">Sign In</button>
       <div class="aerr" id="l-err"></div>
     </div>
     <div class="pane" id="pane-signup">
-      <h2>Create your account</h2>
-      <p>Set up your factory account to get started</p>
-      <div class="f"><label>Email</label><input type="email" id="s-email" placeholder="name@factory.com" /></div>
-      <div class="f"><label>Password</label><input type="password" id="s-pass" placeholder="Min 6 characters" /></div>
-      <div class="f"><label>Confirm Password</label><input type="password" id="s-pass2" placeholder="Confirm password" onkeydown="if(event.key==='Enter')signup()" /></div>
-      <button class="btn-main" id="s-btn" onclick="signup()">Create Account</button>
+      <h2 data-t="signup_title">Create your account</h2>
+      <p data-t="signup_sub">Set up your factory account to get started</p>
+      <div class="f"><label data-t="lbl_email">Email</label><input type="email" id="s-email" placeholder="name@factory.com" /></div>
+      <div class="f"><label data-t="lbl_password">Password</label><input type="password" id="s-pass" placeholder="Min 6 characters" /></div>
+      <div class="f"><label data-t="lbl_confirm_pass">Confirm Password</label><input type="password" id="s-pass2" onkeydown="if(event.key==='Enter')signup()" /></div>
+      <button class="btn-main" id="s-btn" onclick="signup()" data-t="btn_create">Create Account</button>
       <div class="aerr" id="s-err"></div>
     </div>
     <div class="pane" id="pane-forgot">
-      <h2>Reset password</h2>
-      <p>We will send a reset link to your email</p>
-      <div class="f"><label>Email</label><input type="email" id="f-email" placeholder="name@factory.com" /></div>
-      <button class="btn-main" onclick="forgot()">Send Reset Link</button>
-      <div class="aok" id="f-ok">Reset link sent! Check your inbox.</div>
-      <span class="small-link" onclick="authTab('login')" style="text-align:left;margin-top:8px;">Back to sign in</span>
+      <h2 data-t="forgot_title">Reset password</h2>
+      <p data-t="forgot_sub">We will send a reset link to your email</p>
+      <div class="f"><label data-t="lbl_email">Email</label><input type="email" id="f-email" placeholder="name@factory.com" /></div>
+      <button class="btn-main" onclick="forgot()" data-t="btn_send_reset">Send Reset Link</button>
+      <div class="aok" id="f-ok" data-t="reset_sent">Reset link sent! Check your inbox.</div>
+      <span class="small-link" onclick="authTab('login')" style="text-align:left;margin-top:8px;" data-t="back_signin">Back to sign in</span>
     </div>
   </div>
 </div>
 
+<!-- ── Portal ── -->
 <div id="portal">
   <div class="topbar">
     <div class="topbar-l">
       <div class="topbar-mark">S</div>
-      <div class="topbar-title">Supplier Portal</div>
+      <div class="topbar-title" data-t="brand_name">Supplier Portal</div>
     </div>
     <div class="topbar-r">
       <span class="user-tag" id="u-email"></span>
-      <button class="signout" onclick="signout()">Sign out</button>
+      <button class="signout" onclick="signout()" data-t="btn_signout">Sign out</button>
     </div>
   </div>
   <div class="ptabs">
-    <div class="ptab on" onclick="ptab('details')">Factory Details</div>
-    <div class="ptab" onclick="ptab('catalogs')">Catalogs</div>
-    <div class="ptab" onclick="ptab('overview')">Company Overview</div>
-    <div class="ptab" onclick="ptab('quotes')">Quote Sheets</div>
+    <div class="ptab on" onclick="ptab('details')" data-t="tab_factory_details">Factory Details</div>
+    <div class="ptab" onclick="ptab('locations')" data-t="tab_locations">Locations</div>
+    <div class="ptab" onclick="ptab('certifications')" data-t="tab_certifications">Certifications</div>
+    <div class="ptab" onclick="ptab('catalogs')" data-t="tab_catalogs">Catalogs</div>
+    <div class="ptab" onclick="ptab('overview')" data-t="tab_overview">Company Overview</div>
+    <div class="ptab" onclick="ptab('quotes')" data-t="tab_quotes">Quote Sheets</div>
   </div>
   <div class="pcontent">
+
+    <!-- ── Factory Details ── -->
     <div class="ppane on" id="ppane-details">
       <div class="banner pending" id="status-banner" style="display:none"></div>
+
       <div class="card">
-        <div class="card-title">Factory Information</div>
-        <div class="pf"><label>Factory Name (English) <span class="req">*</span></label><input type="text" id="p-name_en" placeholder="e.g. Guangzhou Best Products Co., Ltd." /></div>
-        <div class="pf"><label>Factory Name (Chinese / Local Language)</label><input type="text" id="p-name_local" placeholder="e.g. Chinese name" /></div>
-        <div class="pf"><label>Telephone <span class="req">*</span></label><input type="tel" id="p-telephone" placeholder="+86 20 1234 5678" /></div>
+        <div class="card-title" data-t="section_factory_info">Factory Information</div>
+        <div class="pf"><label data-t="lbl_name_en">Factory Name (English) <span class="req">*</span></label><input type="text" id="p-name_en" /></div>
+        <div class="pf"><label data-t="lbl_name_local">Factory Name (Local Language)</label><input type="text" id="p-name_local" /></div>
+        <div class="g3b pf">
+          <div><label data-t="lbl_years">Years in Business</label><input type="number" id="p-years" min="0" max="200" placeholder="e.g. 15" /></div>
+          <div><label data-t="lbl_revenue">Annual Revenue (USD)</label>
+            <select id="p-revenue">
+              <option value="">— Select —</option>
+              <option value="Under $1M">Under $1M</option>
+              <option value="$1M–$5M">$1M–$5M</option>
+              <option value="$5M–$10M">$5M–$10M</option>
+              <option value="$10M–$50M">$10M–$50M</option>
+              <option value="$50M–$100M">$50M–$100M</option>
+              <option value="Over $100M">Over $100M</option>
+            </select>
+          </div>
+          <div><label data-t="lbl_export">Export %</label><input type="number" id="p-export" min="0" max="100" placeholder="e.g. 80" /><div class="hint" data-t="hint_export">% of production exported</div></div>
+        </div>
+        <div class="pf"><label data-t="lbl_telephone">Telephone <span class="req">*</span></label><input type="tel" id="p-telephone" placeholder="+86 20 1234 5678" /></div>
       </div>
+
       <div class="card">
-        <div class="card-title">Address</div>
-        <div class="pf"><label>Street Address <span class="req">*</span></label><input type="text" id="p-address" placeholder="Building, Street, District" /></div>
+        <div class="card-title" data-t="section_address">Main Factory Address</div>
+        <div class="pf"><label data-t="lbl_address">Street Address <span class="req">*</span></label><input type="text" id="p-address" /></div>
         <div class="g2 pf">
-          <div><label>City <span class="req">*</span></label><input type="text" id="p-city" placeholder="City" /></div>
-          <div><label>State / Province</label><input type="text" id="p-state" placeholder="Province" /></div>
+          <div><label data-t="lbl_city">City <span class="req">*</span></label><input type="text" id="p-city" /></div>
+          <div><label data-t="lbl_state">State / Province</label><input type="text" id="p-state" /></div>
         </div>
         <div class="g2 pf">
-          <div><label>Postal Code</label><input type="text" id="p-postal" placeholder="000000" /></div>
-          <div><label>Country <span class="req">*</span></label><input type="text" id="p-country" placeholder="China" /></div>
+          <div><label data-t="lbl_postal">Postal Code</label><input type="text" id="p-postal" /></div>
+          <div><label data-t="lbl_country">Country <span class="req">*</span></label><input type="text" id="p-country" placeholder="China" /></div>
         </div>
       </div>
+
       <div class="card">
-        <div class="card-title">Sales Contact</div>
+        <div class="card-title" data-t="section_capacity">Factory Capacity</div>
         <div class="g2 pf">
-          <div><label>Contact Name <span class="req">*</span></label><input type="text" id="p-contact_name" placeholder="Full Name" /></div>
-          <div><label>Mobile <span class="req">*</span></label><input type="tel" id="p-contact_mobile" placeholder="+86 138 0000 0000" /></div>
+          <div><label data-t="lbl_employees">Total Employees</label><input type="number" id="p-employees" min="0" placeholder="e.g. 500" /></div>
+          <div><label data-t="lbl_engineers">Engineers / R&amp;D Staff</label><input type="number" id="p-engineers" min="0" placeholder="e.g. 40" /></div>
         </div>
-        <div class="g3 pf">
-          <div><label>Email <span class="req">*</span></label><input type="email" id="p-contact_email" placeholder="name@factory.com" /></div>
-          <div><label>WeChat</label><input type="text" id="p-wechat" placeholder="WeChat ID" /></div>
-          <div><label>WhatsApp</label><input type="tel" id="p-whatsapp" placeholder="+86..." /></div>
+        <div class="g2 pf">
+          <div><label data-t="lbl_qc">QC Staff</label><input type="number" id="p-qc" min="0" placeholder="e.g. 20" /></div>
+          <div><label data-t="lbl_lines">Production Lines</label><input type="number" id="p-lines" min="0" placeholder="e.g. 8" /></div>
         </div>
+        <div class="g3b pf">
+          <div><label data-t="lbl_sqm">Floor Space (m²)</label><input type="number" id="p-sqm" min="0" placeholder="e.g. 12000" /></div>
+          <div><label data-t="lbl_injection">Injection Machines</label><input type="number" id="p-injection" min="0" placeholder="e.g. 24" /></div>
+          <div><label data-t="lbl_capacity">Monthly Capacity (units)</label><input type="number" id="p-capacity" min="0" placeholder="e.g. 50000" /></div>
+        </div>
+        <div class="pf"><label data-t="lbl_capacity_notes">Capacity Notes</label><textarea id="p-capacity-notes" rows="2" style="min-height:56px"></textarea></div>
       </div>
+
       <div class="card">
-        <div class="card-title">Certifications</div>
-        <div class="certs">
-          <label class="cert"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
-          <label class="cert"><input type="checkbox" value="ISO 14001"> ISO 14001</label>
-          <label class="cert"><input type="checkbox" value="ISO 45001"> ISO 45001</label>
-          <label class="cert"><input type="checkbox" value="ETL"> ETL</label>
-          <label class="cert"><input type="checkbox" value="BSCI"> BSCI</label>
-          <label class="cert"><input type="checkbox" value="Sedex"> Sedex</label>
-          <label class="cert"><input type="checkbox" value="CE"> CE</label>
-          <label class="cert"><input type="checkbox" value="FCC"> FCC</label>
-          <label class="cert"><input type="checkbox" value="FDA"> FDA</label>
-          <label class="cert"><input type="checkbox" value="RoHS"> RoHS</label>
-          <label class="cert"><input type="checkbox" value="UL"> UL</label>
-          <label class="cert"><input type="checkbox" value="GRS"> GRS</label>
+        <div class="card-title" data-t="section_sales">Primary Sales Contact</div>
+        <div class="g2 pf">
+          <div><label data-t="lbl_contact_name">Contact Name <span class="req">*</span></label><input type="text" id="p-contact_name" /></div>
+          <div><label data-t="lbl_contact_title">Title / Position</label><input type="text" id="p-contact_title" placeholder="e.g. Sales Manager" /></div>
         </div>
-        <div class="pf" style="margin-top:10px"><label>Other</label><input type="text" id="p-cert_other" placeholder="Any other certifications" /></div>
+        <div class="g2 pf">
+          <div><label data-t="lbl_mobile">Mobile <span class="req">*</span></label><input type="tel" id="p-contact_mobile" placeholder="+86 138 0000 0000" /></div>
+          <div><label data-t="lbl_contact_email">Email <span class="req">*</span></label><input type="email" id="p-contact_email" /></div>
+        </div>
+        <div class="g2 pf">
+          <div><label>WeChat</label><input type="text" id="p-wechat" /></div>
+          <div><label>WhatsApp</label><input type="tel" id="p-whatsapp" /></div>
+        </div>
       </div>
+
       <div class="card">
-        <div class="card-title">Product Categories</div>
-        <div class="pf"><label>What do you manufacture at this facility? <span class="req">*</span></label><textarea id="p-categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics..."></textarea></div>
+        <div class="card-title" data-t="section_categories">Product Categories</div>
+        <div class="pf"><label data-t="lbl_categories">What do you manufacture? <span class="req">*</span></label><textarea id="p-categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics..."></textarea></div>
       </div>
-      <button class="save-btn" id="save-btn" onclick="saveDetails()">Save Factory Details</button>
-      <div class="prog" id="save-prog">Saving...</div>
-      <div class="pmsg ok" id="save-ok">Factory details saved successfully!</div>
+
+      <button class="save-btn" id="save-btn" onclick="saveDetails()" data-t="btn_save">Save Factory Details</button>
+      <div class="prog" id="save-prog" data-t="saving">Saving...</div>
+      <div class="pmsg ok" id="save-ok" data-t="save_ok">Factory details saved successfully!</div>
       <div class="pmsg err" id="save-err"></div>
     </div>
 
+    <!-- ── Locations Tab ── -->
+    <div class="ppane" id="ppane-locations">
+      <div class="card">
+        <div class="card-title" data-t="section_locations">Factory Locations &amp; Offices</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-t="locations_hint">Add all factory sites, warehouses, and sales offices. Your main factory address is saved in Factory Details.</p>
+        <div id="locations-list"></div>
+        <button class="add-btn" onclick="addLocation('factory')" data-t="btn_add_location">+ Add Factory Location</button>
+        <div style="margin-top:8px;"></div>
+        <button class="add-btn" onclick="addLocation('office')" data-t="btn_add_office">+ Add Sales / Engineering Office</button>
+      </div>
+      <button class="save-btn" onclick="saveLocations()" data-t="btn_save_locations">Save Locations</button>
+      <div class="prog" id="loc-prog">Saving...</div>
+      <div class="pmsg ok" id="loc-ok" data-t="save_ok">Locations saved successfully!</div>
+      <div class="pmsg err" id="loc-err"></div>
+    </div>
+
+    <!-- ── Certifications Tab ── -->
+    <div class="ppane" id="ppane-certifications">
+      <div class="card">
+        <div class="card-title" data-t="section_cert_select">Select Certifications</div>
+        <div class="cert-groups">
+          <div>
+            <div class="cert-group-label">Quality &amp; Management</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
+              <label class="cert"><input type="checkbox" value="ISO 14001"> ISO 14001</label>
+              <label class="cert"><input type="checkbox" value="ISO 45001"> ISO 45001</label>
+              <label class="cert"><input type="checkbox" value="ISO 13485"> ISO 13485</label>
+              <label class="cert"><input type="checkbox" value="ISO 22000"> ISO 22000</label>
+            </div>
+          </div>
+          <div>
+            <div class="cert-group-label">Social &amp; Ethical</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="BSCI"> BSCI</label>
+              <label class="cert"><input type="checkbox" value="Sedex"> Sedex</label>
+              <label class="cert"><input type="checkbox" value="SA8000"> SA8000</label>
+              <label class="cert"><input type="checkbox" value="WRAP"> WRAP</label>
+              <label class="cert"><input type="checkbox" value="Fair Trade"> Fair Trade</label>
+              <label class="cert"><input type="checkbox" value="Higg Index"> Higg Index</label>
+            </div>
+          </div>
+          <div>
+            <div class="cert-group-label">Product Safety</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="ETL"> ETL</label>
+              <label class="cert"><input type="checkbox" value="UL"> UL</label>
+              <label class="cert"><input type="checkbox" value="CE"> CE</label>
+              <label class="cert"><input type="checkbox" value="FCC"> FCC</label>
+              <label class="cert"><input type="checkbox" value="FDA"> FDA</label>
+              <label class="cert"><input type="checkbox" value="RoHS"> RoHS</label>
+              <label class="cert"><input type="checkbox" value="REACH"> REACH</label>
+              <label class="cert"><input type="checkbox" value="CPSC"> CPSC</label>
+              <label class="cert"><input type="checkbox" value="ASTM"> ASTM</label>
+            </div>
+          </div>
+          <div>
+            <div class="cert-group-label">Environmental</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="GRS"> GRS</label>
+              <label class="cert"><input type="checkbox" value="OEKO-TEX"> OEKO-TEX</label>
+              <label class="cert"><input type="checkbox" value="Bluesign"> Bluesign</label>
+              <label class="cert"><input type="checkbox" value="FSC"> FSC</label>
+              <label class="cert"><input type="checkbox" value="GOTS"> GOTS</label>
+            </div>
+          </div>
+          <div>
+            <div class="cert-group-label">Industry Specific</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="HACCP"> HACCP</label>
+              <label class="cert"><input type="checkbox" value="BRC"> BRC</label>
+              <label class="cert"><input type="checkbox" value="Walmart Approved"> Walmart</label>
+              <label class="cert"><input type="checkbox" value="Target Approved"> Target</label>
+              <label class="cert"><input type="checkbox" value="Disney Approved"> Disney</label>
+            </div>
+          </div>
+          <div>
+            <div class="cert-group-label">Regional</div>
+            <div class="certs">
+              <label class="cert"><input type="checkbox" value="CCC"> CCC (China)</label>
+              <label class="cert"><input type="checkbox" value="KC"> KC (Korea)</label>
+              <label class="cert"><input type="checkbox" value="PSE"> PSE (Japan)</label>
+              <label class="cert"><input type="checkbox" value="BIS"> BIS (India)</label>
+            </div>
+          </div>
+        </div>
+        <div class="pf" style="margin-top:14px"><label data-t="lbl_cert_other">Other Certifications</label><input type="text" id="p-cert_other" placeholder="e.g. TS16949, Kosher..." /></div>
+      </div>
+
+      <div class="card" id="cert-details-card">
+        <div class="card-title" data-t="section_cert_details">Certificate Details (Optional)</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-t="cert_details_hint">For each certification above, you can add the certificate number, expiry date, and upload the PDF.</p>
+        <div id="cert-details-list"></div>
+      </div>
+
+      <button class="save-btn" onclick="saveCertifications()" data-t="btn_save_certs">Save Certifications</button>
+      <div class="prog" id="cert-prog">Saving...</div>
+      <div class="pmsg ok" id="cert-ok" data-t="save_ok">Certifications saved!</div>
+      <div class="pmsg err" id="cert-err"></div>
+    </div>
+
+    <!-- ── Catalogs ── -->
     <div class="ppane" id="ppane-catalogs">
       <div class="card">
-        <div class="card-title">Product Catalog</div>
-        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your product catalog. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
+        <div class="card-title" data-t="tab_catalogs">Product Catalog</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-t="catalog_hint">Upload your product catalog. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
         <div class="upload-zone" onclick="document.getElementById('cat-input').click()">
           <div class="icon">&#128196;</div>
-          <strong>Upload Catalog</strong>
+          <strong data-t="upload_catalog">Upload Catalog</strong>
           <small>PDF or PowerPoint files</small>
           <div class="file-chosen" id="cat-chosen"></div>
         </div>
         <input type="file" id="cat-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'cat-chosen','cat')">
-        <button class="up-btn" onclick="uploadFile('cat','catalogs','Catalog')">Upload</button>
-        <div class="prog" id="cat-prog">Uploading...</div>
-        <div class="pmsg ok" id="cat-ok">Catalog uploaded successfully!</div>
-        <div class="pmsg err" id="cat-err">Upload failed. Please try again.</div>
+        <button class="up-btn" onclick="uploadFile('cat','catalogs','Catalog')" data-t="btn_upload">Upload</button>
+        <div class="prog" id="cat-prog" data-t="uploading">Uploading...</div>
+        <div class="pmsg ok" id="cat-ok" data-t="upload_ok">Catalog uploaded successfully!</div>
+        <div class="pmsg err" id="cat-err"></div>
       </div>
       <div class="file-list" id="cat-list"></div>
     </div>
 
+    <!-- ── Company Overview ── -->
     <div class="ppane" id="ppane-overview">
       <div class="card">
-        <div class="card-title">Company Overview</div>
-        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your company overview or presentation. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
+        <div class="card-title" data-t="tab_overview">Company Overview</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-t="overview_hint">Upload your company overview or presentation. Accepted: PDF or PowerPoint (.pdf, .pptx)</p>
         <div class="upload-zone" onclick="document.getElementById('ov-input').click()">
           <div class="icon">&#128202;</div>
-          <strong>Upload Overview</strong>
+          <strong data-t="upload_overview">Upload Overview</strong>
           <small>PDF or PowerPoint files</small>
           <div class="file-chosen" id="ov-chosen"></div>
         </div>
         <input type="file" id="ov-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'ov-chosen','ov')">
-        <button class="up-btn" onclick="uploadFile('ov','overview','Company Presentation')">Upload</button>
-        <div class="prog" id="ov-prog">Uploading...</div>
-        <div class="pmsg ok" id="ov-ok">Overview uploaded successfully!</div>
-        <div class="pmsg err" id="ov-err">Upload failed. Please try again.</div>
+        <button class="up-btn" onclick="uploadFile('ov','overview','Company Presentation')" data-t="btn_upload">Upload</button>
+        <div class="prog" id="ov-prog" data-t="uploading">Uploading...</div>
+        <div class="pmsg ok" id="ov-ok" data-t="upload_ok">Overview uploaded successfully!</div>
+        <div class="pmsg err" id="ov-err"></div>
       </div>
       <div class="file-list" id="ov-list"></div>
     </div>
 
+    <!-- ── Quote Sheets ── -->
     <div class="ppane" id="ppane-quotes">
       <div class="card">
-        <div class="card-title">Quote Sheet</div>
-        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your pricing and quote sheets. Accepted: Excel (.xlsx, .xls)</p>
+        <div class="card-title" data-t="tab_quotes">Quote Sheet</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-t="quotes_hint">Upload your pricing and quote sheets. Accepted: Excel (.xlsx, .xls)</p>
         <div class="upload-zone" onclick="document.getElementById('qt-input').click()">
           <div class="icon">&#128202;</div>
-          <strong>Upload Quote Sheet</strong>
+          <strong data-t="upload_quotes">Upload Quote Sheet</strong>
           <small>Excel files only (.xlsx, .xls)</small>
           <div class="file-chosen" id="qt-chosen"></div>
         </div>
         <input type="file" id="qt-input" accept=".xlsx,.xls" style="display:none" onchange="chooseFile(this,'qt-chosen','qt')">
-        <button class="up-btn" onclick="uploadFile('qt','quotes','Quote Sheet')">Upload</button>
-        <div class="prog" id="qt-prog">Uploading...</div>
-        <div class="pmsg ok" id="qt-ok">Quote sheet uploaded successfully!</div>
-        <div class="pmsg err" id="qt-err">Upload failed. Please try again.</div>
+        <button class="up-btn" onclick="uploadFile('qt','quotes','Quote Sheet')" data-t="btn_upload">Upload</button>
+        <div class="prog" id="qt-prog" data-t="uploading">Uploading...</div>
+        <div class="pmsg ok" id="qt-ok" data-t="upload_ok">Quote sheet uploaded successfully!</div>
+        <div class="pmsg err" id="qt-err"></div>
       </div>
       <div class="file-list" id="qt-list"></div>
     </div>
-  </div>
-</div>
+
+  </div><!-- /pcontent -->
+</div><!-- /portal -->
 
 <script>
+// ── Config ──
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
-var USER=null,TOKEN=null,FACTORY_NAME='';
+var USER=null,TOKEN=null,FACTORY_NAME='',FACTORY_ID=null;
 var selFiles={cat:null,ov:null,qt:null};
+var locationBlocks=[];   // [{id, type, data}]
+var certDetailData={};   // cert_name -> {cert_number, expiry_date, db_id}
+var LANG='en';
 
 function g(id){return document.getElementById(id);}
 
-function dateStamp(){
-  var d=new Date();
-  var mm=String(d.getMonth()+1).padStart(2,'0');
-  var dd=String(d.getDate()).padStart(2,'0');
-  var yy=String(d.getFullYear()).slice(-2);
-  return mm+dd+yy;
+// ── i18n ──
+var T={
+  en:{
+    brand_name:'Supplier Portal',brand_sub:'Factory Account',
+    tab_signin:'Sign In',tab_create:'Create Account',
+    login_title:'Welcome back',login_sub:'Sign in to your factory account',
+    signup_title:'Create your account',signup_sub:'Set up your factory account to get started',
+    forgot_title:'Reset password',forgot_sub:'We will send a reset link to your email',
+    lbl_email:'Email',lbl_password:'Password',lbl_confirm_pass:'Confirm Password',
+    forgot_link:'Forgot password?',btn_signin:'Sign In',btn_create:'Create Account',
+    btn_send_reset:'Send Reset Link',reset_sent:'Reset link sent! Check your inbox.',back_signin:'Back to sign in',
+    btn_signout:'Sign out',
+    tab_factory_details:'Factory Details',tab_locations:'Locations',tab_certifications:'Certifications',
+    tab_catalogs:'Catalogs',tab_overview:'Company Overview',tab_quotes:'Quote Sheets',
+    section_factory_info:'Factory Information',lbl_name_en:'Factory Name (English)',lbl_name_local:'Factory Name (Local Language)',
+    lbl_years:'Years in Business',lbl_revenue:'Annual Revenue (USD)',lbl_export:'Export %',hint_export:'% of production exported',
+    lbl_telephone:'Telephone',
+    section_address:'Main Factory Address',lbl_address:'Street Address',lbl_city:'City',lbl_state:'State / Province',lbl_postal:'Postal Code',lbl_country:'Country',
+    section_capacity:'Factory Capacity',lbl_employees:'Total Employees',lbl_engineers:'Engineers / R&D Staff',
+    lbl_qc:'QC Staff',lbl_lines:'Production Lines',lbl_sqm:'Floor Space (m²)',lbl_injection:'Injection Machines',lbl_capacity:'Monthly Capacity (units)',lbl_capacity_notes:'Capacity Notes',
+    section_sales:'Primary Sales Contact',lbl_contact_name:'Contact Name',lbl_contact_title:'Title / Position',
+    lbl_mobile:'Mobile',lbl_contact_email:'Email',
+    section_categories:'Product Categories',lbl_categories:'What do you manufacture?',
+    btn_save:'Save Factory Details',saving:'Saving...',save_ok:'Saved successfully!',
+    section_locations:'Factory Locations & Offices',locations_hint:'Add all factory sites, warehouses, and sales offices.',
+    btn_add_location:'+ Add Factory Location',btn_add_office:'+ Add Sales / Engineering Office',
+    btn_save_locations:'Save Locations',
+    section_cert_select:'Select Certifications',lbl_cert_other:'Other Certifications',
+    section_cert_details:'Certificate Details (Optional)',cert_details_hint:'For each certification, add the certificate number, expiry date, and upload the PDF.',
+    btn_save_certs:'Save Certifications',
+    catalog_hint:'Upload your product catalog. Accepted: PDF or PowerPoint.',upload_catalog:'Upload Catalog',
+    overview_hint:'Upload your company overview or presentation.',upload_overview:'Upload Overview',
+    quotes_hint:'Upload your pricing and quote sheets. Accepted: Excel.',upload_quotes:'Upload Quote Sheet',
+    btn_upload:'Upload',uploading:'Uploading...',upload_ok:'Uploaded successfully!',
+    lbl_cert_number:'Certificate Number',lbl_cert_expiry:'Expiry Date',lbl_cert_file:'Upload Certificate PDF',
+    lbl_loc_type:'Type',lbl_loc_name:'Location Name',lbl_loc_address:'Address',lbl_loc_city:'City',
+    lbl_loc_country:'Country',lbl_loc_contact:'Contact Name',lbl_loc_email:'Email',lbl_loc_phone:'Phone',
+    same_as_factory:'Same address as main factory',
+    lbl_loc_employees:'Employees',lbl_loc_lines:'Production Lines',lbl_loc_sqm:'Floor Space (m²)',lbl_loc_capacity:'Monthly Capacity'
+  },
+  'zh-s':{
+    brand_name:'供应商门户',brand_sub:'工厂账户',
+    tab_signin:'登录',tab_create:'注册账户',
+    login_title:'欢迎回来',login_sub:'登录您的工厂账户',
+    signup_title:'创建账户',signup_sub:'注册工厂账户以开始使用',
+    forgot_title:'重置密码',forgot_sub:'我们将发送重置链接到您的邮箱',
+    lbl_email:'邮箱',lbl_password:'密码',lbl_confirm_pass:'确认密码',
+    forgot_link:'忘记密码？',btn_signin:'登录',btn_create:'注册账户',
+    btn_send_reset:'发送重置链接',reset_sent:'重置链接已发送！请查看您的邮箱。',back_signin:'返回登录',
+    btn_signout:'退出',
+    tab_factory_details:'工厂信息',tab_locations:'工厂地点',tab_certifications:'认证',
+    tab_catalogs:'产品目录',tab_overview:'公司介绍',tab_quotes:'报价单',
+    section_factory_info:'工厂基本信息',lbl_name_en:'工厂名称（英文）',lbl_name_local:'工厂名称（中文）',
+    lbl_years:'成立年限',lbl_revenue:'年营业额（美元）',lbl_export:'出口占比 %',hint_export:'出口占总产量的百分比',
+    lbl_telephone:'电话',
+    section_address:'主要工厂地址',lbl_address:'街道地址',lbl_city:'城市',lbl_state:'省/州',lbl_postal:'邮政编码',lbl_country:'国家',
+    section_capacity:'工厂产能',lbl_employees:'员工总数',lbl_engineers:'工程师/研发人员',
+    lbl_qc:'质检人员',lbl_lines:'生产线数量',lbl_sqm:'厂房面积（平方米）',lbl_injection:'注塑机台数',lbl_capacity:'月产能（件）',lbl_capacity_notes:'产能备注',
+    section_sales:'主要销售联系人',lbl_contact_name:'联系人姓名',lbl_contact_title:'职位',
+    lbl_mobile:'手机号',lbl_contact_email:'邮箱',
+    section_categories:'产品类别',lbl_categories:'贵厂生产哪些产品？',
+    btn_save:'保存工厂信息',saving:'保存中...',save_ok:'保存成功！',
+    section_locations:'工厂地点与办公室',locations_hint:'添加所有工厂、仓库和销售办公室。主工厂地址已在工厂信息中填写。',
+    btn_add_location:'+ 添加工厂地点',btn_add_office:'+ 添加销售/工程办公室',
+    btn_save_locations:'保存地点',
+    section_cert_select:'选择认证',lbl_cert_other:'其他认证',
+    section_cert_details:'证书详情（可选）',cert_details_hint:'为每项认证添加证书编号、到期日期，并上传PDF。',
+    btn_save_certs:'保存认证',
+    catalog_hint:'上传产品目录。接受：PDF或PowerPoint。',upload_catalog:'上传目录',
+    overview_hint:'上传公司介绍或演示文稿。',upload_overview:'上传公司介绍',
+    quotes_hint:'上传定价和报价单。接受：Excel。',upload_quotes:'上传报价单',
+    btn_upload:'上传',uploading:'上传中...',upload_ok:'上传成功！',
+    lbl_cert_number:'证书编号',lbl_cert_expiry:'到期日期',lbl_cert_file:'上传证书PDF',
+    lbl_loc_type:'类型',lbl_loc_name:'地点名称',lbl_loc_address:'地址',lbl_loc_city:'城市',
+    lbl_loc_country:'国家',lbl_loc_contact:'联系人',lbl_loc_email:'邮箱',lbl_loc_phone:'电话',
+    same_as_factory:'与主工厂地址相同',
+    lbl_loc_employees:'员工人数',lbl_loc_lines:'生产线',lbl_loc_sqm:'厂房面积（m²）',lbl_loc_capacity:'月产能'
+  },
+  'zh-t':{
+    brand_name:'供應商門戶',brand_sub:'工廠帳戶',tab_signin:'登入',tab_create:'註冊帳戶',
+    login_title:'歡迎回來',login_sub:'登入您的工廠帳戶',signup_title:'建立帳戶',signup_sub:'註冊工廠帳戶以開始使用',
+    forgot_title:'重設密碼',forgot_sub:'我們將發送重設連結到您的信箱',
+    lbl_email:'電子郵件',lbl_password:'密碼',lbl_confirm_pass:'確認密碼',
+    forgot_link:'忘記密碼？',btn_signin:'登入',btn_create:'註冊帳戶',
+    btn_send_reset:'發送重設連結',reset_sent:'重設連結已發送！請查看信箱。',back_signin:'返回登入',
+    btn_signout:'登出',tab_factory_details:'工廠資訊',tab_locations:'工廠地點',tab_certifications:'認證',
+    tab_catalogs:'產品目錄',tab_overview:'公司介紹',tab_quotes:'報價單',
+    section_factory_info:'工廠基本資訊',lbl_name_en:'工廠名稱（英文）',lbl_name_local:'工廠名稱（繁體中文）',
+    lbl_years:'成立年數',lbl_revenue:'年營業額（美元）',lbl_export:'出口比例 %',hint_export:'出口占總產量的百分比',
+    lbl_telephone:'電話',section_address:'主要工廠地址',lbl_address:'街道地址',lbl_city:'城市',
+    lbl_state:'省/州',lbl_postal:'郵遞區號',lbl_country:'國家',
+    section_capacity:'工廠產能',lbl_employees:'員工總數',lbl_engineers:'工程師/研發人員',
+    lbl_qc:'品管人員',lbl_lines:'生產線數量',lbl_sqm:'廠房面積（平方公尺）',lbl_injection:'射出成型機台數',lbl_capacity:'月產能（件）',lbl_capacity_notes:'產能備註',
+    section_sales:'主要銷售聯絡人',lbl_contact_name:'聯絡人姓名',lbl_contact_title:'職稱',
+    lbl_mobile:'手機號碼',lbl_contact_email:'電子郵件',
+    section_categories:'產品類別',lbl_categories:'貴廠生產哪些產品？',
+    btn_save:'儲存工廠資訊',saving:'儲存中...',save_ok:'儲存成功！',
+    section_locations:'工廠地點與辦公室',locations_hint:'新增所有工廠、倉庫和銷售辦公室。',
+    btn_add_location:'+ 新增工廠地點',btn_add_office:'+ 新增銷售/工程辦公室',btn_save_locations:'儲存地點',
+    section_cert_select:'選擇認證',lbl_cert_other:'其他認證',
+    section_cert_details:'憑證詳情（選填）',cert_details_hint:'為每項認證新增憑證編號、到期日期並上傳PDF。',
+    btn_save_certs:'儲存認證',
+    catalog_hint:'上傳產品目錄。接受：PDF或PowerPoint。',upload_catalog:'上傳目錄',
+    overview_hint:'上傳公司介紹或簡報。',upload_overview:'上傳公司介紹',
+    quotes_hint:'上傳報價單。接受：Excel。',upload_quotes:'上傳報價單',
+    btn_upload:'上傳',uploading:'上傳中...',upload_ok:'上傳成功！',
+    lbl_cert_number:'憑證編號',lbl_cert_expiry:'到期日期',lbl_cert_file:'上傳憑證PDF',
+    lbl_loc_type:'類型',lbl_loc_name:'地點名稱',lbl_loc_address:'地址',lbl_loc_city:'城市',
+    lbl_loc_country:'國家',lbl_loc_contact:'聯絡人',lbl_loc_email:'電子郵件',lbl_loc_phone:'電話',
+    same_as_factory:'與主工廠地址相同',
+    lbl_loc_employees:'員工人數',lbl_loc_lines:'生產線',lbl_loc_sqm:'廠房面積（m²）',lbl_loc_capacity:'月產能'
+  },
+  vi:{
+    brand_name:'Cổng Nhà Cung Cấp',brand_sub:'Tài Khoản Nhà Máy',tab_signin:'Đăng Nhập',tab_create:'Tạo Tài Khoản',
+    login_title:'Chào mừng trở lại',login_sub:'Đăng nhập vào tài khoản nhà máy của bạn',
+    signup_title:'Tạo tài khoản',signup_sub:'Thiết lập tài khoản nhà máy để bắt đầu',
+    forgot_title:'Đặt lại mật khẩu',forgot_sub:'Chúng tôi sẽ gửi liên kết đặt lại đến email của bạn',
+    lbl_email:'Email',lbl_password:'Mật khẩu',lbl_confirm_pass:'Xác nhận mật khẩu',
+    forgot_link:'Quên mật khẩu?',btn_signin:'Đăng Nhập',btn_create:'Tạo Tài Khoản',
+    btn_send_reset:'Gửi liên kết đặt lại',reset_sent:'Đã gửi liên kết! Kiểm tra hộp thư.',back_signin:'Quay lại đăng nhập',
+    btn_signout:'Đăng xuất',tab_factory_details:'Thông Tin Nhà Máy',tab_locations:'Địa Điểm',tab_certifications:'Chứng Nhận',
+    tab_catalogs:'Danh Mục',tab_overview:'Giới Thiệu Công Ty',tab_quotes:'Bảng Giá',
+    section_factory_info:'Thông tin nhà máy',lbl_name_en:'Tên nhà máy (tiếng Anh)',lbl_name_local:'Tên nhà máy (tiếng địa phương)',
+    lbl_years:'Số năm hoạt động',lbl_revenue:'Doanh thu hàng năm (USD)',lbl_export:'% xuất khẩu',hint_export:'% sản lượng xuất khẩu',
+    lbl_telephone:'Điện thoại',section_address:'Địa chỉ nhà máy chính',lbl_address:'Địa chỉ đường phố',
+    lbl_city:'Thành phố',lbl_state:'Tỉnh/Bang',lbl_postal:'Mã bưu chính',lbl_country:'Quốc gia',
+    section_capacity:'Năng lực sản xuất',lbl_employees:'Tổng số nhân viên',lbl_engineers:'Kỹ sư/R&D',
+    lbl_qc:'Nhân viên QC',lbl_lines:'Dây chuyền sản xuất',lbl_sqm:'Diện tích nhà xưởng (m²)',lbl_injection:'Máy ép nhựa',lbl_capacity:'Năng lực hàng tháng (đơn vị)',lbl_capacity_notes:'Ghi chú năng lực',
+    section_sales:'Liên hệ bán hàng chính',lbl_contact_name:'Tên liên hệ',lbl_contact_title:'Chức vụ',
+    lbl_mobile:'Di động',lbl_contact_email:'Email',
+    section_categories:'Danh mục sản phẩm',lbl_categories:'Nhà máy sản xuất gì?',
+    btn_save:'Lưu thông tin',saving:'Đang lưu...',save_ok:'Lưu thành công!',
+    section_locations:'Địa điểm & văn phòng',locations_hint:'Thêm tất cả cơ sở, kho và văn phòng.',
+    btn_add_location:'+ Thêm địa điểm nhà máy',btn_add_office:'+ Thêm văn phòng bán hàng/kỹ thuật',btn_save_locations:'Lưu địa điểm',
+    section_cert_select:'Chọn chứng nhận',lbl_cert_other:'Chứng nhận khác',
+    section_cert_details:'Chi tiết chứng chỉ (tùy chọn)',cert_details_hint:'Thêm số chứng chỉ, ngày hết hạn và tải lên PDF.',
+    btn_save_certs:'Lưu chứng nhận',
+    catalog_hint:'Tải lên danh mục sản phẩm. Chấp nhận: PDF hoặc PowerPoint.',upload_catalog:'Tải lên danh mục',
+    overview_hint:'Tải lên giới thiệu công ty.',upload_overview:'Tải lên giới thiệu',
+    quotes_hint:'Tải lên bảng giá. Chấp nhận: Excel.',upload_quotes:'Tải lên bảng giá',
+    btn_upload:'Tải lên',uploading:'Đang tải...',upload_ok:'Tải lên thành công!',
+    lbl_cert_number:'Số chứng chỉ',lbl_cert_expiry:'Ngày hết hạn',lbl_cert_file:'Tải lên PDF chứng chỉ',
+    lbl_loc_type:'Loại',lbl_loc_name:'Tên địa điểm',lbl_loc_address:'Địa chỉ',lbl_loc_city:'Thành phố',
+    lbl_loc_country:'Quốc gia',lbl_loc_contact:'Liên hệ',lbl_loc_email:'Email',lbl_loc_phone:'Điện thoại',
+    same_as_factory:'Cùng địa chỉ với nhà máy chính',
+    lbl_loc_employees:'Nhân viên',lbl_loc_lines:'Dây chuyền',lbl_loc_sqm:'Diện tích (m²)',lbl_loc_capacity:'Năng lực tháng'
+  },
+  ko:{
+    brand_name:'공급업체 포털',brand_sub:'공장 계정',tab_signin:'로그인',tab_create:'계정 만들기',
+    login_title:'다시 오셨군요',login_sub:'공장 계정으로 로그인하세요',signup_title:'계정 만들기',signup_sub:'공장 계정을 설정하세요',
+    forgot_title:'비밀번호 재설정',forgot_sub:'이메일로 재설정 링크를 보내드립니다',
+    lbl_email:'이메일',lbl_password:'비밀번호',lbl_confirm_pass:'비밀번호 확인',
+    forgot_link:'비밀번호를 잊으셨나요?',btn_signin:'로그인',btn_create:'계정 만들기',
+    btn_send_reset:'재설정 링크 보내기',reset_sent:'링크가 전송되었습니다! 받은 편지함을 확인하세요.',back_signin:'로그인으로 돌아가기',
+    btn_signout:'로그아웃',tab_factory_details:'공장 정보',tab_locations:'위치',tab_certifications:'인증',
+    tab_catalogs:'카탈로그',tab_overview:'회사 소개',tab_quotes:'견적서',
+    section_factory_info:'공장 기본 정보',lbl_name_en:'공장명 (영문)',lbl_name_local:'공장명 (현지어)',
+    lbl_years:'업력 (년)',lbl_revenue:'연간 매출 (USD)',lbl_export:'수출 비중 %',hint_export:'생산량 중 수출 비중',
+    lbl_telephone:'전화번호',section_address:'주요 공장 주소',lbl_address:'도로명 주소',lbl_city:'시/군',lbl_state:'도/주',lbl_postal:'우편번호',lbl_country:'국가',
+    section_capacity:'생산 능력',lbl_employees:'총 직원 수',lbl_engineers:'엔지니어/R&D',
+    lbl_qc:'품질관리 인원',lbl_lines:'생산 라인 수',lbl_sqm:'공장 면적 (m²)',lbl_injection:'사출 성형기',lbl_capacity:'월 생산량 (단위)',lbl_capacity_notes:'생산 능력 비고',
+    section_sales:'주요 영업 담당자',lbl_contact_name:'담당자 이름',lbl_contact_title:'직함',
+    lbl_mobile:'휴대폰',lbl_contact_email:'이메일',
+    section_categories:'제품 카테고리',lbl_categories:'어떤 제품을 생산하시나요?',
+    btn_save:'공장 정보 저장',saving:'저장 중...',save_ok:'저장되었습니다!',
+    section_locations:'공장 위치 및 사무소',locations_hint:'모든 공장, 창고, 영업 사무소를 추가하세요.',
+    btn_add_location:'+ 공장 위치 추가',btn_add_office:'+ 영업/기술 사무소 추가',btn_save_locations:'위치 저장',
+    section_cert_select:'인증 선택',lbl_cert_other:'기타 인증',
+    section_cert_details:'인증서 세부 정보 (선택사항)',cert_details_hint:'인증번호, 만료일, PDF를 추가하세요.',
+    btn_save_certs:'인증 저장',
+    catalog_hint:'제품 카탈로그를 업로드하세요. 허용: PDF 또는 PowerPoint.',upload_catalog:'카탈로그 업로드',
+    overview_hint:'회사 소개서를 업로드하세요.',upload_overview:'소개서 업로드',
+    quotes_hint:'견적서를 업로드하세요. 허용: Excel.',upload_quotes:'견적서 업로드',
+    btn_upload:'업로드',uploading:'업로드 중...',upload_ok:'업로드 성공!',
+    lbl_cert_number:'인증서 번호',lbl_cert_expiry:'만료일',lbl_cert_file:'인증서 PDF 업로드',
+    lbl_loc_type:'유형',lbl_loc_name:'위치명',lbl_loc_address:'주소',lbl_loc_city:'도시',
+    lbl_loc_country:'국가',lbl_loc_contact:'담당자',lbl_loc_email:'이메일',lbl_loc_phone:'전화',
+    same_as_factory:'주요 공장과 동일한 주소',
+    lbl_loc_employees:'직원 수',lbl_loc_lines:'생산 라인',lbl_loc_sqm:'면적 (m²)',lbl_loc_capacity:'월 생산량'
+  },
+  ja:{
+    brand_name:'サプライヤーポータル',brand_sub:'工場アカウント',tab_signin:'ログイン',tab_create:'アカウント作成',
+    login_title:'おかえりなさい',login_sub:'工場アカウントにログイン',signup_title:'アカウント作成',signup_sub:'工場アカウントを設定してください',
+    forgot_title:'パスワードリセット',forgot_sub:'リセットリンクをメールで送信します',
+    lbl_email:'メールアドレス',lbl_password:'パスワード',lbl_confirm_pass:'パスワード確認',
+    forgot_link:'パスワードを忘れた方',btn_signin:'ログイン',btn_create:'アカウント作成',
+    btn_send_reset:'リセットリンクを送信',reset_sent:'リンクを送信しました！受信箱を確認してください。',back_signin:'ログインに戻る',
+    btn_signout:'サインアウト',tab_factory_details:'工場情報',tab_locations:'拠点',tab_certifications:'認証',
+    tab_catalogs:'カタログ',tab_overview:'会社概要',tab_quotes:'見積書',
+    section_factory_info:'工場基本情報',lbl_name_en:'工場名（英語）',lbl_name_local:'工場名（現地語）',
+    lbl_years:'創業年数',lbl_revenue:'年間売上高（USD）',lbl_export:'輸出比率 %',hint_export:'生産量に占める輸出の割合',
+    lbl_telephone:'電話番号',section_address:'主要工場住所',lbl_address:'住所',lbl_city:'市区町村',lbl_state:'都道府県',lbl_postal:'郵便番号',lbl_country:'国',
+    section_capacity:'生産能力',lbl_employees:'従業員数',lbl_engineers:'エンジニア/R&D',
+    lbl_qc:'品質管理スタッフ',lbl_lines:'生産ライン数',lbl_sqm:'工場面積（m²）',lbl_injection:'射出成形機',lbl_capacity:'月間生産能力（単位）',lbl_capacity_notes:'生産能力メモ',
+    section_sales:'主要営業担当者',lbl_contact_name:'担当者名',lbl_contact_title:'役職',
+    lbl_mobile:'携帯電話',lbl_contact_email:'メールアドレス',
+    section_categories:'製品カテゴリー',lbl_categories:'どのような製品を製造していますか？',
+    btn_save:'工場情報を保存',saving:'保存中...',save_ok:'保存しました！',
+    section_locations:'工場拠点・オフィス',locations_hint:'すべての工場、倉庫、営業所を追加してください。',
+    btn_add_location:'+ 工場拠点を追加',btn_add_office:'+ 営業/技術オフィスを追加',btn_save_locations:'拠点を保存',
+    section_cert_select:'認証を選択',lbl_cert_other:'その他の認証',
+    section_cert_details:'証明書の詳細（任意）',cert_details_hint:'証明書番号、有効期限、PDFを追加してください。',
+    btn_save_certs:'認証を保存',
+    catalog_hint:'製品カタログをアップロードしてください。対応形式：PDFまたはPowerPoint。',upload_catalog:'カタログをアップロード',
+    overview_hint:'会社概要をアップロードしてください。',upload_overview:'概要をアップロード',
+    quotes_hint:'見積書をアップロードしてください。対応形式：Excel。',upload_quotes:'見積書をアップロード',
+    btn_upload:'アップロード',uploading:'アップロード中...',upload_ok:'アップロード完了！',
+    lbl_cert_number:'証明書番号',lbl_cert_expiry:'有効期限',lbl_cert_file:'証明書PDFをアップロード',
+    lbl_loc_type:'種類',lbl_loc_name:'拠点名',lbl_loc_address:'住所',lbl_loc_city:'市区町村',
+    lbl_loc_country:'国',lbl_loc_contact:'担当者',lbl_loc_email:'メール',lbl_loc_phone:'電話',
+    same_as_factory:'主要工場と同じ住所',
+    lbl_loc_employees:'従業員数',lbl_loc_lines:'生産ライン',lbl_loc_sqm:'面積（m²）',lbl_loc_capacity:'月間生産能力'
+  },
+  hi:{
+    brand_name:'आपूर्तिकर्ता पोर्टल',brand_sub:'कारखाना खाता',tab_signin:'साइन इन',tab_create:'खाता बनाएं',
+    login_title:'वापस स्वागत है',login_sub:'अपने कारखाने के खाते में साइन इन करें',
+    signup_title:'खाता बनाएं',signup_sub:'शुरू करने के लिए कारखाना खाता सेट करें',
+    forgot_title:'पासवर्ड रीसेट',forgot_sub:'हम आपके ईमेल पर रीसेट लिंक भेजेंगे',
+    lbl_email:'ईमेल',lbl_password:'पासवर्ड',lbl_confirm_pass:'पासवर्ड की पुष्टि करें',
+    forgot_link:'पासवर्ड भूल गए?',btn_signin:'साइन इन',btn_create:'खाता बनाएं',
+    btn_send_reset:'रीसेट लिंक भेजें',reset_sent:'लिंक भेजा गया! अपना इनबॉक्स देखें।',back_signin:'साइन इन पर वापस',
+    btn_signout:'साइन आउट',tab_factory_details:'कारखाना विवरण',tab_locations:'स्थान',tab_certifications:'प्रमाणपत्र',
+    tab_catalogs:'कैटलॉग',tab_overview:'कंपनी परिचय',tab_quotes:'कोटेशन',
+    section_factory_info:'कारखाना जानकारी',lbl_name_en:'कारखाना नाम (अंग्रेजी)',lbl_name_local:'कारखाना नाम (स्थानीय भाषा)',
+    lbl_years:'व्यापार में वर्ष',lbl_revenue:'वार्षिक राजस्व (USD)',lbl_export:'निर्यात %',hint_export:'उत्पादन का निर्यात प्रतिशत',
+    lbl_telephone:'टेलीफोन',section_address:'मुख्य कारखाना पता',lbl_address:'सड़क का पता',lbl_city:'शहर',lbl_state:'राज्य',lbl_postal:'पिन कोड',lbl_country:'देश',
+    section_capacity:'उत्पादन क्षमता',lbl_employees:'कुल कर्मचारी',lbl_engineers:'इंजीनियर/R&D',
+    lbl_qc:'QC कर्मचारी',lbl_lines:'उत्पादन लाइनें',lbl_sqm:'फ्लोर स्पेस (m²)',lbl_injection:'इंजेक्शन मशीनें',lbl_capacity:'मासिक क्षमता (इकाइयां)',lbl_capacity_notes:'क्षमता नोट्स',
+    section_sales:'मुख्य बिक्री संपर्क',lbl_contact_name:'संपर्क नाम',lbl_contact_title:'पदवी',
+    lbl_mobile:'मोबाइल',lbl_contact_email:'ईमेल',
+    section_categories:'उत्पाद श्रेणियां',lbl_categories:'आप क्या निर्माण करते हैं?',
+    btn_save:'कारखाना विवरण सहेजें',saving:'सहेज रहे हैं...',save_ok:'सफलतापूर्वक सहेजा!',
+    section_locations:'कारखाना स्थान और कार्यालय',locations_hint:'सभी कारखाने, गोदाम और कार्यालय जोड़ें।',
+    btn_add_location:'+ कारखाना स्थान जोड़ें',btn_add_office:'+ बिक्री/तकनीकी कार्यालय जोड़ें',btn_save_locations:'स्थान सहेजें',
+    section_cert_select:'प्रमाणपत्र चुनें',lbl_cert_other:'अन्य प्रमाणपत्र',
+    section_cert_details:'प्रमाणपत्र विवरण (वैकल्पिक)',cert_details_hint:'प्रमाणपत्र नंबर, समाप्ति तिथि और PDF जोड़ें।',
+    btn_save_certs:'प्रमाणपत्र सहेजें',
+    catalog_hint:'उत्पाद कैटलॉग अपलोड करें। स्वीकृत: PDF या PowerPoint।',upload_catalog:'कैटलॉग अपलोड करें',
+    overview_hint:'कंपनी परिचय अपलोड करें।',upload_overview:'परिचय अपलोड करें',
+    quotes_hint:'कोटेशन अपलोड करें। स्वीकृत: Excel।',upload_quotes:'कोटेशन अपलोड करें',
+    btn_upload:'अपलोड',uploading:'अपलोड हो रहा है...',upload_ok:'अपलोड सफल!',
+    lbl_cert_number:'प्रमाणपत्र संख्या',lbl_cert_expiry:'समाप्ति तिथि',lbl_cert_file:'प्रमाणपत्र PDF अपलोड',
+    lbl_loc_type:'प्रकार',lbl_loc_name:'स्थान नाम',lbl_loc_address:'पता',lbl_loc_city:'शहर',
+    lbl_loc_country:'देश',lbl_loc_contact:'संपर्क',lbl_loc_email:'ईमेल',lbl_loc_phone:'फोन',
+    same_as_factory:'मुख्य कारखाने जैसा पता',
+    lbl_loc_employees:'कर्मचारी',lbl_loc_lines:'उत्पादन लाइनें',lbl_loc_sqm:'क्षेत्रफल (m²)',lbl_loc_capacity:'मासिक क्षमता'
+  },
+  es:{
+    brand_name:'Portal de Proveedores',brand_sub:'Cuenta de Fábrica',tab_signin:'Iniciar Sesión',tab_create:'Crear Cuenta',
+    login_title:'Bienvenido de nuevo',login_sub:'Inicia sesión en tu cuenta de fábrica',
+    signup_title:'Crea tu cuenta',signup_sub:'Configura tu cuenta de fábrica para comenzar',
+    forgot_title:'Restablecer contraseña',forgot_sub:'Te enviaremos un enlace a tu email',
+    lbl_email:'Correo electrónico',lbl_password:'Contraseña',lbl_confirm_pass:'Confirmar contraseña',
+    forgot_link:'¿Olvidaste tu contraseña?',btn_signin:'Iniciar Sesión',btn_create:'Crear Cuenta',
+    btn_send_reset:'Enviar enlace',reset_sent:'¡Enlace enviado! Revisa tu bandeja de entrada.',back_signin:'Volver al inicio de sesión',
+    btn_signout:'Cerrar sesión',tab_factory_details:'Datos de Fábrica',tab_locations:'Ubicaciones',tab_certifications:'Certificaciones',
+    tab_catalogs:'Catálogos',tab_overview:'Presentación',tab_quotes:'Cotizaciones',
+    section_factory_info:'Información de la Fábrica',lbl_name_en:'Nombre de fábrica (inglés)',lbl_name_local:'Nombre de fábrica (idioma local)',
+    lbl_years:'Años en el negocio',lbl_revenue:'Ingresos anuales (USD)',lbl_export:'% de exportación',hint_export:'% de la producción exportada',
+    lbl_telephone:'Teléfono',section_address:'Dirección principal',lbl_address:'Dirección',lbl_city:'Ciudad',lbl_state:'Estado/Provincia',lbl_postal:'Código postal',lbl_country:'País',
+    section_capacity:'Capacidad de Producción',lbl_employees:'Total de empleados',lbl_engineers:'Ingenieros/I+D',
+    lbl_qc:'Personal de QC',lbl_lines:'Líneas de producción',lbl_sqm:'Espacio de planta (m²)',lbl_injection:'Máquinas de inyección',lbl_capacity:'Capacidad mensual (unidades)',lbl_capacity_notes:'Notas de capacidad',
+    section_sales:'Contacto de ventas principal',lbl_contact_name:'Nombre de contacto',lbl_contact_title:'Cargo',
+    lbl_mobile:'Móvil',lbl_contact_email:'Email',
+    section_categories:'Categorías de productos',lbl_categories:'¿Qué fabrica?',
+    btn_save:'Guardar información',saving:'Guardando...',save_ok:'¡Guardado correctamente!',
+    section_locations:'Ubicaciones y oficinas',locations_hint:'Agrega todas las plantas, almacenes y oficinas.',
+    btn_add_location:'+ Agregar ubicación de fábrica',btn_add_office:'+ Agregar oficina de ventas/técnica',btn_save_locations:'Guardar ubicaciones',
+    section_cert_select:'Seleccionar certificaciones',lbl_cert_other:'Otras certificaciones',
+    section_cert_details:'Detalles del certificado (opcional)',cert_details_hint:'Agrega número, fecha de vencimiento y PDF.',
+    btn_save_certs:'Guardar certificaciones',
+    catalog_hint:'Sube tu catálogo. Aceptado: PDF o PowerPoint.',upload_catalog:'Subir catálogo',
+    overview_hint:'Sube tu presentación de empresa.',upload_overview:'Subir presentación',
+    quotes_hint:'Sube cotizaciones. Aceptado: Excel.',upload_quotes:'Subir cotización',
+    btn_upload:'Subir',uploading:'Subiendo...',upload_ok:'¡Subido correctamente!',
+    lbl_cert_number:'Número de certificado',lbl_cert_expiry:'Fecha de vencimiento',lbl_cert_file:'Subir PDF del certificado',
+    lbl_loc_type:'Tipo',lbl_loc_name:'Nombre del lugar',lbl_loc_address:'Dirección',lbl_loc_city:'Ciudad',
+    lbl_loc_country:'País',lbl_loc_contact:'Contacto',lbl_loc_email:'Email',lbl_loc_phone:'Teléfono',
+    same_as_factory:'Misma dirección que la fábrica principal',
+    lbl_loc_employees:'Empleados',lbl_loc_lines:'Líneas de producción',lbl_loc_sqm:'Área (m²)',lbl_loc_capacity:'Capacidad mensual'
+  },
+  de:{
+    brand_name:'Lieferantenportal',brand_sub:'Fabrik-Konto',tab_signin:'Anmelden',tab_create:'Konto erstellen',
+    login_title:'Willkommen zurück',login_sub:'Melden Sie sich bei Ihrem Fabrik-Konto an',
+    signup_title:'Konto erstellen',signup_sub:'Richten Sie Ihr Fabrik-Konto ein',
+    forgot_title:'Passwort zurücksetzen',forgot_sub:'Wir senden einen Reset-Link an Ihre E-Mail',
+    lbl_email:'E-Mail',lbl_password:'Passwort',lbl_confirm_pass:'Passwort bestätigen',
+    forgot_link:'Passwort vergessen?',btn_signin:'Anmelden',btn_create:'Konto erstellen',
+    btn_send_reset:'Reset-Link senden',reset_sent:'Link gesendet! Prüfen Sie Ihren Posteingang.',back_signin:'Zurück zur Anmeldung',
+    btn_signout:'Abmelden',tab_factory_details:'Fabrik-Details',tab_locations:'Standorte',tab_certifications:'Zertifizierungen',
+    tab_catalogs:'Kataloge',tab_overview:'Firmenübersicht',tab_quotes:'Angebote',
+    section_factory_info:'Fabrik-Informationen',lbl_name_en:'Fabrikname (Englisch)',lbl_name_local:'Fabrikname (Landessprache)',
+    lbl_years:'Jahre im Geschäft',lbl_revenue:'Jahresumsatz (USD)',lbl_export:'Export %',hint_export:'% der Produktion wird exportiert',
+    lbl_telephone:'Telefon',section_address:'Hauptadresse der Fabrik',lbl_address:'Straße',lbl_city:'Stadt',lbl_state:'Bundesland',lbl_postal:'Postleitzahl',lbl_country:'Land',
+    section_capacity:'Produktionskapazität',lbl_employees:'Gesamtmitarbeiter',lbl_engineers:'Ingenieure/F&E',
+    lbl_qc:'QC-Personal',lbl_lines:'Produktionslinien',lbl_sqm:'Hallenfläche (m²)',lbl_injection:'Spritzgussmaschinen',lbl_capacity:'Monatskapazität (Einheiten)',lbl_capacity_notes:'Kapazitätshinweise',
+    section_sales:'Hauptverkaufskontakt',lbl_contact_name:'Kontaktname',lbl_contact_title:'Position',
+    lbl_mobile:'Mobiltelefon',lbl_contact_email:'E-Mail',
+    section_categories:'Produktkategorien',lbl_categories:'Was stellen Sie her?',
+    btn_save:'Fabrik-Details speichern',saving:'Speichern...',save_ok:'Erfolgreich gespeichert!',
+    section_locations:'Standorte & Büros',locations_hint:'Alle Werke, Lager und Büros hinzufügen.',
+    btn_add_location:'+ Fabrikstandort hinzufügen',btn_add_office:'+ Vertriebs-/Technikbüro hinzufügen',btn_save_locations:'Standorte speichern',
+    section_cert_select:'Zertifizierungen auswählen',lbl_cert_other:'Weitere Zertifizierungen',
+    section_cert_details:'Zertifikatsdetails (optional)',cert_details_hint:'Nummer, Ablaufdatum und PDF hinzufügen.',
+    btn_save_certs:'Zertifizierungen speichern',
+    catalog_hint:'Produktkatalog hochladen. Akzeptiert: PDF oder PowerPoint.',upload_catalog:'Katalog hochladen',
+    overview_hint:'Firmenübersicht hochladen.',upload_overview:'Übersicht hochladen',
+    quotes_hint:'Angebote hochladen. Akzeptiert: Excel.',upload_quotes:'Angebot hochladen',
+    btn_upload:'Hochladen',uploading:'Wird hochgeladen...',upload_ok:'Erfolgreich hochgeladen!',
+    lbl_cert_number:'Zertifikatsnummer',lbl_cert_expiry:'Ablaufdatum',lbl_cert_file:'Zertifikats-PDF hochladen',
+    lbl_loc_type:'Typ',lbl_loc_name:'Standortname',lbl_loc_address:'Adresse',lbl_loc_city:'Stadt',
+    lbl_loc_country:'Land',lbl_loc_contact:'Kontakt',lbl_loc_email:'E-Mail',lbl_loc_phone:'Telefon',
+    same_as_factory:'Gleiche Adresse wie Hauptfabrik',
+    lbl_loc_employees:'Mitarbeiter',lbl_loc_lines:'Produktionslinien',lbl_loc_sqm:'Fläche (m²)',lbl_loc_capacity:'Monatskapazität'
+  }
+};
+
+function t(key){return (T[LANG]&&T[LANG][key])||T.en[key]||key;}
+
+function setLang(lang){
+  LANG=lang;
+  document.querySelectorAll('.lang-btn').forEach(function(b){
+    b.classList.toggle('on',b.getAttribute('onclick').includes("'"+lang+"'"));
+  });
+  document.querySelectorAll('[data-t]').forEach(function(el){
+    var key=el.getAttribute('data-t');
+    var tr=t(key);
+    if(el.tagName==='INPUT'||el.tagName==='TEXTAREA'){el.placeholder=tr;}
+    else{el.innerHTML=tr;}
+  });
+  // Re-render dynamic sections if portal open
+  if(g('portal').style.display==='block'){
+    renderLocationBlocks();
+    renderCertDetails();
+  }
 }
 
-function formatFileName(factoryName,fileType,originalFile){
-  var ext=originalFile.name.split('.').pop();
-  var safeName=factoryName.replace(/[^a-zA-Z0-9\s]/g,'').trim()||'Factory';
-  return safeName+'_'+fileType+'_'+dateStamp()+'.'+ext;
-}
-
-function authTab(t){
-  var tabs=document.querySelectorAll('.tabs .tab');
-  var names=['login','signup','forgot'];
-  tabs.forEach(function(el,i){el.classList.toggle('on',names[i]===t);});
+// ── Auth ──
+function authTab(tab){
+  ['login','signup','forgot'].forEach(function(n,i){
+    document.querySelectorAll('.tabs .tab')[i] && document.querySelectorAll('.tabs .tab')[i].classList.toggle('on',n===tab);
+  });
   document.querySelectorAll('.pane').forEach(function(el){el.classList.remove('on');});
-  g('pane-'+t).classList.add('on');
+  g('pane-'+tab).classList.add('on');
 }
-
 function showAerr(id,msg){var el=g(id);el.textContent=msg;el.style.display='block';}
 
 async function signup(){
-  var email=g('s-email').value.trim();
-  var pass=g('s-pass').value;
-  var pass2=g('s-pass2').value;
+  var email=g('s-email').value.trim(),pass=g('s-pass').value,pass2=g('s-pass2').value;
   g('s-err').style.display='none';
   if(!email||!pass)return showAerr('s-err','Please fill in all fields.');
   if(pass.length<6)return showAerr('s-err','Password must be at least 6 characters.');
@@ -310,14 +826,13 @@ async function signup(){
     var d=await r.json();
     if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
     else if(d.user&&d.session){TOKEN=d.session.access_token;USER=d.user;enterPortal();}
-    else showAerr('s-err',d.error_description||d.msg||'Signup failed. Please try again.');
+    else showAerr('s-err',d.error_description||d.msg||'Signup failed.');
   }catch(e){showAerr('s-err','Connection error: '+e.message);}
-  btn.disabled=false;btn.textContent='Create Account';
+  btn.disabled=false;btn.textContent=t('btn_create');
 }
 
 async function login(){
-  var email=g('l-email').value.trim();
-  var pass=g('l-pass').value;
+  var email=g('l-email').value.trim(),pass=g('l-pass').value;
   g('l-err').style.display='none';
   if(!email||!pass)return showAerr('l-err','Please enter your email and password.');
   var btn=g('l-btn');btn.disabled=true;btn.textContent='Signing in...';
@@ -327,39 +842,43 @@ async function login(){
     if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
     else showAerr('l-err','Incorrect email or password.');
   }catch(e){showAerr('l-err','Connection error: '+e.message);}
-  btn.disabled=false;btn.textContent='Sign In';
+  btn.disabled=false;btn.textContent=t('btn_signin');
 }
 
 async function forgot(){
-  var email=g('f-email').value.trim();
-  if(!email)return;
+  var email=g('f-email').value.trim();if(!email)return;
   await fetch(SB+'/auth/v1/recover',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email})});
   g('f-ok').style.display='block';
 }
 
-function signout(){USER=null;TOKEN=null;FACTORY_NAME='';g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
+function signout(){USER=null;TOKEN=null;FACTORY_NAME='';FACTORY_ID=null;locationBlocks=[];certDetailData={};g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
 
 async function enterPortal(){
   g('auth-screen').style.display='none';
   g('portal').style.display='block';
   g('u-email').textContent=USER.email;
   await loadDetails();
+  await loadLocations();
+  await loadCertifications();
   await loadAllFileLists();
 }
 
-function ptab(t){
-  var names=['details','catalogs','overview','quotes'];
-  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',names[i]===t);});
+// ── Portal Tabs ──
+function ptab(tab){
+  var names=['details','locations','certifications','catalogs','overview','quotes'];
+  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',names[i]===tab);});
   document.querySelectorAll('.ppane').forEach(function(el){el.classList.remove('on');});
-  g('ppane-'+t).classList.add('on');
+  g('ppane-'+tab).classList.add('on');
 }
 
+// ── Load / Save Factory Details ──
 async function loadDetails(){
   try{
     var r=await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
     var d=await r.json();
     if(Array.isArray(d)&&d.length>0){
       var f=d[0];
+      FACTORY_ID=f.id;
       FACTORY_NAME=f.factory_name_english||'';
       g('p-name_en').value=f.factory_name_english||'';
       g('p-name_local').value=f.factory_name_local||'';
@@ -375,11 +894,16 @@ async function loadDetails(){
       g('p-wechat').value=f.sales_wechat||'';
       g('p-whatsapp').value=f.sales_whatsapp||'';
       g('p-categories').value=(f.product_categories||[]).join(', ');
-      (f.certifications||[]).forEach(function(c){document.querySelectorAll('.certs input[type=checkbox]').forEach(function(cb){if(cb.value===c)cb.checked=true;});});
+      if(f.years_in_business)g('p-years').value=f.years_in_business;
+      if(f.annual_revenue_usd)g('p-revenue').value=f.annual_revenue_usd;
+      if(f.export_percentage)g('p-export').value=f.export_percentage;
+      (f.certifications||[]).forEach(function(c){
+        document.querySelectorAll('#ppane-certifications .certs input[type=checkbox]').forEach(function(cb){if(cb.value===c)cb.checked=true;});
+      });
       var banner=g('status-banner');banner.style.display='block';
       if(f.status==='approved'){banner.textContent='Your factory is approved and active in our supplier network.';banner.className='banner approved';}
       else{banner.textContent='Your registration is under review. Our team will be in touch shortly.';banner.className='banner pending';}
-      g('save-btn').textContent='Update Factory Details';
+      g('save-btn').textContent=t('btn_save').replace('Save','Update');
     }
   }catch(e){console.log('loadDetails error:',e);}
 }
@@ -389,10 +913,9 @@ async function saveDetails(){
   for(var i=0;i<reqFields.length;i++){if(!g(reqFields[i]).value.trim()){alert('Please fill in all required fields.');g(reqFields[i]).focus();return;}}
   var btn=g('save-btn');btn.disabled=true;
   g('save-prog').style.display='block';
-  g('save-ok').style.display='none';
-  g('save-err').style.display='none';
+  g('save-ok').style.display='none';g('save-err').style.display='none';
   var certs=[];
-  document.querySelectorAll('.certs input:checked').forEach(function(c){certs.push(c.value);});
+  document.querySelectorAll('#ppane-certifications .certs input:checked').forEach(function(c){certs.push(c.value);});
   var other=g('p-cert_other').value.trim();if(other)certs.push(other);
   FACTORY_NAME=g('p-name_en').value.trim();
   var payload={
@@ -412,6 +935,9 @@ async function saveDetails(){
     sales_whatsapp:g('p-whatsapp').value.trim(),
     certifications:certs,
     product_categories:[g('p-categories').value.trim()],
+    years_in_business:parseInt(g('p-years').value)||null,
+    annual_revenue_usd:g('p-revenue').value||null,
+    export_percentage:parseInt(g('p-export').value)||null,
     status:'pending'
   };
   try{
@@ -420,11 +946,12 @@ async function saveDetails(){
     var exists=Array.isArray(existing)&&existing.length>0;
     var method=exists?'PATCH':'POST';
     var url=exists?SB+'/rest/v1/factories?user_id=eq.'+USER.id:SB+'/rest/v1/factories';
-    var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    var r=await fetch(url,{method:method,headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=representation'},body:JSON.stringify(payload)});
     g('save-prog').style.display='none';btn.disabled=false;
     if(r.ok){
+      var result=await r.json();
+      if(!FACTORY_ID&&Array.isArray(result)&&result[0])FACTORY_ID=result[0].id;
       g('save-ok').style.display='block';
-      g('save-btn').textContent='Update Factory Details';
       g('status-banner').style.display='block';
       setTimeout(function(){g('save-ok').style.display='none';},4000);
     }else{
@@ -434,28 +961,192 @@ async function saveDetails(){
     }
   }catch(e){
     g('save-prog').style.display='none';btn.disabled=false;
-    g('save-err').textContent='Error: '+e.message;
-    g('save-err').style.display='block';
+    g('save-err').textContent='Error: '+e.message;g('save-err').style.display='block';
   }
 }
 
-function chooseFile(input,displayId,key){
-  var file=input.files[0];if(!file)return;
-  selFiles[key]=file;
-  g(displayId).textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
+// ── Locations ──
+var locCounter=0;
+function addLocation(type){
+  locCounter++;
+  locationBlocks.push({key:'loc_'+locCounter,type:type,data:{}});
+  renderLocationBlocks();
+}
+function removeLocation(key){
+  locationBlocks=locationBlocks.filter(function(l){return l.key!==key;});
+  renderLocationBlocks();
+}
+function renderLocationBlocks(){
+  var el=g('locations-list');
+  if(!locationBlocks.length){el.innerHTML='<p style="font-size:13px;color:#bbb;margin-bottom:12px;">'+t('locations_hint')+'</p>';return;}
+  var html='';
+  locationBlocks.forEach(function(loc){
+    var isOffice=loc.type==='office';
+    var titleLabel=isOffice?'Sales / Engineering Office':'Factory Location';
+    html+='<div class="location-block" id="block_'+loc.key+'">';
+    html+='<div class="location-block-header"><span class="location-block-title">'+titleLabel+'</span>';
+    html+='<button class="remove-btn" onclick="removeLocation(\''+loc.key+'\')">Remove</button></div>';
+    html+='<div class="g2 pf"><div><label>'+t('lbl_loc_name')+'</label><input type="text" id="'+loc.key+'_name" value="'+(loc.data.location_name||'')+'" /></div>';
+    html+='<div><label>'+t('lbl_loc_type')+'</label><select id="'+loc.key+'_type">';
+    var types=isOffice?[['sales','Sales Office'],['engineering','Engineering Office'],['admin','Admin Office']]:
+                       [['factory','Factory'],['warehouse','Warehouse'],['office','General Office']];
+    types.forEach(function(opt){html+='<option value="'+opt[0]+'"'+(loc.data.location_type===opt[0]?' selected':'')+'>'+opt[1]+'</option>';});
+    html+='</select></div></div>';
+    if(isOffice){
+      html+='<label class="same-as-check"><input type="checkbox" id="'+loc.key+'_same" onchange="toggleSameAs(\''+loc.key+'\')" '+(loc.data.same_as_factory?' checked':'')+'>'+t('same_as_factory')+'</label>';
+    }
+    html+='<div id="'+loc.key+'_addr_block">';
+    html+='<div class="pf"><label>'+t('lbl_loc_address')+'</label><input type="text" id="'+loc.key+'_address" value="'+(loc.data.address||'')+'" /></div>';
+    html+='<div class="g2 pf"><div><label>'+t('lbl_loc_city')+'</label><input type="text" id="'+loc.key+'_city" value="'+(loc.data.city||'')+'" /></div>';
+    html+='<div><label>'+t('lbl_loc_country')+'</label><input type="text" id="'+loc.key+'_country" value="'+(loc.data.country||'')+'" /></div></div>';
+    html+='</div>';
+    html+='<div class="g2 pf"><div><label>'+t('lbl_loc_contact')+'</label><input type="text" id="'+loc.key+'_contact" value="'+(loc.data.contact_name||'')+'" /></div>';
+    html+='<div><label>'+t('lbl_loc_phone')+'</label><input type="tel" id="'+loc.key+'_phone" value="'+(loc.data.telephone||'')+'" /></div></div>';
+    html+='<div class="g2 pf"><div><label>'+t('lbl_loc_email')+'</label><input type="email" id="'+loc.key+'_email" value="'+(loc.data.contact_email||'')+'" /></div>';
+    html+='<div></div></div>';
+    if(!isOffice){
+      html+='<div class="section-divider">Capacity</div>';
+      html+='<div class="g4 pf">';
+      html+='<div><label>'+t('lbl_loc_employees')+'</label><input type="number" id="'+loc.key+'_emp" value="'+(loc.data.employees_total||'')+'" min="0" /></div>';
+      html+='<div><label>'+t('lbl_loc_lines')+'</label><input type="number" id="'+loc.key+'_lines" value="'+(loc.data.production_lines||'')+'" min="0" /></div>';
+      html+='<div><label>'+t('lbl_loc_sqm')+'</label><input type="number" id="'+loc.key+'_sqm" value="'+(loc.data.floor_space_sqm||'')+'" min="0" /></div>';
+      html+='<div><label>'+t('lbl_loc_capacity')+'</label><input type="number" id="'+loc.key+'_cap" value="'+(loc.data.monthly_capacity_units||'')+'" min="0" /></div>';
+      html+='</div>';
+    }
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function toggleSameAs(key){
+  var checked=g(key+'_same').checked;
+  g(key+'_addr_block').style.display=checked?'none':'block';
+}
+async function loadLocations(){
+  if(!FACTORY_ID)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_locations?factory_id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var rows=await r.json();
+    if(Array.isArray(rows)&&rows.length){
+      locationBlocks=rows.map(function(row){
+        locCounter++;
+        var isOffice=row.location_type==='sales'||row.location_type==='engineering'||row.location_type==='admin';
+        return{key:'loc_'+locCounter,type:isOffice?'office':'factory',db_id:row.id,data:row};
+      });
+      renderLocationBlocks();
+    }
+  }catch(e){console.log('loadLocations:',e);}
+}
+async function saveLocations(){
+  if(!FACTORY_ID){alert('Please save your Factory Details first.');return;}
+  g('loc-prog').style.display='block';g('loc-ok').style.display='none';g('loc-err').style.display='none';
+  try{
+    // Delete existing then reinsert (simple upsert strategy)
+    await fetch(SB+'/rest/v1/factory_locations?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var rows=locationBlocks.map(function(loc){
+      var isOffice=loc.type==='office';
+      var sameAs=isOffice&&g(loc.key+'_same')&&g(loc.key+'_same').checked;
+      return{
+        factory_id:FACTORY_ID,
+        location_type:gv(loc.key+'_type')||loc.type,
+        location_name:gv(loc.key+'_name'),
+        address:sameAs?g('p-address').value:gv(loc.key+'_address'),
+        city:sameAs?g('p-city').value:gv(loc.key+'_city'),
+        country:sameAs?g('p-country').value:gv(loc.key+'_country'),
+        telephone:gv(loc.key+'_phone'),
+        contact_name:gv(loc.key+'_contact'),
+        contact_email:gv(loc.key+'_email'),
+        employees_total:isOffice?null:(parseInt(gv(loc.key+'_emp'))||null),
+        production_lines:isOffice?null:(parseInt(gv(loc.key+'_lines'))||null),
+        floor_space_sqm:isOffice?null:(parseInt(gv(loc.key+'_sqm'))||null),
+        monthly_capacity_units:isOffice?null:(parseInt(gv(loc.key+'_cap'))||null)
+      };
+    });
+    if(rows.length){
+      var r=await fetch(SB+'/rest/v1/factory_locations',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=minimal'},body:JSON.stringify(rows)});
+      if(!r.ok)throw new Error('Save failed: '+r.status);
+    }
+    g('loc-prog').style.display='none';g('loc-ok').style.display='block';
+    setTimeout(function(){g('loc-ok').style.display='none';},4000);
+  }catch(e){g('loc-prog').style.display='none';g('loc-err').textContent='Error: '+e.message;g('loc-err').style.display='block';}
+}
+function gv(id){var el=g(id);return el?el.value.trim():'';}
+
+// ── Certifications ──
+function renderCertDetails(){
+  var checked=[];
+  document.querySelectorAll('#ppane-certifications .certs input:checked').forEach(function(cb){checked.push(cb.value);});
+  var other=g('p-cert_other').value.trim();if(other)checked.push(other);
+  if(!checked.length){g('cert-details-list').innerHTML='<p style="font-size:13px;color:#bbb;">'+t('cert_details_hint')+'</p>';return;}
+  var html='';
+  checked.forEach(function(cert){
+    var d=certDetailData[cert]||{};
+    html+='<div style="border:1px solid #e0e0d8;border-radius:8px;padding:10px;margin-bottom:10px;">';
+    html+='<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">'+cert+'</div>';
+    html+='<div class="g2 pf">';
+    html+='<div><label>'+t('lbl_cert_number')+'</label><input type="text" id="certnum_'+cert.replace(/\s/g,'_')+'" value="'+(d.certificate_number||'')+'" /></div>';
+    html+='<div><label>'+t('lbl_cert_expiry')+'</label><input type="date" id="certexp_'+cert.replace(/\s/g,'_')+'" value="'+(d.expiry_date||'')+'" /></div>';
+    html+='</div></div>';
+  });
+  g('cert-details-list').innerHTML=html;
+}
+document.addEventListener('change',function(e){
+  if(e.target.closest&&e.target.closest('#ppane-certifications .certs')){renderCertDetails();}
+});
+async function loadCertifications(){
+  if(!FACTORY_ID)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_certifications?factory_id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var rows=await r.json();
+    if(Array.isArray(rows)){
+      rows.forEach(function(row){
+        certDetailData[row.certification_name]={certificate_number:row.certificate_number,expiry_date:row.expiry_date,db_id:row.id};
+        document.querySelectorAll('#ppane-certifications .certs input[type=checkbox]').forEach(function(cb){if(cb.value===row.certification_name)cb.checked=true;});
+      });
+      renderCertDetails();
+    }
+  }catch(e){console.log('loadCertifications:',e);}
+}
+async function saveCertifications(){
+  if(!FACTORY_ID){alert('Please save your Factory Details first.');return;}
+  g('cert-prog').style.display='block';g('cert-ok').style.display='none';g('cert-err').style.display='none';
+  var checked=[];
+  document.querySelectorAll('#ppane-certifications .certs input:checked').forEach(function(cb){checked.push(cb.value);});
+  var other=g('p-cert_other').value.trim();if(other)checked.push(other);
+  try{
+    await fetch(SB+'/rest/v1/factory_certifications?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    if(checked.length){
+      var rows=checked.map(function(cert){
+        var key=cert.replace(/\s/g,'_');
+        var numEl=g('certnum_'+key),expEl=g('certexp_'+key);
+        return{
+          factory_id:FACTORY_ID,
+          certification_name:cert,
+          certificate_number:numEl?numEl.value.trim()||null:null,
+          expiry_date:expEl?expEl.value||null:null
+        };
+      });
+      var r=await fetch(SB+'/rest/v1/factory_certifications',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=minimal'},body:JSON.stringify(rows)});
+      if(!r.ok)throw new Error('Save failed: '+r.status);
+    }
+    // Also update certifications array on factories table
+    var certNames=checked;
+    await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id,{method:'PATCH',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+TOKEN,'Prefer':'return=minimal'},body:JSON.stringify({certifications:certNames})});
+    g('cert-prog').style.display='none';g('cert-ok').style.display='block';
+    setTimeout(function(){g('cert-ok').style.display='none';},4000);
+  }catch(e){g('cert-prog').style.display='none';g('cert-err').textContent='Error: '+e.message;g('cert-err').style.display='block';}
 }
 
+// ── File Uploads ──
+function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getFullYear()).slice(-2);}
+function formatFileName(factoryName,fileType,originalFile){var ext=originalFile.name.split('.').pop();var safeName=factoryName.replace(/[^a-zA-Z0-9\s]/g,'').trim()||'Factory';return safeName+'_'+fileType+'_'+dateStamp()+'.'+ext;}
+function chooseFile(input,displayId,key){var file=input.files[0];if(!file)return;selFiles[key]=file;g(displayId).textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';}
 async function uploadFile(key,folder,fileType){
-  var file=selFiles[key];
-  if(!file){alert('Please select a file first.');return;}
+  var file=selFiles[key];if(!file){alert('Please select a file first.');return;}
   var progId=key+'-prog',okId=key+'-ok',errId=key+'-err';
   g(progId).style.display='block';g(okId).style.display='none';g(errId).style.display='none';
-
-  // Use formatted file name
   var factoryName=FACTORY_NAME||g('p-name_en').value.trim()||'Factory';
   var formattedName=formatFileName(factoryName,fileType,file);
   var storagePath=USER.id+'/'+folder+'/'+formattedName;
-
   var ct='application/octet-stream';
   var n=file.name.toLowerCase();
   if(n.endsWith('.pdf'))ct='application/pdf';
@@ -463,22 +1154,13 @@ async function uploadFile(key,folder,fileType){
   else if(n.endsWith('.ppt'))ct='application/vnd.ms-powerpoint';
   else if(n.endsWith('.xlsx'))ct='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   else if(n.endsWith('.xls'))ct='application/vnd.ms-excel';
-
   try{
     var r=await fetch(SB+'/storage/v1/object/factory-files/'+storagePath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':ct,'x-upsert':'true'},body:file});
     g(progId).style.display='none';
-    if(r.ok){
-      g(okId).style.display='block';selFiles[key]=null;
-      g(key+'-chosen').textContent='';
-      await loadAllFileLists();
-      setTimeout(function(){g(okId).style.display='none';},4000);
-    }else{
-      var e=await r.json().catch(function(){return{};});
-      g(errId).textContent='Upload failed: '+(e.message||r.status);g(errId).style.display='block';
-    }
+    if(r.ok){g(okId).style.display='block';selFiles[key]=null;g(key+'-chosen').textContent='';await loadAllFileLists();setTimeout(function(){g(okId).style.display='none';},4000);}
+    else{var e=await r.json().catch(function(){return{};});g(errId).textContent='Upload failed: '+(e.message||r.status);g(errId).style.display='block';}
   }catch(e){g(progId).style.display='none';g(errId).textContent='Error: '+e.message;g(errId).style.display='block';}
 }
-
 async function loadAllFileLists(){
   var map={cat:'catalogs',ov:'overview',qt:'quotes'};
   for(var key in map){
