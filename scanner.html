@@ -158,10 +158,14 @@ window.addEventListener('load', function () {
 function handleFiles(files) {
   if (!files || !files.length) return;
   Array.from(files).forEach(function (file) {
-    if (!file.type.startsWith('image/')) return;
+    // Accept any image — don't filter by MIME type as HEIC may have no type
     var id = 'c' + (++counter);
     var card = { id: id, file: file, dataUrl: null, status: 'pending', data: null, errorMsg: '', multiCount: 0 };
     cards.push(card);
+    // Show card immediately with pending status
+    renderCard(card);
+    updateBar();
+    // Then load the image data
     var reader = new FileReader();
     reader.onload = function (e) {
       card.dataUrl = e.target.result;
