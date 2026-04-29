@@ -317,41 +317,25 @@ async function scanCard(card,apiKey){
       card.status='error';
       card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';
     }else if(d.content&&d.content[0]&&d.content[0].text){
-      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
-      try{
-        var parsed=JSON.parse(raw);
-        // Handle both array and single object responses
-        var dataArr=Array.isArray(parsed)?parsed:[parsed];
-        if(dataArr.length===1){
-          // Single card — use existing card slot
-          card.data=dataArr[0];
-          card.status='done';
-        }else{
-          // Multiple cards — use first for this card, create new slots for the rest
-          card.data=dataArr[0];
-          card.status='done';
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+      var dataArr=null;
+      try{var p=JSON.parse(raw);dataArr=Array.isArray(p)?p:[p];}catch(e){}
+      if(!dataArr){try{var m=raw.match(/\[[\s\S]*\]/);if(m){var p2=JSON.parse(m[0]);dataArr=Array.isArray(p2)?p2:[p2];}}catch(e){}}
+      if(!dataArr){var objs=[];var re=/\{[\s\S]+?\}/g;var om;while((om=re.exec(raw))!==null){try{var ob=JSON.parse(om[0]);if(ob.factory_name_english!==undefined)objs.push(ob);}catch(e){}}if(objs.length)dataArr=objs;}
+      if(dataArr&&dataArr.length){
+        card.data=dataArr[0];
+        card.status='done';
+        if(dataArr.length>1){
+          card.multiCount=dataArr.length;
           for(var mi=1;mi<dataArr.length;mi++){
             var newId='c'+(++counter);
             var newCard={id:newId,file:card.file,dataUrl:card.dataUrl,status:'done',data:dataArr[mi]};
             cards.push(newCard);
             renderCard(newCard);
           }
-          card.status='done';
-          card.multiCount=dataArr.length;
         }
-      }catch(e){
-        var match=raw.match(/\[[\s\S]*\]/);
-        if(match){
-          try{
-            var arr=JSON.parse(match[0]);
-            card.data=Array.isArray(arr)?arr[0]:arr;
-            card.status='done';
-          }catch(e2){card.data={notes:raw};card.status='done_err';}
-        }else{
-          var objMatch=raw.match(/\{[\s\S]*\}/);
-          if(objMatch){try{card.data=JSON.parse(objMatch[0]);card.status='done';}catch(e3){card.data={notes:raw};card.status='done_err';}}
-          else{card.data={notes:raw};card.status='done_err';}
-        }
+      }else{
+        card.data={notes:raw};card.status='done_err';
       }
     }else{
       card.status='error';
