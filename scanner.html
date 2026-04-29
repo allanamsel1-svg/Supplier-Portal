@@ -192,7 +192,7 @@ function renderCard(card){
   var stText='',stCls='';
   if(card.status==='pending'){stText='Ready to scan';}
   else if(card.status==='processing'){stText='<span class="spinner"></span>Reading card with AI...';;stCls='reading';}
-  else if(card.status==='done'){stText='✓ Extracted — review and save below';stCls='ok';}
+  else if(card.status==='done'){stText=card.multiCount?'✓ Found '+card.multiCount+' cards — each shown separately below':'✓ Extracted — review and save below';stCls='ok';}
   else if(card.status==='done_err'){stText='Partial read — review what was found';stCls='err';}
   else if(card.status==='saved'){stText='✓ Saved as draft factory';stCls='ok';}
   else if(card.status==='error'){stText='Error: '+(card.errorMsg||'Could not read card — check API key in Admin Settings');stCls='err';}
@@ -296,7 +296,8 @@ async function scanCard(card,apiKey){
   var base64=resized.split(",")[1];
   var mediaType="image/jpeg";
 
-  var prompt='This is a photo of a business card. It may be in English, Chinese, Vietnamese, Korean, Japanese, or another language. Extract every piece of information visible and return ONLY a JSON object with these exact keys (empty string if not found):\n{\n  "factory_name_english": "",\n  "factory_name_local": "",\n  "sales_contact_name": "",\n  "contact_title": "",\n  "sales_email": "",\n  "sales_mobile": "",\n  "telephone": "",\n  "sales_wechat": "",\n  "sales_whatsapp": "",\n  "website": "",\n  "address": "",\n  "city": "",\n  "country": "",\n  "product_categories": "",\n  "notes": ""\n}\nRules:\n- factory_name_english: English company name, or romanized version of local name\n- factory_name_local: company name in Chinese/Korean/etc if present\n- notes: anything else on the card (slogans, certifications mentioned, QR code info, etc)\n- Return ONLY the raw JSON object, no markdown, no explanation';
+
+  var prompt='This image may contain one or more business cards. It may be in English, Chinese, Vietnamese, Korean, Japanese, or another language. Identify ALL business cards visible and extract information from each one. Return ONLY a JSON array (even if just one card) where each element has these exact keys (empty string if not found):\n[\n  {\n    "factory_name_english": "",\n    "factory_name_local": "",\n    "sales_contact_name": "",\n    "contact_title": "",\n    "sales_email": "",\n    "sales_mobile": "",\n    "telephone": "",\n    "sales_wechat": "",\n    "sales_whatsapp": "",\n    "website": "",\n    "address": "",\n    "city": "",\n    "country": "",\n    "product_categories": "",\n    "notes": ""\n  }\n]\nRules:\n- factory_name_english: English company name, or romanized version\n- factory_name_local: company name in Chinese/Korean/etc if present\n- notes: anything else on the card not captured above\n- Return ONLY the raw JSON array, no markdown, no explanation';
 
   try{
     var r=await fetch('https://api.anthropic.com/v1/messages',{
@@ -304,7 +305,7 @@ async function scanCard(card,apiKey){
       headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({
         model:'claude-sonnet-4-5',
-        max_tokens:800,
+        max_tokens:2000,
         messages:[{role:'user',content:[
           {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
           {type:'text',text:prompt}
@@ -313,29 +314,57 @@ async function scanCard(card,apiKey){
     });
     var d=await r.json();
     if(d.error){
-      card.status="error";
-      card.errorMsg="API error: "+d.error.message+" ("+d.error.type+")";
+      card.status='error';
+      card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';
     }else if(d.content&&d.content[0]&&d.content[0].text){
-      var raw=d.content[0].text.trim().replace(/^```json\s*/,"").replace(/^```\s*/,"").replace(/\s*```$/,"");
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
       try{
-        card.data=JSON.parse(raw);
-        card.status="done";
+        var parsed=JSON.parse(raw);
+        // Handle both array and single object responses
+        var dataArr=Array.isArray(parsed)?parsed:[parsed];
+        if(dataArr.length===1){
+          // Single card — use existing card slot
+          card.data=dataArr[0];
+          card.status='done';
+        }else{
+          // Multiple cards — use first for this card, create new slots for the rest
+          card.data=dataArr[0];
+          card.status='done';
+          for(var mi=1;mi<dataArr.length;mi++){
+            var newId='c'+(++counter);
+            var newCard={id:newId,file:card.file,dataUrl:card.dataUrl,status:'done',data:dataArr[mi]};
+            cards.push(newCard);
+            renderCard(newCard);
+          }
+          card.status='done';
+          card.multiCount=dataArr.length;
+        }
       }catch(e){
-        var match=raw.match(/\{[\s\S]*\}/);
-        if(match){try{card.data=JSON.parse(match[0]);card.status="done";}catch(e2){card.data={notes:raw};card.status="done_err";}}
-        else{card.data={notes:raw};card.status="done_err";}
+        var match=raw.match(/\[[\s\S]*\]/);
+        if(match){
+          try{
+            var arr=JSON.parse(match[0]);
+            card.data=Array.isArray(arr)?arr[0]:arr;
+            card.status='done';
+          }catch(e2){card.data={notes:raw};card.status='done_err';}
+        }else{
+          var objMatch=raw.match(/\{[\s\S]*\}/);
+          if(objMatch){try{card.data=JSON.parse(objMatch[0]);card.status='done';}catch(e3){card.data={notes:raw};card.status='done_err';}}
+          else{card.data={notes:raw};card.status='done_err';}
+        }
       }
     }else{
-      card.status="error";
-      card.errorMsg="Unexpected response: "+JSON.stringify(d).slice(0,300);
+      card.status='error';
+      card.errorMsg='Unexpected response: '+JSON.stringify(d).slice(0,300);
     }
   }catch(e){
-    card.status="error";
-    card.errorMsg="Connection error: "+e.message;
+    card.status='error';
+    card.errorMsg='Connection error: '+e.message;
   }
 
   renderCard(card);
 }
+
 
 // Save draft to Supabase
 async function saveDraft(id){
