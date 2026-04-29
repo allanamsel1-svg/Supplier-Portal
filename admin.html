@@ -188,6 +188,8 @@
     .d-btn-rfq:hover { opacity: 0.87; }
     .no-data { font-size: 13px; color: #ccc; font-style: italic; }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script>emailjs.init("6A1UTdzNuQ8z546HR");</script>
 </head>
 <body>
 
@@ -323,11 +325,15 @@
     <button class="gen-btn" onclick="generateRFQ()">✦ Regenerate with AI</button>
     <div class="gen-prog" id="gen-prog">AI is generating your RFQ...</div>
     <textarea id="rfq-body" placeholder="Your RFQ will appear here. You can edit before sending."></textarea>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Attach a file link (optional) — paste a Google Drive or Dropbox link to a photo, spec sheet, or Excel RFQ</label>
+      <input type="url" id="rfq-file-link" placeholder="https://drive.google.com/..." style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;color:#1a1a2e;" />
+    </div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeRFQ()">Cancel</button>
-      <button class="btn-send" onclick="sendRFQ()">Open in Outlook</button>
+      <button class="btn-send" onclick="sendRFQ()">Send RFQ ✉</button>
     </div>
-    <div class="modal-msg" id="rfq-msg">✓ Opening in Outlook desktop...</div>
+    <div class="modal-msg" id="rfq-msg">✓ RFQ sent successfully via email!</div>
   </div>
 </div>
 
@@ -785,16 +791,30 @@ async function generateRFQ(){
   }catch(e){g('gen-prog').style.display='none';g('rfq-body').value='Error connecting to AI. Please type manually.';}
 }
 
-function sendRFQ(){
+async function sendRFQ(){
   var f=currentRFQFactory;
   if(!f||!f.sales_email){alert('This factory does not have an email address on file.');return;}
   var cats=(f.product_categories||[]).join(', ')||'Products';
   var subject='Request for Quotation — '+cats+' — '+(f.factory_name_english||'');
   var body=g('rfq-body').value;
-  var mailto='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-  window.location.href=mailto;
-  g('rfq-msg').style.display='block';
-  setTimeout(function(){g('rfq-msg').style.display='none';},5000);
+  var fileLink=g('rfq-file-link').value.trim();
+  var fullBody=body+(fileLink?'\n\nPlease refer to the attached reference file for product details:\n'+fileLink:'');
+  var myEmail=localStorage.getItem('from_email')||'';
+  try{
+    await emailjs.send('service_aawsxwi','template_er5zzqp',{
+      to_email:f.sales_email,
+      contact_name:f.sales_contact_name||'Team',
+      email_body:fullBody,
+      invite_link:'https://project-7o416.vercel.app',
+      reply_to:myEmail,
+      subject:subject
+    });
+    g('rfq-msg').style.display='block';
+    g('rfq-file-link').value='';
+    setTimeout(function(){g('rfq-msg').style.display='none';},5000);
+  }catch(ex){
+    alert('Email failed to send: '+(ex.text||ex.message||JSON.stringify(ex)));
+  }
 }
 
 // ── AI Chat ──
@@ -904,7 +924,21 @@ async function doSendInvite(f){
 
   var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(f.factory_name_english||'');
   var mailto='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(emailBody);
-  window.location.href=mailto;
+  // Send via EmailJS
+  var myEmail=localStorage.getItem('from_email')||'';
+  try{
+    await emailjs.send('service_aawsxwi','template_er5zzqp',{
+      to_email:f.sales_email,
+      contact_name:f.sales_contact_name||'Team',
+      email_body:emailBody,
+      invite_link:link,
+      reply_to:myEmail,
+      subject:subject
+    });
+  }catch(ex){
+    alert('Email failed to send: '+ex.text+'. Please check your EmailJS settings.');
+    return;
+  }
 
   // Update invitation status in Supabase
   var newStatus=isFollowUp?'follow_up_sent':'invited';
