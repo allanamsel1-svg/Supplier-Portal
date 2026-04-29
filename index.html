@@ -8,7 +8,7 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; min-height: 100vh; }
     #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
-    .auth-box { background: #fff; border: 1px solid #e0e0d8; border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
+    .auth-box { background: #fff; border: 1px solid #e0e0d8; border-radius: 16px; padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
     .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 2rem; }
     .brand-mark { width: 36px; height: 36px; background: #1a1a2e; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 16px; font-weight: 700; }
     .brand-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
@@ -216,7 +216,7 @@
           <div class="file-chosen" id="cat-chosen"></div>
         </div>
         <input type="file" id="cat-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'cat-chosen','cat')">
-        <button class="up-btn" onclick="uploadFile('cat','catalogs')">Upload</button>
+        <button class="up-btn" onclick="uploadFile('cat','catalogs','Catalog')">Upload</button>
         <div class="prog" id="cat-prog">Uploading...</div>
         <div class="pmsg ok" id="cat-ok">Catalog uploaded successfully!</div>
         <div class="pmsg err" id="cat-err">Upload failed. Please try again.</div>
@@ -235,7 +235,7 @@
           <div class="file-chosen" id="ov-chosen"></div>
         </div>
         <input type="file" id="ov-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'ov-chosen','ov')">
-        <button class="up-btn" onclick="uploadFile('ov','overview')">Upload</button>
+        <button class="up-btn" onclick="uploadFile('ov','overview','Company Presentation')">Upload</button>
         <div class="prog" id="ov-prog">Uploading...</div>
         <div class="pmsg ok" id="ov-ok">Overview uploaded successfully!</div>
         <div class="pmsg err" id="ov-err">Upload failed. Please try again.</div>
@@ -254,7 +254,7 @@
           <div class="file-chosen" id="qt-chosen"></div>
         </div>
         <input type="file" id="qt-input" accept=".xlsx,.xls" style="display:none" onchange="chooseFile(this,'qt-chosen','qt')">
-        <button class="up-btn" onclick="uploadFile('qt','quotes')">Upload</button>
+        <button class="up-btn" onclick="uploadFile('qt','quotes','Quote Sheet')">Upload</button>
         <div class="prog" id="qt-prog">Uploading...</div>
         <div class="pmsg ok" id="qt-ok">Quote sheet uploaded successfully!</div>
         <div class="pmsg err" id="qt-err">Upload failed. Please try again.</div>
@@ -267,10 +267,24 @@
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
-var USER=null,TOKEN=null;
+var USER=null,TOKEN=null,FACTORY_NAME='';
 var selFiles={cat:null,ov:null,qt:null};
 
 function g(id){return document.getElementById(id);}
+
+function dateStamp(){
+  var d=new Date();
+  var mm=String(d.getMonth()+1).padStart(2,'0');
+  var dd=String(d.getDate()).padStart(2,'0');
+  var yy=String(d.getFullYear()).slice(-2);
+  return mm+dd+yy;
+}
+
+function formatFileName(factoryName,fileType,originalFile){
+  var ext=originalFile.name.split('.').pop();
+  var safeName=factoryName.replace(/[^a-zA-Z0-9\s]/g,'').trim()||'Factory';
+  return safeName+'_'+fileType+'_'+dateStamp()+'.'+ext;
+}
 
 function authTab(t){
   var tabs=document.querySelectorAll('.tabs .tab');
@@ -323,7 +337,7 @@ async function forgot(){
   g('f-ok').style.display='block';
 }
 
-function signout(){USER=null;TOKEN=null;g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
+function signout(){USER=null;TOKEN=null;FACTORY_NAME='';g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
 
 async function enterPortal(){
   g('auth-screen').style.display='none';
@@ -346,6 +360,7 @@ async function loadDetails(){
     var d=await r.json();
     if(Array.isArray(d)&&d.length>0){
       var f=d[0];
+      FACTORY_NAME=f.factory_name_english||'';
       g('p-name_en').value=f.factory_name_english||'';
       g('p-name_local').value=f.factory_name_local||'';
       g('p-telephone').value=f.telephone||'';
@@ -379,6 +394,7 @@ async function saveDetails(){
   var certs=[];
   document.querySelectorAll('.certs input:checked').forEach(function(c){certs.push(c.value);});
   var other=g('p-cert_other').value.trim();if(other)certs.push(other);
+  FACTORY_NAME=g('p-name_en').value.trim();
   var payload={
     user_id:USER.id,
     factory_name_english:g('p-name_en').value.trim(),
@@ -412,7 +428,7 @@ async function saveDetails(){
       g('status-banner').style.display='block';
       setTimeout(function(){g('save-ok').style.display='none';},4000);
     }else{
-      var errData=await r.json().catch(function(){return {};});
+      var errData=await r.json().catch(function(){return{};});
       g('save-err').textContent='Save failed: '+(errData.message||errData.details||r.status);
       g('save-err').style.display='block';
     }
@@ -429,12 +445,17 @@ function chooseFile(input,displayId,key){
   g(displayId).textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
 }
 
-async function uploadFile(key,folder){
+async function uploadFile(key,folder,fileType){
   var file=selFiles[key];
   if(!file){alert('Please select a file first.');return;}
   var progId=key+'-prog',okId=key+'-ok',errId=key+'-err';
   g(progId).style.display='block';g(okId).style.display='none';g(errId).style.display='none';
-  var fileName=USER.id+'/'+folder+'/'+Date.now()+'_'+file.name.replace(/\s+/g,'_');
+
+  // Use formatted file name
+  var factoryName=FACTORY_NAME||g('p-name_en').value.trim()||'Factory';
+  var formattedName=formatFileName(factoryName,fileType,file);
+  var storagePath=USER.id+'/'+folder+'/'+formattedName;
+
   var ct='application/octet-stream';
   var n=file.name.toLowerCase();
   if(n.endsWith('.pdf'))ct='application/pdf';
@@ -442,8 +463,9 @@ async function uploadFile(key,folder){
   else if(n.endsWith('.ppt'))ct='application/vnd.ms-powerpoint';
   else if(n.endsWith('.xlsx'))ct='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   else if(n.endsWith('.xls'))ct='application/vnd.ms-excel';
+
   try{
-    var r=await fetch(SB+'/storage/v1/object/factory-files/'+fileName,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':ct,'x-upsert':'true'},body:file});
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+storagePath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':ct,'x-upsert':'true'},body:file});
     g(progId).style.display='none';
     if(r.ok){
       g(okId).style.display='block';selFiles[key]=null;
@@ -451,7 +473,7 @@ async function uploadFile(key,folder){
       await loadAllFileLists();
       setTimeout(function(){g(okId).style.display='none';},4000);
     }else{
-      var e=await r.json().catch(function(){return {};});
+      var e=await r.json().catch(function(){return{};});
       g(errId).textContent='Upload failed: '+(e.message||r.status);g(errId).style.display='block';
     }
   }catch(e){g(progId).style.display='none';g(errId).textContent='Error: '+e.message;g(errId).style.display='block';}
@@ -469,7 +491,7 @@ async function loadAllFileLists(){
         var html='<div class="file-list-title">Uploaded Files</div>';
         items.filter(function(f){return f.name;}).forEach(function(f){
           var url=SB+'/storage/v1/object/public/factory-files/'+USER.id+'/'+folder+'/'+f.name;
-          var icon=f.name.endsWith('.pdf')?'PDF':f.name.match(/\.pptx?$/i)?'PPT':'XLS';
+          var icon=f.name.toLowerCase().endsWith('.pdf')?'PDF':f.name.match(/\.pptx?$/i)?'PPT':'XLS';
           html+='<div class="file-row"><span class="file-row-name">['+icon+'] '+f.name+'</span><a class="file-row-link" href="'+url+'" target="_blank">View / Download</a></div>';
         });
         listEl.innerHTML=html;
