@@ -271,12 +271,30 @@ async function scanAll(){
   updateBar();
 }
 
+function resizeImage(dataUrl,maxPx,quality){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){
+        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      var canvas=document.createElement("canvas");
+      canvas.width=w;canvas.height=h;
+      canvas.getContext("2d").drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL("image/jpeg",quality));
+    };
+    img.src=dataUrl;
+  });
+}
+
 async function scanCard(card,apiKey){
   card.status='processing';
   renderCard(card);
 
-  var base64=card.dataUrl.split(',')[1];
-  var mediaType=card.file.type||'image/jpeg';
+  var resized=await resizeImage(card.dataUrl,1600,0.85);
+  var base64=resized.split(",")[1];
+  var mediaType="image/jpeg";
 
   var prompt='This is a photo of a business card. It may be in English, Chinese, Vietnamese, Korean, Japanese, or another language. Extract every piece of information visible and return ONLY a JSON object with these exact keys (empty string if not found):\n{\n  "factory_name_english": "",\n  "factory_name_local": "",\n  "sales_contact_name": "",\n  "contact_title": "",\n  "sales_email": "",\n  "sales_mobile": "",\n  "telephone": "",\n  "sales_wechat": "",\n  "sales_whatsapp": "",\n  "website": "",\n  "address": "",\n  "city": "",\n  "country": "",\n  "product_categories": "",\n  "notes": ""\n}\nRules:\n- factory_name_english: English company name, or romanized version of local name\n- factory_name_local: company name in Chinese/Korean/etc if present\n- notes: anything else on the card (slogans, certifications mentioned, QR code info, etc)\n- Return ONLY the raw JSON object, no markdown, no explanation';
 
