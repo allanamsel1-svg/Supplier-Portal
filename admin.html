@@ -190,6 +190,22 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>emailjs.init("6A1UTdzNuQ8z546HR");</script>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());
+    gtag('config','G-W8YDH8LTSB');
+  </script>
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-W8YDH8LTSB');
+</script>
 </head>
 <body>
 
@@ -907,7 +923,8 @@ async function doSendInvite(f){
       '- Keep it to 3-4 short paragraphs\n'+
       '- Be warm and genuine, not generic\n'+
       followUpNote+
-      '- Write ONLY the email body, no subject line, no markdown.';
+      '- Start the email with Dear [first name], on the first line\n'+
+      '- Write ONLY the email body, no subject line, no markdown, no sign-off (the template adds the sign-off).';  
     try{
       var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
       var d=await r.json();

@@ -128,6 +128,22 @@
       .lang-btn { font-size: 11px; padding: 3px 7px; }
     }
   </style>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());
+    gtag('config','G-W8YDH8LTSB');
+  </script>
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-W8YDH8LTSB');
+</script>
 </head>
 <body>
 
@@ -457,6 +473,25 @@
 
 <script>
 // ── Config ──
+// ── US IP Block ──
+(function(){
+  fetch('https://ipapi.co/json/')
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.country_code==='US'){
+        var block=document.getElementById('ip-block');
+        if(block){block.style.display='flex';}
+        document.getElementById('auth-screen').style.display='none';
+        document.getElementById('portal').style.display='none';
+        // Also hide the lang bar
+        var lb=document.querySelector('.lang-bar');if(lb)lb.style.display='none';
+      }
+    })
+    .catch(function(){
+      // If IP check fails, allow access (fail open)
+    });
+})();
+
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var USER=null,TOKEN=null,FACTORY_NAME='',FACTORY_ID=null;
@@ -1224,5 +1259,12 @@ async function loadAllFileLists(){
   }
 }
 </script>
+<div id="ip-block" style="display:none;position:fixed;inset:0;background:#f5f5f0;z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:2rem;">
+  <div style="background:#fff;border:1px solid #e0e0d8;border-radius:16px;padding:2.5rem;max-width:420px;width:100%;box-shadow:0 2px 16px rgba(0,0,0,0.06);">
+    <div style="width:48px;height:48px;background:#1a1a2e;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem;color:#fff;font-size:22px;">S</div>
+    <h2 style="font-size:18px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">Portal Not Available</h2>
+    <p style="font-size:14px;color:#888;line-height:1.6;">This supplier portal is not available in your region. If you believe this is an error, please contact your account manager.</p>
+  </div>
+</div>
 </body>
 </html>
