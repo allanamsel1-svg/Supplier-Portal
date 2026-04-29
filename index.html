@@ -460,6 +460,40 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var USER=null,TOKEN=null,FACTORY_NAME='',FACTORY_ID=null;
+var INVITE_TOKEN=null,INVITE_FACTORY=null;
+
+// ── Read invite token from URL and pre-populate ──
+(function(){
+  var params=new URLSearchParams(window.location.search);
+  var token=params.get('invite');
+  if(!token)return;
+  INVITE_TOKEN=token;
+  // Look up factory by token and pre-fill name on auth screen
+  fetch(SB+'/rest/v1/factories?invitation_token=eq.'+token+'&select=id,factory_name_english,factory_name_local,sales_contact_name,sales_email,invitation_status',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+    .then(function(r){return r.json();})
+    .then(function(rows){
+      if(!Array.isArray(rows)||!rows.length)return;
+      INVITE_FACTORY=rows[0];
+      // Pre-fill signup email if we have it
+      if(INVITE_FACTORY.sales_email){
+        var sEmail=document.getElementById('s-email');
+        if(sEmail)sEmail.value=INVITE_FACTORY.sales_email;
+      }
+      // Show welcome banner
+      var box=document.querySelector('.auth-box');
+      if(box){
+        var banner=document.createElement('div');
+        banner.style.cssText='background:#edfaed;border:1px solid #a0d8a0;border-radius:9px;padding:10px 14px;font-size:13px;color:#1a6a1a;margin-bottom:1rem;';
+        banner.textContent='Welcome! You have been invited to join our supplier network'+(INVITE_FACTORY.factory_name_english?' as '+INVITE_FACTORY.factory_name_english:'')+'. Create your account below to get started.';
+        box.insertBefore(banner,box.firstChild);
+      }
+      // Switch to signup tab
+      authTab('signup');
+      // Mark invitation as opened
+      fetch(SB+'/rest/v1/factories?id=eq.'+INVITE_FACTORY.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({invitation_status:'opened',invitation_opened_at:new Date().toISOString()})}).catch(function(){});
+      fetch(SB+'/rest/v1/invitation_events',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_id:INVITE_FACTORY.id,event_type:'opened',triggered_by:'factory'})}).catch(function(){});
+    }).catch(function(){});
+})();
 var selFiles={cat:null,ov:null,qt:null};
 var locationBlocks=[];   // [{id, type, data}]
 var certDetailData={};   // cert_name -> {cert_number, expiry_date, db_id}
@@ -857,6 +891,20 @@ async function enterPortal(){
   g('auth-screen').style.display='none';
   g('portal').style.display='block';
   g('u-email').textContent=USER.email;
+
+  // If arriving via invite link, link user_id to the draft factory record
+  if(INVITE_FACTORY&&INVITE_FACTORY.id&&!INVITE_FACTORY.user_id){
+    try{
+      await fetch(SB+'/rest/v1/factories?id=eq.'+INVITE_FACTORY.id,{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({user_id:USER.id,invitation_status:'registered',invitation_completed_at:new Date().toISOString()})
+      });
+      await fetch(SB+'/rest/v1/invitation_events',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_id:INVITE_FACTORY.id,event_type:'registered',triggered_by:'factory'})});
+      FACTORY_ID=INVITE_FACTORY.id;
+    }catch(ex){}
+  }
+
   await loadDetails();
   await loadLocations();
   await loadCertifications();

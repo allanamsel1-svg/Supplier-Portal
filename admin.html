@@ -121,6 +121,31 @@
     .btn-send { padding: 9px 18px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-send:hover { opacity: 0.87; }
     .modal-msg { font-size: 13px; color: #1a7a1a; margin-top: 10px; display: none; background: #e8f8e8; padding: 8px 12px; border-radius: 7px; }
+    /* Invitation badges */
+    .inv-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 500; margin-left: 6px; vertical-align: middle; }
+    .inv-not_invited { background: #f0f0e8; color: #aaa; border: 1px solid #e0e0d8; }
+    .inv-invited { background: #e8f0ff; color: #2244cc; border: 1px solid #b8ccf0; }
+    .inv-opened { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
+    .inv-registered { background: #e8f8ff; color: #006688; border: 1px solid #80ccee; }
+    .inv-completed { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
+    .inv-follow_up_sent { background: #fff0e8; color: #884400; border: 1px solid #f0c080; }
+    .inv-declined { background: #fff0f0; color: #880000; border: 1px solid #f0c0c0; }
+    .btn-invite { font-size: 11px; padding: 5px 12px; background: #e8f0ff; color: #2244cc; border: 1px solid #b8ccf0; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    .btn-invite:hover { background: #d8e4ff; }
+    .btn-invite:disabled { opacity: 0.5; cursor: not-allowed; }
+    /* Follow-up panel */
+    .followup-item { background: #fff; border: 1px solid #f0d860; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+    .followup-name { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .followup-meta { font-size: 12px; color: #888; margin-top: 3px; }
+    .followup-days { font-size: 11px; background: #fff8e0; color: #886600; border: 1px solid #f0d860; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+    /* Drawer invite section */
+    .d-invite-section { padding: 12px 14px; background: #f8f8f4; border-top: 1px solid #f0f0e8; }
+    .d-invite-label { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px; }
+    .d-invite-status { font-size: 13px; color: #1a1a2e; margin-bottom: 8px; }
+    .d-invite-link { font-size: 12px; color: #2266cc; word-break: break-all; background: #f0f4ff; border: 1px solid #c0d0f0; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; display: none; }
+    .d-btn-invite { width: 100%; padding: 10px; background: #2244cc; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .d-btn-invite:hover { opacity: 0.87; }
+    .d-btn-invite:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* ── Supplier Detail Drawer ── */
     .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 200; display: none; }
@@ -195,6 +220,8 @@
       <div class="slabel">Factories</div>
       <button class="sitem" id="nav-all" onclick="showPanel('all')"><span class="sicon">🏭</span> All Factories <span class="scount" id="cnt-all">0</span></button>
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
+      <div class="slabel">Outreach</div>
+      <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">⏰</span> Follow-ups <span class="scount" id="cnt-followup">0</span></button>
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
@@ -233,6 +260,11 @@
     <div class="panel" id="panel-pending">
       <div class="ph"><div class="ph-title">Pending Review</div><div class="ph-sub">Factories awaiting approval</div></div>
       <div class="factory-list" id="pending-list"><div class="empty">Loading...</div></div>
+    </div>
+
+    <div class="panel" id="panel-followup">
+      <div class="ph"><div class="ph-title">Follow-up Required</div><div class="ph-sub">Factories invited 3+ business days ago with no response</div></div>
+      <div class="factory-list" id="followup-list"><div class="empty">No follow-ups needed right now.</div></div>
     </div>
 
     <div class="panel" id="panel-chat">
@@ -392,6 +424,12 @@
     </div>
 
   </div>
+  <div class="d-invite-section">
+    <div class="d-invite-label">Invitation Status</div>
+    <div class="d-invite-status" id="d-inv-status">Not Invited</div>
+    <div class="d-invite-link" id="d-inv-link"></div>
+    <button class="d-btn-invite" id="d-invite-btn" onclick="inviteFromDrawer()">✉ Send Invitation Email</button>
+  </div>
   <div class="d-actions">
     <button class="d-btn-approve" id="d-approve-btn" onclick="approveFromDrawer()">✓ Approve Factory</button>
     <button class="d-btn-rfq" onclick="rfqFromDrawer()">✉ Send RFQ</button>
@@ -501,6 +539,7 @@ function renderAll(){
   g('all-list').innerHTML=allFactories.map(factoryCard).join('')||'<div class="empty">No factories yet.</div>';
   var pend=allFactories.filter(function(f){return f.status==='pending';});
   g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
+  renderFollowUps();
 }
 
 function factoryCard(f){
@@ -514,14 +553,19 @@ function factoryCard(f){
   var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(\''+f.id+'\',event)">✓ Approve</button>':'';
   var rfqBtn='<button class="btn-rfq" onclick="openRFQ(\''+f.id+'\',event)">✉ Send RFQ</button>';
   var viewBtn='<button class="btn-view" onclick="openDrawer(\''+f.id+'\',event)">View Details →</button>';
+  var invStatus=f.invitation_status||'not_invited';
+  var invLabels={'not_invited':'Not Invited','invited':'Invited','opened':'Opened','registered':'Registered','completed':'Completed','follow_up_sent':'Follow-up Sent','declined':'Declined','no_response':'No Response'};
+  var invBadge='<span class="inv-badge inv-'+invStatus+'">'+(invLabels[invStatus]||invStatus)+'</span>';
+  var invBtnLabel=invStatus==='not_invited'?'✉ Invite':(invStatus==='follow_up_sent'||invStatus==='no_response'?'✉ Follow-up':'✉ Re-invite');
+  var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInvite(\''+f.id+'\',event)">'+invBtnLabel+'</button>':'';
   return '<div class="fc" onclick="openDrawer(\''+f.id+'\',event)">'+
-    '<div class="fc-top"><div><div class="fc-name">'+(f.factory_name_english||'—')+'</div><div class="fc-local">'+(f.factory_name_local||'&nbsp;')+'</div></div>'+
+    '<div class="fc-top"><div><div class="fc-name">'+(f.factory_name_english||'—')+invBadge+'</div><div class="fc-local">'+(f.factory_name_local||'&nbsp;')+'</div></div>'+
     '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
     '<div class="fc-meta"><span>📍 '+([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
     '<span>✉ '+(f.sales_email||'—')+'</span>'+
     (filesSummary||'')+(locSummary||'')+'</div>'+
     (certs?'<div class="fc-certs">'+certs+moreCerts+'</div>':'')+
-    '<div class="fc-actions">'+approveBtn+rfqBtn+viewBtn+'</div></div>';
+    '<div class="fc-actions">'+approveBtn+invBtn+rfqBtn+viewBtn+'</div></div>';
 }
 
 function filterFactories(){
@@ -677,6 +721,24 @@ async function openDrawer(id,e){
   if(f.status==='approved'){approveBtn.disabled=true;approveBtn.textContent='✓ Already Approved';}
   else{approveBtn.disabled=false;approveBtn.textContent='✓ Approve Factory';}
 
+  // Invitation status in drawer
+  var invStatus=f.invitation_status||'not_invited';
+  var invLabels={'not_invited':'Not yet invited','invited':'Invitation sent','opened':'Invitation opened','registered':'Registered','completed':'Profile completed','follow_up_sent':'Follow-up sent','declined':'Declined','no_response':'No response'};
+  var invStatusEl=g('d-inv-status');
+  if(invStatusEl){
+    invStatusEl.innerHTML=(invLabels[invStatus]||invStatus)+(f.invitation_sent_at?' · Sent '+new Date(f.invitation_sent_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'');
+  }
+  var invLink='https://project-7o416.vercel.app?invite='+f.invitation_token;
+  var invLinkEl=g('d-inv-link');
+  if(invLinkEl){invLinkEl.textContent=invLink;invLinkEl.style.display='block';}
+  var inviteBtn=g('d-invite-btn');
+  if(inviteBtn){
+    if(invStatus==='completed'||invStatus==='registered'){inviteBtn.textContent='✓ Already Registered';inviteBtn.disabled=true;}
+    else if(invStatus==='follow_up_sent'||invStatus==='no_response'){inviteBtn.textContent='✉ Send Follow-up';inviteBtn.disabled=false;}
+    else if(invStatus==='invited'||invStatus==='opened'){inviteBtn.textContent='✉ Re-send Invitation';inviteBtn.disabled=false;}
+    else{inviteBtn.textContent='✉ Send Invitation Email';inviteBtn.disabled=false;}
+  }
+
   // Open drawer
   g('drawer-overlay').classList.add('on');
   g('supplier-drawer').classList.add('open');
@@ -782,6 +844,135 @@ function saveCreds(){var u=g('set-user').value.trim(),p=g('set-pass').value;if(u
 function saveApiKey(){var k=g('set-apikey').value.trim();if(k)localStorage.setItem('anthropic_key',k);flash('api-saved');}
 function saveEmail(){var e=g('set-email').value.trim();if(e)localStorage.setItem('from_email',e);flash('email-saved');}
 function flash(id){var m=g(id);m.style.display='inline';setTimeout(function(){m.style.display='none';},2000);}
+
+// ── Invitation System ──
+function inviteLink(token){return 'https://project-7o416.vercel.app?invite='+token;}
+
+async function sendInvite(id,e){
+  if(e)e.stopPropagation();
+  var f=allFactories.find(function(x){return x.id===id;});
+  if(!f)return;
+  if(!f.sales_email){alert('This factory has no email address on file. Open the factory details to add one.');return;}
+  await doSendInvite(f);
+}
+
+async function inviteFromDrawer(){
+  if(!currentDrawerFactory)return;
+  await doSendInvite(currentDrawerFactory);
+}
+
+async function doSendInvite(f){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  var link=inviteLink(f.invitation_token);
+  var isFollowUp=f.invitation_status==='follow_up_sent'||f.invitation_status==='no_response'||f.invitation_status==='invited'||f.invitation_status==='opened';
+  var emailBody='';
+
+  if(apiKey){
+    // Generate personalised email with AI
+    var prompt='Write a professional '+( isFollowUp?'follow-up ':'')+'invitation email to a factory asking them to register on our supplier portal.
+
+Factory: '+(f.factory_name_english||'')+(f.factory_name_local?' ('+f.factory_name_local+')':'')+'
+Contact: '+(f.sales_contact_name||'Factory Team')+'
+Country: '+(f.country||'')+'
+Products: '+(f.product_categories||[]).join(', ')+'
+Invitation link: '+link+'
+
+The email should:
+- Be warm and professional
+- Briefly introduce us as a US-based product sourcing company actively looking for suppliers
+- Explain they can register on our supplier portal to be considered for orders
+- Include the invitation link prominently
+- Mention it only takes a few minutes to complete
+'+(isFollowUp?'- Acknowledge this is a follow-up to a previous email
+':'')+'
+- Close professionally
+
+Write ONLY the email body, no subject line, no markdown.';
+    try{
+      var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
+      var d=await r.json();
+      if(d.content&&d.content[0])emailBody=d.content[0].text;
+    }catch(ex){}
+  }
+
+  if(!emailBody){
+    // Fallback plain text invite
+    emailBody='Dear '+(f.sales_contact_name||'Team')+',
+
+I hope this message finds you well. My name is Allan and I represent a US-based product sourcing company.
+
+We are actively building our supplier network and would love to include '+(f.factory_name_english||'your company')+' as one of our preferred suppliers.
+
+Please take a few minutes to register on our supplier portal using the link below. Once registered, you can upload your product catalog, certifications, and quote sheets to be considered for upcoming orders.
+
+Your invitation link:
+'+link+'
+
+This link is unique to your company. Please do not share it.
+
+We look forward to working with you.
+
+Best regards,
+Allan
+Supplier Portal';
+  }
+
+  var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(f.factory_name_english||'');
+  var mailto='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(emailBody);
+  window.location.href=mailto;
+
+  // Update invitation status in Supabase
+  var newStatus=isFollowUp?'follow_up_sent':'invited';
+  var patch={invitation_status:newStatus,invitation_sent_at:new Date().toISOString()};
+  if(isFollowUp)patch.follow_up_sent_at=new Date().toISOString();
+  try{
+    await fetch(SB+'/rest/v1/factories?id=eq.'+f.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(patch)});
+    // Log event
+    await fetch(SB+'/rest/v1/invitation_events',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_id:f.id,event_type:newStatus,triggered_by:'admin'})});
+  }catch(ex){}
+
+  await loadData();
+}
+
+// ── Follow-up panel ──
+function renderFollowUps(){
+  var today=new Date();
+  var needFollowUp=allFactories.filter(function(f){
+    if(!f.invitation_sent_at)return false;
+    if(f.invitation_status==='completed'||f.invitation_status==='registered'||f.invitation_status==='declined')return false;
+    if(f.follow_up_sent_at)return false;
+    var sent=new Date(f.invitation_sent_at);
+    var bizDays=0;
+    var d=new Date(sent);
+    while(d<today){
+      d.setDate(d.getDate()+1);
+      var dow=d.getDay();
+      if(dow!==0&&dow!==6)bizDays++;
+    }
+    return bizDays>=3;
+  });
+
+  g('cnt-followup').textContent=needFollowUp.length;
+  if(!needFollowUp.length){g('followup-list').innerHTML='<div class="empty">No follow-ups needed right now. 🎉</div>';return;}
+
+  g('followup-list').innerHTML=needFollowUp.map(function(f){
+    var sent=new Date(f.invitation_sent_at);
+    var bizDays=0;var d=new Date(sent);var today=new Date();
+    while(d<today){d.setDate(d.getDate()+1);var dow=d.getDay();if(dow!==0&&dow!==6)bizDays++;}
+    return '<div class="followup-item">'+
+      '<div class="followup-name">'+(f.factory_name_english||'—')+
+      '<span class="followup-days">'+bizDays+' business days</span></div>'+
+      '<div class="followup-meta">'+
+        (f.sales_email||'No email')+'&nbsp;·&nbsp;'+(f.invitation_status||'invited')+
+        '&nbsp;·&nbsp;Invited '+sent.toLocaleDateString('en-US',{month:'short',day:'numeric'})+
+      '</div>'+
+      '<div style="margin-top:8px;display:flex;gap:8px;">'+
+        '<button class="btn-invite" onclick="sendInvite(''+f.id+'',event)" style="font-size:12px;">✉ Send Follow-up</button>'+
+        '<button class="btn-view" onclick="openDrawer(''+f.id+'',event)" style="font-size:12px;">View Details</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
 </script>
 </body>
 </html>
