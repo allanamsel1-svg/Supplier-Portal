@@ -800,6 +800,8 @@ async function sendRFQ(){
   var fileLink=g('rfq-file-link').value.trim();
   var fullBody=body+(fileLink?'\n\nPlease refer to the attached reference file for product details:\n'+fileLink:'');
   var myEmail=localStorage.getItem('from_email')||'';
+  var sendBtn=document.querySelector('.btn-send');
+  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Sending...';}
   try{
     await emailjs.send('service_aawsxwi','template_er5zzqp',{
       to_email:f.sales_email,
@@ -809,10 +811,12 @@ async function sendRFQ(){
       reply_to:myEmail,
       subject:subject
     });
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='Send RFQ ✉';}
     g('rfq-msg').style.display='block';
     g('rfq-file-link').value='';
     setTimeout(function(){g('rfq-msg').style.display='none';},5000);
   }catch(ex){
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='Send RFQ ✉';}
     alert('Email failed to send: '+(ex.text||ex.message||JSON.stringify(ex)));
   }
 }
@@ -891,20 +895,19 @@ async function doSendInvite(f){
     // Generate personalised email with AI
     var followUpNote=isFollowUp?'- Acknowledge this is a follow-up to a previous email\n':'';
     var factoryInfo='Factory: '+(f.factory_name_english||'')+(f.factory_name_local?' ('+f.factory_name_local+')':'')+
-      '\nContact: '+(f.sales_contact_name||'Factory Team')+
+      '\nContact name: '+(f.sales_contact_name||'Factory Team')+
       '\nCountry: '+(f.country||'')+
-      '\nProducts: '+(f.product_categories||[]).join(', ')+
-      '\nInvitation link: '+link;
-    var prompt='Write a professional '+(isFollowUp?'follow-up ':'')+'invitation email to a factory asking them to register on our supplier portal.\n\n'+
-      factoryInfo+'\n\nThe email should:\n'+
-      '- Be warm and professional\n'+
-      '- Briefly introduce us as a US-based product sourcing company actively looking for suppliers\n'+
-      '- Explain they can register on our supplier portal to be considered for orders\n'+
-      '- Include the invitation link prominently\n'+
-      '- Mention it only takes a few minutes to complete\n'+
+      '\nProducts: '+(f.product_categories||[]).join(', ');
+    var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Allan Amsel at a US-based product sourcing company to a factory contact, inviting them to register on our supplier portal.\n\n'+
+      factoryInfo+'\n\nRules:\n'+
+      '- Address the contact by their first name if available\n'+
+      '- Sign off as Allan Amsel, Supplier Sourcing\n'+
+      '- DO NOT include any placeholder text like [Your Name] or [Company Name]\n'+
+      '- DO NOT include the invitation link — it will be added separately\n'+
+      '- Keep it to 3-4 short paragraphs\n'+
+      '- Be warm and genuine, not generic\n'+
       followUpNote+
-      '- Close professionally\n\n'+
-      'Write ONLY the email body, no subject line, no markdown.';
+      '- Write ONLY the email body, no subject line, no markdown.';
     try{
       var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:600,messages:[{role:'user',content:prompt}]})});
       var d=await r.json();
@@ -913,19 +916,20 @@ async function doSendInvite(f){
   }
 
   if(!emailBody){
-    emailBody='Dear '+(f.sales_contact_name||'Team')+',\n\n'+
-      'I hope this message finds you well. My name is Allan and I represent a US-based product sourcing company.\n\n'+
+    var firstName=(f.sales_contact_name||'').split(' ')[0]||'there';
+    emailBody='Dear '+firstName+',\n\n'+
+      'I hope this message finds you well. My name is Allan Amsel and I represent a US-based product sourcing company.\n\n'+
       'We are actively building our supplier network and would love to include '+(f.factory_name_english||'your company')+' as one of our preferred suppliers.\n\n'+
-      'Please take a few minutes to register on our supplier portal using the link below. Once registered, you can upload your product catalog, certifications, and quote sheets to be considered for upcoming orders.\n\n'+
-      'Your invitation link:\n'+link+'\n\n'+
-      'This link is unique to your company. Please do not share it.\n\n'+
-      'We look forward to working with you.\n\nBest regards,\nAllan\nSupplier Portal';
+      'Please take a few minutes to register on our supplier portal using your unique invitation link below. Once registered, you can upload your product catalog, certifications, and quote sheets to be considered for upcoming orders.\n\n'+
+      'We look forward to working with you.\n\nBest regards,\nAllan Amsel\nSupplier Sourcing';
   }
 
   var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(f.factory_name_english||'');
-  var mailto='mailto:'+f.sales_email+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(emailBody);
   // Send via EmailJS
   var myEmail=localStorage.getItem('from_email')||'';
+  // Show sending state on all invite buttons
+  document.querySelectorAll('.btn-invite').forEach(function(b){b.disabled=true;b.textContent='Sending...';});
+  var inviteDrawerBtn=g('d-invite-btn');if(inviteDrawerBtn){inviteDrawerBtn.disabled=true;inviteDrawerBtn.textContent='Sending...';}
   try{
     await emailjs.send('service_aawsxwi','template_er5zzqp',{
       to_email:f.sales_email,
@@ -935,8 +939,9 @@ async function doSendInvite(f){
       reply_to:myEmail,
       subject:subject
     });
+    alert('✓ Invitation sent to '+f.sales_email);
   }catch(ex){
-    alert('Email failed to send: '+ex.text+'. Please check your EmailJS settings.');
+    alert('Email failed to send: '+(ex.text||ex.message||JSON.stringify(ex)));
     return;
   }
 
