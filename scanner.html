@@ -165,14 +165,33 @@ function handleFiles(files) {
     // Show card immediately with pending status
     renderCard(card);
     updateBar();
-    // Then load the image data
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      card.dataUrl = e.target.result;
+    // Load image — use createObjectURL for better compatibility with iPhone photos
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function() {
+      // Draw to canvas to force JPEG conversion (handles HEIC renamed as jpg)
+      var canvas = document.createElement('canvas');
+      var max = 1600;
+      var w = img.width, h = img.height;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      card.dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      URL.revokeObjectURL(url);
       renderCard(card);
       updateBar();
     };
-    reader.readAsDataURL(file);
+    img.onerror = function() {
+      // Fallback to FileReader if object URL fails
+      URL.revokeObjectURL(url);
+      var reader = new FileReader();
+      reader.onload = function(e) { card.dataUrl = e.target.result; renderCard(card); updateBar(); };
+      reader.readAsDataURL(file);
+    };
+    img.src = url;
   });
 }
 
@@ -281,8 +300,8 @@ async function scanCard(card, apiKey) {
   renderCard(card);
 
   try {
-    var resized = await resizeImage(card.dataUrl, 1600, 0.85);
-    var base64 = resized.split(',')[1];
+    // dataUrl already resized to 1600px at load time
+    var base64 = card.dataUrl.split(',')[1];
 
     var prompt = 'This image may contain one or more business cards. Treat each physically separate card as a completely independent record.\n\nCRITICAL RULES:\n1. NEVER mix information from different cards. Each card is its own object.\n2. Only assign a field value if it physically appears on THAT specific card. Use empty string if not found on that card.\n3. A phone number, email, or name from card A must NEVER appear in card B.\n4. Carefully look at the physical boundaries of each card before extracting.\n5. IGNORE fax numbers completely. Do not put fax numbers in any field.\n6. If there is a QR code on a card, try to decode it. If it is a WeChat ID or WeChat URL put it in sales_wechat. If it is a website URL put it in website.\n\nReturn ONLY a JSON array (even for one card). Each element must use these exact keys (empty string if not found on that card):\n[\n  {\n    "factory_name_english": "",\n    "factory_name_local": "",\n    "sales_contact_name": "",\n    "contact_title": "",\n    "sales_email": "",\n    "sales_mobile": "",\n    "telephone": "",\n    "sales_wechat": "",\n    "sales_whatsapp": "",\n    "website": "",\n    "address": "",\n    "city": "",\n    "country": "",\n    "product_categories": "",\n    "notes": ""\n  }\n]\n\nReturn ONLY the raw JSON array. No markdown, no explanation.';
 
