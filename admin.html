@@ -716,7 +716,7 @@ async function generateRFQ(){
   var certs=(f.certifications||[]).join(', ')||'none listed';
   var prompt='Generate a professional RFQ (Request for Quotation) email body to send to a factory.\n\nFactory: '+(f.factory_name_english||'')+'\nContact: '+(f.sales_contact_name||'')+'\nCountry: '+(f.country||'')+'\nProducts they manufacture: '+cats+'\nCertifications they hold: '+certs+'\n\nThe email body should:\n- Open with a professional greeting\n- Briefly introduce our company as a US-based product sourcing company\n- Request detailed product specifications and available models\n- Ask for FOB pricing with port of departure\n- Ask for MOQ (minimum order quantities)\n- Ask for lead times for samples and production\n- Ask about packaging options and details\n- Request high resolution product images and spec sheets\n- Direct them to upload their quote sheet at: https://project-7o416.vercel.app\n- Close professionally with our contact details placeholder\n\nWrite ONLY the email body, no subject line, no markdown formatting.';
   try{
-    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     var d=await r.json();g('gen-prog').style.display='none';
     if(d.content&&d.content[0])g('rfq-body').value=d.content[0].text;
     else g('rfq-body').value='Could not generate RFQ. Please type manually.';
@@ -770,7 +770,7 @@ async function sendMsg(){
   }));
   var sys='You are an expert supplier intelligence assistant for a US-based product sourcing company. FACTORY DATABASE ('+allFactories.length+' factories):\n'+db+'\n\nHelp search, filter, analyze suppliers, draft RFQs, and provide sourcing recommendations. Be concise and professional.';
   try{
-    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1024,system:sys,messages:[{role:'user',content:text}]})});
+    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1024,system:sys,messages:[{role:'user',content:text}]})});
     var d=await r.json();hideTyping();
     if(d.content&&d.content[0]){addMsg(d.content[0].text.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>'),'ai');}
     else{addMsg('Could not get a response. Check your API key in Settings.','ai');}
