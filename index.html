@@ -1042,9 +1042,30 @@ async function login(){
 }
 
 async function forgot(){
-  var email=g('f-email').value.trim();if(!email)return;
-  await fetch(SB+'/auth/v1/recover',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email})});
-  g('f-ok').style.display='block';
+  var email=g('f-email').value.trim();
+  if(!email){alert('Please enter your email address.');return;}
+  var btn=document.querySelector('#pane-forgot .btn-main');
+  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  try{
+    var r=await fetch(SB+'/auth/v1/recover',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':KEY},
+      body:JSON.stringify({
+        email:email,
+        gotrue_meta_security:{},
+        redirect_to:'https://project-7o416.vercel.app'
+      })
+    });
+    if(r.ok){
+      g('f-ok').style.display='block';
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      alert('Reset failed: '+(e.msg||e.message||r.status)+'. Please check your email address and try again.');
+    }
+  }catch(e){
+    alert('Connection error: '+e.message);
+  }
+  if(btn){btn.disabled=false;btn.textContent='Send Reset Link';}
 }
 
 function signout(){USER=null;TOKEN=null;FACTORY_NAME='';FACTORY_ID=null;locationBlocks=[];certDetailData={};g('portal').style.display='none';g('auth-screen').style.display='flex';authTab('login');}
