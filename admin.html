@@ -863,33 +863,29 @@
     </div>
 
     <div class="d-section">
-      <div class="d-section-title">Factory Capacity</div>
+      <div class="d-section-title">Factory Capacity <span style="font-size:10px;color:#bbb;font-weight:400;text-transform:none;letter-spacing:0;">(edit via factory portal or locations)</span></div>
       <div class="d-grid-3">
-        <div class="d-field"><div class="d-label">Total Employees</div><div class="d-value" id="d-emp">—</div><input class="d-input" id="de-emp" type="number" placeholder="Employees" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Engineers / R&D</div><div class="d-value" id="d-eng">—</div><input class="d-input" id="de-eng" type="number" placeholder="Engineers" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">QC Staff</div><div class="d-value" id="d-qc">—</div><input class="d-input" id="de-qc" type="number" placeholder="QC staff" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Production Lines</div><div class="d-value" id="d-lines">—</div><input class="d-input" id="de-lines" type="number" placeholder="Lines" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Floor Space (m²)</div><div class="d-value" id="d-sqm">—</div><input class="d-input" id="de-sqm" type="number" placeholder="m²" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Injection Machines</div><div class="d-value" id="d-inj">—</div><input class="d-input" id="de-inj" type="number" placeholder="Machines" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Monthly Capacity</div><div class="d-value" id="d-cap">—</div><input class="d-input" id="de-cap" type="number" placeholder="Units/mo" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Total Employees</div><div class="d-value" id="d-emp">—</div></div>
+        <div class="d-field"><div class="d-label">Engineers / R&D</div><div class="d-value" id="d-eng">—</div></div>
+        <div class="d-field"><div class="d-label">QC Staff</div><div class="d-value" id="d-qc">—</div></div>
+        <div class="d-field"><div class="d-label">Production Lines</div><div class="d-value" id="d-lines">—</div></div>
+        <div class="d-field"><div class="d-label">Floor Space (m²)</div><div class="d-value" id="d-sqm">—</div></div>
+        <div class="d-field"><div class="d-label">Injection Machines</div><div class="d-value" id="d-inj">—</div></div>
+        <div class="d-field"><div class="d-label">Monthly Capacity</div><div class="d-value" id="d-cap">—</div></div>
       </div>
       <div style="margin-top:8px;" id="d-cap-notes-wrap">
         <div class="d-label">Capacity Notes</div>
-        <div class="d-value" id="d-cap-notes" style="margin-top:3px;font-weight:400;line-height:1.5;"></div><textarea class="d-input" id="de-cap-notes" rows="2" placeholder="Capacity notes" style="display:none"></textarea>
+        <div class="d-value" id="d-cap-notes" style="margin-top:3px;font-weight:400;line-height:1.5;"></div>
       </div>
     </div>
 
     <div class="d-section">
-      <div class="d-section-title">Product Categories (Free Text)</div>
-      <div class="d-value" id="d-categories" style="font-weight:400;line-height:1.6;">—</div>
+      <div class="d-section-title">Product Categories</div>
+      <div class="d-value" id="d-categories" style="font-weight:400;line-height:1.6;color:#999;font-size:12px;"></div>
     </div>
     <div class="d-section">
-      <div class="d-section-title" style="display:flex;align-items:center;justify-content:space-between;">
-        Manufacturing Categories
-        <button onclick="saveCategorySelections()" style="font-size:11px;padding:4px 10px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;">Save Categories</button>
-      </div>
-      <div id="d-factory-cats" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;margin-top:6px;"></div>
-      <div id="d-cats-msg" style="font-size:12px;color:#1a7a1a;margin-top:6px;display:none;">✓ Categories saved!</div>
+      <div class="d-section-title">Manufacturing Categories <span style="font-size:10px;color:#bbb;font-weight:400;text-transform:none;letter-spacing:0;">(click Edit to change)</span></div>
+      <div id="d-factory-cats" style="display:flex;flex-direction:column;gap:5px;max-height:240px;overflow-y:auto;margin-top:6px;"></div>
     </div>
 
     <div class="d-section">
@@ -1362,6 +1358,8 @@ async function saveDrawerEdit(){
       body:JSON.stringify(payload)
     });
     if(r.ok){
+      // Also save category selections
+      await saveCategorySelections();
       // Update local factory object
       Object.assign(f,payload);
       // Re-render view fields with new values
@@ -1648,7 +1646,7 @@ async function uploadFactoryPhotos(input){
     // Resize image
     var resized=await resizeImageAdmin(file,1600,0.85);
     var blob=await fetch(resized).then(function(r){return r.blob();});
-    var path=f.user_id+'/photos/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    var path=(f.user_id||f.id)+'/photos/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     try{
       var uploadR=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
         method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob
@@ -1697,13 +1695,22 @@ async function loadDrawerCategories(factoryId){
   if(!el)return;
   el.innerHTML='<div style="font-size:12px;color:#bbb;">Loading...</div>';
 
+  // Load factory's current category selections
   try{
     var r=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+factoryId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     drawerFactoryCategories=await r.json();
   }catch(e){drawerFactoryCategories=[];}
 
+  // Load all categories if not yet loaded
   if(!allCategories.length){
-    el.innerHTML='<div style="font-size:12px;color:#bbb;">No categories set up yet. Go to Categories to add them.</div>';
+    try{
+      var cr=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      allCategories=await cr.json();
+    }catch(e){}
+  }
+
+  if(!allCategories.length){
+    el.innerHTML='<div style="font-size:12px;color:#bbb;">No categories set up yet. Go to the Categories section to add them first.</div>';
     return;
   }
 
