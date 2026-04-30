@@ -227,6 +227,21 @@
     .d-btn-approve:disabled { opacity: 0.45; cursor: not-allowed; }
     .d-btn-rfq { flex: 1; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .d-btn-rfq:hover { opacity: 0.87; }
+    .d-btn-delete { flex: 1; padding: 10px; background: #fff0f0; color: #b00; border: 1px solid #fdd; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .d-btn-delete:hover { background: #ffe0e0; }
+    .d-edit-btn { font-size: 12px; padding: 5px 12px; background: #f0f0e8; color: #555; border: 1px solid #e0e0d8; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    .d-edit-btn:hover { background: #e8e8e0; color: #1a1a2e; }
+    .d-input { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; color: #1a1a2e; background: #fff; margin-top: 2px; }
+    .d-input:focus { outline: none; border-color: #1a1a2e; }
+    .d-select { width: 100%; padding: 6px 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .d-save-bar { display: none; gap: 8px; padding: 10px 1.25rem; background: #f0f8ff; border-top: 1px solid #c0d8f0; }
+    .d-save-bar.on { display: flex; }
+    .d-btn-save-edit { flex: 1; padding: 9px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .d-btn-cancel-edit { padding: 9px 14px; background: #f0f0e8; color: #666; border: 1px solid #e0e0d8; border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .d-edit-msg { font-size: 12px; padding: 6px 10px; border-radius: 6px; display: none; }
+    .d-edit-msg.ok { color: #1a7a1a; background: #edfaed; border: 1px solid #a0d8a0; }
+    .d-edit-msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
+    .d-btn-delete:hover { background: #ffe0e0; }
     .no-data { font-size: 13px; color: #ccc; font-style: italic; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -790,61 +805,71 @@
   <div class="drawer-header">
     <div class="drawer-header-l">
       <div class="drawer-factory-name" id="d-name">—</div>
+      <input class="d-input" id="de-name" placeholder="Factory name (English)" style="display:none;font-size:15px;font-weight:600;" />
       <div class="drawer-factory-local" id="d-local"></div>
+      <input class="d-input" id="de-local" placeholder="Factory name (local)" style="display:none;font-size:12px;" />
     </div>
     <div class="drawer-header-r">
       <span class="fc-status" id="d-status-badge">—</span>
+      <button class="d-edit-btn" id="d-edit-toggle" onclick="toggleDrawerEdit()">✏ Edit</button>
       <button class="drawer-close" onclick="closeDrawer()">✕</button>
     </div>
+  </div>
+  <!-- Edit save bar -->
+  <div class="d-save-bar" id="d-save-bar">
+    <button class="d-btn-save-edit" onclick="saveDrawerEdit()">✓ Save Changes</button>
+    <button class="d-btn-cancel-edit" onclick="cancelDrawerEdit()">Cancel</button>
+    <div class="d-edit-msg ok" id="d-edit-ok">Saved!</div>
+    <div class="d-edit-msg err" id="d-edit-err"></div>
   </div>
   <div class="drawer-body">
 
     <div class="d-section">
       <div class="d-section-title">Factory Information</div>
       <div class="d-grid-3">
-        <div class="d-field"><div class="d-label">Years in Business</div><div class="d-value" id="d-years">—</div></div>
-        <div class="d-field"><div class="d-label">Annual Revenue</div><div class="d-value" id="d-revenue">—</div></div>
-        <div class="d-field"><div class="d-label">Export %</div><div class="d-value" id="d-export">—</div></div>
+        <div class="d-field"><div class="d-label">Years in Business</div><div class="d-value" id="d-years">—</div><input class="d-input" id="de-years" type="number" placeholder="Years" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Annual Revenue</div><div class="d-value" id="d-revenue">—</div><input class="d-input" id="de-revenue" type="text" placeholder="e.g. $1M–$5M" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Export %</div><div class="d-value" id="d-export">—</div><input class="d-input" id="de-export" type="number" placeholder="0-100" style="display:none" /></div>
       </div>
     </div>
 
     <div class="d-section">
       <div class="d-section-title">Contact</div>
       <div class="d-grid">
-        <div class="d-field"><div class="d-label">Contact Name</div><div class="d-value" id="d-contact">—</div></div>
-        <div class="d-field"><div class="d-label">Mobile</div><div class="d-value" id="d-mobile">—</div></div>
-        <div class="d-field"><div class="d-label">Email</div><div class="d-value" id="d-email">—</div></div>
-        <div class="d-field"><div class="d-label">Telephone</div><div class="d-value" id="d-tel">—</div></div>
-        <div class="d-field"><div class="d-label">WeChat</div><div class="d-value" id="d-wechat">—</div></div>
-        <div class="d-field"><div class="d-label">WhatsApp</div><div class="d-value" id="d-whatsapp">—</div></div>
+        <div class="d-field"><div class="d-label">Contact Name</div><div class="d-value" id="d-contact">—</div><input class="d-input" id="de-contact" type="text" placeholder="Contact name" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Mobile</div><div class="d-value" id="d-mobile">—</div><input class="d-input" id="de-mobile" type="tel" placeholder="+86 138..." style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Email</div><div class="d-value" id="d-email">—</div><input class="d-input" id="de-email" type="email" placeholder="email@factory.com" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Telephone</div><div class="d-value" id="d-tel">—</div><input class="d-input" id="de-tel" type="tel" placeholder="+86 20..." style="display:none" /></div>
+        <div class="d-field"><div class="d-label">WeChat</div><div class="d-value" id="d-wechat">—</div><input class="d-input" id="de-wechat" type="text" placeholder="WeChat ID" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">WhatsApp</div><div class="d-value" id="d-whatsapp">—</div><input class="d-input" id="de-whatsapp" type="tel" placeholder="+86 138..." style="display:none" /></div>
       </div>
     </div>
 
     <div class="d-section">
       <div class="d-section-title">Main Factory Address</div>
       <div class="d-grid">
-        <div class="d-field"><div class="d-label">Address</div><div class="d-value" id="d-address">—</div></div>
-        <div class="d-field"><div class="d-label">City</div><div class="d-value" id="d-city">—</div></div>
-        <div class="d-field"><div class="d-label">State / Province</div><div class="d-value" id="d-state">—</div></div>
-        <div class="d-field"><div class="d-label">Postal Code</div><div class="d-value" id="d-postal">—</div></div>
-        <div class="d-field"><div class="d-label">Country</div><div class="d-value" id="d-country">—</div></div>
+        <div class="d-field"><div class="d-label">Address</div><div class="d-value" id="d-address">—</div><input class="d-input" id="de-address" type="text" placeholder="Street address" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">City</div><div class="d-value" id="d-city">—</div><input class="d-input" id="de-city" type="text" placeholder="City" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">State / Province</div><div class="d-value" id="d-state">—</div><input class="d-input" id="de-state" type="text" placeholder="State/Province" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Postal Code</div><div class="d-value" id="d-postal">—</div><input class="d-input" id="de-postal" type="text" placeholder="Postal code" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Country</div><div class="d-value" id="d-country">—</div><input class="d-input" id="de-country" type="text" placeholder="Country" style="display:none" /></div>
       </div>
     </div>
 
     <div class="d-section">
       <div class="d-section-title">Factory Capacity</div>
       <div class="d-grid-3">
-        <div class="d-field"><div class="d-label">Total Employees</div><div class="d-value" id="d-emp">—</div></div>
-        <div class="d-field"><div class="d-label">Engineers / R&D</div><div class="d-value" id="d-eng">—</div></div>
-        <div class="d-field"><div class="d-label">QC Staff</div><div class="d-value" id="d-qc">—</div></div>
-        <div class="d-field"><div class="d-label">Production Lines</div><div class="d-value" id="d-lines">—</div></div>
-        <div class="d-field"><div class="d-label">Floor Space (m²)</div><div class="d-value" id="d-sqm">—</div></div>
-        <div class="d-field"><div class="d-label">Injection Machines</div><div class="d-value" id="d-inj">—</div></div>
-        <div class="d-field"><div class="d-label">Monthly Capacity</div><div class="d-value" id="d-cap">—</div></div>
+        <div class="d-field"><div class="d-label">Total Employees</div><div class="d-value" id="d-emp">—</div><input class="d-input" id="de-emp" type="number" placeholder="Employees" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Engineers / R&D</div><div class="d-value" id="d-eng">—</div><input class="d-input" id="de-eng" type="number" placeholder="Engineers" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">QC Staff</div><div class="d-value" id="d-qc">—</div><input class="d-input" id="de-qc" type="number" placeholder="QC staff" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Production Lines</div><div class="d-value" id="d-lines">—</div><input class="d-input" id="de-lines" type="number" placeholder="Lines" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Floor Space (m²)</div><div class="d-value" id="d-sqm">—</div><input class="d-input" id="de-sqm" type="number" placeholder="m²" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Injection Machines</div><div class="d-value" id="d-inj">—</div><input class="d-input" id="de-inj" type="number" placeholder="Machines" style="display:none" /></div>
+        <div class="d-field"><div class="d-label">Monthly Capacity</div><div class="d-value" id="d-cap">—</div><input class="d-input" id="de-cap" type="number" placeholder="Units/mo" style="display:none" /></div>
       </div>
       <div style="margin-top:8px;" id="d-cap-notes-wrap">
         <div class="d-label">Capacity Notes</div>
-        <div class="d-value" id="d-cap-notes" style="margin-top:3px;font-weight:400;line-height:1.5;"></div>
+        <div class="d-value" id="d-cap-notes" style="margin-top:3px;font-weight:400;line-height:1.5;"></div><textarea class="d-input" id="de-cap-notes" rows="2" placeholder="Capacity notes" style="display:none"></textarea>
       </div>
     </div>
 
@@ -892,8 +917,9 @@
     <button class="d-btn-invite" id="d-invite-btn" onclick="inviteFromDrawer()">✉ Send Invitation Email</button>
   </div>
   <div class="d-actions">
-    <button class="d-btn-approve" id="d-approve-btn" onclick="approveFromDrawer()">✓ Approve Factory</button>
-    <button class="d-btn-rfq" onclick="rfqFromDrawer()">✉ Send RFQ</button>
+    <button class="d-btn-approve" id="d-approve-btn" onclick="approveFromDrawer()">✓ Approve</button>
+    <button class="d-btn-rfq" onclick="rfqFromDrawer()">✉ RFQ</button>
+    <button class="d-btn-delete" onclick="deleteFromDrawer()">🗑 Delete</button>
   </div>
 </div>
 
@@ -1225,6 +1251,157 @@ function closeDrawer(){
   g('drawer-overlay').classList.remove('on');
   g('supplier-drawer').classList.remove('open');
   currentDrawerFactory=null;
+}
+
+// ── Drawer inline edit ──
+var drawerEditMode=false;
+
+function toggleDrawerEdit(){
+  drawerEditMode=!drawerEditMode;
+  if(drawerEditMode) enterDrawerEdit();
+  else cancelDrawerEdit();
+}
+
+function enterDrawerEdit(){
+  var f=currentDrawerFactory;if(!f)return;
+  drawerEditMode=true;
+  g('d-edit-toggle').textContent='✕ Cancel';
+  g('d-save-bar').classList.add('on');
+  g('d-edit-ok').style.display='none';g('d-edit-err').style.display='none';
+
+  // Map field id -> factory value
+  var map={
+    'name':f.factory_name_english||'',
+    'local':f.factory_name_local||'',
+    'years':f.years_in_business||'',
+    'revenue':f.annual_revenue_usd||'',
+    'export':f.export_percentage||'',
+    'contact':f.sales_contact_name||'',
+    'mobile':f.sales_mobile||'',
+    'email':f.sales_email||'',
+    'tel':f.telephone||'',
+    'wechat':f.sales_wechat||'',
+    'whatsapp':f.sales_whatsapp||'',
+    'address':f.address||'',
+    'city':f.city||'',
+    'state':f.state_province||'',
+    'postal':f.postal_code||'',
+    'country':f.country||'',
+    'emp':f.employees_total||'',
+    'eng':f.employees_engineers||'',
+    'qc':f.employees_qc||'',
+    'lines':f.production_lines||'',
+    'sqm':f.floor_space_sqm||'',
+    'inj':f.injection_machines||'',
+    'cap':f.monthly_capacity_units||'',
+    'cap-notes':f.monthly_capacity_notes||'',
+    'categories':(f.product_categories||[]).join(', ')
+  };
+
+  Object.keys(map).forEach(function(k){
+    var viewEl=g('d-'+k);
+    var editEl=g('de-'+k);
+    if(viewEl)viewEl.style.display='none';
+    if(editEl){editEl.value=map[k];editEl.style.display='block';}
+  });
+}
+
+function cancelDrawerEdit(){
+  drawerEditMode=false;
+  g('d-edit-toggle').textContent='✏ Edit';
+  g('d-save-bar').classList.remove('on');
+  // Restore view elements
+  document.querySelectorAll('#supplier-drawer .d-value').forEach(function(el){el.style.display='';});
+  document.querySelectorAll('#supplier-drawer .d-input').forEach(function(el){el.style.display='none';});
+  // Restore name in header
+  var nameEl=g('de-name');if(nameEl)nameEl.style.display='none';
+  var localEl=g('de-local');if(localEl)localEl.style.display='none';
+}
+
+async function saveDrawerEdit(){
+  var f=currentDrawerFactory;if(!f)return;
+  var ge=function(k){var el=g('de-'+k);return el?el.value.trim():'';};
+
+  var payload={
+    factory_name_english:ge('name')||null,
+    factory_name_local:ge('local')||null,
+    years_in_business:parseInt(ge('years'))||null,
+    annual_revenue_usd:ge('revenue')||null,
+    export_percentage:parseInt(ge('export'))||null,
+    sales_contact_name:ge('contact')||null,
+    sales_mobile:ge('mobile')||null,
+    sales_email:ge('email')||null,
+    telephone:ge('tel')||null,
+    sales_wechat:ge('wechat')||null,
+    sales_whatsapp:ge('whatsapp')||null,
+    address:ge('address')||null,
+    city:ge('city')||null,
+    state_province:ge('state')||null,
+    postal_code:ge('postal')||null,
+    country:ge('country')||null,
+    employees_total:parseInt(ge('emp'))||null,
+    employees_engineers:parseInt(ge('eng'))||null,
+    employees_qc:parseInt(ge('qc'))||null,
+    production_lines:parseInt(ge('lines'))||null,
+    floor_space_sqm:parseInt(ge('sqm'))||null,
+    injection_machines:parseInt(ge('inj'))||null,
+    monthly_capacity_units:parseInt(ge('cap'))||null,
+    monthly_capacity_notes:ge('cap-notes')||null,
+    product_categories:ge('categories')?[ge('categories')]:[]
+  };
+
+  var saveBtn=g('supplier-drawer').querySelector('.d-btn-save-edit');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
+
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+f.id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    if(r.ok){
+      // Update local factory object
+      Object.assign(f,payload);
+      // Re-render view fields with new values
+      cancelDrawerEdit();
+      // Re-open drawer to refresh all displayed values
+      await openDrawer(f.id,null);
+      var ok=g('d-edit-ok');if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},3000);}
+      await loadData();
+    }else{
+      var err=await r.json().catch(function(){return{};});
+      var errEl=g('d-edit-err');
+      if(errEl){errEl.textContent='Save failed: '+(err.message||err.details||r.status);errEl.style.display='block';}
+    }
+  }catch(e){
+    var errEl=g('d-edit-err');
+    if(errEl){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+  }finally{
+    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='✓ Save Changes';}
+  }
+}
+
+async function deleteFromDrawer(){
+  var f=currentDrawerFactory;if(!f)return;
+  var name=f.factory_name_english||'this factory';
+  if(!confirm('Are you sure you want to delete '+name+'? This cannot be undone and will remove all their data.'))return;
+  try{
+    // Delete related records first
+    await fetch(SB+'/rest/v1/factory_locations?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_offices?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_certifications?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/invitation_events?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    // Delete factory
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){
+      closeDrawer();
+      await loadData();
+    }else{
+      var err=await r.json().catch(function(){return{};});
+      alert('Delete failed: '+(err.message||err.details||r.status));
+    }
+  }catch(e){alert('Error: '+e.message);}
 }
 
 function rfqFromDrawer(){
