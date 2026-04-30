@@ -2057,6 +2057,108 @@ function renderFactoryMatchList(factories){
 }
 
 
+function toggleFactorySelect(id){
+  if(selectedFactoryIds[id])delete selectedFactoryIds[id];
+  else selectedFactoryIds[id]=true;
+}
+
+async function saveRFQ(action){
+  var desc=g('rfq-description').value.trim();
+  if(!desc){alert('Item description is required.');return;}
+
+  var catId=g('rfq-category-id').value;
+  var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
+
+  // Collect packaging types
+  var pkgTypes=[];
+  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox]').forEach(function(cb){
+    if(cb.checked&&['Bulk','Paper Box','Glass Jar','Plastic Bottle','Bag','Pillow Pack','Hang Tag','Tube','Pump Bottle','Spray Bottle','Blister Pack','Other'].includes(cb.value))pkgTypes.push(cb.value);
+  });
+
+  // Collect certs
+  var certs=[];
+  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox]').forEach(function(cb){
+    if(cb.checked&&!pkgTypes.includes(cb.value))certs.push(cb.value);
+  });
+
+  var factoryIds=Object.keys(selectedFactoryIds);
+  var payload={
+    item_description:desc,
+    detailed_specifications:g('rfq-specs').value.trim()||null,
+    category_id:catId||null,
+    category:catRow?catRow.category:null,
+    sub_category:catRow?catRow.sub_category:null,
+    sub_sub_category:catRow?catRow.sub_sub_category:null,
+    unit_of_measure:g('rfq-uom').value||null,
+    color_code:g('rfq-color').value||null,
+    quote_quantity:parseInt(g('rfq-quantity').value)||null,
+    inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
+    master_case_pack:parseInt(g('rfq-master-pack').value)||null,
+    packaging_type:pkgTypes.join(',')||null,
+    packaging_notes:g('rfq-pkg-notes').value.trim()||null,
+    certifications_required:certs.length?certs:null,
+    is_cosmetic:catRow?catRow.is_cosmetic:false,
+    inci_required:catRow?catRow.is_cosmetic:false,
+    status:action==='send'?'sent':'draft',
+    factories_to_send:factoryIds,
+    sent_to_count:action==='send'?factoryIds.length:0
+  };
+
+  var rfqId=g('rfq-id').value;
+  var url=rfqId?SB+'/rest/v1/rfqs?id=eq.'+rfqId:SB+'/rest/v1/rfqs';
+  var method=rfqId?'PATCH':'POST';
+  var sendBtn=g('rfq-send-btn');
+  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Saving...';}
+
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(r.ok){
+      var result=await r.json();
+      var savedRFQ=Array.isArray(result)?result[0]:result;
+      if(savedRFQ){
+        g('rfq-id').value=savedRFQ.id;
+        g('rfq-project-number').textContent=savedRFQ.project_number;
+
+        // Create factory assignments
+        if(savedRFQ.id&&factoryIds.length){
+          var assignments=factoryIds.map(function(fid){
+            var f=allFactories.find(function(x){return x.id===fid;});
+            return{rfq_id:savedRFQ.id,factory_id:fid,email_sent_to:f?f.sales_email:null,status:action==='send'?'sent':'pending'};
+          });
+          var ar=await fetch(SB+'/rest/v1/rfq_factory_assignments',{
+            method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify(assignments)
+          });
+          if(!ar.ok){
+            var ae=await ar.json().catch(function(){return{};});
+            alert('Warning: RFQ saved but factory assignments failed: '+(ae.message||ae.details||ar.status));
+          }
+        }
+
+        // Send emails
+        if(action==='send'){
+          await sendRFQEmails(savedRFQ);
+        }
+      }
+      var msg=action==='send'?'RFQ sent to '+factoryIds.length+' factories!':'Draft saved as '+(savedRFQ?savedRFQ.project_number:'');
+      showFormMsg('rfq-save-ok',msg);
+      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+      await loadRFQs();
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      var errMsg='Save failed: '+(e.message||e.details||r.status);
+      showFormMsg('rfq-save-err',errMsg);
+      alert(errMsg);
+      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+    }
+  }catch(e){
+    showFormMsg('rfq-save-err','Error: '+e.message);
+    alert('Error: '+e.message);
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+  }
+}
+
 async function sendRFQEmails(rfq){
   var apiKey=localStorage.getItem('anthropic_key')||'';
   var myEmail=localStorage.getItem('from_email')||'';
@@ -2088,7 +2190,6 @@ async function sendRFQEmails(rfq){
       }catch(e){}
     }
 
-    if(!emailBody){
     if(!emailBody){
       var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
       emailBody='Dear '+firstName+',\n\n'+
@@ -2604,7 +2705,6 @@ function renderFollowUps(){
       '</div>'+
     '</div>';
   }).join('');
-}
 }
 
 // ── Auto-login if session exists ──
