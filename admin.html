@@ -1223,7 +1223,17 @@ function showPanel(name){
   if(name==='upload')initAdminUpload();
   if(name==='rfq'){loadRFQs();loadCategories();}
   if(name==='rfq-followup')loadRFQFollowups();
-  if(name==='inbox')loadInbox();
+  if(name==='inbox'){
+    loadInbox();
+    // Auto-refresh every 30 seconds while inbox is open
+    if(window._inboxTimer)clearInterval(window._inboxTimer);
+    window._inboxTimer=setInterval(function(){
+      if(document.getElementById('panel-inbox').classList.contains('on'))loadInbox();
+      else clearInterval(window._inboxTimer);
+    },30000);
+  } else {
+    if(window._inboxTimer)clearInterval(window._inboxTimer);
+  }
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
