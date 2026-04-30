@@ -809,6 +809,7 @@
   <div class="drawer-header">
     <div class="drawer-header-l">
       <div class="drawer-factory-name" id="d-name">—</div>
+      <div style="font-size:11px;color:#aaa;font-family:monospace;margin-top:2px;" id="d-factory-id"></div>
       <input class="d-input" id="de-name" placeholder="Factory name (English)" style="display:none;font-size:15px;font-weight:600;" />
       <div class="drawer-factory-local" id="d-local"></div>
       <input class="d-input" id="de-local" placeholder="Factory name (local)" style="display:none;font-size:12px;" />
@@ -1056,7 +1057,6 @@ function renderAll(){
   g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
   renderFollowUps();
   populateUploadDropdown();
-  initCardClicks();
 }
 
 function factoryCard(f){
@@ -1072,14 +1072,14 @@ function factoryCard(f){
   var invBadge='<span class="inv-badge inv-'+invStatus+'">'+(invLabels[invStatus]||invStatus)+'</span>';
   var invBtnLabel=invStatus==='not_invited'?'✉ Invite':(invStatus==='follow_up_sent'||invStatus==='no_response'?'✉ Follow-up':'✉ Re-invite');
 
-  // Use data-id + data-action instead of inline onclick to avoid quote escaping bugs
-  var approveBtn=f.status==='pending'?'<button class="btn-approve" data-action="approve" data-id="'+f.id+'">✓ Approve</button>':'';
-  var invBtn=f.sales_email?'<button class="btn-invite" data-action="invite" data-id="'+f.id+'">'+invBtnLabel+'</button>':'';
-  var rfqBtn='<button class="btn-rfq" data-action="rfq" data-id="'+f.id+'">✉ Send RFQ</button>';
-  var viewBtn='<button class="btn-view" data-action="view" data-id="'+f.id+'">View Details →</button>';
+  var fid=f.id;
+  var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(allFactories.find(function(x){return x.id===\''+fid+'\'})?allFactories.find(function(x){return x.id===\''+fid+'\'}).id:\'\',event)">✓ Approve</button>':'';
+  var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInviteById(\''+fid+'\',event)">'+invBtnLabel+'</button>':'';
+  var rfqBtn='<button class="btn-rfq" onclick="openRFQById(\''+fid+'\',event)">✉ Send RFQ</button>';
+  var viewBtn='<button class="btn-view" onclick="openDrawerById(\''+fid+'\',event)">View Details →</button>';
 
-  return '<div class="fc" data-action="view" data-id="'+f.id+'">'+
-    '<div class="fc-top"><div><div class="fc-name">'+esc(f.factory_name_english||'—')+invBadge+'</div><div class="fc-local">'+esc(f.factory_name_local||'')+'</div></div>'+
+  return '<div class="fc" onclick="openDrawerById(\''+fid+'\',event)">'+
+    '<div class="fc-top"><div><div class="fc-name">'+esc(f.factory_name_english||'—')+invBadge+(f.factory_id?'<span style="font-size:10px;color:#bbb;font-family:monospace;margin-left:6px;font-weight:400;">'+f.factory_id+'</span>':'')+'</div><div class="fc-local">'+esc(f.factory_name_local||'')+'</div></div>'+
     '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
     '<div class="fc-meta"><span>📍 '+esc([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
     '<span>✉ '+esc(f.sales_email||'—')+'</span>'+
@@ -1090,27 +1090,6 @@ function factoryCard(f){
 
 function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-
-// ── Single event delegation for all factory list clicks ──
-function initCardClicks(){
-  ['recent-list','all-list','pending-list','followup-list'].forEach(function(listId){
-    var el=g(listId);
-    if(!el||el.dataset.delegated)return;
-    el.dataset.delegated='1';
-    el.addEventListener('click',function(e){
-      var btn=e.target.closest('[data-action]');
-      if(!btn)return;
-      e.stopPropagation();
-      var action=btn.dataset.action;
-      var id=btn.dataset.id;
-      if(!id)return;
-      if(action==='view')openDrawer(id,e);
-      else if(action==='approve')approveCard(id,e);
-      else if(action==='invite')sendInvite(id,e);
-      else if(action==='rfq')openRFQ(id,e);
-    });
-  });
-}
 
 function filterFactories(){
   var search=g('search-input').value.toLowerCase();
@@ -1157,16 +1136,33 @@ async function doApprove(id){
 }
 
 // ── Supplier Detail Drawer ──
+// ── Safe factory lookup wrappers ──
+function openDrawerById(id,e){
+  if(e)e.stopPropagation();
+  var f=allFactories.find(function(x){return x.id===id;});
+  if(!f){alert('Factory not found. Please refresh the page.');return;}
+  openDrawer(id,null);
+}
+function sendInviteById(id,e){
+  if(e)e.stopPropagation();
+  sendInvite(id,e);
+}
+function openRFQById(id,e){
+  if(e)e.stopPropagation();
+  openRFQ(id,e);
+}
+
 async function openDrawer(id,e){
   try{
   if(e)e.stopPropagation();
   var f=allFactories.find(function(x){return x.id===id;});
-  if(!f){console.error('Factory not found:',id);return;}
+  if(!f){alert('Factory not found: '+id);return;}
   currentDrawerFactory=f;
 
   // Header
   g('d-name').textContent=f.factory_name_english||'—';
   g('d-local').textContent=f.factory_name_local||'';
+  var fidEl=g('d-factory-id');if(fidEl)fidEl.textContent=f.factory_id||'';
   var badge=g('d-status-badge');
   badge.textContent=f.status||'pending';
   badge.className='fc-status '+(f.status==='approved'?'st-approved':'st-pending');
@@ -1261,6 +1257,7 @@ async function openDrawer(id,e){
   var created=f.created_at?new Date(f.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}):'—';
   dv('d-created',created);
   dv('d-status-text',f.status||'pending');
+  dv('d-fid',f.factory_id||'—');
 
   // Approve button state
   var approveBtn=g('d-approve-btn');
