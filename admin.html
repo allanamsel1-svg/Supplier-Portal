@@ -354,6 +354,25 @@
       <div class="factory-list" id="followup-list"><div class="empty">No follow-ups needed right now.</div></div>
     </div>
 
+    <div class="panel" id="panel-rfq-followup">
+      <div class="ph"><div class="ph-title">RFQ Follow-ups</div><div class="ph-sub">Factories that have not yet submitted a quote</div></div>
+      <div style="padding:1rem 1.5rem;">
+
+        <!-- Sent but no response -->
+        <div style="margin-bottom:1.5rem;">
+          <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Sent — No Response</div>
+          <div id="rfq-no-response-list"><div class="empty">Loading...</div></div>
+        </div>
+
+        <!-- Viewed but not quoted -->
+        <div>
+          <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Viewed Portal — Not Yet Quoted</div>
+          <div id="rfq-viewed-list"><div class="empty">Loading...</div></div>
+        </div>
+
+      </div>
+    </div>
+
     <div class="panel" id="panel-chat">
       <div class="ph"><div class="ph-title">AI Assistant</div><div class="ph-sub">Ask anything about your supplier database</div></div>
       <div class="sq-row">
@@ -972,6 +991,7 @@ function showPanel(name){
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
   if(name==='upload')initAdminUpload();
   if(name==='rfq'){loadRFQs();loadCategories();}
+  if(name==='rfq-followup')loadRFQFollowups();
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
@@ -2534,6 +2554,123 @@ function showFormMsg(id,msg){
   var el=g(id);if(!el)return;
   el.textContent=msg;el.style.display='block';
   setTimeout(function(){el.style.display='none';},4000);
+}
+
+// ── RFQ Follow-ups ──
+async function loadRFQFollowups(){
+  var noRespEl=g('rfq-no-response-list');
+  var viewedEl=g('rfq-viewed-list');
+  if(!noRespEl||!viewedEl)return;
+  noRespEl.innerHTML='<div class="empty">Loading...</div>';
+  viewedEl.innerHTML='<div class="empty">Loading...</div>';
+
+  try{
+    // Load all assignments with factory and RFQ data
+    var r=await fetch(SB+'/rest/v1/rfq_factory_assignments?select=*,rfqs(project_number,item_description,created_at),factories(factory_name_english,sales_email,sales_contact_name)&status=in.(sent,viewed)&order=sent_at',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){
+      var e=await r.json().catch(function(){return{};});
+      noRespEl.innerHTML='<div class="empty" style="color:#b00;">Load failed: '+(e.message||r.status)+'</div>';
+      return;
+    }
+    var assignments=await r.json();
+
+    // Split into sent (no response) and viewed (not quoted)
+    var sent=assignments.filter(function(a){return a.status==='sent';});
+    var viewed=assignments.filter(function(a){return a.status==='viewed';});
+
+    // Update badge count
+    var total=sent.length+viewed.length;
+    g('cnt-rfq-followup').textContent=total;
+
+    // Render sent/no response
+    if(!sent.length){
+      noRespEl.innerHTML='<div class="empty">No pending RFQs without response.</div>';
+    }else{
+      noRespEl.innerHTML=sent.map(function(a){
+        var rfq=a.rfqs||{};
+        var f=a.factories||{};
+        var sentDate=a.sent_at?new Date(a.sent_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'-';
+        var days=a.sent_at?Math.floor((Date.now()-new Date(a.sent_at))/86400000):0;
+        return '<div class="followup-item">'+
+          '<div class="followup-name">'+(f.factory_name_english||'—')+
+            '<span class="followup-days">'+days+' day'+(days===1?'':'s')+' ago</span>'+
+          '</div>'+
+          '<div class="followup-meta">'+
+            (rfq.project_number||'—')+' · '+(rfq.item_description||'—')+' · Sent '+sentDate+
+            (f.sales_email?' · '+f.sales_email:'')+
+          '</div>'+
+          '<div style="margin-top:8px;display:flex;gap:8px;">'+
+            '<button class="btn-invite" data-aid="'+a.id+'" data-email="'+(f.sales_email||'')+' " data-contact="'+(f.sales_contact_name||'Team')+' " data-proj="'+(rfq.project_number||'')+' " data-desc="'+(rfq.item_description||'')+' " onclick="rfqFollowupClick(this)" style="font-size:12px;">✉ Send Follow-up</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+
+    // Render viewed/not quoted
+    if(!viewed.length){
+      viewedEl.innerHTML='<div class="empty">No factories have viewed without quoting.</div>';
+    }else{
+      viewedEl.innerHTML=viewed.map(function(a){
+        var rfq=a.rfqs||{};
+        var f=a.factories||{};
+        var viewedDate=a.viewed_at?new Date(a.viewed_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'-';
+        var days=a.viewed_at?Math.floor((Date.now()-new Date(a.viewed_at))/86400000):0;
+        return '<div class="followup-item">'+
+          '<div class="followup-name">'+(f.factory_name_english||'—')+
+            '<span class="followup-days" style="background:#fff8e0;color:#886600;">Viewed '+days+' day'+(days===1?'':'s')+' ago</span>'+
+          '</div>'+
+          '<div class="followup-meta">'+
+            (rfq.project_number||'—')+' · '+(rfq.item_description||'—')+' · Viewed '+viewedDate+
+            (f.sales_email?' · '+f.sales_email:'')+
+          '</div>'+
+          '<div style="margin-top:8px;display:flex;gap:8px;">'+
+            '<button class="btn-invite" data-aid="'+a.id+'" data-email="'+(f.sales_email||'')+' " data-contact="'+(f.sales_contact_name||'Team')+' " data-proj="'+(rfq.project_number||'')+' " data-desc="'+(rfq.item_description||'')+' " onclick="rfqFollowupClick(this)" style="font-size:12px;">✉ Send Reminder</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+  }catch(e){
+    noRespEl.innerHTML='<div class="empty" style="color:#b00;">Error: '+e.message+'</div>';
+    alert('RFQ followup load error: '+e.message);
+  }
+}
+
+function rfqFollowupClick(btn){
+  sendRFQFollowup(
+    btn.dataset.aid,
+    btn.dataset.name,
+    btn.dataset.email,
+    btn.dataset.contact,
+    btn.dataset.proj,
+    btn.dataset.desc
+  );
+}
+
+async function sendRFQFollowup(assignmentId,factoryName,email,contactName,projectNum,itemDesc){
+  if(!email){alert('No email address for this factory.');return;}
+  var myEmail=localStorage.getItem('from_email')||'';
+  var firstName=(contactName||'').split(' ')[0]||'Team';
+  var body='Dear '+firstName+',\n\nThis is a friendly reminder that we sent you a Request for Quotation ('+projectNum+') for '+itemDesc+'.\n\nWe have not yet received your quote. Please log into our supplier portal at your earliest convenience to review and submit your quote.\n\nBest regards,\nAllan Amsel\nSupplier Sourcing';
+  try{
+    await emailjs.send('service_aawsxwi','template_er5zzqp',{
+      to_email:email,
+      contact_name:contactName||'Team',
+      email_body:body,
+      invite_link:'https://project-7o416.vercel.app',
+      reply_to:myEmail,
+      subject:'Reminder: RFQ '+projectNum+' — '+itemDesc
+    });
+    // Update status
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+assignmentId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'no_response'})
+    });
+    alert('✓ Follow-up sent to '+email);
+    loadRFQFollowups();
+  }catch(e){alert('Send failed: '+(e.text||e.message));}
 }
 
 function saveCreds(){var u=g('set-user').value.trim(),p=g('set-pass').value;if(u){localStorage.setItem('admin_user',u);ADMIN_USER=u;}if(p){localStorage.setItem('admin_pass',p);ADMIN_PASS=p;}flash('cred-saved');}
