@@ -540,6 +540,18 @@ async function uploadPhotos(input){
   else showMsg('photo-msg','ok','✓ Photos uploaded!');
 }
 
+async function deleteFile(factoryId,folder,filename){
+  if(!confirm('Delete '+filename.replace(/^\d{8}_\d{4}_/,'')+'?'))return;
+  try{
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+factoryId+'/'+folder+'/'+filename,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+KEY,'apikey':KEY}
+    });
+    if(r.ok){showMsg('file-msg','ok','File deleted.');await loadFiles();}
+    else{var e=await r.json().catch(function(){return{};});alert('Delete failed: '+(e.message||e.error||r.status));}
+  }catch(e){alert('Delete error: '+e.message);}
+}
+
 function resizePhoto(file,maxPx,quality){
   return new Promise(function(resolve){
     var url=URL.createObjectURL(file);
@@ -571,16 +583,29 @@ async function loadFiles(){
     var folder=folders[i];
     var listId=listIds[i];
     try{
+      console.log('Listing path:',FACTORY_ID+'/'+folder+'/');
       var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},body:JSON.stringify({prefix:FACTORY_ID+'/'+folder+'/',limit:20})});
       var items=await r.json();
       var el=g(listId);
       if(!el)continue;
-      if(Array.isArray(items)&&items.filter(function(f){return f.name;}).length){
-        el.innerHTML=items.filter(function(f){return f.name;}).map(function(f){
+      var validItems=Array.isArray(items)?items.filter(function(f){return f.name&&f.name!=='.emptyFolderPlaceholder'}):[]; 
+      if(validItems.length){
+        el.innerHTML=validItems.map(function(f){
           var url=SB+'/storage/v1/object/public/factory-files/'+FACTORY_ID+'/'+folder+'/'+f.name;
-          return '<div class="file-row"><span class="file-name">'+f.name+'</span><a class="file-link" href="'+url+'" target="_blank">View / Download</a></div>';
+          // Strip date prefix for display (format: YYYYMMDD_HHMM_originalname)
+          var displayName=f.name.replace(/^\d{8}_\d{4}_/,'');
+          var sizeKB=f.metadata&&f.metadata.size?Math.round(f.metadata.size/1024)+'KB':'';
+          return '<div class="file-row">'+
+            '<div><span class="file-name">'+displayName+'</span>'+
+            (sizeKB?'<span style="font-size:11px;color:#bbb;margin-left:6px;">'+sizeKB+'</span>':'')+
+            '</div>'+
+            '<div style="display:flex;gap:8px;align-items:center;">'+
+              '<a class="file-link" href="'+url+'" target="_blank">View</a>'+
+              '<button onclick="deleteFile(''+FACTORY_ID+'',''+folder+'',''+f.name+'')" style="font-size:11px;color:#b00;background:none;border:none;cursor:pointer;padding:0;">Delete</button>'+
+            '</div>'+
+          '</div>';
         }).join('');
-      }else{el.innerHTML='';}
+      }else{el.innerHTML='<div style="font-size:12px;color:#bbb;padding:4px 0;">No files uploaded yet.</div>';}
     }catch(e){console.log('file list error:',e);}
   }
 }
@@ -599,9 +624,12 @@ async function uploadFile(input,folder,fileType){
   }
   var name=(factory.factory_name_english||'Factory').replace(/[^a-zA-Z0-9\s]/g,'').trim();
   var ext=file.name.split('.').pop();
-  var safeName=name+'_'+fileType+'_'+dateStamp()+'.'+ext;
-  // Always use FACTORY_ID as root path for consistency
-  var path=FACTORY_ID+'/'+folder+'/'+safeName;
+  // Keep original filename but add date prefix to avoid duplicates
+  var d=new Date();
+  var datePrefix=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'_';
+  var safeOriginal=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var path=FACTORY_ID+'/'+folder+'/'+datePrefix+safeOriginal;
+  console.log('Uploading to path:',path);
   showMsg('file-msg','ok','Uploading '+file.name+'...');
   try{
     var r=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
