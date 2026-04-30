@@ -249,7 +249,34 @@
     .d-edit-msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
     .d-btn-delete:hover { background: #ffe0e0; }
     .no-data { font-size: 13px; color: #ccc; font-style: italic; }
-  </style>
+  
+    .rfq-tab { padding:8px 12px;font-size:11px;font-weight:500;color:#888;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit; }
+    .rfq-tab.on { color:#1a1a2e;border-bottom-color:#1a1a2e; }
+    .rfq-tab:hover { color:#1a1a2e; }
+    .rfq-list-item { padding:12px 14px;border-bottom:1px solid #f0f0e8;cursor:pointer;transition:background 0.1s; }
+    .rfq-list-item:hover { background:#f8f8f4; }
+    .rfq-list-item.selected { background:#eef2ff; }
+    .rfq-list-item .rli-proj { font-size:12px;font-weight:600;color:#1a1a2e; }
+    .rfq-list-item .rli-desc { font-size:12px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .rfq-list-item .rli-meta { display:flex;align-items:center;justify-content:space-between;margin-top:5px; }
+    .rfq-list-item .rli-date { font-size:11px;color:#bbb; }
+    .rfq-list-item .rli-badge { font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500; }
+    .rfq-list-item .rli-quotes { font-size:11px;color:#2244cc;font-weight:500; }
+    .quote-card { background:#fff;border:1px solid #e0e0d8;border-radius:10px;margin-bottom:10px;overflow:hidden; }
+    .quote-card-header { padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:#f8f8f4; }
+    .quote-card-body { padding:14px;border-top:1px solid #f0f0e8;display:none; }
+    .quote-card-body.open { display:block; }
+    .qdet-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px; }
+    .qdet-item { background:#f8f8f4;border-radius:6px;padding:8px 10px; }
+    .qdet-label { font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em; }
+    .qdet-val { font-size:13px;font-weight:500;color:#1a1a2e;margin-top:2px; }
+    .margin-compare { display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:#f5f5f0;border-radius:8px;padding:10px;margin-bottom:12px; }
+    .mc-item { text-align:center; }
+    .mc-label { font-size:10px;color:#aaa; }
+    .mc-est { font-size:11px;color:#888; }
+    .mc-act { font-size:14px;font-weight:700; }
+
+</style>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <script>emailjs.init("6A1UTdzNuQ8z546HR");</script>
   <!-- Google Analytics -->
@@ -402,16 +429,37 @@
         <button onclick="showRFQForm()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">+ New RFQ</button>
       </div>
 
-      <!-- RFQ List view -->
-      <div id="rfq-list-view" style="padding:1.25rem 1.5rem;">
-        <div id="rfq-quotes-received" style="margin-bottom:1.25rem;display:none;">
-          <div style="font-size:11px;font-weight:600;color:#1a7a1a;text-transform:uppercase;letter-spacing:0.07em;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
-            <span>🎉 New quotes received!</span>
-            <button onclick="g('rfq-quotes-received').style.display='none'" style="background:none;border:none;font-size:16px;cursor:pointer;color:#1a7a1a;">×</button>
+      <!-- RFQ Email Client -->
+      <div id="rfq-list-view" style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+
+        <!-- Left pane — RFQ list -->
+        <div style="width:320px;min-width:280px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <!-- Status tabs -->
+          <div style="display:flex;overflow-x:auto;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" onclick="filterRFQs('all')" id="rtab-all">All</button>
+            <button class="rfq-tab" onclick="filterRFQs('active')" id="rtab-active">Active</button>
+            <button class="rfq-tab" onclick="filterRFQs('new_quotes')" id="rtab-new_quotes">New Quotes</button>
+            <button class="rfq-tab" onclick="filterRFQs('in_review')" id="rtab-in_review">In Review</button>
+            <button class="rfq-tab" onclick="filterRFQs('approved')" id="rtab-approved">Approved</button>
+            <button class="rfq-tab" onclick="filterRFQs('rejected')" id="rtab-rejected">Rejected</button>
           </div>
-          <div id="rfq-new-quotes-list" style="margin-top:8px;"></div>
+          <!-- New quote banner -->
+          <div id="rfq-quotes-received" style="display:none;background:#edfaed;border-bottom:1px solid #a0d8a0;padding:8px 12px;font-size:12px;color:#1a7a1a;cursor:pointer;" onclick="filterRFQs('new_quotes')">
+            🎉 New quotes received — click to view
+          </div>
+          <!-- RFQ list -->
+          <div id="rfq-list-items" style="overflow-y:auto;flex:1;"></div>
         </div>
-        <div id="rfq-list-items"><div class="empty">No RFQs yet. Create your first one.</div></div>
+
+        <!-- Right pane — RFQ detail -->
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="rfq-detail-empty" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;">
+            <div style="font-size:32px;margin-bottom:12px;">📋</div>
+            <div style="font-size:14px;">Select an RFQ to view details</div>
+          </div>
+          <div id="rfq-detail-pane" style="display:none;padding:1.25rem;flex:1;"></div>
+        </div>
+
       </div>
 
       <!-- RFQ Create/Edit Form -->
@@ -575,7 +623,7 @@
         </div>
 
         <!-- Admin-Only Margin Calculator -->
-        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;">
+        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;max-width:100%;overflow:hidden;">
           <div class="mgr-card-title" style="color:#5522aa;">🔒 Margin Calculator — Admin Only (not visible to factory)
             <button onclick="calcMargins()" style="padding:5px 12px;background:#5522aa;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;">Calculate</button>
           </div>
@@ -604,15 +652,17 @@
           <!-- Estimated dimensions -->
           <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Estimated Master Carton Dimensions (for freight calc)</div>
           <div style="font-size:11px;color:#999;margin-bottom:8px;">Always rectangular — CBM per unit = carton CBM ÷ master case pack</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
             <div class="mf"><label>Carton L (cm)</label><input type="number" id="rfq-est-len" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Carton W (cm)</label><input type="number" id="rfq-est-wid" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Carton H (cm)</label><input type="number" id="rfq-est-hgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
             <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.001" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Units/Carton</label><input type="number" id="rfq-units-per-carton" step="1" placeholder="= master pack" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Est. CBM/Unit</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label>Est. CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
             <div class="mf"><label>Container Cost ($)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Est. Freight/Unit ($)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
           </div>
@@ -636,12 +686,15 @@
 
           <!-- Deductions -->
           <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Deductions</div>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
             <div class="mf"><label>Returns %</label><input type="number" id="rfq-est-returns" step="0.1" value="3" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Dilution %</label><input type="number" id="rfq-est-dilution" step="0.1" value="2" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Commission %</label><input type="number" id="rfq-est-commission" step="0.1" value="5" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
             <div class="mf"><label>Ad Allowance %</label><input type="number" id="rfq-est-ad" step="0.1" value="2" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Royalty %</label><input type="number" id="rfq-est-royalty" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"></div>
           </div>
 
           <!-- Thresholds -->
@@ -653,10 +706,10 @@
           <!-- Results -->
           <div id="rfq-margin-results" style="display:none;background:#1a1a2e;border-radius:10px;padding:1rem;color:#fff;">
             <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#aaa;margin-bottom:10px;">Estimated Results</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div><div style="font-size:11px;color:#aaa;">Target Wholesale</div><div style="font-size:16px;font-weight:700;" id="res-wholesale">—</div></div>
-              <div><div style="font-size:11px;color:#aaa;">Max FOB Price</div><div style="font-size:16px;font-weight:700;color:#f0d060;" id="res-max-fob">—</div></div>
-              <div><div style="font-size:11px;color:#aaa;">Est. Landed Cost</div><div style="font-size:16px;font-weight:700;" id="res-landed">—</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+              <div><div style="font-size:10px;color:#aaa;">Target Wholesale</div><div style="font-size:15px;font-weight:700;" id="res-wholesale">—</div></div>
+              <div><div style="font-size:10px;color:#aaa;">Max FOB Price</div><div style="font-size:15px;font-weight:700;color:#f0d060;" id="res-max-fob">—</div></div>
+              <div><div style="font-size:10px;color:#aaa;">Est. Landed Cost</div><div style="font-size:15px;font-weight:700;" id="res-landed">—</div></div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:10px;">
@@ -1993,31 +2046,261 @@ async function checkNewQuotes(){
   }catch(e){console.log('checkNewQuotes error:',e);}
 }
 
+var currentRFQFilter='all';
+var selectedRFQId=null;
+
+function filterRFQs(filter){
+  currentRFQFilter=filter;
+  document.querySelectorAll('.rfq-tab').forEach(function(t){t.classList.remove('on');});
+  var tabEl=g('rtab-'+filter);if(tabEl)tabEl.classList.add('on');
+  renderRFQList();
+}
+
 function renderRFQList(){
   var el=g('rfq-list-items');if(!el)return;
-  if(!allRFQs.length){el.innerHTML='<div class="empty">No RFQs yet. Create your first one.</div>';return;}
-  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','quotes_received':'#fff8e0','approved':'#e8f8e8','cancelled':'#fff0f0'};
-  var statusText={'draft':'Draft','sent':'Sent','quotes_received':'Quotes In','approved':'Approved','cancelled':'Cancelled'};
-  el.innerHTML=allRFQs.map(function(r){
-    var sc=statusColors[r.status]||'#f0f0e8';
+  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0'};
+  var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected','cancelled':'Cancelled'};
+  var badgeColors={'draft':'#888','sent':'#2244cc','in_review':'#cc7700','quotes_received':'#886600','approved':'#1a7a1a','rejected':'#b00','cancelled':'#b00'};
+
+  // Filter
+  var filtered=allRFQs.filter(function(r){
+    if(currentRFQFilter==='all')return true;
+    if(currentRFQFilter==='active')return r.status==='sent'||r.status==='draft';
+    if(currentRFQFilter==='new_quotes')return r.status==='quotes_received';
+    if(currentRFQFilter==='in_review')return r.status==='in_review';
+    if(currentRFQFilter==='approved')return r.status==='approved';
+    if(currentRFQFilter==='rejected')return r.status==='rejected'||r.status==='cancelled';
+    return true;
+  });
+
+  if(!filtered.length){
+    el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No RFQs in this category.</div>';
+    return;
+  }
+
+  el.innerHTML=filtered.map(function(r){
     var st=statusText[r.status]||r.status;
-    var date=new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    return '<div class="fc" style="margin-bottom:10px;" onclick="openRFQForm(\''+r.id+'\')" >'+
-      '<div class="fc-top">'+
-        '<div>'+
-          '<div class="fc-name">'+r.project_number+' — '+(r.item_description||'—')+'</div>'+
-          '<div class="fc-local">'+(r.category||'No category')+(r.sub_category?' › '+r.sub_category:'')+'</div>'+
+    var sc=statusColors[r.status]||'#f0f0e8';
+    var bc=badgeColors[r.status]||'#888';
+    var date=new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    var quoteCount=r.quote_count||0;
+    var sentCount=r.sent_to_count||0;
+    var isSelected=r.id===selectedRFQId;
+    return '<div class="rfq-list-item'+(isSelected?' selected':'')+' " data-rfqid="'+r.id+'" onclick="openRFQDetail(this.dataset.rfqid)">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div class="rli-proj">'+r.project_number+'</div>'+
+          '<div class="rli-desc">'+(r.item_description||'—')+'</div>'+
         '</div>'+
-        '<span class="fc-status" style="background:'+sc+';color:#555;border:1px solid #ddd;">'+st+'</span>'+
+        '<span class="rli-badge" style="background:'+sc+';color:'+bc+';margin-left:6px;flex-shrink:0;">'+st+'</span>'+
       '</div>'+
-      '<div class="fc-meta">'+
-        '<span>📅 '+date+'</span>'+
-        '<span>🏭 '+(r.sent_to_count||0)+' factories sent</span>'+
-        (r.unit_of_measure?'<span>📦 '+r.unit_of_measure+'</span>':'')+
+      '<div class="rli-meta">'+
+        '<span class="rli-date">'+date+(r.category?' · '+r.category:'')+'</span>'+
+        (quoteCount?'<span class="rli-quotes">'+quoteCount+'/'+sentCount+' quoted</span>':'<span style="font-size:11px;color:#bbb;">'+sentCount+' sent</span>')+
       '</div>'+
     '</div>';
   }).join('');
 }
+
+async function openRFQDetail(rfqId){
+  selectedRFQId=rfqId;
+  renderRFQList(); // re-render to show selection
+  var rfq=allRFQs.find(function(r){return r.id===rfqId;});
+  if(!rfq)return;
+  g('rfq-detail-empty').style.display='none';
+  g('rfq-detail-pane').style.display='block';
+  g('rfq-detail-pane').innerHTML='<div style="color:#bbb;font-size:13px;padding:1rem;">Loading quotes...</div>';
+
+  // Load factory assignments + quotes
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+rfqId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name)',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var assignments=await r.json();
+
+    var q=await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&select=*,factories(factory_name_english)',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var quotes=await q.json();
+
+    renderRFQDetailPane(rfq,assignments,quotes);
+  }catch(e){
+    g('rfq-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error loading: '+e.message+'</div>';
+  }
+}
+
+function renderRFQDetailPane(rfq,assignments,quotes){
+  var el=g('rfq-detail-pane');
+  var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
+  var qtyStr=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'each')+' — '+uomStr:'—';
+
+  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0'};
+  var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected'};
+
+  var html=''+
+    // Header
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">'+
+      '<div>'+
+        '<div style="font-size:18px;font-weight:700;color:#1a1a2e;">'+rfq.project_number+'</div>'+
+        '<div style="font-size:13px;color:#666;margin-top:2px;">'+(rfq.item_description||'—')+'</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;align-items:center;">'+
+        '<span style="font-size:12px;padding:4px 10px;border-radius:20px;background:'+(statusColors[rfq.status]||'#f0f0e8')+';color:#555;border:1px solid #ddd;">'+(statusText[rfq.status]||rfq.status)+'</span>'+
+        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">✏ Edit</button>'+
+      '</div>'+
+    '</div>'+
+
+    // RFQ brief
+    '<div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:10px;padding:1rem;margin-bottom:1rem;">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
+        '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Category</div><div style="font-size:12px;font-weight:500;">'+[rfq.category,rfq.sub_category,rfq.sub_sub_category].filter(Boolean).join(' › ')+'</div></div>'+
+        '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Quantity</div><div style="font-size:12px;font-weight:500;">'+qtyStr+'</div></div>'+
+        '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Packaging</div><div style="font-size:12px;font-weight:500;">'+(rfq.packaging_type||'—')+'</div></div>'+
+        (rfq.max_fob_price?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Max FOB Target</div><div style="font-size:12px;font-weight:700;color:#5522aa;">$'+parseFloat(rfq.max_fob_price).toFixed(2)+'</div></div>':'')+
+        (rfq.target_retail_price?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Target Retail</div><div style="font-size:12px;font-weight:500;">$'+parseFloat(rfq.target_retail_price).toFixed(2)+'</div></div>':'')+
+        (rfq.min_gross_margin_pct?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Min Gross Margin</div><div style="font-size:12px;font-weight:500;">'+rfq.min_gross_margin_pct+'%</div></div>':'')+
+      '</div>'+
+      (rfq.detailed_specifications?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e8e8e0;font-size:12px;color:#555;">'+rfq.detailed_specifications+'</div>':'')+
+    '</div>'+
+
+    // Factory status summary
+    '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">'+
+      assignments.length+' Factories Assigned · '+quotes.length+' Quotes Received'+
+    '</div>'+
+
+    // Factory assignment status
+    '<div style="margin-bottom:1rem;">'+
+    assignments.map(function(a){
+      var f=a.factories||{};
+      var fQuotes=quotes.filter(function(q){return q.factory_id===a.factory_id;});
+      var statusDot={'sent':'🔵','viewed':'🟡','quoted':'🟢','no_response':'⚪','declined':'🔴'}[a.status]||'⚪';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:6px;margin-bottom:4px;font-size:12px;">'+
+        '<span>'+statusDot+' '+(f.factory_name_english||'—')+'</span>'+
+        '<span style="color:#888;">'+(fQuotes.length?fQuotes.length+' quote'+(fQuotes.length>1?'s':''):a.status)+'</span>'+
+      '</div>';
+    }).join('')+
+    '</div>'+
+
+    // Quotes
+    (quotes.length?
+      '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Quotes Received</div>'+
+      quotes.map(function(q,idx){
+        return renderQuoteCard(q,rfq,idx);
+      }).join('')
+    :'<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No quotes received yet.</div>')+
+  '';
+
+  el.innerHTML=html;
+}
+
+function renderQuoteCard(q,rfq,idx){
+  var f=q.factories||{};
+  var fob=parseFloat(q.unit_fob_price)||0;
+  var maxFob=parseFloat(rfq.max_fob_price)||0;
+  var fobColor=maxFob?(fob<=maxFob?'#1a7a1a':'#b00'):'#1a1a2e';
+  var fobFlag=maxFob?(fob<=maxFob?'✓ Under target':'⚠ Over target $'+maxFob.toFixed(2)):'';
+
+  return '<div class="quote-card" id="qcard-'+q.id+'">'+
+    '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
+        '<div style="font-size:12px;margin-top:2px;">'+
+          '<span style="font-size:16px;font-weight:700;color:'+fobColor+';">$'+fob.toFixed(2)+' FOB</span>'+
+          (fobFlag?'<span style="font-size:11px;margin-left:8px;color:'+fobColor+';">'+fobFlag+'</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<span style="color:#bbb;font-size:18px;">▾</span>'+
+    '</div>'+
+    '<div class="quote-card-body" id="qbody-'+q.id+'">'+
+      '<div class="qdet-grid">'+
+        (q.factory_specifications?'<div class="qdet-item" style="grid-column:span 2;"><div class="qdet-label">Specifications</div><div class="qdet-val" style="font-size:12px;font-weight:400;">'+q.factory_specifications+'</div></div>':'')+
+        (q.unit_of_measure?'<div class="qdet-item"><div class="qdet-label">Unit of Measure</div><div class="qdet-val">'+q.unit_of_measure+'</div></div>':'')+
+        (q.moq?'<div class="qdet-item"><div class="qdet-label">MOQ</div><div class="qdet-val">'+q.moq.toLocaleString()+'</div></div>':'')+
+        (q.hts_code_factory?'<div class="qdet-item"><div class="qdet-label">HTS Code (factory)</div><div class="qdet-val">'+q.hts_code_factory+'</div></div>':'')+
+        (q.country_of_manufacture?'<div class="qdet-item"><div class="qdet-label">Country of Manufacture</div><div class="qdet-val">'+(Array.isArray(q.country_of_manufacture)?q.country_of_manufacture.join(', '):q.country_of_manufacture)+'</div></div>':'')+
+        (q.fob_ports?'<div class="qdet-item"><div class="qdet-label">FOB Port(s)</div><div class="qdet-val">'+(Array.isArray(q.fob_ports)?q.fob_ports.join(', '):q.fob_ports)+'</div></div>':'')+
+        (q.unit_length_cm?'<div class="qdet-item"><div class="qdet-label">Unit Dimensions</div><div class="qdet-val">'+q.unit_length_cm+'×'+q.unit_width_cm+'×'+q.unit_height_cm+' cm</div></div>':'')+
+        (q.unit_cbm?'<div class="qdet-item"><div class="qdet-label">Unit CBM</div><div class="qdet-val">'+parseFloat(q.unit_cbm).toFixed(6)+'</div></div>':'')+
+        (q.unit_weight_kg?'<div class="qdet-item"><div class="qdet-label">Unit Weight</div><div class="qdet-val">'+q.unit_weight_kg+' kg</div></div>':'')+
+        (q.certifications_confirmed&&q.certifications_confirmed.length?'<div class="qdet-item"><div class="qdet-label">Certifications Confirmed</div><div class="qdet-val" style="font-size:12px;">'+q.certifications_confirmed.join(', ')+'</div></div>':'')+
+      '</div>'+
+      // Margin comparison
+      (rfq.max_fob_price?
+        '<div class="margin-compare">'+
+          '<div class="mc-item"><div class="mc-label">FOB</div><div class="mc-est">Est. max $'+parseFloat(rfq.max_fob_price).toFixed(2)+'</div><div class="mc-act" style="color:'+fobColor+';">$'+fob.toFixed(2)+'</div></div>'+
+          (rfq.est_freight_per_unit?'<div class="mc-item"><div class="mc-label">Freight/Unit</div><div class="mc-est">Est. $'+parseFloat(rfq.est_freight_per_unit).toFixed(3)+'</div><div class="mc-act">—</div></div>':'')+
+          (rfq.min_gross_margin_pct?'<div class="mc-item"><div class="mc-label">Min Gross Margin</div><div class="mc-est">'+rfq.min_gross_margin_pct+'%</div><div class="mc-act">—</div></div>':'')+
+        '</div>'
+      :'')+
+      // Product image
+      (q.factory_product_image_url?'<div style="margin-bottom:12px;"><img src="'+q.factory_product_image_url+'" style="max-height:160px;border-radius:8px;border:1px solid #e0e0d8;" /></div>':'')+
+      // INCI document
+      (q.inci_document_url?'<div style="margin-bottom:12px;"><a href="'+q.inci_document_url+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">🧴 View INCI Document</a></div>':'')+
+      // Action buttons
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
+        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
+        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMoreInfo(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">? Request More Info</button>'+
+        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="saveQuoteToFactory(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f5f5f0;color:#555;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">💾 Save to Factory</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function toggleQuoteCard(id){
+  var body=g('qbody-'+id);
+  if(body)body.classList.toggle('open');
+}
+
+async function acceptQuote(quoteId,rfqId){
+  var reason=confirm('Accept this quote and move RFQ to Approved?');
+  if(!reason)return;
+  try{
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'accepted'})});
+    await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved'})});
+    await loadRFQs();
+    openRFQDetail(rfqId);
+    alert('Quote accepted! RFQ moved to Approved.');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function rejectQuote(quoteId,rfqId){
+  var reasons=['Price too high','Specifications do not match','Certifications missing','No response','Going with another supplier','Other'];
+  var reason=prompt('Select rejection reason:\n1. Price too high\n2. Specs do not match\n3. Certifications missing\n4. No response\n5. Going with another supplier\n6. Other\n\nEnter number or type reason:');
+  if(!reason)return;
+  var reasonText=reasons[parseInt(reason)-1]||reason;
+  try{
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected',admin_notes:reasonText})});
+    await loadRFQs();
+    openRFQDetail(rfqId);
+    alert('Quote rejected: '+reasonText);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function requestMoreInfo(quoteId,rfqId){
+  var info=prompt('What additional information do you need? (e.g. Better photos, INCI list, Lead time, Sample price, HTS code)');
+  if(!info)return;
+  try{
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'more_info_requested',admin_notes:info})});
+    // TODO: send email to factory with the request
+    alert('Request sent. Factory will be notified to provide: '+info);
+    openRFQDetail(rfqId);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function saveQuoteToFactory(quoteId,rfqId){
+  // Mark quote as saved to factory record
+  try{
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({saved_to_factory:true})});
+    alert('Quote saved to factory record. View it in the factory detail page under Quote History.');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function loadRFQById(rfqId){
+  var rfq=allRFQs.find(function(r){return r.id===rfqId;});
+  if(rfq)populateRFQEditForm(rfq);
+}
+
 
 async function showRFQForm(){
   g('rfq-list-view').style.display='none';
