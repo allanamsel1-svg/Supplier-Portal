@@ -1968,173 +1968,67 @@ function rfqImageChosen(input){
 
 async function findMatchingFactories(){
   var catId=g('rfq-category-id').value;
-  var desc=g('rfq-description').value.trim();
-  if(!catId&&!desc){alert('Please select a category or enter a description first.');return;}
+  if(!catId){alert('Please select a category first.');return;}
 
   var catOpt=g('rfq-category-id').options[g('rfq-category-id').selectedIndex];
-  var catText=catOpt?catOpt.textContent:'';
+  var catText=catOpt?catOpt.textContent.replace(/\[.*?\]/,'').trim():'';
+  var catRow=allCategories.find(function(c){return c.id===catId;});
 
-  g('factory-match-status').textContent='Finding matching factories...';
+  g('factory-match-status').textContent='Searching for factories in this category...';
   g('factory-match-list').innerHTML='';
-
-  // First find by category in factory_categories table
-  var matched=[];
-  if(catId){
-    var catRow=allCategories.find(function(c){return c.id===catId;});
-    if(catRow){
-      // Find factories with matching category
-      matched=allFactories.filter(function(f){
-        var cats=(f.product_categories||[]).join(' ').toLowerCase();
-        return cats.includes((catRow.category||'').toLowerCase())||
-               cats.includes((catRow.sub_category||'').toLowerCase());
-      });
-    }
-  }
-
-  // If AI available, use it to also suggest based on description
-  var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(apiKey&&desc&&allFactories.length){
-    var factoryList=allFactories.map(function(f){
-      return f.factory_name_english+' ('+f.country+'): '+(f.product_categories||[]).join(', ');
-    }).join('\n');
-    try{
-      var r=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({
-          model:'claude-sonnet-4-5',max_tokens:500,
-          messages:[{role:'user',content:'I am sourcing the following product: "'+desc+'" in category: "'+catText+'"\n\nFrom this factory list, which ones are most likely to manufacture this product? Return ONLY a JSON array of factory names that match, nothing else.\n\nFactory list:\n'+factoryList}]
-        })
-      });
-      var d=await r.json();
-      if(d.content&&d.content[0]){
-        var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
-        try{
-          var aiNames=JSON.parse(raw);
-          if(Array.isArray(aiNames)){
-            aiNames.forEach(function(name){
-              var f=allFactories.find(function(x){return x.factory_name_english===name;});
-              if(f&&!matched.find(function(m){return m.id===f.id;}))matched.push(f);
-            });
-          }
-        }catch(e){}
-      }
-    }catch(e){}
-  }
-
   selectedFactoryIds={};
-  if(!matched.length){
-    g('factory-match-status').textContent='No matching factories found. You can manually select from all factories below.';
-    // Show all factories for manual selection
-    matched=allFactories;
-  }else{
-    g('factory-match-status').textContent=matched.length+' matching '+( matched.length===1?'factory':'factories')+' found. Review and select which to send to:';
-    // Pre-select all matches
-    matched.forEach(function(f){selectedFactoryIds[f.id]=true;});
+
+  // Query factory_categories table directly for exact category match
+  var matched=[];
+  try{
+    var params='?select=factory_id';
+    if(catRow){
+      params+='&category=eq.'+encodeURIComponent(catRow.category);
+      if(catRow.sub_category)params+='&sub_category=eq.'+encodeURIComponent(catRow.sub_category);
+      if(catRow.sub_sub_category)params+='&sub_sub_category=eq.'+encodeURIComponent(catRow.sub_sub_category);
+    }
+    var r=await fetch(SB+'/rest/v1/factory_categories'+params,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){
+      var rows=await r.json();
+      var matchedIds=rows.map(function(x){return x.factory_id;});
+      matched=allFactories.filter(function(f){return matchedIds.includes(f.id);});
+    }
+  }catch(e){console.log('factory_categories query error:',e);}
+
+  // Fallback: also check product_categories free text if no structured matches
+  if(!matched.length&&catRow){
+    matched=allFactories.filter(function(f){
+      var cats=(f.product_categories||[]).join(' ').toLowerCase();
+      return cats.includes((catRow.category||'').toLowerCase());
+    });
   }
+
+  if(!matched.length){
+    g('factory-match-status').innerHTML='No factories found for this category. <a href="factory-detail.html" style="color:#2266cc;">Add categories to your factories →</a>';
+    return;
+  }
+
+  // Pre-select ALL matched factories
+  matched.forEach(function(f){selectedFactoryIds[f.id]=true;});
+
+  g('factory-match-status').innerHTML=
+    '<strong>'+matched.length+' '+(matched.length===1?'factory':'factories')+' found</strong> in this category. All selected — deselect any to exclude.'+
+    '<div style="margin-top:6px;display:flex;gap:8px;">'+
+      '<button onclick="selectAllFactories(true)" style="font-size:11px;padding:4px 10px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;">Select All</button>'+
+      '<button onclick="selectAllFactories(false)" style="font-size:11px;padding:4px 10px;background:#f5f5f0;color:#555;border:1px solid #ddd;border-radius:5px;cursor:pointer;">Deselect All</button>'+
+    '</div>';
 
   renderFactoryMatchList(matched);
 }
 
-function renderFactoryMatchList(factories){
-  g('factory-match-list').innerHTML=factories.map(function(f){
-    var checked=selectedFactoryIds[f.id]?'checked':'';
-    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:6px;cursor:pointer;">'+
-      '<input type="checkbox" '+checked+' value="'+f.id+'" onchange="toggleFactorySelect(\''+f.id+'\')" style="width:15px;height:15px;flex-shrink:0;" />'+
-      '<div>'+
-        '<div style="font-size:13px;font-weight:500;color:#1a1a2e;">'+f.factory_name_english+'</div>'+
-        '<div style="font-size:11px;color:#999;">'+(f.city?f.city+', ':'')+f.country+' · '+(f.sales_email||'No email')+'</div>'+
-      '</div>'+
-    '</label>';
-  }).join('');
-}
-
-function toggleFactorySelect(id){
-  if(selectedFactoryIds[id])delete selectedFactoryIds[id];
-  else selectedFactoryIds[id]=true;
-}
-
-async function saveRFQ(action){
-  var desc=g('rfq-description').value.trim();
-  if(!desc){showFormMsg('rfq-save-err','Item description is required.');return;}
-
-  var catId=g('rfq-category-id').value;
-  var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
-
-  // Collect packaging types
-  var pkgTypes=[];
-  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox][value]').forEach(function(cb){
-    if(cb.checked&&['Bulk','Paper Box','Glass Jar','Plastic Bottle','Bag','Pillow Pack','Hang Tag','Tube','Pump Bottle','Spray Bottle','Blister Pack','Other'].includes(cb.value))pkgTypes.push(cb.value);
+function selectAllFactories(selectAll){
+  document.querySelectorAll('#factory-match-list input[type=checkbox]').forEach(function(cb){
+    cb.checked=selectAll;
+    if(selectAll)selectedFactoryIds[cb.value]=true;
+    else delete selectedFactoryIds[cb.value];
   });
-
-  // Collect certs
-  var certs=[];
-  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox][value]').forEach(function(cb){
-    if(cb.checked&&!pkgTypes.includes(cb.value))certs.push(cb.value);
-  });
-
-  var payload={
-    item_description:desc,
-    detailed_specifications:g('rfq-specs').value.trim()||null,
-    category_id:catId||null,
-    category:catRow?catRow.category:null,
-    sub_category:catRow?catRow.sub_category:null,
-    sub_sub_category:catRow?catRow.sub_sub_category:null,
-    unit_of_measure:g('rfq-uom').value||null,
-    color_code:g('rfq-color').value||null,
-    quote_quantity:parseInt(g('rfq-quantity').value)||null,
-    inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
-    master_case_pack:parseInt(g('rfq-master-pack').value)||null,
-    packaging_type:pkgTypes.join(',')||null,
-    packaging_notes:g('rfq-pkg-notes').value.trim()||null,
-    certifications_required:certs.length?certs:null,
-    is_cosmetic:catRow?catRow.is_cosmetic:false,
-    inci_required:catRow?catRow.is_cosmetic:false,
-    status:action==='send'?'sent':'draft',
-    factories_to_send:Object.keys(selectedFactoryIds),
-    sent_to_count:action==='send'?Object.keys(selectedFactoryIds).length:0
-  };
-
-  var rfqId=g('rfq-id').value;
-  var url=rfqId?SB+'/rest/v1/rfqs?id=eq.'+rfqId:SB+'/rest/v1/rfqs';
-  var method=rfqId?'PATCH':'POST';
-  var sendBtn=g('rfq-send-btn');
-  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Saving...';}
-
-  try{
-    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
-    if(r.ok){
-      var result=await r.json();
-      var savedRFQ=Array.isArray(result)?result[0]:result;
-      if(savedRFQ){
-        g('rfq-id').value=savedRFQ.id;
-        g('rfq-project-number').textContent=savedRFQ.project_number;
-        // Create factory assignments
-        if(savedRFQ.id&&Object.keys(selectedFactoryIds).length){
-          var assignments=Object.keys(selectedFactoryIds).map(function(fid){
-            var f=allFactories.find(function(x){return x.id===fid;});
-            return{rfq_id:savedRFQ.id,factory_id:fid,email_sent_to:f?f.sales_email:null,status:action==='send'?'sent':'pending'};
-          });
-          await fetch(SB+'/rest/v1/rfq_factory_assignments',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(assignments)});
-        }
-        // Send emails if action is send
-        if(action==='send'){
-          await sendRFQEmails(savedRFQ);
-        }
-      }
-      showFormMsg('rfq-save-ok',action==='send'?'RFQ sent to '+Object.keys(selectedFactoryIds).length+' factories!':'Draft saved as '+( savedRFQ?savedRFQ.project_number:''));
-      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
-      await loadRFQs();
-    }else{
-      var e=await r.json().catch(function(){return{};});
-      showFormMsg('rfq-save-err','Save failed: '+(e.message||e.details||r.status));
-      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
-    }
-  }catch(e){
-    showFormMsg('rfq-save-err','Error: '+e.message);
-    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
-  }
 }
+
 
 async function sendRFQEmails(rfq){
   var apiKey=localStorage.getItem('anthropic_key')||'';
