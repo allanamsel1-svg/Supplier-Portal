@@ -1458,6 +1458,261 @@ async function loadAllFileLists(){
     }catch(e){console.log('file list error:',e);}
   }
 }
+
+// ══════════════════════════════════════════
+// FACTORY RFQ SYSTEM
+// ══════════════════════════════════════════
+var currentRFQ=null;
+var currentAssignmentId=null;
+
+async function loadMyRFQs(){
+  var el=g('rfq-list-factory');
+  if(!el)return;
+  if(!FACTORY_ID){
+    el.innerHTML='<div style="font-size:13px;color:#bbb;">Please save your factory details first to see your RFQs.</div>';
+    return;
+  }
+  el.innerHTML='<div style="font-size:13px;color:#bbb;">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_factory_assignments?factory_id=eq.'+FACTORY_ID+'&select=*,rfqs(*)',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){
+      var e=await r.json().catch(function(){return{};});
+      el.innerHTML='<div style="font-size:13px;color:#b00;">Load failed: '+(e.message||r.status)+'</div>';
+      return;
+    }
+    var assignments=await r.json();
+    if(!assignments.length){
+      el.innerHTML='<div style="font-size:13px;color:#bbb;padding:1rem 0;">No RFQs assigned to you yet. Check back soon.</div>';
+      return;
+    }
+    var statusColors={'sent':'#e8f0ff','viewed':'#fff8e0','quoted':'#e8f8e8','no_response':'#f5f5f0','declined':'#fff0f0'};
+    var statusLabels={'sent':'New','viewed':'Viewed','quoted':'Quoted','no_response':'No Response','declined':'Declined'};
+    el.innerHTML=assignments.map(function(a){
+      var rfq=a.rfqs||{};
+      var sc=statusColors[a.status]||'#f5f5f0';
+      var sl=statusLabels[a.status]||a.status;
+      var date=rfq.created_at?new Date(rfq.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      return '<div style="background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1rem;margin-bottom:10px;cursor:pointer;" onclick="openRFQDetail(\'' +a.id+ '\',\''+rfq.id+'\')" >'+
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">'+
+          '<div>'+
+            '<div style="font-size:14px;font-weight:600;color:#1a1a2e;">'+rfq.project_number+'</div>'+
+            '<div style="font-size:12px;color:#999;margin-top:2px;">'+(rfq.item_description||'—')+'</div>'+
+          '</div>'+
+          '<span style="font-size:11px;padding:3px 9px;border-radius:20px;background:'+sc+';color:#555;border:1px solid #ddd;font-weight:500;">'+sl+'</span>'+
+        '</div>'+
+        '<div style="display:flex;gap:12px;font-size:11px;color:#999;">'+
+          '<span>📂 '+(rfq.category||'—')+'</span>'+
+          (rfq.unit_of_measure?'<span>📦 '+rfq.unit_of_measure+'</span>':'')+
+          (date?'<span>📅 '+date+'</span>':'')+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div style="font-size:13px;color:#b00;">Error: '+e.message+'</div>';
+    alert('RFQ load error: '+e.message);
+  }
+}
+
+async function openRFQDetail(assignmentId,rfqId){
+  currentAssignmentId=assignmentId;
+  g('rfq-list-factory').style.display='none';
+  g('rfq-detail-factory').style.display='block';
+
+  await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+assignmentId,{
+    method:'PATCH',
+    headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({status:'viewed',viewed_at:new Date().toISOString()})
+  });
+
+  try{
+    var r=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var rows=await r.json();
+    if(!rows.length){alert('RFQ not found.');return;}
+    currentRFQ=rows[0];
+    populateRFQDetail(currentRFQ);
+    loadMyQuotes(rfqId);
+  }catch(e){alert('Error loading RFQ: '+e.message);}
+}
+
+function populateRFQDetail(rfq){
+  g('rfq-detail-proj').textContent=rfq.project_number||'—';
+  g('rfq-detail-desc').textContent=rfq.item_description||'—';
+  g('rfq-det-cat').textContent=[rfq.category,rfq.sub_category,rfq.sub_sub_category].filter(Boolean).join(' › ')||'—';
+  g('rfq-det-uom').textContent=rfq.unit_of_measure||'—';
+  g('rfq-det-inner').textContent=rfq.inner_case_pack||'—';
+  g('rfq-det-master').textContent=rfq.master_case_pack||'—';
+  g('rfq-det-qty').textContent=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' units':'—';
+  g('rfq-det-pkg').textContent=rfq.packaging_type||'—';
+  g('rfq-det-specs').textContent=rfq.detailed_specifications||'—';
+
+  var certs=rfq.certifications_required||[];
+  if(certs.length){
+    g('rfq-det-certs-wrap').style.display='block';
+    g('rfq-det-certs').textContent=certs.join(', ');
+    var grid=g('q-certs-grid');
+    if(grid){
+      grid.innerHTML=certs.map(function(c){
+        return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;padding:4px 6px;background:#fff;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">'+
+          '<input type="checkbox" class="q-cert-cb" value="'+c+'" /> '+c+'</label>';
+      }).join('');
+    }
+  }else{
+    g('rfq-det-certs-wrap').style.display='none';
+    var grid=g('q-certs-grid');if(grid)grid.innerHTML='';
+  }
+
+  g('rfq-det-inci-notice').style.display=rfq.is_cosmetic?'block':'none';
+  g('q-inci-wrap').style.display=rfq.is_cosmetic?'block':'none';
+
+  if(rfq.product_image_url){
+    g('rfq-det-img-wrap').style.display='block';
+    g('rfq-det-img').src=rfq.product_image_url;
+  }else{
+    g('rfq-det-img-wrap').style.display='none';
+  }
+
+  ['q-fob','q-pkg-price','q-uom','q-specs','q-hts','q-moq','q-len','q-wid','q-hgt','q-wgt','q-countries','q-ports','q-notes'].forEach(function(id){
+    var el=g(id);if(el)el.value='';
+  });
+  g('q-option').value='A';
+  g('q-ok').style.display='none';
+  g('q-err').style.display='none';
+  g('q-img-label').textContent='Click to upload your product photo';
+  if(g('q-inci-label'))g('q-inci-label').textContent='Upload INCI list';
+}
+
+async function loadMyQuotes(rfqId){
+  var el=g('rfq-my-quotes');
+  if(!el||!FACTORY_ID)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&factory_id=eq.'+FACTORY_ID+'&select=*&order=quote_option',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok)return;
+    var quotes=await r.json();
+    if(!quotes.length){el.innerHTML='';return;}
+    el.innerHTML='<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Your Submitted Quotes</div>'+
+      quotes.map(function(q){
+        return '<div style="background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+            '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">Option '+q.quote_option+' — $'+parseFloat(q.unit_fob_price).toFixed(2)+' FOB</div>'+
+            '<span style="font-size:11px;color:#1a7a1a;background:#c8f0c8;padding:2px 8px;border-radius:10px;">Submitted</span>'+
+          '</div>'+
+          (q.factory_specifications?'<div style="font-size:12px;color:#555;margin-top:4px;">'+q.factory_specifications+'</div>':'')+
+        '</div>';
+      }).join('');
+    var used=quotes.map(function(q){return q.quote_option;});
+    var next=['A','B','C'].find(function(l){return !used.includes(l);});
+    if(next)g('q-option').value=next;
+  }catch(e){console.log('loadMyQuotes error:',e);}
+}
+
+async function submitQuote(){
+  if(!currentRFQ||!FACTORY_ID){alert('Error: no RFQ loaded.');return;}
+  var fob=parseFloat(g('q-fob').value);
+  if(!fob||fob<=0){alert('Please enter a valid FOB price.');return;}
+  var btn=g('q-submit-btn');btn.disabled=true;btn.textContent='Submitting...';
+  g('q-ok').style.display='none';g('q-err').style.display='none';
+
+  var certs=[];
+  document.querySelectorAll('.q-cert-cb:checked').forEach(function(cb){certs.push(cb.value);});
+  var countries=g('q-countries').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+  var ports=g('q-ports').value.split(',').map(function(s){return s.trim();}).filter(Boolean);
+
+  var payload={
+    rfq_id:currentRFQ.id,
+    factory_id:FACTORY_ID,
+    assignment_id:currentAssignmentId,
+    quote_option:g('q-option').value,
+    unit_fob_price:fob,
+    factory_specifications:g('q-specs').value.trim()||null,
+    unit_of_measure:g('q-uom').value.trim()||null,
+    hts_code_factory:g('q-hts').value.trim()||null,
+    hts_code_status:'unverified',
+    moq:parseInt(g('q-moq').value)||null,
+    unit_length_cm:parseFloat(g('q-len').value)||null,
+    unit_width_cm:parseFloat(g('q-wid').value)||null,
+    unit_height_cm:parseFloat(g('q-hgt').value)||null,
+    unit_weight_kg:parseFloat(g('q-wgt').value)||null,
+    country_of_manufacture:countries.length?countries:null,
+    fob_ports:ports.length?ports:null,
+    certifications_confirmed:certs.length?certs:null,
+    formulation_notes:g('q-notes').value.trim()||null,
+    status:'submitted'
+  };
+
+  if(payload.unit_length_cm&&payload.unit_width_cm&&payload.unit_height_cm){
+    payload.unit_cbm=parseFloat(((payload.unit_length_cm*payload.unit_width_cm*payload.unit_height_cm)/1000000).toFixed(6));
+  }
+
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){
+      var e=await r.json().catch(function(){return{};});
+      var msg='Submit failed: '+(e.message||e.details||r.status);
+      g('q-err').textContent=msg;g('q-err').style.display='block';
+      alert(msg);
+      btn.disabled=false;btn.textContent='Submit Quote';
+      return;
+    }
+    var result=await r.json();
+    var quote=Array.isArray(result)?result[0]:result;
+
+    var imgFile=g('q-img-input').files[0];
+    if(imgFile&&quote&&quote.id){
+      try{
+        var resized=await resizeFactoryImage(imgFile);
+        var blob=await fetch(resized).then(function(r2){return r2.blob();});
+        var imgPath=FACTORY_ID+'/rfq_quotes/'+quote.id+'_product.jpg';
+        var upR=await fetch(SB+'/storage/v1/object/factory-files/'+imgPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+        if(upR.ok){
+          var imgUrl=SB+'/storage/v1/object/public/factory-files/'+imgPath;
+          await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quote.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_product_image_url:imgUrl})});
+        }
+      }catch(e2){console.log('image upload:',e2);}
+    }
+
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+currentAssignmentId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'quoted',quoted_at:new Date().toISOString()})
+    });
+
+    g('q-ok').style.display='block';
+    btn.disabled=false;btn.textContent='Submit Quote';
+    loadMyQuotes(currentRFQ.id);
+  }catch(e){
+    g('q-err').textContent='Error: '+e.message;
+    g('q-err').style.display='block';
+    alert('Submit error: '+e.message);
+    btn.disabled=false;btn.textContent='Submit Quote';
+  }
+}
+
+function resizeFactoryImage(file){
+  return new Promise(function(resolve){
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height,max=1200;
+      if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',0.85));
+    };
+    img.src=url;
+  });
+}
+
 </script>
 
 </body>
