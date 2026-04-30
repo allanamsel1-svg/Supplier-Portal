@@ -220,6 +220,7 @@
     <div class="ptab" onclick="ptab('catalogs')" data-t="tab_catalogs">Catalogs</div>
     <div class="ptab" onclick="ptab('overview')" data-t="tab_overview">Company Overview</div>
     <div class="ptab" onclick="ptab('quotes')" data-t="tab_quotes">Quote Sheets</div>
+    <div class="ptab" onclick="ptab('rfq');loadMyRFQs();">📋 RFQs</div>
   </div>
   <div class="pcontent">
 
@@ -473,6 +474,142 @@
         <div class="pmsg err" id="qt-err"></div>
       </div>
       <div class="file-list" id="qt-list"></div>
+    </div>
+
+    <!-- ── RFQ Tab ── -->
+    <div class="ppane" id="ppane-rfq">
+      <div class="card">
+        <div class="card-title">My RFQs</div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Quote requests sent to you by our sourcing team. Click an RFQ to submit your quote.</p>
+        <div id="rfq-list-factory"><div style="font-size:13px;color:#bbb;">Loading RFQs...</div></div>
+      </div>
+
+      <!-- RFQ Detail / Quote Submission -->
+      <div id="rfq-detail-factory" style="display:none;">
+        <div class="card" style="margin-top:1rem;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">
+            <button onclick="g('rfq-detail-factory').style.display='none';g('rfq-list-factory').style.display='block';" style="background:none;border:none;font-size:20px;color:#999;cursor:pointer;">←</button>
+            <div>
+              <div style="font-size:15px;font-weight:600;" id="rfq-detail-proj"></div>
+              <div style="font-size:12px;color:#999;" id="rfq-detail-desc"></div>
+            </div>
+          </div>
+
+          <!-- RFQ Info -->
+          <div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;padding:1rem;margin-bottom:1rem;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div><div style="font-size:11px;color:#aaa;">Category</div><div style="font-size:13px;font-weight:500;" id="rfq-det-cat"></div></div>
+              <div><div style="font-size:11px;color:#aaa;">Unit of Measure</div><div style="font-size:13px;font-weight:500;" id="rfq-det-uom"></div></div>
+              <div><div style="font-size:11px;color:#aaa;">Inner Case Pack</div><div style="font-size:13px;font-weight:500;" id="rfq-det-inner"></div></div>
+              <div><div style="font-size:11px;color:#aaa;">Master Case Pack</div><div style="font-size:13px;font-weight:500;" id="rfq-det-master"></div></div>
+              <div><div style="font-size:11px;color:#aaa;">Quantity to Quote</div><div style="font-size:13px;font-weight:500;" id="rfq-det-qty"></div></div>
+              <div><div style="font-size:11px;color:#aaa;">Packaging</div><div style="font-size:13px;font-weight:500;" id="rfq-det-pkg"></div></div>
+            </div>
+            <div style="margin-top:10px;"><div style="font-size:11px;color:#aaa;">Specifications</div><div style="font-size:13px;margin-top:3px;line-height:1.6;" id="rfq-det-specs"></div></div>
+            <div id="rfq-det-certs-wrap" style="margin-top:10px;display:none;"><div style="font-size:11px;color:#aaa;">Certifications Required</div><div style="font-size:13px;margin-top:3px;" id="rfq-det-certs"></div></div>
+            <div id="rfq-det-inci-notice" style="display:none;margin-top:10px;background:#fce8f0;border:1px solid #f0b8d0;border-radius:7px;padding:8px 12px;font-size:12px;color:#880044;">🧴 <strong>Cosmetic product:</strong> Please upload your INCI ingredient list with your quote.</div>
+            <div id="rfq-det-img-wrap" style="margin-top:10px;display:none;"><div style="font-size:11px;color:#aaa;margin-bottom:6px;">Reference Image</div><img id="rfq-det-img" style="max-height:180px;border-radius:8px;border:1px solid #e0e0d8;" /></div>
+          </div>
+
+          <!-- Existing quotes -->
+          <div id="rfq-my-quotes" style="margin-bottom:1rem;"></div>
+
+          <!-- Submit new quote option -->
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;" id="rfq-quote-form-title">Submit Quote</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Quote Option Label</label>
+                <select id="q-option" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;">
+                  <option value="A">Option A</option><option value="B">Option B</option><option value="C">Option C</option>
+                </select>
+              </div>
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit FOB Price (USD) *</label>
+                <input type="number" id="q-fob" step="0.01" min="0" placeholder="e.g. 2.50" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Packaging Price (USD)</label>
+                <input type="number" id="q-pkg-price" step="0.01" min="0" placeholder="e.g. 0.35" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit of Measure</label>
+                <input type="text" id="q-uom" placeholder="e.g. 100ml, 250g" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+            </div>
+
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Your Specifications (describe what you are quoting)</label>
+              <textarea id="q-specs" rows="3" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;resize:vertical;"></textarea>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">HTS Code (your suggestion)</label>
+                <input type="text" id="q-hts" placeholder="e.g. 3304.99.5000" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">MOQ</label>
+                <input type="number" id="q-moq" placeholder="e.g. 1000" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit Length (cm)</label>
+                <input type="number" id="q-len" step="0.1" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit Width (cm)</label>
+                <input type="number" id="q-wid" step="0.1" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit Height (cm)</label>
+                <input type="number" id="q-hgt" step="0.1" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+              <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Unit Weight (kg)</label>
+                <input type="number" id="q-wgt" step="0.001" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+              </div>
+            </div>
+
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Country(s) of Manufacture</label>
+              <input type="text" id="q-countries" placeholder="e.g. China, Vietnam" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+            </div>
+
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">FOB Port(s)</label>
+              <input type="text" id="q-ports" placeholder="e.g. Shenzhen, Ningbo" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+            </div>
+
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Certifications — confirm which you have</label>
+              <div id="q-certs-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;padding:8px;"></div>
+            </div>
+
+            <!-- Product image upload -->
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Your Product Image</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:10px;background:#f8f8f4;border:1.5px dashed #ccc;border-radius:8px;cursor:pointer;">
+                <span style="font-size:20px;">📸</span>
+                <span style="font-size:12px;color:#888;" id="q-img-label">Click to upload your product photo</span>
+                <input type="file" id="q-img-input" accept="image/*" style="display:none" onchange="g('q-img-label').textContent=this.files[0]?this.files[0].name:'Click to upload'" />
+              </label>
+            </div>
+
+            <!-- INCI upload (cosmetics) -->
+            <div id="q-inci-wrap" style="display:none;">
+              <label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">INCI Ingredient List (required for cosmetics)</label>
+              <label style="display:flex;align-items:center;gap:8px;padding:10px;background:#fce8f0;border:1.5px dashed #f0b8d0;border-radius:8px;cursor:pointer;">
+                <span style="font-size:20px;">🧴</span>
+                <span style="font-size:12px;color:#880044;" id="q-inci-label">Upload INCI list (PDF or text file)</span>
+                <input type="file" id="q-inci-input" accept=".pdf,.txt,.doc,.docx" style="display:none" onchange="g('q-inci-label').textContent=this.files[0]?this.files[0].name:'Upload INCI list'" />
+              </label>
+            </div>
+
+            <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Additional Notes</label>
+              <textarea id="q-notes" rows="2" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;resize:vertical;"></textarea>
+            </div>
+
+            <button onclick="submitQuote()" style="width:100%;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;" id="q-submit-btn">Submit Quote</button>
+            <div style="font-size:13px;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;padding:9px 12px;display:none;" id="q-ok">✓ Quote submitted successfully!</div>
+            <div style="font-size:13px;color:#b00;background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:9px 12px;display:none;" id="q-err"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /pcontent -->
