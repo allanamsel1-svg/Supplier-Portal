@@ -849,9 +849,16 @@
     </div>
 
     <div class="d-section">
-      <div class="d-section-title">Product Categories</div>
+      <div class="d-section-title">Product Categories (Free Text)</div>
       <div class="d-value" id="d-categories" style="font-weight:400;line-height:1.6;">—</div>
-      <div id="d-factory-cats" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;"></div>
+    </div>
+    <div class="d-section">
+      <div class="d-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        Manufacturing Categories
+        <button onclick="saveCategorySelections()" style="font-size:11px;padding:4px 10px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;">Save Categories</button>
+      </div>
+      <div id="d-factory-cats" style="display:flex;flex-direction:column;gap:5px;max-height:200px;overflow-y:auto;margin-top:6px;"></div>
+      <div id="d-cats-msg" style="font-size:12px;color:#1a7a1a;margin-top:6px;display:none;">✓ Categories saved!</div>
     </div>
 
     <div class="d-section">
@@ -1203,6 +1210,9 @@ async function openDrawer(id,e){
     else{inviteBtn.textContent='✉ Send Invitation Email';inviteBtn.disabled=false;}
   }
 
+  // Load editable categories
+  await loadDrawerCategories(f.id);
+
   // Open drawer
   g('drawer-overlay').classList.add('on');
   g('supplier-drawer').classList.add('open');
@@ -1423,6 +1433,58 @@ async function adminUpload(){
     g('admin-upload-err').textContent='Error: '+e.message;
     g('admin-upload-err').style.display='block';
   }
+}
+
+// ── FACTORY CATEGORY EDITOR (Admin Drawer) ──
+var drawerFactoryCategories=[];
+
+async function loadDrawerCategories(factoryId){
+  var el=g('d-factory-cats');
+  if(!el)return;
+  el.innerHTML='<div style="font-size:12px;color:#bbb;">Loading...</div>';
+
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+factoryId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    drawerFactoryCategories=await r.json();
+  }catch(e){drawerFactoryCategories=[];}
+
+  if(!allCategories.length){
+    el.innerHTML='<div style="font-size:12px;color:#bbb;">No categories set up yet. Go to Categories to add them.</div>';
+    return;
+  }
+
+  // Build selected keys set
+  var selectedKeys={};
+  drawerFactoryCategories.forEach(function(row){
+    var key=row.category+'|'+(row.sub_category||'')+'|'+(row.sub_sub_category||'');
+    selectedKeys[key]=true;
+  });
+
+  el.innerHTML=allCategories.map(function(c){
+    var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
+    var checked=selectedKeys[key]?'checked':'';
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:6px;cursor:pointer;">'+
+      '<input type="checkbox" class="drawer-cat-cb" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'" '+checked+' style="width:14px;height:14px;flex-shrink:0;" />'+
+      '<span style="font-size:12px;color:#1a1a2e;">'+path+(c.is_cosmetic?' <span style="font-size:10px;background:#fce8f0;color:#880044;border:1px solid #f0b8d0;padding:1px 5px;border-radius:8px;">Cosmetic</span>':'')+'</span>'+
+    '</label>';
+  }).join('');
+}
+
+async function saveCategorySelections(){
+  var f=currentDrawerFactory;if(!f)return;
+  var checked=[];
+  document.querySelectorAll('.drawer-cat-cb:checked').forEach(function(cb){
+    checked.push({factory_id:f.id,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false});
+  });
+  try{
+    await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+f.id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(checked.length){
+      await fetch(SB+'/rest/v1/factory_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(checked)});
+    }
+    var msg=g('d-cats-msg');if(msg){msg.style.display='block';setTimeout(function(){msg.style.display='none';},3000);}
+    await loadData();
+  }catch(e){alert('Save failed: '+e.message);}
 }
 
 // ── RFQ SYSTEM ──
