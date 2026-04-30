@@ -1,0 +1,42 @@
+-- Add margin calculator fields to rfqs table
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS target_retail_price numeric(10,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS comp_retail_price numeric(10,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS target_wholesale_price numeric(10,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS customer_margin_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_unit_length_cm numeric(8,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_unit_width_cm numeric(8,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_unit_height_cm numeric(8,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_unit_weight_kg numeric(8,3);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_unit_cbm numeric(10,6);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS container_cost_usd numeric(10,2) DEFAULT 6000;
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS container_cbm numeric(6,2) DEFAULT 26.5;
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_freight_per_unit numeric(10,4);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS likely_country_of_manufacture text;
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_duty_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_tariff_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS duty_tariff_notes text;
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_landed_cost numeric(10,4);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_gross_margin_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_returns_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_dilution_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_commission_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_ad_allowance_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_royalty_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS est_net_margin_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS max_fob_price numeric(10,4);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS min_gross_margin_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS min_net_margin_pct numeric(5,2);
+ALTER TABLE rfqs ADD COLUMN IF NOT EXISTS customer_id uuid REFERENCES customers(id);
+
+-- Add actual vs estimated comparison fields to rfq_quotes
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS packaging_price numeric(10,4);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS total_fob_price numeric(10,4);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_freight_per_unit numeric(10,4);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_duty_pct numeric(5,2);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_tariff_pct numeric(5,2);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_landed_cost numeric(10,4);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_gross_margin_pct numeric(5,2);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS act_net_margin_pct numeric(5,2);
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS margin_flag boolean DEFAULT false;
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS admin_notes text;
+ALTER TABLE rfq_quotes ADD COLUMN IF NOT EXISTS response_days integer;
