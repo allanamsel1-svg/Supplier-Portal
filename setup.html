@@ -375,15 +375,40 @@ function genPrefix(){
   var c1=gv('cf-cat')?gv('cf-cat')[0].toUpperCase():'';
   var c2=gv('cf-sub')?gv('cf-sub')[0].toUpperCase():'';
   var c3=gv('cf-subsub')?gv('cf-subsub')[0].toUpperCase():'';
-  var auto=(c1+c2+c3).slice(0,3);
+  var base=(c1+c2+c3).slice(0,3);
+  if(!base)return;
   var prefixEl=g('cf-prefix');
-  if(prefixEl)prefixEl.value=auto;
+  if(!prefixEl)return;
+  // Check for conflicts and add digit if needed
+  var candidate=base;
+  var existing=allCats.map(function(c){return c.model_prefix;});
+  var currentId=gv('cf-id');
+  var conflicts=allCats.filter(function(c){return c.model_prefix===candidate&&c.id!==currentId;});
+  if(conflicts.length){
+    // Try appending 2,3,4... until unique
+    for(var i=2;i<=9;i++){
+      candidate=base.slice(0,2)+i;
+      if(!existing.includes(candidate))break;
+    }
+  }
+  prefixEl.value=candidate;
 }
 
 async function saveCat(){
   var cat=gv('cf-cat'),prefix=gv('cf-prefix').toUpperCase();
   if(!cat){alert('Category name is required.');return;}
   if(!prefix){alert('Model prefix is required.\n\nType the category name and it will auto-generate.\nOr type a 3-letter prefix manually.');return;}
+
+  // Check for duplicate prefix before saving
+  var id=gv('cf-id');
+  var dupCheck=allCats.find(function(c){return c.model_prefix===prefix&&c.id!==id;});
+  if(dupCheck){
+    var path=[dupCheck.category,dupCheck.sub_category,dupCheck.sub_sub_category].filter(Boolean).join(' › ');
+    alert('The prefix "'+prefix+'" is already used by "'+path+'".\n\nPlease choose a different prefix — each category must have a unique 3-letter code.');
+    g('cf-prefix').focus();
+    return;
+  }
+
   var payload={
     category:cat,
     sub_category:gv('cf-sub')||null,
@@ -394,7 +419,6 @@ async function saveCat(){
     min_net_margin_pct:pf('cf-net'),
     notes:gv('cf-notes')||null
   };
-  var id=gv('cf-id');
   var url=id?SB+'/rest/v1/categories?id=eq.'+id:SB+'/rest/v1/categories';
   var method=id?'PATCH':'POST';
   try{
@@ -405,7 +429,7 @@ async function saveCat(){
       if(!id)newCatForm();
     }else{
       var e=await r.json().catch(function(){return{};});
-      var msg='Save failed: '+(e.message||e.details||r.status);
+      var msg=e.code==='23505'?'Prefix "'+prefix+'" already exists. Choose a different 3-letter prefix.':(e.message||e.details||r.status);
       showMsg('cat','err',msg);alert(msg);
     }
   }catch(e){showMsg('cat','err','Error: '+e.message);alert('Save error: '+e.message);}
