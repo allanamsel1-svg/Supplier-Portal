@@ -957,10 +957,12 @@ function dv(id,val){var e=g(id);if(e)e.textContent=val||'—';}
 
 function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value;
-  if(u===ADMIN_USER&&p===ADMIN_PASS){g('login').style.display='none';g('main').style.display='flex';loadData();}
-  else{g('l-err').style.display='block';}
+  if(u===ADMIN_USER&&p===ADMIN_PASS){
+    localStorage.setItem('admin_session','1');
+    g('login').style.display='none';g('main').style.display='flex';loadData();
+  }else{g('l-err').style.display='block';}
 }
-function doLogout(){g('main').style.display='none';g('login').style.display='flex';g('l-user').value='';g('l-pass').value='';}
+function doLogout(){localStorage.removeItem('admin_session');g('main').style.display='none';g('login').style.display='flex';g('l-user').value='';g('l-pass').value='';}
 
 function showPanel(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
@@ -1851,14 +1853,14 @@ function renderRFQList(){
   }).join('');
 }
 
-function showRFQForm(){
+async function showRFQForm(){
   g('rfq-list-view').style.display='none';
   g('rfq-form-view').style.display='block';
   g('rfq-form-title').textContent='New RFQ';
   g('rfq-project-number').textContent='Project number will be assigned on save';
   g('rfq-id').value='';
   resetRFQForm();
-  populateRFQDropdowns();
+  await populateRFQDropdowns();
 }
 
 function hideRFQForm(){
@@ -1915,10 +1917,27 @@ function resetRFQForm(){
   selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
 }
 
-function populateRFQDropdowns(){
-  // Categories
+async function populateRFQDropdowns(){
+  // Load categories fresh if not loaded
+  if(!allCategories.length){
+    try{
+      var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      if(r.ok){
+        var cats=await r.json();
+        allCategories=Array.isArray(cats)?cats:[];
+      }else{
+        alert('Could not load categories. Make sure you have added categories in Product Setup.');
+      }
+    }catch(e){alert('Categories error: '+e.message);}
+  }
+
   var catSel=g('rfq-category-id');
+  if(!catSel)return;
   catSel.innerHTML='<option value="">— Select Category —</option>';
+  if(!allCategories.length){
+    catSel.innerHTML+='<option disabled>No categories found — add them in Product Setup</option>';
+    return;
+  }
   allCategories.forEach(function(c){
     var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
     catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'">'+path+' ['+c.model_prefix+']</option>';
@@ -2663,6 +2682,13 @@ function renderFollowUps(){
     '</div>';
   }).join('');
 }
+}
+
+// ── Auto-login if session exists ──
+if(localStorage.getItem('admin_session')==='1'){
+  g('login').style.display='none';
+  g('main').style.display='flex';
+  loadData();
 }
 </script>
 </body>
