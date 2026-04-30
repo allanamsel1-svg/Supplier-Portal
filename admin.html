@@ -941,6 +941,10 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
+var allCategories=[];
+var allBrands=[];
+var allCustomers=[];
+var allRFQs=[];
 var factoryFiles={};
 var factoryLocations={};
 var factoryCerts={};
@@ -1076,9 +1080,9 @@ function factoryCard(f){
   var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(allFactories.find(function(x){return x.id===\''+fid+'\'})?allFactories.find(function(x){return x.id===\''+fid+'\'}).id:\'\',event)">✓ Approve</button>':'';
   var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInviteById(\''+fid+'\',event)">'+invBtnLabel+'</button>':'';
   var rfqBtn='<button class="btn-rfq" onclick="openRFQById(\''+fid+'\',event)">✉ Send RFQ</button>';
-  var viewBtn='<button class="btn-view" onclick="openDrawerById(\''+fid+'\',event)">View Details →</button>';
+  var viewBtn='<button class="btn-view" onclick="event.stopPropagation();window.open(\'factory-detail.html?id='+fid+'\',\'_blank\')">View Details →</button>';
 
-  return '<div class="fc" onclick="openDrawerById(\''+fid+'\',event)">'+
+  return '<div class="fc" onclick="window.open(\'factory-detail.html?id='+fid+'\',\'_blank\')">'+
     '<div class="fc-top"><div><div class="fc-name">'+esc(f.factory_name_english||'—')+invBadge+(f.factory_id?'<span style="font-size:10px;color:#bbb;font-family:monospace;margin-left:6px;font-weight:400;">'+f.factory_id+'</span>':'')+'</div><div class="fc-local">'+esc(f.factory_name_local||'')+'</div></div>'+
     '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
     '<div class="fc-meta"><span>📍 '+esc([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
@@ -2168,7 +2172,6 @@ async function sendRFQEmails(rfq){
 }
 
 // ── BRANDS ──
-var allBrands=[];
 async function loadBrands(){
   try{
     var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
@@ -2244,7 +2247,6 @@ async function deleteBrand(id){
 }
 
 // ── CUSTOMERS ──
-var allCustomers=[];
 async function loadCustomers(){
   try{
     var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
@@ -2320,7 +2322,6 @@ async function deleteCustomer(id){
 }
 
 // ── CATEGORIES ──
-var allCategories=[];
 async function loadCategories(){
   try{
     var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});

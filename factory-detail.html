@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factory Details — Supplier Portal</title>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-W8YDH8LTSB');</script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; }
+    .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
+    .topbar-l { display: flex; align-items: center; gap: 10px; }
+    .tm { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .back-link { font-size: 13px; color: #888; text-decoration: none; }
+    .back-link:hover { color: #1a1a2e; }
+    .topbar-r { display: flex; gap: 8px; align-items: center; }
+    .status-badge { font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+    .st-pending { background: #fff8e0; color: #a06000; border: 1px solid #f0d880; }
+    .st-approved { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
+    .factory-id { font-size: 11px; color: #bbb; font-family: monospace; }
+
+    .wrap { max-width: 900px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    .factory-name { font-size: 22px; font-weight: 700; color: #1a1a2e; margin-bottom: 2px; }
+    .factory-local { font-size: 14px; color: #aaa; margin-bottom: 1.5rem; }
+
+    /* Tabs */
+    .tabs { display: flex; background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; padding: 4px; gap: 4px; margin-bottom: 1.25rem; }
+    .tab { flex: 1; padding: 8px; text-align: center; font-size: 12px; font-weight: 500; color: #888; cursor: pointer; border-radius: 7px; border: none; background: none; font-family: inherit; }
+    .tab.on { background: #1a1a2e; color: #fff; }
+    .tab-panel { display: none; }
+    .tab-panel.on { display: block; }
+
+    /* Cards */
+    .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 1px solid #f0f0e8; }
+
+    /* Form fields */
+    .fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .fg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    .fg4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+    @media(max-width:600px) { .fg2,.fg3,.fg4 { grid-template-columns: 1fr; } }
+    .f { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+    .f:last-child { margin-bottom: 0; }
+    .f label { font-size: 11px; color: #888; }
+    .f input, .f select, .f textarea { padding: 8px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; width: 100%; }
+    .f input:focus, .f select:focus, .f textarea:focus { outline: none; border-color: #1a1a2e; }
+    .f textarea { resize: vertical; min-height: 70px; }
+
+    /* Buttons */
+    .btn-primary { padding: 11px 20px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-primary:hover { opacity: 0.87; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-danger { padding: 11px 20px; background: #fff0f0; color: #b00; border: 1px solid #fdd; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-danger:hover { background: #ffe0e0; }
+    .btn-secondary { padding: 9px 16px; background: #f5f5f0; color: #555; border: 1px solid #e0e0d8; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .save-row { display: flex; gap: 10px; align-items: center; margin-top: 1rem; }
+    .save-msg { font-size: 13px; }
+    .save-msg.ok { color: #1a7a1a; }
+    .save-msg.err { color: #b00; }
+
+    /* Categories */
+    .cat-grid { display: flex; flex-direction: column; gap: 5px; max-height: 300px; overflow-y: auto; border: 1px solid #e0e0d8; border-radius: 8px; padding: 8px; }
+    .cat-label { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .cat-label:hover { background: #f5f5f0; }
+    .cat-label input { width: 15px; height: 15px; flex-shrink: 0; }
+    .cat-label:has(input:checked) { background: #eef2ff; }
+    .cosmetic-tag { font-size: 10px; background: #fce8f0; color: #880044; border: 1px solid #f0b8d0; padding: 1px 5px; border-radius: 8px; margin-left: 4px; }
+
+    /* Certs */
+    .cert-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+    @media(max-width:600px) { .cert-grid { grid-template-columns: repeat(2,1fr); } }
+    .cert-label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #444; cursor: pointer; padding: 5px 8px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 6px; }
+    .cert-label input { width: 13px; height: 13px; }
+    .cert-label:has(input:checked) { background: #eef2ff; border-color: #b0bcf0; color: #1a1a2e; }
+
+    /* Photos */
+    .photo-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 10px; }
+    @media(max-width:500px) { .photo-grid { grid-template-columns: repeat(2,1fr); } }
+    .photo-item { position: relative; aspect-ratio: 4/3; border-radius: 8px; overflow: hidden; border: 1px solid #e0e0d8; background: #f0f0e8; cursor: zoom-in; }
+    .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; padding: 2px 6px; }
+    .upload-zone { border: 2px dashed #d0d0c8; border-radius: 8px; padding: 1.5rem; text-align: center; cursor: pointer; font-size: 13px; color: #999; }
+    .upload-zone:hover { border-color: #1a1a2e; background: #f8f8f4; }
+
+    /* Files */
+    .file-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; margin-bottom: 6px; }
+    .file-name { font-size: 13px; color: #1a1a2e; font-weight: 500; }
+    .file-link { font-size: 12px; color: #2266cc; text-decoration: none; }
+    .file-link:hover { text-decoration: underline; }
+    .file-upload-btn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; background: #f8f8f4; border: 1.5px dashed #ccc; border-radius: 8px; cursor: pointer; font-size: 13px; color: #888; margin-bottom: 6px; }
+    .file-upload-btn:hover { border-color: #1a1a2e; color: #1a1a2e; background: #f0f0e8; }
+
+    /* Invite section */
+    .invite-box { background: #f0f4ff; border: 1px solid #c0d0f0; border-radius: 10px; padding: 1rem; }
+    .invite-link { font-size: 12px; color: #2266cc; word-break: break-all; background: #fff; border: 1px solid #dde; border-radius: 6px; padding: 7px 10px; margin: 8px 0; display: block; font-family: monospace; }
+    .inv-status { display: inline-block; font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; margin-bottom: 8px; }
+    .inv-not_invited { background: #f0f0e8; color: #aaa; }
+    .inv-invited { background: #e8f0ff; color: #2244cc; }
+    .inv-opened { background: #fff8e0; color: #886600; }
+    .inv-registered,.inv-completed { background: #e8f8e8; color: #1a7a1a; }
+    .inv-follow_up_sent { background: #fff0e8; color: #884400; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">S</div>
+    <a class="back-link" href="admin.html">← Dashboard</a>
+  </div>
+  <div class="topbar-r">
+    <span class="factory-id" id="t-factory-id"></span>
+    <span class="status-badge" id="t-status"></span>
+    <button class="btn-danger" onclick="deleteFactory()" style="font-size:12px;padding:6px 12px;">🗑 Delete</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="factory-name" id="t-name">Loading...</div>
+  <div class="factory-local" id="t-local"></div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="switchTab('details')">Details</button>
+    <button class="tab" onclick="switchTab('categories')">Categories</button>
+    <button class="tab" onclick="switchTab('certs')">Certifications</button>
+    <button class="tab" onclick="switchTab('photos')">Photos</button>
+    <button class="tab" onclick="switchTab('files')">Files</button>
+    <button class="tab" onclick="switchTab('invite')">Invite</button>
+  </div>
+
+  <!-- ── DETAILS ── -->
+  <div class="tab-panel on" id="tab-details">
+    <div class="card">
+      <div class="card-title">Company Information</div>
+      <div class="fg2">
+        <div class="f"><label>Factory Name (English)</label><input type="text" id="d-name_en" /></div>
+        <div class="f"><label>Factory Name (Local)</label><input type="text" id="d-name_local" /></div>
+      </div>
+      <div class="fg3">
+        <div class="f"><label>Years in Business</label><input type="number" id="d-years" /></div>
+        <div class="f"><label>Annual Revenue</label>
+          <select id="d-revenue">
+            <option value="">— Select —</option>
+            <option>Under $1M</option><option>$1M–$5M</option><option>$5M–$10M</option>
+            <option>$10M–$50M</option><option>$50M–$100M</option><option>Over $100M</option>
+          </select>
+        </div>
+        <div class="f"><label>Export %</label><input type="number" id="d-export" min="0" max="100" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Primary Contact</div>
+      <div class="fg2">
+        <div class="f"><label>Contact Name</label><input type="text" id="d-contact" /></div>
+        <div class="f"><label>Email</label><input type="email" id="d-email" /></div>
+      </div>
+      <div class="fg3">
+        <div class="f"><label>Mobile</label><input type="tel" id="d-mobile" /></div>
+        <div class="f"><label>Telephone</label><input type="tel" id="d-tel" /></div>
+        <div class="f"><label>WeChat</label><input type="text" id="d-wechat" /></div>
+      </div>
+      <div class="fg2">
+        <div class="f"><label>WhatsApp</label><input type="tel" id="d-whatsapp" /></div>
+        <div class="f"><label>Website</label><input type="text" id="d-website" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Factory Address</div>
+      <div class="f"><label>Street Address</label><input type="text" id="d-address" /></div>
+      <div class="fg3">
+        <div class="f"><label>City</label><input type="text" id="d-city" /></div>
+        <div class="f"><label>State / Province</label><input type="text" id="d-state" /></div>
+        <div class="f"><label>Postal Code</label><input type="text" id="d-postal" /></div>
+      </div>
+      <div class="f"><label>Country</label><input type="text" id="d-country" /></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Products (free text)</div>
+      <div class="f"><textarea id="d-categories" rows="3" placeholder="e.g. LED Lighting, Outdoor Furniture..."></textarea></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Internal Notes</div>
+      <div class="f"><textarea id="d-notes" rows="3"></textarea></div>
+    </div>
+
+    <div class="save-row">
+      <button class="btn-primary" onclick="saveDetails()">Save Details</button>
+      <span class="save-msg" id="details-msg"></span>
+    </div>
+  </div>
+
+  <!-- ── CATEGORIES ── -->
+  <div class="tab-panel" id="tab-categories">
+    <div class="card">
+      <div class="card-title">Manufacturing Categories — check all that apply</div>
+      <div class="cat-grid" id="cat-grid"><div style="color:#bbb;font-size:13px;">Loading categories...</div></div>
+      <div class="save-row" style="margin-top:12px;">
+        <button class="btn-primary" onclick="saveCategories()">Save Categories</button>
+        <span class="save-msg" id="cat-msg"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CERTIFICATIONS ── -->
+  <div class="tab-panel" id="tab-certs">
+    <div class="card">
+      <div class="card-title">Certifications</div>
+      <div class="cert-grid" id="cert-grid"></div>
+      <div class="f" style="margin-top:12px;"><label>Other Certifications</label><input type="text" id="d-cert-other" placeholder="e.g. TS16949, Kosher..." /></div>
+      <div class="save-row">
+        <button class="btn-primary" onclick="saveCerts()">Save Certifications</button>
+        <span class="save-msg" id="cert-msg"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PHOTOS ── -->
+  <div class="tab-panel" id="tab-photos">
+    <div class="card">
+      <div class="card-title">Factory Photos</div>
+      <div class="photo-grid" id="photo-grid"></div>
+      <label class="upload-zone">
+        📷 Click to upload factory photos (JPG, PNG — multiple at once)
+        <input type="file" accept="image/*" multiple style="display:none" onchange="uploadPhotos(this)" />
+      </label>
+      <div class="save-row"><span class="save-msg" id="photo-msg"></span></div>
+    </div>
+  </div>
+
+  <!-- ── FILES ── -->
+  <div class="tab-panel" id="tab-files">
+    <div class="card">
+      <div class="card-title">Product Catalog</div>
+      <div id="catalog-list"></div>
+      <label class="file-upload-btn">📄 Upload Catalog (PDF or PowerPoint)<input type="file" accept=".pdf,.pptx,.ppt" style="display:none" onchange="uploadFile(this,'catalogs','Catalog')" /></label>
+    </div>
+    <div class="card">
+      <div class="card-title">Company Overview / Presentation</div>
+      <div id="overview-list"></div>
+      <label class="file-upload-btn">📊 Upload Overview (PDF or PowerPoint)<input type="file" accept=".pdf,.pptx,.ppt" style="display:none" onchange="uploadFile(this,'overview','Company Presentation')" /></label>
+    </div>
+    <div class="card">
+      <div class="card-title">Quote Sheets</div>
+      <div id="quotes-list"></div>
+      <label class="file-upload-btn">📋 Upload Quote Sheet (Excel)<input type="file" accept=".xlsx,.xls" style="display:none" onchange="uploadFile(this,'quotes','Quote Sheet')" /></label>
+    </div>
+    <div class="card">
+      <div class="card-title">Certification Documents</div>
+      <div id="certs-file-list"></div>
+      <label class="file-upload-btn">🏅 Upload Certification Document (PDF)<input type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="uploadFile(this,'certifications','Certification')" /></label>
+    </div>
+    <div class="card">
+      <div class="card-title">Factory Audit Reports</div>
+      <div id="audits-list"></div>
+      <label class="file-upload-btn">📋 Upload Audit Report (PDF)<input type="file" accept=".pdf" style="display:none" onchange="uploadFile(this,'audits','Audit Report')" /></label>
+    </div>
+    <div class="save-row"><span class="save-msg" id="file-msg"></span></div>
+  </div>
+
+  <!-- ── INVITE ── -->
+  <div class="tab-panel" id="tab-invite">
+    <div class="card">
+      <div class="card-title">Invitation Status</div>
+      <div class="invite-box">
+        <div class="inv-status" id="inv-status-badge">Not Invited</div>
+        <div style="font-size:13px;color:#555;margin-bottom:8px;" id="inv-status-detail"></div>
+        <div style="font-size:11px;color:#888;margin-bottom:4px;">Unique invitation link:</div>
+        <div class="invite-link" id="inv-link"></div>
+        <button class="btn-primary" id="inv-btn" onclick="sendInvite()" style="width:100%;">✉ Send Invitation Email</button>
+        <div class="save-row" style="margin-top:8px;"><span class="save-msg" id="inv-msg"></span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Approve Factory</div>
+      <div style="font-size:13px;color:#666;margin-bottom:12px;">Approving adds this factory to your active supplier network.</div>
+      <button class="btn-primary" id="approve-btn" onclick="approveFactory()">✓ Approve Factory</button>
+      <div class="save-row"><span class="save-msg" id="approve-msg"></span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var FACTORY_ID=null;
+var factory=null;
+var allCategories=[];
+var factoryCategories=[];
+
+function g(id){return document.getElementById(id);}
+function gv(id){var e=g(id);return e?e.value.trim():'';}
+function pf(id){return parseFloat(gv(id))||null;}
+
+function showMsg(id,type,text){
+  var el=g(id);
+  if(!el)return;
+  el.textContent=text;
+  el.className='save-msg '+type;
+  if(type==='ok')setTimeout(function(){el.textContent='';},4000);
+}
+
+// ── Get factory ID from URL ──
+window.addEventListener('load',function(){
+  var params=new URLSearchParams(window.location.search);
+  FACTORY_ID=params.get('id');
+  if(!FACTORY_ID){alert('No factory ID in URL. Go back to the dashboard.');return;}
+  loadFactory();
+});
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
+  var tabs=['details','categories','certs','photos','files','invite'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('on');
+  g('tab-'+name).classList.add('on');
+}
+
+// ── Load factory ──
+async function loadFactory(){
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Failed to load factory: '+r.status);return;}
+    var rows=await r.json();
+    if(!rows.length){alert('Factory not found.');return;}
+    factory=rows[0];
+    populateForm();
+    loadCategories();
+    loadCerts();
+    loadPhotos();
+    loadFiles();
+    populateInvite();
+  }catch(e){alert('Load error: '+e.message);}
+}
+
+function populateForm(){
+  g('t-name').textContent=factory.factory_name_english||'Unnamed Factory';
+  g('t-local').textContent=factory.factory_name_local||'';
+  g('t-factory-id').textContent=factory.factory_id||'';
+  var sb=g('t-status');
+  sb.textContent=factory.status||'pending';
+  sb.className='status-badge '+(factory.status==='approved'?'st-approved':'st-pending');
+  document.title=(factory.factory_name_english||'Factory')+' — Supplier Portal';
+
+  g('d-name_en').value=factory.factory_name_english||'';
+  g('d-name_local').value=factory.factory_name_local||'';
+  g('d-years').value=factory.years_in_business||'';
+  g('d-revenue').value=factory.annual_revenue_usd||'';
+  g('d-export').value=factory.export_percentage||'';
+  g('d-contact').value=factory.sales_contact_name||'';
+  g('d-email').value=factory.sales_email||'';
+  g('d-mobile').value=factory.sales_mobile||'';
+  g('d-tel').value=factory.telephone||'';
+  g('d-wechat').value=factory.sales_wechat||'';
+  g('d-whatsapp').value=factory.sales_whatsapp||'';
+  g('d-website').value=factory.catalog_url||'';
+  g('d-address').value=factory.address||'';
+  g('d-city').value=factory.city||'';
+  g('d-state').value=factory.state_province||'';
+  g('d-postal').value=factory.postal_code||'';
+  g('d-country').value=factory.country||'';
+  g('d-categories').value=(factory.product_categories||[]).join(', ');
+  g('d-notes').value=factory.internal_notes||'';
+}
+
+// ── Save details ──
+async function saveDetails(){
+  var btn=document.querySelector('#tab-details .btn-primary');
+  btn.disabled=true;btn.textContent='Saving...';
+  var payload={
+    factory_name_english:gv('d-name_en')||null,
+    factory_name_local:gv('d-name_local')||null,
+    years_in_business:pf('d-years'),
+    annual_revenue_usd:gv('d-revenue')||null,
+    export_percentage:pf('d-export'),
+    sales_contact_name:gv('d-contact')||null,
+    sales_email:gv('d-email')||null,
+    sales_mobile:gv('d-mobile')||null,
+    telephone:gv('d-tel')||null,
+    sales_wechat:gv('d-wechat')||null,
+    sales_whatsapp:gv('d-whatsapp')||null,
+    catalog_url:gv('d-website')||null,
+    address:gv('d-address')||null,
+    city:gv('d-city')||null,
+    state_province:gv('d-state')||null,
+    postal_code:gv('d-postal')||null,
+    country:gv('d-country')||null,
+    product_categories:gv('d-categories')?gv('d-categories').split(',').map(function(s){return s.trim();}).filter(Boolean):[],
+    internal_notes:gv('d-notes')||null
+  };
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){
+      Object.assign(factory,payload);
+      g('t-name').textContent=factory.factory_name_english||'Unnamed Factory';
+      g('t-local').textContent=factory.factory_name_local||'';
+      showMsg('details-msg','ok','✓ Saved successfully!');
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      var msg='Save failed: '+(e.message||e.details||r.status);
+      showMsg('details-msg','err',msg);
+      alert(msg);
+    }
+  }catch(e){showMsg('details-msg','err','Error: '+e.message);alert('Save error: '+e.message);}
+  btn.disabled=false;btn.textContent='Save Details';
+}
+
+// ── Categories ──
+async function loadCategories(){
+  // Load all available categories
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Categories load failed: '+r.status);return;}
+    allCategories=await r.json();
+  }catch(e){alert('Categories error: '+e.message);return;}
+
+  // Load this factory's selected categories
+  try{
+    var r2=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r2.ok){alert('Factory categories load failed: '+r2.status);return;}
+    factoryCategories=await r2.json();
+  }catch(e){alert('Factory categories error: '+e.message);return;}
+
+  renderCategoryGrid();
+}
+
+function renderCategoryGrid(){
+  var el=g('cat-grid');
+  if(!allCategories.length){el.innerHTML='<div style="color:#bbb;font-size:13px;">No categories set up. <a href="setup.html" target="_blank" style="color:#2266cc;">Open Product Setup →</a></div>';return;}
+
+  var selectedKeys={};
+  factoryCategories.forEach(function(row){
+    selectedKeys[row.category+'|'+(row.sub_category||'')+'|'+(row.sub_sub_category||'')]=true;
+  });
+
+  el.innerHTML=allCategories.map(function(c){
+    var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    var checked=selectedKeys[key]?'checked':'';
+    return '<label class="cat-label">'+
+      '<input type="checkbox" class="cat-cb" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'" '+checked+' />'+
+      path+(c.is_cosmetic?'<span class="cosmetic-tag">Cosmetic</span>':'')+
+    '</label>';
+  }).join('');
+}
+
+async function saveCategories(){
+  var checked=[];
+  document.querySelectorAll('.cat-cb:checked').forEach(function(cb){
+    checked.push({factory_id:FACTORY_ID,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false});
+  });
+  try{
+    var d=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!d.ok){var de=await d.json().catch(function(){return{};});var dm='Delete failed: '+(de.message||de.details||d.status);showMsg('cat-msg','err',dm);alert(dm);return;}
+    if(checked.length){
+      var p=await fetch(SB+'/rest/v1/factory_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(checked)});
+      if(!p.ok){var pe=await p.json().catch(function(){return{};});var pm='Save failed: '+(pe.message||pe.details||p.status);showMsg('cat-msg','err',pm);alert(pm);return;}
+    }
+    factoryCategories=checked;
+    showMsg('cat-msg','ok','✓ Categories saved!');
+  }catch(e){showMsg('cat-msg','err','Error: '+e.message);alert('Category save error: '+e.message);}
+}
+
+// ── Certifications ──
+var CERTS=['ISO 9001','ISO 14001','ISO 45001','ISO 13485','BSCI','Sedex','SA8000','ETL','UL','CE','FCC','FDA','RoHS','REACH','GRS','OEKO-TEX','FSC','GOTS','HACCP','BRC','GMP','Leaping Bunny','Cruelty Free','Vegan','Organic','COSMOS','Health Canada','Prop 65 Compliant','CCC','KC','PSE','BIS'];
+
+function loadCerts(){
+  var existing=factory.certifications||[];
+  g('cert-grid').innerHTML=CERTS.map(function(c){
+    var checked=existing.includes(c)?'checked':'';
+    return '<label class="cert-label"><input type="checkbox" class="cert-cb" value="'+c+'" '+checked+' /> '+c+'</label>';
+  }).join('');
+  // Other certs
+  var others=existing.filter(function(c){return !CERTS.includes(c);});
+  g('d-cert-other').value=others.join(', ');
+}
+
+async function saveCerts(){
+  var certs=[];
+  document.querySelectorAll('.cert-cb:checked').forEach(function(cb){certs.push(cb.value);});
+  var other=gv('d-cert-other');
+  if(other)other.split(',').forEach(function(c){var t=c.trim();if(t)certs.push(t);});
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({certifications:certs})});
+    if(r.ok){factory.certifications=certs;showMsg('cert-msg','ok','✓ Certifications saved!');}
+    else{var e=await r.json().catch(function(){return{};});var m='Save failed: '+(e.message||e.details||r.status);showMsg('cert-msg','err',m);alert(m);}
+  }catch(e){showMsg('cert-msg','err','Error: '+e.message);alert(e.message);}
+}
+
+// ── Photos ──
+async function loadPhotos(){
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_photos?factory_id=eq.'+FACTORY_ID+'&select=*&order=created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Photos load failed: '+r.status);return;}
+    var photos=await r.json();
+    renderPhotos(photos);
+  }catch(e){alert('Photos error: '+e.message);}
+}
+
+function renderPhotos(photos){
+  var el=g('photo-grid');
+  el.innerHTML=photos.map(function(p){
+    return '<div class="photo-item" onclick="window.open(\''+p.photo_url+'\',\'_blank\')">'+
+      '<img src="'+p.photo_url+'" />'+
+      '<button class="photo-del" onclick="event.stopPropagation();deletePhoto(\''+p.id+'\')">✕</button>'+
+    '</div>';
+  }).join('');
+}
+
+async function uploadPhotos(input){
+  var files=Array.from(input.files);
+  if(!files.length)return;
+  showMsg('photo-msg','ok','Uploading '+files.length+' photo'+(files.length>1?'s':'')+'...');
+  var errors=[];
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    try{
+      var dataUrl=await resizePhoto(file,1600,0.85);
+      var blob=await fetch(dataUrl).then(function(r){return r.blob();});
+      var path=(factory.user_id||FACTORY_ID)+'/photos/'+Date.now()+'_'+i+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      var up=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+      if(up.ok){
+        var url=SB+'/storage/v1/object/public/factory-files/'+path;
+        var db=await fetch(SB+'/rest/v1/factory_photos',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_id:FACTORY_ID,photo_url:url,photo_name:file.name,uploaded_by:'admin'})});
+        if(!db.ok){var dbe=await db.json().catch(function(){return{};});errors.push('DB: '+(dbe.message||db.status));}
+      }else{
+        var upe=await up.json().catch(function(){return{};});
+        errors.push(file.name+': '+(upe.message||upe.error||up.status));
+      }
+    }catch(e){errors.push(file.name+': '+e.message);}
+  }
+  input.value='';
+  await loadPhotos();
+  if(errors.length){showMsg('photo-msg','err','Errors: '+errors.join('; '));alert('Upload errors:\n'+errors.join('\n'));}
+  else showMsg('photo-msg','ok','✓ Photos uploaded!');
+}
+
+function resizePhoto(file,maxPx,quality){
+  return new Promise(function(resolve){
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);resolve(null);};
+    img.src=url;
+  });
+}
+
+async function deletePhoto(photoId){
+  if(!confirm('Delete this photo?'))return;
+  await fetch(SB+'/rest/v1/factory_photos?id=eq.'+photoId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadPhotos();
+}
+
+// ── Files ──
+async function loadFiles(){
+  var folders=['catalogs','overview','quotes','certifications','audits'];
+  var listIds=['catalog-list','overview-list','quotes-list','certs-file-list','audits-list'];
+  var userId=factory.user_id||FACTORY_ID;
+  for(var i=0;i<folders.length;i++){
+    var folder=folders[i];
+    var listId=listIds[i];
+    try{
+      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},body:JSON.stringify({prefix:userId+'/'+folder+'/',limit:20})});
+      var items=await r.json();
+      var el=g(listId);
+      if(!el)continue;
+      if(Array.isArray(items)&&items.filter(function(f){return f.name;}).length){
+        el.innerHTML=items.filter(function(f){return f.name;}).map(function(f){
+          var url=SB+'/storage/v1/object/public/factory-files/'+userId+'/'+folder+'/'+f.name;
+          return '<div class="file-row"><span class="file-name">'+f.name+'</span><a class="file-link" href="'+url+'" target="_blank">View / Download</a></div>';
+        }).join('');
+      }else{el.innerHTML='';}
+    }catch(e){console.log('file list error:',e);}
+  }
+}
+
+function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getFullYear()).slice(-2);}
+
+async function uploadFile(input,folder,fileType){
+  var file=input.files[0];if(!file)return;
+  var userId=factory.user_id||FACTORY_ID;
+  var name=(factory.factory_name_english||'Factory').replace(/[^a-zA-Z0-9\s]/g,'').trim();
+  var ext=file.name.split('.').pop();
+  var path=userId+'/'+folder+'/'+name+'_'+fileType+'_'+dateStamp()+'.'+ext;
+  showMsg('file-msg','ok','Uploading...');
+  try{
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:file});
+    input.value='';
+    if(r.ok){await loadFiles();showMsg('file-msg','ok','✓ Uploaded!');}
+    else{var e=await r.json().catch(function(){return{};});var m='Upload failed: '+(e.message||e.error||r.status);showMsg('file-msg','err',m);alert(m);}
+  }catch(e){showMsg('file-msg','err','Error: '+e.message);alert(e.message);}
+}
+
+// ── Invite ──
+function populateInvite(){
+  var status=factory.invitation_status||'not_invited';
+  var labels={'not_invited':'Not Invited','invited':'Invited — awaiting response','opened':'Invitation Opened','registered':'Registered','completed':'Profile Completed','follow_up_sent':'Follow-up Sent','declined':'Declined','no_response':'No Response'};
+  var badge=g('inv-status-badge');
+  badge.textContent=labels[status]||status;
+  badge.className='inv-status inv-'+(status==='registered'||status==='completed'?'registered':status);
+  var detail='';
+  if(factory.invitation_sent_at)detail+='Sent: '+new Date(factory.invitation_sent_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  if(factory.invitation_opened_at)detail+=' · Opened: '+new Date(factory.invitation_opened_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  g('inv-status-detail').textContent=detail;
+  var link='https://project-7o416.vercel.app?invite='+(factory.invitation_token||'');
+  g('inv-link').textContent=link;
+  var btn=g('inv-btn');
+  if(status==='completed'||status==='registered'){btn.textContent='✓ Already Registered';btn.disabled=true;}
+  else if(status==='invited'||status==='opened'){btn.textContent='✉ Re-send Invitation';}
+  else if(status==='follow_up_sent'){btn.textContent='✉ Send Another Follow-up';}
+  else{btn.textContent='✉ Send Invitation Email';}
+  var appBtn=g('approve-btn');
+  if(factory.status==='approved'){appBtn.textContent='✓ Already Approved';appBtn.disabled=true;}
+}
+
+async function sendInvite(){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  var myEmail=localStorage.getItem('from_email')||'';
+  if(!factory.sales_email){alert('This factory has no email address. Add one in the Details tab first.');return;}
+  var isFollowUp=factory.invitation_status==='invited'||factory.invitation_status==='opened'||factory.invitation_status==='follow_up_sent';
+  var link='https://project-7o416.vercel.app?invite='+(factory.invitation_token||'');
+  var emailBody='';
+  if(apiKey){
+    try{
+      var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Allan Amsel at a US-based product sourcing company to invite this factory to register on our supplier portal.\n\nFactory: '+(factory.factory_name_english||'')+(factory.factory_name_local?' ('+factory.factory_name_local+')':'')+'\nContact: '+(factory.sales_contact_name||'Team')+'\nCountry: '+(factory.country||'')+'\n\nRules:\n- Address by first name\n- Sign as Allan Amsel, Supplier Sourcing\n- No placeholders like [Your Name]\n- Do NOT include the portal link (added separately)\n- Keep to 3 short paragraphs\n- Write ONLY the email body';
+      var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
+      var d=await r.json();
+      if(d.content&&d.content[0])emailBody=d.content[0].text;
+    }catch(e){}
+  }
+  if(!emailBody){
+    var fn=(factory.sales_contact_name||'').split(' ')[0]||'Team';
+    emailBody='Dear '+fn+',\n\nI hope this finds you well. My name is Allan Amsel and I represent a US-based product sourcing company.\n\nWe would love to include '+(factory.factory_name_english||'your company')+' in our supplier network. Please take a few minutes to register on our supplier portal using your unique link below.\n\nWe look forward to working with you.\n\nBest regards,\nAllan Amsel\nSupplier Sourcing';
+  }
+  var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(factory.factory_name_english||'');
+  try{
+    var btn=g('inv-btn');btn.disabled=true;btn.textContent='Sending...';
+    await emailjs.send('service_aawsxwi','template_er5zzqp',{to_email:factory.sales_email,contact_name:factory.sales_contact_name||'Team',email_body:emailBody,invite_link:link,reply_to:myEmail,subject:subject});
+    var newStatus=isFollowUp?'follow_up_sent':'invited';
+    await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({invitation_status:newStatus,invitation_sent_at:new Date().toISOString()})});
+    factory.invitation_status=newStatus;
+    factory.invitation_sent_at=new Date().toISOString();
+    populateInvite();
+    showMsg('inv-msg','ok','✓ Invitation sent to '+factory.sales_email);
+  }catch(e){showMsg('inv-msg','err','Send failed: '+(e.text||e.message));alert('Send failed: '+(e.text||e.message));g('inv-btn').disabled=false;populateInvite();}
+}
+
+async function approveFactory(){
+  var btn=g('approve-btn');btn.disabled=true;btn.textContent='Approving...';
+  try{
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved'})});
+    if(r.ok){factory.status='approved';var sb=g('t-status');sb.textContent='approved';sb.className='status-badge st-approved';btn.textContent='✓ Approved';showMsg('approve-msg','ok','✓ Factory approved!');}
+    else{var e=await r.json().catch(function(){return{};});var m='Approve failed: '+(e.message||e.details||r.status);showMsg('approve-msg','err',m);alert(m);btn.disabled=false;btn.textContent='✓ Approve Factory';}
+  }catch(e){showMsg('approve-msg','err','Error: '+e.message);alert(e.message);btn.disabled=false;btn.textContent='✓ Approve Factory';}
+}
+
+async function deleteFactory(){
+  var name=factory.factory_name_english||'this factory';
+  if(!confirm('Delete '+name+'? This cannot be undone.'))return;
+  try{
+    await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_certifications?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_locations?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/factory_photos?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/invitation_events?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){alert(name+' deleted.');window.location.href='admin.html';}
+    else{var e=await r.json().catch(function(){return{};});alert('Delete failed: '+(e.message||e.details||r.status));}
+  }catch(e){alert('Delete error: '+e.message);}
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>emailjs.init('6A1UTdzNuQ8z546HR');</script>
+</body>
+</html>
