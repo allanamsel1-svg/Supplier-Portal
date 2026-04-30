@@ -693,7 +693,7 @@
               <div class="mf-row">
                 <div class="mf">
                   <label>Model Prefix * (auto-generated, editable)</label>
-                  <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;" oninput="this.dataset.userEdited='true'" />
+                  <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;"  />
                 </div>
                 <div class="mf">
                   <label>Cosmetic Category?</label>
@@ -2321,8 +2321,8 @@ async function saveCategory(){
   try{
     var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
     if(r.ok){showFormMsg('category-ok','Category saved!');await loadCategories();if(!id)newCategoryForm();}
-    else{var e=await r.json().catch(function(){return{};});showFormMsg('category-err','Save failed: '+(e.message||e.details||r.status));}
-  }catch(e){showFormMsg('category-err','Error: '+e.message);}
+    else{var e=await r.json().catch(function(){return{};});var msg='Save failed: '+(e.message||e.details||r.status);showFormMsg('category-err',msg);alert(msg);}
+  }catch(e){showFormMsg('category-err','Error: '+e.message);alert('Category save error: '+e.message);}
 }
 async function deleteCategory(id){
   if(!confirm('Delete this category?'))return;
@@ -2420,16 +2420,14 @@ async function deleteDept(id){
 // ── AUTO PREFIX for categories ──
 function autoPrefix(){
   var prefixEl=g('cat-prefix');
-  if(prefixEl.dataset.userEdited==='true')return;
+  if(!prefixEl)return;
   var cat=g('cat-category').value.trim();
   var sub=g('cat-sub').value.trim();
   var subsub=g('cat-subsub').value.trim();
-  // Always exactly 3 letters: first letter of category, sub, sub-sub
   var c1=cat?cat[0].toUpperCase():'';
   var c2=sub?sub[0].toUpperCase():'';
   var c3=subsub?subsub[0].toUpperCase():'';
-  var prefix=(c1+c2+c3).slice(0,3);
-  prefixEl.value=prefix;
+  prefixEl.value=(c1+c2+c3).slice(0,3);
 }
 
 // ── Override edit function to show dept section ──
