@@ -404,7 +404,27 @@
             <div class="mf-row">
               <div class="mf"><label>Color</label>
                 <select id="rfq-color">
-                  <option value="">— Select if applicable —</option>
+                  <option value="">None / Not Applicable</option>
+                  <option value="BK">Black (BK)</option>
+                  <option value="WH">White (WH)</option>
+                  <option value="GY">Gray (GY)</option>
+                  <option value="SL">Silver (SL)</option>
+                  <option value="GD">Gold (GD)</option>
+                  <option value="RD">Red (RD)</option>
+                  <option value="PK">Pink (PK)</option>
+                  <option value="OR">Orange (OR)</option>
+                  <option value="YL">Yellow (YL)</option>
+                  <option value="GN">Green (GN)</option>
+                  <option value="BL">Blue (BL)</option>
+                  <option value="NV">Navy (NV)</option>
+                  <option value="PL">Purple (PL)</option>
+                  <option value="BR">Brown (BR)</option>
+                  <option value="BG">Beige (BG)</option>
+                  <option value="CR">Cream (CR)</option>
+                  <option value="CL">Clear (CL)</option>
+                  <option value="MT">Multi (MT)</option>
+                  <option value="NA">Natural (NA)</option>
+                  <option value="RW">Raw (RW)</option>
                 </select>
               </div>
               <div class="mf"><label>Quantity to Quote</label><input type="number" id="rfq-quantity" placeholder="e.g. 5000" min="1" /></div>
@@ -831,6 +851,7 @@
     <div class="d-section">
       <div class="d-section-title">Product Categories</div>
       <div class="d-value" id="d-categories" style="font-weight:400;line-height:1.6;">—</div>
+      <div id="d-factory-cats" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px;"></div>
     </div>
 
     <div class="d-section">
@@ -914,6 +935,9 @@ async function loadData(){
     await loadAllCerts();
     renderAll();
     loadRFQs();
+    loadCategories();
+    loadBrands();
+    loadCustomers();
   }catch(e){console.log('load error:',e);}
 }
 
@@ -1514,17 +1538,7 @@ function populateRFQDropdowns(){
     var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
     catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'">'+path+' ['+c.model_prefix+']</option>';
   });
-  // Colors
-  var colSel=g('rfq-color');
-  colSel.innerHTML='<option value="">— Select if applicable —</option>';
-  // Load colors from DB
-  fetch(SB+'/rest/v1/color_codes?select=*&order=name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
-    .then(function(r){return r.json();})
-    .then(function(colors){
-      colors.forEach(function(c){
-        colSel.innerHTML+='<option value="'+c.code+'">'+c.name+' ('+c.code+')</option>';
-      });
-    });
+  // Colors are hardcoded in HTML dropdown
 }
 
 function rfqCategoryChanged(){

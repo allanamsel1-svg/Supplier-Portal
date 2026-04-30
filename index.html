@@ -298,7 +298,14 @@
 
       <div class="card">
         <div class="card-title" data-t="section_categories">Product Categories</div>
-        <div class="pf"><label data-t="lbl_categories">What do you manufacture? <span class="req">*</span></label><textarea id="p-categories" placeholder="e.g. LED Lighting, Outdoor Furniture, Electronics..."></textarea></div>
+        <p style="font-size:13px;color:#999;margin-bottom:1rem;">Select all categories that apply to your factory. This helps us match you to relevant RFQs.</p>
+        <div id="factory-cat-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+          <div style="font-size:13px;color:#bbb;">Loading categories...</div>
+        </div>
+        <div class="pf" style="margin-top:10px;">
+          <label data-t="lbl_categories">Additional Products / Notes</label>
+          <textarea id="p-categories" placeholder="Describe any additional products or specializations not listed above..."></textarea>
+        </div>
       </div>
 
       <button class="save-btn" id="save-btn" onclick="saveDetails()" data-t="btn_save">Save Factory Details</button>
@@ -944,6 +951,8 @@ async function enterPortal(){
   await loadLocations();
   await loadCertifications();
   await loadAllFileLists();
+  await loadAvailableCategories();
+  await loadFactoryCategories();
 }
 
 // ── Portal Tabs ──
@@ -989,6 +998,58 @@ async function loadDetails(){
       g('save-btn').textContent=t('btn_save').replace('Save','Update');
     }
   }catch(e){console.log('loadDetails error:',e);}
+}
+
+// ── Factory Categories ──
+var availableCategories=[];
+var selectedCategoryIds={};
+
+async function loadAvailableCategories(){
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    availableCategories=await r.json();
+    renderCategoryCheckboxes();
+  }catch(e){console.log('loadCategories error:',e);}
+}
+
+async function loadFactoryCategories(){
+  if(!FACTORY_ID)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var rows=await r.json();
+    selectedCategoryIds={};
+    if(Array.isArray(rows))rows.forEach(function(row){selectedCategoryIds[row.category+'|'+(row.sub_category||'')+'|'+(row.sub_sub_category||'')]=row.id;});
+    renderCategoryCheckboxes();
+  }catch(e){console.log('loadFactoryCategories error:',e);}
+}
+
+function renderCategoryCheckboxes(){
+  var el=g('factory-cat-list');if(!el)return;
+  if(!availableCategories.length){el.innerHTML='<div style="font-size:13px;color:#bbb;">No categories available yet.</div>';return;}
+  el.innerHTML=availableCategories.map(function(c){
+    var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
+    var checked=selectedCategoryIds[key]?'checked':'';
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;cursor:pointer;">'+
+      '<input type="checkbox" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'" data-id="'+c.id+'" '+checked+' style="width:15px;height:15px;flex-shrink:0;" />'+
+      '<span style="font-size:13px;color:#1a1a2e;">'+path+(c.is_cosmetic?' <span style="font-size:10px;background:#fce8f0;color:#880044;border:1px solid #f0b8d0;padding:1px 5px;border-radius:8px;margin-left:4px;">Cosmetic</span>':'')+'</span>'+
+    '</label>';
+  }).join('');
+}
+
+async function saveFactoryCategories(){
+  if(!FACTORY_ID)return;
+  var checked=[];
+  g('factory-cat-list').querySelectorAll('input[type=checkbox]:checked').forEach(function(cb){
+    checked.push({factory_id:FACTORY_ID,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false});
+  });
+  try{
+    // Delete all existing then reinsert
+    await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    if(checked.length){
+      await fetch(SB+'/rest/v1/factory_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(checked)});
+    }
+  }catch(e){console.log('saveFactoryCategories error:',e);}
 }
 
 async function saveDetails(){
