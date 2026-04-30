@@ -284,6 +284,8 @@
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
+      <div class="slabel">RFQ & Products</div>
+      <button class="sitem" id="nav-rfq" onclick="showPanel('rfq')"><span class="sicon">📋</span> RFQs <span class="scount" id="cnt-rfq">0</span></button>
       <div class="slabel">Product Setup</div>
       <button class="sitem" id="nav-brands" onclick="showPanel('brands')"><span class="sicon">🏷</span> Brands</button>
       <button class="sitem" id="nav-customers" onclick="showPanel('customers')"><span class="sicon">🛒</span> Customers</button>
@@ -349,6 +351,151 @@
       <div class="chat-bar">
         <textarea id="chat-input" placeholder="Ask about your suppliers..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
         <button class="send" id="send-btn" onclick="sendMsg()">Send</button>
+      </div>
+    </div>
+
+    <!-- ── RFQ PANEL ── -->
+    <div class="panel" id="panel-rfq">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">RFQs</div><div class="ph-sub">Create and manage product quote requests</div></div>
+        <button onclick="showRFQForm()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">+ New RFQ</button>
+      </div>
+
+      <!-- RFQ List view -->
+      <div id="rfq-list-view" style="padding:1.25rem 1.5rem;">
+        <div id="rfq-list-items"><div class="empty">No RFQs yet. Create your first one.</div></div>
+      </div>
+
+      <!-- RFQ Create/Edit Form -->
+      <div id="rfq-form-view" style="display:none;padding:1.25rem 1.5rem;max-width:800px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
+          <button onclick="hideRFQForm()" style="background:none;border:none;font-size:22px;color:#999;cursor:pointer;">←</button>
+          <div>
+            <div style="font-size:16px;font-weight:600;color:#1a1a2e;" id="rfq-form-title">New RFQ</div>
+            <div style="font-size:12px;color:#999;" id="rfq-project-number"></div>
+          </div>
+        </div>
+
+        <input type="hidden" id="rfq-id" />
+
+        <!-- Step 1: Product Info -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Product Information</div>
+          <div class="mgr-form">
+            <div class="mf-row">
+              <div class="mf">
+                <label>Category *</label>
+                <select id="rfq-category-id" onchange="rfqCategoryChanged()">
+                  <option value="">— Select Category —</option>
+                </select>
+              </div>
+              <div class="mf">
+                <label>Unit of Measure *</label>
+                <select id="rfq-uom">
+                  <option value="">— Select —</option>
+                  <option>ml</option><option>L</option><option>g</option><option>kg</option>
+                  <option>oz</option><option>fl oz</option><option>units</option>
+                  <option>pairs</option><option>sets</option><option>pcs</option>
+                </select>
+              </div>
+            </div>
+            <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" /></div>
+            <div class="mf"><label>Basic Specifications *</label><textarea id="rfq-specs" rows="4" placeholder="Describe the product specifications. For cosmetics include key actives, texture, fragrance preference, target skin type, etc."></textarea></div>
+            <div class="mf-row">
+              <div class="mf"><label>Color</label>
+                <select id="rfq-color">
+                  <option value="">— Select if applicable —</option>
+                </select>
+              </div>
+              <div class="mf"><label>Quantity to Quote</label><input type="number" id="rfq-quantity" placeholder="e.g. 5000" min="1" /></div>
+            </div>
+            <div class="mf-row">
+              <div class="mf"><label>Inner Case Pack</label><input type="number" id="rfq-inner-pack" placeholder="e.g. 12" min="1" /></div>
+              <div class="mf"><label>Master Case Pack</label><input type="number" id="rfq-master-pack" placeholder="e.g. 48" min="1" /></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Packaging -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Packaging Type</div>
+          <div class="checkbox-grid">
+            <label class="cb-item"><input type="checkbox" value="Bulk"> Bulk</label>
+            <label class="cb-item"><input type="checkbox" value="Paper Box"> Paper Box</label>
+            <label class="cb-item"><input type="checkbox" value="Glass Jar"> Glass Jar</label>
+            <label class="cb-item"><input type="checkbox" value="Plastic Bottle"> Plastic Bottle</label>
+            <label class="cb-item"><input type="checkbox" value="Bag"> Bag</label>
+            <label class="cb-item"><input type="checkbox" value="Pillow Pack"> Pillow Pack</label>
+            <label class="cb-item"><input type="checkbox" value="Hang Tag"> Hang Tag</label>
+            <label class="cb-item"><input type="checkbox" value="Tube"> Tube</label>
+            <label class="cb-item"><input type="checkbox" value="Pump Bottle"> Pump Bottle</label>
+            <label class="cb-item"><input type="checkbox" value="Spray Bottle"> Spray Bottle</label>
+            <label class="cb-item"><input type="checkbox" value="Blister Pack"> Blister Pack</label>
+            <label class="cb-item"><input type="checkbox" value="Other"> Other</label>
+          </div>
+          <div id="pkg-fields" style="display:none;margin-top:1rem;">
+            <div class="mf"><label>Packaging Notes</label><textarea id="rfq-pkg-notes" rows="2" placeholder="Additional packaging details..."></textarea></div>
+          </div>
+        </div>
+
+        <!-- Certifications -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Certifications Required</div>
+          <div class="checkbox-grid">
+            <label class="cb-item"><input type="checkbox" value="FDA"> FDA</label>
+            <label class="cb-item"><input type="checkbox" value="CE"> CE</label>
+            <label class="cb-item"><input type="checkbox" value="ETL"> ETL</label>
+            <label class="cb-item"><input type="checkbox" value="UL"> UL</label>
+            <label class="cb-item"><input type="checkbox" value="FCC"> FCC</label>
+            <label class="cb-item"><input type="checkbox" value="RoHS"> RoHS</label>
+            <label class="cb-item"><input type="checkbox" value="REACH"> REACH</label>
+            <label class="cb-item"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
+            <label class="cb-item"><input type="checkbox" value="BSCI"> BSCI</label>
+            <label class="cb-item"><input type="checkbox" value="GMP"> GMP</label>
+            <label class="cb-item"><input type="checkbox" value="NSF"> NSF</label>
+            <label class="cb-item"><input type="checkbox" value="Leaping Bunny"> Leaping Bunny</label>
+            <label class="cb-item"><input type="checkbox" value="Cruelty Free"> Cruelty Free</label>
+            <label class="cb-item"><input type="checkbox" value="Vegan"> Vegan</label>
+            <label class="cb-item"><input type="checkbox" value="Organic"> Organic</label>
+            <label class="cb-item"><input type="checkbox" value="COSMOS"> COSMOS</label>
+            <label class="cb-item"><input type="checkbox" value="Health Canada"> Health Canada</label>
+            <label class="cb-item"><input type="checkbox" value="Prop 65 Compliant"> Prop 65</label>
+          </div>
+        </div>
+
+        <!-- Product Image -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Reference Product Image</div>
+          <div id="rfq-img-drop" style="border:2px dashed #d0d0c8;border-radius:10px;padding:1.5rem;text-align:center;cursor:pointer;" onclick="g('rfq-img-input').click()">
+            <div style="font-size:24px;margin-bottom:6px;">🖼</div>
+            <div style="font-size:13px;color:#888;">Click to upload reference image (JPG, PNG)</div>
+            <div id="rfq-img-name" style="font-size:12px;color:#2266cc;margin-top:4px;"></div>
+          </div>
+          <input type="file" id="rfq-img-input" accept="image/*" style="display:none" onchange="rfqImageChosen(this)" />
+          <div id="rfq-img-preview" style="margin-top:8px;display:none;"><img id="rfq-img-thumb" style="max-height:120px;border-radius:8px;border:1px solid #e0e0d8;" /></div>
+        </div>
+
+        <!-- Cosmetics INCI notice -->
+        <div id="rfq-inci-notice" style="display:none;background:#fce8f0;border:1px solid #f0b8d0;border-radius:9px;padding:12px 14px;font-size:13px;color:#880044;margin-bottom:1rem;">
+          🧴 <strong>Cosmetic Category:</strong> Factories will be required to provide their INCI ingredient list and formulation details with their quote.
+        </div>
+
+        <!-- Factory Matching -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Factory Matching
+            <button onclick="findMatchingFactories()" style="padding:5px 12px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;">✦ Find Matching Factories</button>
+          </div>
+          <div id="factory-match-status" style="font-size:13px;color:#999;margin-bottom:10px;">Click "Find Matching Factories" to see which suppliers match this category.</div>
+          <div id="factory-match-list"></div>
+        </div>
+
+        <!-- Send Actions -->
+        <div style="display:flex;gap:10px;margin-bottom:2rem;">
+          <button onclick="saveRFQ('draft')" style="flex:1;padding:12px;background:#f5f5f0;color:#1a1a2e;border:1px solid #e0e0d8;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Save as Draft</button>
+          <button onclick="saveRFQ('send')" id="rfq-send-btn" style="flex:2;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">✉ Send RFQ to Selected Factories</button>
+        </div>
+        <div class="form-msg ok" id="rfq-save-ok" style="margin-bottom:1rem;"></div>
+        <div class="form-msg err" id="rfq-save-err" style="margin-bottom:1rem;"></div>
       </div>
     </div>
 
@@ -750,6 +897,7 @@ function showPanel(name){
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
   if(name==='upload')initAdminUpload();
+  if(name==='rfq'){loadRFQs();loadCategories();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories')loadCategories();
@@ -765,6 +913,7 @@ async function loadData(){
     await loadAllLocations();
     await loadAllCerts();
     renderAll();
+    loadRFQs();
   }catch(e){console.log('load error:',e);}
 }
 
@@ -1249,6 +1398,377 @@ async function adminUpload(){
     btn.disabled=false;btn.textContent='Upload File';
     g('admin-upload-err').textContent='Error: '+e.message;
     g('admin-upload-err').style.display='block';
+  }
+}
+
+// ── RFQ SYSTEM ──
+var allRFQs=[];
+var selectedFactoryIds={};
+var rfqImageFile=null;
+var rfqImageUrl=null;
+
+async function loadRFQs(){
+  try{
+    var r=await fetch(SB+'/rest/v1/rfqs?select=*&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allRFQs=await r.json();
+    renderRFQList();
+    g('cnt-rfq').textContent=allRFQs.length;
+  }catch(e){console.log('loadRFQs:',e);}
+}
+
+function renderRFQList(){
+  var el=g('rfq-list-items');if(!el)return;
+  if(!allRFQs.length){el.innerHTML='<div class="empty">No RFQs yet. Create your first one.</div>';return;}
+  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','quotes_received':'#fff8e0','approved':'#e8f8e8','cancelled':'#fff0f0'};
+  var statusText={'draft':'Draft','sent':'Sent','quotes_received':'Quotes In','approved':'Approved','cancelled':'Cancelled'};
+  el.innerHTML=allRFQs.map(function(r){
+    var sc=statusColors[r.status]||'#f0f0e8';
+    var st=statusText[r.status]||r.status;
+    var date=new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    return '<div class="fc" style="margin-bottom:10px;" onclick="openRFQForm(\''+r.id+'\')" >'+
+      '<div class="fc-top">'+
+        '<div>'+
+          '<div class="fc-name">'+r.project_number+' — '+(r.item_description||'—')+'</div>'+
+          '<div class="fc-local">'+(r.category||'No category')+(r.sub_category?' › '+r.sub_category:'')+'</div>'+
+        '</div>'+
+        '<span class="fc-status" style="background:'+sc+';color:#555;border:1px solid #ddd;">'+st+'</span>'+
+      '</div>'+
+      '<div class="fc-meta">'+
+        '<span>📅 '+date+'</span>'+
+        '<span>🏭 '+(r.sent_to_count||0)+' factories sent</span>'+
+        (r.unit_of_measure?'<span>📦 '+r.unit_of_measure+'</span>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function showRFQForm(){
+  g('rfq-list-view').style.display='none';
+  g('rfq-form-view').style.display='block';
+  g('rfq-form-title').textContent='New RFQ';
+  g('rfq-project-number').textContent='Project number will be assigned on save';
+  g('rfq-id').value='';
+  resetRFQForm();
+  populateRFQDropdowns();
+}
+
+function hideRFQForm(){
+  g('rfq-list-view').style.display='block';
+  g('rfq-form-view').style.display='none';
+  loadRFQs();
+}
+
+function openRFQForm(id){
+  var rfq=allRFQs.find(function(r){return r.id===id;});
+  if(!rfq)return;
+  g('rfq-list-view').style.display='none';
+  g('rfq-form-view').style.display='block';
+  g('rfq-form-title').textContent='Edit RFQ';
+  g('rfq-project-number').textContent=rfq.project_number;
+  g('rfq-id').value=rfq.id;
+  populateRFQDropdowns();
+  // Fill form fields
+  g('rfq-category-id').value=rfq.category_id||'';
+  g('rfq-uom').value=rfq.unit_of_measure||'';
+  g('rfq-description').value=rfq.item_description||'';
+  g('rfq-specs').value=rfq.detailed_specifications||'';
+  g('rfq-color').value=rfq.color_code||'';
+  g('rfq-quantity').value=rfq.quote_quantity||'';
+  g('rfq-inner-pack').value=rfq.inner_case_pack||'';
+  g('rfq-master-pack').value=rfq.master_case_pack||'';
+  g('rfq-pkg-notes').value=rfq.packaging_notes||'';
+  // Check packaging checkboxes
+  var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
+  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(2) input[type=checkbox]').forEach(function(cb){
+    cb.checked=pkgTypes.includes(cb.value);
+  });
+  // Check cert checkboxes
+  var certs=rfq.certifications_required||[];
+  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(3) input[type=checkbox]').forEach(function(cb){
+    cb.checked=certs.includes(cb.value);
+  });
+  rfqCategoryChanged();
+}
+
+function resetRFQForm(){
+  g('rfq-id').value='';
+  g('rfq-category-id').value='';g('rfq-uom').value='';
+  g('rfq-description').value='';g('rfq-specs').value='';
+  g('rfq-color').value='';g('rfq-quantity').value='';
+  g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
+  g('rfq-pkg-notes').value='';
+  document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+  g('rfq-inci-notice').style.display='none';
+  g('factory-match-list').innerHTML='';
+  g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
+  g('rfq-img-name').textContent='';g('rfq-img-preview').style.display='none';
+  g('rfq-save-ok').style.display='none';g('rfq-save-err').style.display='none';
+  selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
+}
+
+function populateRFQDropdowns(){
+  // Categories
+  var catSel=g('rfq-category-id');
+  catSel.innerHTML='<option value="">— Select Category —</option>';
+  allCategories.forEach(function(c){
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'">'+path+' ['+c.model_prefix+']</option>';
+  });
+  // Colors
+  var colSel=g('rfq-color');
+  colSel.innerHTML='<option value="">— Select if applicable —</option>';
+  // Load colors from DB
+  fetch(SB+'/rest/v1/color_codes?select=*&order=name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+    .then(function(r){return r.json();})
+    .then(function(colors){
+      colors.forEach(function(c){
+        colSel.innerHTML+='<option value="'+c.code+'">'+c.name+' ('+c.code+')</option>';
+      });
+    });
+}
+
+function rfqCategoryChanged(){
+  var sel=g('rfq-category-id');
+  var opt=sel.options[sel.selectedIndex];
+  var isCosmetic=opt&&opt.dataset.cosmetic==='true';
+  g('rfq-inci-notice').style.display=isCosmetic?'block':'none';
+}
+
+function rfqImageChosen(input){
+  var file=input.files[0];if(!file)return;
+  rfqImageFile=file;
+  g('rfq-img-name').textContent=file.name;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    g('rfq-img-thumb').src=e.target.result;
+    g('rfq-img-preview').style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function findMatchingFactories(){
+  var catId=g('rfq-category-id').value;
+  var desc=g('rfq-description').value.trim();
+  if(!catId&&!desc){alert('Please select a category or enter a description first.');return;}
+
+  var catOpt=g('rfq-category-id').options[g('rfq-category-id').selectedIndex];
+  var catText=catOpt?catOpt.textContent:'';
+
+  g('factory-match-status').textContent='Finding matching factories...';
+  g('factory-match-list').innerHTML='';
+
+  // First find by category in factory_categories table
+  var matched=[];
+  if(catId){
+    var catRow=allCategories.find(function(c){return c.id===catId;});
+    if(catRow){
+      // Find factories with matching category
+      matched=allFactories.filter(function(f){
+        var cats=(f.product_categories||[]).join(' ').toLowerCase();
+        return cats.includes((catRow.category||'').toLowerCase())||
+               cats.includes((catRow.sub_category||'').toLowerCase());
+      });
+    }
+  }
+
+  // If AI available, use it to also suggest based on description
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(apiKey&&desc&&allFactories.length){
+    var factoryList=allFactories.map(function(f){
+      return f.factory_name_english+' ('+f.country+'): '+(f.product_categories||[]).join(', ');
+    }).join('\n');
+    try{
+      var r=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-5',max_tokens:500,
+          messages:[{role:'user',content:'I am sourcing the following product: "'+desc+'" in category: "'+catText+'"\n\nFrom this factory list, which ones are most likely to manufacture this product? Return ONLY a JSON array of factory names that match, nothing else.\n\nFactory list:\n'+factoryList}]
+        })
+      });
+      var d=await r.json();
+      if(d.content&&d.content[0]){
+        var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'');
+        try{
+          var aiNames=JSON.parse(raw);
+          if(Array.isArray(aiNames)){
+            aiNames.forEach(function(name){
+              var f=allFactories.find(function(x){return x.factory_name_english===name;});
+              if(f&&!matched.find(function(m){return m.id===f.id;}))matched.push(f);
+            });
+          }
+        }catch(e){}
+      }
+    }catch(e){}
+  }
+
+  selectedFactoryIds={};
+  if(!matched.length){
+    g('factory-match-status').textContent='No matching factories found. You can manually select from all factories below.';
+    // Show all factories for manual selection
+    matched=allFactories;
+  }else{
+    g('factory-match-status').textContent=matched.length+' matching '+( matched.length===1?'factory':'factories')+' found. Review and select which to send to:';
+    // Pre-select all matches
+    matched.forEach(function(f){selectedFactoryIds[f.id]=true;});
+  }
+
+  renderFactoryMatchList(matched);
+}
+
+function renderFactoryMatchList(factories){
+  g('factory-match-list').innerHTML=factories.map(function(f){
+    var checked=selectedFactoryIds[f.id]?'checked':'';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:6px;cursor:pointer;">'+
+      '<input type="checkbox" '+checked+' value="'+f.id+'" onchange="toggleFactorySelect(\''+f.id+'\')" style="width:15px;height:15px;flex-shrink:0;" />'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:500;color:#1a1a2e;">'+f.factory_name_english+'</div>'+
+        '<div style="font-size:11px;color:#999;">'+(f.city?f.city+', ':'')+f.country+' · '+(f.sales_email||'No email')+'</div>'+
+      '</div>'+
+    '</label>';
+  }).join('');
+}
+
+function toggleFactorySelect(id){
+  if(selectedFactoryIds[id])delete selectedFactoryIds[id];
+  else selectedFactoryIds[id]=true;
+}
+
+async function saveRFQ(action){
+  var desc=g('rfq-description').value.trim();
+  if(!desc){showFormMsg('rfq-save-err','Item description is required.');return;}
+
+  var catId=g('rfq-category-id').value;
+  var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
+
+  // Collect packaging types
+  var pkgTypes=[];
+  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox][value]').forEach(function(cb){
+    if(cb.checked&&['Bulk','Paper Box','Glass Jar','Plastic Bottle','Bag','Pillow Pack','Hang Tag','Tube','Pump Bottle','Spray Bottle','Blister Pack','Other'].includes(cb.value))pkgTypes.push(cb.value);
+  });
+
+  // Collect certs
+  var certs=[];
+  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox][value]').forEach(function(cb){
+    if(cb.checked&&!pkgTypes.includes(cb.value))certs.push(cb.value);
+  });
+
+  var payload={
+    item_description:desc,
+    detailed_specifications:g('rfq-specs').value.trim()||null,
+    category_id:catId||null,
+    category:catRow?catRow.category:null,
+    sub_category:catRow?catRow.sub_category:null,
+    sub_sub_category:catRow?catRow.sub_sub_category:null,
+    unit_of_measure:g('rfq-uom').value||null,
+    color_code:g('rfq-color').value||null,
+    quote_quantity:parseInt(g('rfq-quantity').value)||null,
+    inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
+    master_case_pack:parseInt(g('rfq-master-pack').value)||null,
+    packaging_type:pkgTypes.join(',')||null,
+    packaging_notes:g('rfq-pkg-notes').value.trim()||null,
+    certifications_required:certs.length?certs:null,
+    is_cosmetic:catRow?catRow.is_cosmetic:false,
+    inci_required:catRow?catRow.is_cosmetic:false,
+    status:action==='send'?'sent':'draft',
+    factories_to_send:Object.keys(selectedFactoryIds),
+    sent_to_count:action==='send'?Object.keys(selectedFactoryIds).length:0
+  };
+
+  var rfqId=g('rfq-id').value;
+  var url=rfqId?SB+'/rest/v1/rfqs?id=eq.'+rfqId:SB+'/rest/v1/rfqs';
+  var method=rfqId?'PATCH':'POST';
+  var sendBtn=g('rfq-send-btn');
+  if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Saving...';}
+
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(r.ok){
+      var result=await r.json();
+      var savedRFQ=Array.isArray(result)?result[0]:result;
+      if(savedRFQ){
+        g('rfq-id').value=savedRFQ.id;
+        g('rfq-project-number').textContent=savedRFQ.project_number;
+        // Create factory assignments
+        if(savedRFQ.id&&Object.keys(selectedFactoryIds).length){
+          var assignments=Object.keys(selectedFactoryIds).map(function(fid){
+            var f=allFactories.find(function(x){return x.id===fid;});
+            return{rfq_id:savedRFQ.id,factory_id:fid,email_sent_to:f?f.sales_email:null,status:action==='send'?'sent':'pending'};
+          });
+          await fetch(SB+'/rest/v1/rfq_factory_assignments',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(assignments)});
+        }
+        // Send emails if action is send
+        if(action==='send'){
+          await sendRFQEmails(savedRFQ);
+        }
+      }
+      showFormMsg('rfq-save-ok',action==='send'?'RFQ sent to '+Object.keys(selectedFactoryIds).length+' factories!':'Draft saved as '+( savedRFQ?savedRFQ.project_number:''));
+      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+      await loadRFQs();
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      showFormMsg('rfq-save-err','Save failed: '+(e.message||e.details||r.status));
+      if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+    }
+  }catch(e){
+    showFormMsg('rfq-save-err','Error: '+e.message);
+    if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
+  }
+}
+
+async function sendRFQEmails(rfq){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  var myEmail=localStorage.getItem('from_email')||'';
+  var factories=allFactories.filter(function(f){return selectedFactoryIds[f.id];});
+  var portalUrl='https://project-7o416.vercel.app';
+
+  for(var i=0;i<factories.length;i++){
+    var f=factories[i];
+    if(!f.sales_email)continue;
+    var emailBody='';
+
+    if(apiKey){
+      try{
+        var prompt='Write a professional RFQ email to a factory.\n\n'+
+          'Project: '+rfq.project_number+'\n'+
+          'Factory: '+f.factory_name_english+'\n'+
+          'Contact: '+(f.sales_contact_name||'Team')+'\n'+
+          'Product: '+rfq.item_description+'\n'+
+          'Specifications: '+(rfq.detailed_specifications||'See portal')+'\n'+
+          'Quantity: '+(rfq.quote_quantity||'TBD')+'\n'+
+          'Unit of Measure: '+(rfq.unit_of_measure||'TBD')+'\n'+
+          'Inner Case Pack: '+(rfq.inner_case_pack||'TBD')+'\n'+
+          'Master Case Pack: '+(rfq.master_case_pack||'TBD')+'\n\n'+
+          'The factory logs into our portal to submit their quote.\n\n'+
+          'Rules:\n- Address contact by first name\n- Sign as Allan Amsel, Sourcing\n- No placeholders\n- Concise and professional\n- Do not include the portal link\n- Write ONLY the email body';
+        var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
+        var d=await r.json();
+        if(d.content&&d.content[0])emailBody=d.content[0].text;
+      }catch(e){}
+    }
+
+    if(!emailBody){
+    if(!emailBody){
+      var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
+      emailBody='Dear '+firstName+',\n\n'+
+        'We have a new sourcing project and would like to invite you to submit a quote.\n\n'+
+        'Project: '+rfq.project_number+'\n'+
+        'Product: '+rfq.item_description+'\n'+
+        'Quantity: '+(rfq.quote_quantity||'TBD')+'\n\n'+
+        'Please log into our supplier portal to view the full specifications and submit your quote.\n\n'+
+        'Best regards,\nAllan Amsel\nSourcing';
+    }
+
+    try{
+      await emailjs.send('service_aawsxwi','template_er5zzqp',{
+        to_email:f.sales_email,
+        contact_name:f.sales_contact_name||'Team',
+        email_body:emailBody,
+        invite_link:portalUrl,
+        reply_to:myEmail,
+        subject:'RFQ — '+rfq.project_number+' — '+rfq.item_description
+      });
+    }catch(ex){console.log('Email failed for '+f.factory_name_english+':',ex);}
   }
 }
 
@@ -1751,6 +2271,7 @@ function renderFollowUps(){
       '</div>'+
     '</div>';
   }).join('');
+}
 }
 </script>
 </body>
