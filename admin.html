@@ -1287,14 +1287,6 @@ function enterDrawerEdit(){
     'state':f.state_province||'',
     'postal':f.postal_code||'',
     'country':f.country||'',
-    'emp':f.employees_total||'',
-    'eng':f.employees_engineers||'',
-    'qc':f.employees_qc||'',
-    'lines':f.production_lines||'',
-    'sqm':f.floor_space_sqm||'',
-    'inj':f.injection_machines||'',
-    'cap':f.monthly_capacity_units||'',
-    'cap-notes':f.monthly_capacity_notes||'',
     'categories':(f.product_categories||[]).join(', ')
   };
 
@@ -1339,15 +1331,7 @@ async function saveDrawerEdit(){
     state_province:ge('state')||null,
     postal_code:ge('postal')||null,
     country:ge('country')||null,
-    employees_total:parseInt(ge('emp'))||null,
-    employees_engineers:parseInt(ge('eng'))||null,
-    employees_qc:parseInt(ge('qc'))||null,
-    production_lines:parseInt(ge('lines'))||null,
-    floor_space_sqm:parseInt(ge('sqm'))||null,
-    injection_machines:parseInt(ge('inj'))||null,
-    monthly_capacity_units:parseInt(ge('cap'))||null,
-    monthly_capacity_notes:ge('cap-notes')||null,
-    product_categories:ge('categories')?[ge('categories')]:[]
+    product_categories:ge('categories')?ge('categories').split(',').map(function(s){return s.trim();}).filter(Boolean):[]
   };
 
   var saveBtn=g('supplier-drawer').querySelector('.d-btn-save-edit');
