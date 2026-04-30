@@ -104,6 +104,47 @@
     .set-section p { font-size: 12px; color: #aaa; margin-top: 4px; }
     .save { padding: 8px 16px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .saved { font-size: 12px; color: #1a7a1a; margin-left: 10px; display: none; }
+    /* Manager panels shared styles */
+    .mgr-wrap { padding: 1.25rem 1.5rem; max-width: 900px; }
+    .mgr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .mgr-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; }
+    .mgr-card-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 1px solid #f0f0e8; display: flex; align-items: center; justify-content: space-between; }
+    .mgr-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+    .mgr-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; }
+    .mgr-item-name { font-size: 13px; font-weight: 500; color: #1a1a2e; }
+    .mgr-item-meta { font-size: 11px; color: #999; margin-top: 2px; }
+    .mgr-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-edit { font-size: 11px; padding: 4px 10px; background: #f0f0e8; color: #666; border: 1px solid #e0e0d8; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    .btn-edit:hover { background: #e8e8e0; }
+    .btn-del { font-size: 11px; padding: 4px 10px; background: #fff0f0; color: #b00; border: 1px solid #fdd; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    .btn-del:hover { background: #ffe0e0; }
+    .btn-add-new { font-size: 12px; padding: 6px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    .btn-add-new:hover { opacity: 0.87; }
+    .mgr-form { display: flex; flex-direction: column; gap: 10px; }
+    .mf { display: flex; flex-direction: column; gap: 3px; }
+    .mf label { font-size: 11px; color: #888; }
+    .mf input, .mf select, .mf textarea { padding: 8px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .mf input:focus, .mf select:focus, .mf textarea:focus { outline: none; border-color: #1a1a2e; }
+    .mf textarea { resize: vertical; min-height: 60px; }
+    .mf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mf-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .btn-save-form { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+    .btn-save-form:hover { opacity: 0.87; }
+    .form-msg { font-size: 12px; padding: 7px 10px; border-radius: 6px; margin-top: 6px; display: none; }
+    .form-msg.ok { color: #1a7a1a; background: #edfaed; border: 1px solid #a0d8a0; }
+    .form-msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
+    .checkbox-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .cb-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+    .cb-item input { width: 13px; height: 13px; }
+    .pct-field { display: flex; align-items: center; gap: 6px; }
+    .pct-field input { flex: 1; }
+    .pct-field span { font-size: 13px; color: #888; flex-shrink: 0; }
+    .section-header { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; margin: 10px 0 6px; }
+    .cat-tree-item { padding: 8px 12px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 7px; margin-bottom: 6px; }
+    .cat-tree-cat { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .cat-tree-sub { font-size: 12px; color: #666; margin-top: 2px; }
+    .cat-tree-prefix { font-size: 11px; font-family: monospace; background: #f0f0e8; color: #666; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
+    .cosmetic-badge { font-size: 10px; background: #fce8f0; color: #880044; border: 1px solid #f0b8d0; padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
 
     /* ── RFQ Modal ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: none; align-items: center; justify-content: center; }
@@ -243,6 +284,10 @@
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
+      <div class="slabel">Product Setup</div>
+      <button class="sitem" id="nav-brands" onclick="showPanel('brands')"><span class="sicon">🏷</span> Brands</button>
+      <button class="sitem" id="nav-customers" onclick="showPanel('customers')"><span class="sicon">🛒</span> Customers</button>
+      <button class="sitem" id="nav-categories" onclick="showPanel('categories')"><span class="sicon">📂</span> Categories</button>
       <div class="slabel">System</div>
       <button class="sitem" id="nav-upload" onclick="showPanel('upload')"><span class="sicon">📤</span> Upload Files</button>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
@@ -304,6 +349,148 @@
       <div class="chat-bar">
         <textarea id="chat-input" placeholder="Ask about your suppliers..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
         <button class="send" id="send-btn" onclick="sendMsg()">Send</button>
+      </div>
+    </div>
+
+    <!-- ── BRANDS PANEL ── -->
+    <div class="panel" id="panel-brands">
+      <div class="ph"><div class="ph-title">Brands</div><div class="ph-sub">Manage house brands and licensed brands with royalty rates</div></div>
+      <div class="mgr-wrap">
+        <div class="mgr-grid">
+          <!-- Brand list -->
+          <div class="mgr-card">
+            <div class="mgr-card-title">All Brands <button class="btn-add-new" onclick="newBrandForm()">+ New Brand</button></div>
+            <div class="mgr-list" id="brand-list"><div style="font-size:13px;color:#bbb;">Loading...</div></div>
+          </div>
+          <!-- Brand form -->
+          <div class="mgr-card">
+            <div class="mgr-card-title" id="brand-form-title">New Brand</div>
+            <div class="mgr-form">
+              <input type="hidden" id="brand-id" />
+              <div class="mf"><label>Brand Name *</label><input type="text" id="brand-name" placeholder="e.g. SkinMax" /></div>
+              <div class="mf"><label>Brand Code * (short, used in model numbers)</label><input type="text" id="brand-code" placeholder="e.g. SM" maxlength="6" style="text-transform:uppercase" /></div>
+              <div class="mf-row">
+                <div class="mf">
+                  <label>Type</label>
+                  <select id="brand-type" onchange="toggleLicenseFields()">
+                    <option value="house">House Brand</option>
+                    <option value="licensed">Licensed Brand</option>
+                    <option value="private_label">Private Label</option>
+                  </select>
+                </div>
+                <div class="mf">
+                  <label>Royalty %</label>
+                  <div class="pct-field"><input type="number" id="brand-royalty" value="0" min="0" max="100" step="0.1" /><span>%</span></div>
+                </div>
+              </div>
+              <div id="license-fields" style="display:none;">
+                <div class="mf"><label>Licensor Name</label><input type="text" id="brand-licensor" placeholder="e.g. Disney Consumer Products" /></div>
+                <div class="mf"><label>License Expiry Date</label><input type="date" id="brand-expiry" /></div>
+              </div>
+              <div class="mf"><label>Notes</label><textarea id="brand-notes" rows="2"></textarea></div>
+              <button class="btn-save-form" onclick="saveBrand()">Save Brand</button>
+              <div class="form-msg ok" id="brand-ok">Brand saved successfully!</div>
+              <div class="form-msg err" id="brand-err"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CUSTOMERS PANEL ── -->
+    <div class="panel" id="panel-customers">
+      <div class="ph"><div class="ph-title">Customers</div><div class="ph-sub">Manage retail customers and their margin/deduction terms</div></div>
+      <div class="mgr-wrap">
+        <div class="mgr-grid">
+          <!-- Customer list -->
+          <div class="mgr-card">
+            <div class="mgr-card-title">All Customers <button class="btn-add-new" onclick="newCustomerForm()">+ New Customer</button></div>
+            <div class="mgr-list" id="customer-list"><div style="font-size:13px;color:#bbb;">Loading...</div></div>
+          </div>
+          <!-- Customer form -->
+          <div class="mgr-card" style="overflow-y:auto;max-height:600px;">
+            <div class="mgr-card-title" id="customer-form-title">New Customer</div>
+            <div class="mgr-form">
+              <input type="hidden" id="customer-id" />
+              <div class="mf-row">
+                <div class="mf"><label>Customer Name *</label><input type="text" id="customer-name" placeholder="e.g. Target" /></div>
+                <div class="mf"><label>Customer Code *</label><input type="text" id="customer-code" placeholder="e.g. TGT" maxlength="6" style="text-transform:uppercase" /></div>
+              </div>
+              <div class="mf-row">
+                <div class="mf"><label>Contact Name</label><input type="text" id="customer-contact" /></div>
+                <div class="mf"><label>Contact Email</label><input type="email" id="customer-email" /></div>
+              </div>
+              <div class="section-header">Default Margin & Deduction Terms</div>
+              <div class="mf-row">
+                <div class="mf"><label>Customer Margin %</label><div class="pct-field"><input type="number" id="cust-margin" placeholder="55" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div class="mf"><label>Returns Allowance %</label><div class="pct-field"><input type="number" id="cust-returns" placeholder="3" min="0" max="100" step="0.1" /><span>%</span></div></div>
+              </div>
+              <div class="mf-row">
+                <div class="mf"><label>Dilution %</label><div class="pct-field"><input type="number" id="cust-dilution" placeholder="2" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div class="mf"><label>Commission %</label><div class="pct-field"><input type="number" id="cust-commission" placeholder="5" min="0" max="100" step="0.1" /><span>%</span></div></div>
+              </div>
+              <div class="mf-row">
+                <div class="mf"><label>Ad Allowance %</label><div class="pct-field"><input type="number" id="cust-adallowance" placeholder="2" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div class="mf"></div>
+              </div>
+              <div class="section-header">Our Margin Thresholds</div>
+              <div class="mf-row">
+                <div class="mf"><label>Min Gross Margin %</label><div class="pct-field"><input type="number" id="cust-min-gross" placeholder="45" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div class="mf"><label>Min Net Margin %</label><div class="pct-field"><input type="number" id="cust-min-net" placeholder="30" min="0" max="100" step="0.1" /><span>%</span></div></div>
+              </div>
+              <div class="mf"><label>Notes</label><textarea id="customer-notes" rows="2"></textarea></div>
+              <button class="btn-save-form" onclick="saveCustomer()">Save Customer</button>
+              <div class="form-msg ok" id="customer-ok">Customer saved!</div>
+              <div class="form-msg err" id="customer-err"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CATEGORIES PANEL ── -->
+    <div class="panel" id="panel-categories">
+      <div class="ph"><div class="ph-title">Categories</div><div class="ph-sub">Manage product categories, model number prefixes, and margin thresholds</div></div>
+      <div class="mgr-wrap">
+        <div class="mgr-grid">
+          <!-- Category list -->
+          <div class="mgr-card">
+            <div class="mgr-card-title">All Categories <button class="btn-add-new" onclick="newCategoryForm()">+ New Category</button></div>
+            <div class="mgr-list" id="category-list"><div style="font-size:13px;color:#bbb;">Loading...</div></div>
+          </div>
+          <!-- Category form -->
+          <div class="mgr-card">
+            <div class="mgr-card-title" id="category-form-title">New Category</div>
+            <div class="mgr-form">
+              <input type="hidden" id="category-id" />
+              <div class="mf"><label>Category *</label><input type="text" id="cat-category" placeholder="e.g. Skin Care" /></div>
+              <div class="mf"><label>Sub-Category</label><input type="text" id="cat-sub" placeholder="e.g. Moisturizer" /></div>
+              <div class="mf"><label>Sub-Sub-Category</label><input type="text" id="cat-subsub" placeholder="e.g. Face Cream" /></div>
+              <div class="mf-row">
+                <div class="mf">
+                  <label>Model Prefix * (3 letters, unique)</label>
+                  <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;" />
+                </div>
+                <div class="mf">
+                  <label>Cosmetic Category?</label>
+                  <select id="cat-cosmetic">
+                    <option value="false">No</option>
+                    <option value="true">Yes — requires INCI</option>
+                  </select>
+                </div>
+              </div>
+              <div class="section-header">Margin Thresholds (optional)</div>
+              <div class="mf-row">
+                <div class="mf"><label>Min Gross Margin %</label><div class="pct-field"><input type="number" id="cat-min-gross" placeholder="45" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div class="mf"><label>Min Net Margin %</label><div class="pct-field"><input type="number" id="cat-min-net" placeholder="30" min="0" max="100" step="0.1" /><span>%</span></div></div>
+              </div>
+              <div class="mf"><label>Notes</label><textarea id="cat-notes" rows="2"></textarea></div>
+              <button class="btn-save-form" onclick="saveCategory()">Save Category</button>
+              <div class="form-msg ok" id="category-ok">Category saved!</div>
+              <div class="form-msg err" id="category-err"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -527,6 +714,9 @@ function showPanel(name){
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
   if(name==='upload')initAdminUpload();
+  if(name==='brands')loadBrands();
+  if(name==='customers')loadCustomers();
+  if(name==='categories')loadCategories();
 }
 
 // ── Load all data ──
@@ -1024,6 +1214,232 @@ async function adminUpload(){
     g('admin-upload-err').textContent='Error: '+e.message;
     g('admin-upload-err').style.display='block';
   }
+}
+
+// ── BRANDS ──
+var allBrands=[];
+async function loadBrands(){
+  try{
+    var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allBrands=await r.json();
+    renderBrands();
+  }catch(e){console.log('loadBrands:',e);}
+}
+function renderBrands(){
+  var el=g('brand-list');if(!el)return;
+  if(!allBrands.length){el.innerHTML='<div style="font-size:13px;color:#bbb;">No brands yet. Create your first brand.</div>';return;}
+  el.innerHTML=allBrands.map(function(b){
+    var typeLabel=b.is_licensed?'Licensed':b.is_private_label?'Private Label':'House Brand';
+    var royalty=b.royalty_percentage>0?b.royalty_percentage+'% royalty':'';
+    return '<div class="mgr-item">'+
+      '<div><div class="mgr-item-name">'+b.brand_name+' <span class="cat-tree-prefix">'+b.brand_code+'</span></div>'+
+      '<div class="mgr-item-meta">'+typeLabel+(royalty?' · '+royalty:'')+'</div></div>'+
+      '<div class="mgr-item-actions">'+
+        '<button class="btn-edit" onclick="editBrand(\''+b.id+'\')">Edit</button>'+
+        '<button class="btn-del" onclick="deleteBrand(\''+b.id+'\')">Delete</button>'+
+      '</div></div>';
+  }).join('');
+}
+function newBrandForm(){
+  g('brand-id').value='';g('brand-name').value='';g('brand-code').value='';
+  g('brand-type').value='house';g('brand-royalty').value='0';
+  g('brand-licensor').value='';g('brand-expiry').value='';g('brand-notes').value='';
+  g('brand-form-title').textContent='New Brand';
+  g('license-fields').style.display='none';
+  g('brand-ok').style.display='none';g('brand-err').style.display='none';
+}
+function editBrand(id){
+  var b=allBrands.find(function(x){return x.id===id;});if(!b)return;
+  g('brand-id').value=b.id;g('brand-name').value=b.brand_name||'';
+  g('brand-code').value=b.brand_code||'';
+  g('brand-type').value=b.is_licensed?'licensed':b.is_private_label?'private_label':'house';
+  g('brand-royalty').value=b.royalty_percentage||0;
+  g('brand-licensor').value=b.licensor_name||'';
+  g('brand-expiry').value=b.license_expiry||'';g('brand-notes').value=b.notes||'';
+  g('brand-form-title').textContent='Edit Brand';
+  toggleLicenseFields();
+  g('brand-ok').style.display='none';g('brand-err').style.display='none';
+}
+function toggleLicenseFields(){
+  var t=g('brand-type').value;
+  g('license-fields').style.display=(t==='licensed')?'block':'none';
+}
+async function saveBrand(){
+  var name=g('brand-name').value.trim(),code=g('brand-code').value.trim().toUpperCase();
+  if(!name||!code){showFormMsg('brand-err','Brand name and code are required.');return;}
+  var type=g('brand-type').value;
+  var payload={
+    brand_name:name,brand_code:code,
+    is_licensed:type==='licensed',is_private_label:type==='private_label',
+    royalty_percentage:parseFloat(g('brand-royalty').value)||0,
+    licensor_name:g('brand-licensor').value.trim()||null,
+    license_expiry:g('brand-expiry').value||null,
+    notes:g('brand-notes').value.trim()||null,is_active:true
+  };
+  var id=g('brand-id').value;
+  var url=id?SB+'/rest/v1/brands?id=eq.'+id:SB+'/rest/v1/brands';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showFormMsg('brand-ok','Brand saved successfully!');await loadBrands();if(!id)newBrandForm();}
+    else{var e=await r.json().catch(function(){return{};});showFormMsg('brand-err','Save failed: '+(e.message||e.details||r.status));}
+  }catch(e){showFormMsg('brand-err','Error: '+e.message);}
+}
+async function deleteBrand(id){
+  if(!confirm('Delete this brand?'))return;
+  await fetch(SB+'/rest/v1/brands?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadBrands();
+}
+
+// ── CUSTOMERS ──
+var allCustomers=[];
+async function loadCustomers(){
+  try{
+    var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allCustomers=await r.json();
+    renderCustomers();
+  }catch(e){console.log('loadCustomers:',e);}
+}
+function renderCustomers(){
+  var el=g('customer-list');if(!el)return;
+  if(!allCustomers.length){el.innerHTML='<div style="font-size:13px;color:#bbb;">No customers yet.</div>';return;}
+  el.innerHTML=allCustomers.map(function(c){
+    return '<div class="mgr-item">'+
+      '<div><div class="mgr-item-name">'+c.customer_name+' <span class="cat-tree-prefix">'+c.customer_code+'</span></div>'+
+      '<div class="mgr-item-meta">Margin: '+(c.default_margin_pct||'—')+'% · Returns: '+(c.default_returns_pct||'—')+'% · Dilution: '+(c.default_dilution_pct||'—')+'%</div></div>'+
+      '<div class="mgr-item-actions">'+
+        '<button class="btn-edit" onclick="editCustomer(\''+c.id+'\')">Edit</button>'+
+        '<button class="btn-del" onclick="deleteCustomer(\''+c.id+'\')">Delete</button>'+
+      '</div></div>';
+  }).join('');
+}
+function newCustomerForm(){
+  g('customer-id').value='';g('customer-name').value='';g('customer-code').value='';
+  g('customer-contact').value='';g('customer-email').value='';
+  g('cust-margin').value='';g('cust-returns').value='';g('cust-dilution').value='';
+  g('cust-commission').value='';g('cust-adallowance').value='';
+  g('cust-min-gross').value='';g('cust-min-net').value='';g('customer-notes').value='';
+  g('customer-form-title').textContent='New Customer';
+  g('customer-ok').style.display='none';g('customer-err').style.display='none';
+}
+function editCustomer(id){
+  var c=allCustomers.find(function(x){return x.id===id;});if(!c)return;
+  g('customer-id').value=c.id;g('customer-name').value=c.customer_name||'';
+  g('customer-code').value=c.customer_code||'';g('customer-contact').value=c.contact_name||'';
+  g('customer-email').value=c.contact_email||'';
+  g('cust-margin').value=c.default_margin_pct||'';g('cust-returns').value=c.default_returns_pct||'';
+  g('cust-dilution').value=c.default_dilution_pct||'';g('cust-commission').value=c.default_commission_pct||'';
+  g('cust-adallowance').value=c.default_ad_allowance_pct||'';
+  g('cust-min-gross').value=c.min_gross_margin_pct||'';g('cust-min-net').value=c.min_net_margin_pct||'';
+  g('customer-notes').value=c.notes||'';
+  g('customer-form-title').textContent='Edit Customer';
+  g('customer-ok').style.display='none';g('customer-err').style.display='none';
+}
+async function saveCustomer(){
+  var name=g('customer-name').value.trim(),code=g('customer-code').value.trim().toUpperCase();
+  if(!name||!code){showFormMsg('customer-err','Customer name and code are required.');return;}
+  var payload={
+    customer_name:name,customer_code:code,
+    contact_name:g('customer-contact').value.trim()||null,
+    contact_email:g('customer-email').value.trim()||null,
+    default_margin_pct:parseFloat(g('cust-margin').value)||null,
+    default_returns_pct:parseFloat(g('cust-returns').value)||null,
+    default_dilution_pct:parseFloat(g('cust-dilution').value)||null,
+    default_commission_pct:parseFloat(g('cust-commission').value)||null,
+    default_ad_allowance_pct:parseFloat(g('cust-adallowance').value)||null,
+    min_gross_margin_pct:parseFloat(g('cust-min-gross').value)||null,
+    min_net_margin_pct:parseFloat(g('cust-min-net').value)||null,
+    notes:g('customer-notes').value.trim()||null,is_active:true
+  };
+  var id=g('customer-id').value;
+  var url=id?SB+'/rest/v1/customers?id=eq.'+id:SB+'/rest/v1/customers';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showFormMsg('customer-ok','Customer saved!');await loadCustomers();if(!id)newCustomerForm();}
+    else{var e=await r.json().catch(function(){return{};});showFormMsg('customer-err','Save failed: '+(e.message||e.details||r.status));}
+  }catch(e){showFormMsg('customer-err','Error: '+e.message);}
+}
+async function deleteCustomer(id){
+  if(!confirm('Delete this customer?'))return;
+  await fetch(SB+'/rest/v1/customers?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadCustomers();
+}
+
+// ── CATEGORIES ──
+var allCategories=[];
+async function loadCategories(){
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allCategories=await r.json();
+    renderCategories();
+  }catch(e){console.log('loadCategories:',e);}
+}
+function renderCategories(){
+  var el=g('category-list');if(!el)return;
+  if(!allCategories.length){el.innerHTML='<div style="font-size:13px;color:#bbb;">No categories yet.</div>';return;}
+  el.innerHTML=allCategories.map(function(c){
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<div class="mgr-item">'+
+      '<div><div class="mgr-item-name">'+path+
+        '<span class="cat-tree-prefix">'+c.model_prefix+'</span>'+
+        (c.is_cosmetic?'<span class="cosmetic-badge">Cosmetic</span>':'')+
+      '</div>'+
+      '<div class="mgr-item-meta">'+(c.min_gross_margin_pct?'Min gross: '+c.min_gross_margin_pct+'%':'No margin threshold set')+'</div></div>'+
+      '<div class="mgr-item-actions">'+
+        '<button class="btn-edit" onclick="editCategory(\''+c.id+'\')">Edit</button>'+
+        '<button class="btn-del" onclick="deleteCategory(\''+c.id+'\')">Delete</button>'+
+      '</div></div>';
+  }).join('');
+}
+function newCategoryForm(){
+  g('category-id').value='';g('cat-category').value='';g('cat-sub').value='';
+  g('cat-subsub').value='';g('cat-prefix').value='';g('cat-cosmetic').value='false';
+  g('cat-min-gross').value='';g('cat-min-net').value='';g('cat-notes').value='';
+  g('category-form-title').textContent='New Category';
+  g('category-ok').style.display='none';g('category-err').style.display='none';
+}
+function editCategory(id){
+  var c=allCategories.find(function(x){return x.id===id;});if(!c)return;
+  g('category-id').value=c.id;g('cat-category').value=c.category||'';
+  g('cat-sub').value=c.sub_category||'';g('cat-subsub').value=c.sub_sub_category||'';
+  g('cat-prefix').value=c.model_prefix||'';g('cat-cosmetic').value=c.is_cosmetic?'true':'false';
+  g('cat-min-gross').value=c.min_gross_margin_pct||'';g('cat-min-net').value=c.min_net_margin_pct||'';
+  g('cat-notes').value=c.notes||'';
+  g('category-form-title').textContent='Edit Category';
+  g('category-ok').style.display='none';g('category-err').style.display='none';
+}
+async function saveCategory(){
+  var cat=g('cat-category').value.trim(),prefix=g('cat-prefix').value.trim().toUpperCase();
+  if(!cat||!prefix){showFormMsg('category-err','Category and model prefix are required.');return;}
+  var payload={
+    category:cat,sub_category:g('cat-sub').value.trim()||null,
+    sub_sub_category:g('cat-subsub').value.trim()||null,
+    model_prefix:prefix,is_cosmetic:g('cat-cosmetic').value==='true',
+    min_gross_margin_pct:parseFloat(g('cat-min-gross').value)||null,
+    min_net_margin_pct:parseFloat(g('cat-min-net').value)||null,
+    notes:g('cat-notes').value.trim()||null
+  };
+  var id=g('category-id').value;
+  var url=id?SB+'/rest/v1/categories?id=eq.'+id:SB+'/rest/v1/categories';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showFormMsg('category-ok','Category saved!');await loadCategories();if(!id)newCategoryForm();}
+    else{var e=await r.json().catch(function(){return{};});showFormMsg('category-err','Save failed: '+(e.message||e.details||r.status));}
+  }catch(e){showFormMsg('category-err','Error: '+e.message);}
+}
+async function deleteCategory(id){
+  if(!confirm('Delete this category?'))return;
+  await fetch(SB+'/rest/v1/categories?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadCategories();
+}
+
+// ── Shared form message helper ──
+function showFormMsg(id,msg){
+  var el=g(id);if(!el)return;
+  el.textContent=msg;el.style.display='block';
+  setTimeout(function(){el.style.display='none';},4000);
 }
 
 function saveCreds(){var u=g('set-user').value.trim(),p=g('set-pass').value;if(u){localStorage.setItem('admin_user',u);ADMIN_USER=u;}if(p){localStorage.setItem('admin_pass',p);ADMIN_PASS=p;}flash('cred-saved');}
