@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Setup — Supplier Portal</title>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-W8YDH8LTSB');</script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
+    .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
+    .topbar-l { display: flex; align-items: center; gap: 10px; }
+    .tm { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .topbar-title { font-size: 14px; font-weight: 600; }
+    .back-link { font-size: 13px; color: #888; text-decoration: none; }
+    .back-link:hover { color: #1a1a2e; }
+
+    /* Tabs */
+    .tabs { display: flex; background: #fff; border-bottom: 1px solid #e0e0d8; padding: 0 1.5rem; }
+    .tab { padding: 12px 16px; font-size: 13px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 500; }
+    .tab.on { color: #1a1a2e; border-bottom-color: #1a1a2e; }
+    .tab-panel { display: none; }
+    .tab-panel.on { display: block; }
+
+    /* Layout */
+    .wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    @media(max-width:700px) { .grid2 { grid-template-columns: 1fr; } }
+
+    /* Cards */
+    .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; }
+    .card-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 1rem; padding-bottom: 8px; border-bottom: 1px solid #f0f0e8; display: flex; align-items: center; justify-content: space-between; }
+
+    /* List items */
+    .item-list { display: flex; flex-direction: column; gap: 8px; max-height: 480px; overflow-y: auto; }
+    .list-item { display: flex; align-items: flex-start; justify-content: space-between; padding: 10px 12px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; gap: 10px; }
+    .item-name { font-size: 13px; font-weight: 500; color: #1a1a2e; }
+    .item-meta { font-size: 11px; color: #999; margin-top: 2px; }
+    .item-badge { font-size: 10px; background: #f0f0e8; color: #666; padding: 2px 6px; border-radius: 4px; font-family: monospace; margin-left: 6px; }
+    .item-cosmetic { font-size: 10px; background: #fce8f0; color: #880044; border: 1px solid #f0b8d0; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
+    .item-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .btn-sm-edit { font-size: 11px; padding: 4px 10px; background: #f0f0e8; color: #555; border: 1px solid #e0e0d8; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    .btn-sm-edit:hover { background: #e8e8e0; }
+    .btn-sm-del { font-size: 11px; padding: 4px 10px; background: #fff0f0; color: #b00; border: 1px solid #fdd; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    .btn-sm-del:hover { background: #ffe0e0; }
+    .btn-new { font-size: 12px; padding: 5px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
+    .btn-new:hover { opacity: 0.87; }
+    .empty-list { font-size: 13px; color: #bbb; padding: 8px 0; }
+
+    /* Form */
+    .form-section { display: flex; flex-direction: column; gap: 10px; }
+    .form-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 2px; }
+    .f { display: flex; flex-direction: column; gap: 3px; }
+    .f label { font-size: 11px; color: #888; }
+    .f input, .f select, .f textarea { padding: 8px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; width: 100%; }
+    .f input:focus, .f select:focus, .f textarea:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 2px rgba(26,26,46,0.06); }
+    .f textarea { resize: vertical; min-height: 60px; }
+    .fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .section-divider { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; padding-top: 6px; margin-top: 4px; border-top: 1px solid #f0f0e8; }
+    .pct-row { display: flex; align-items: center; gap: 4px; }
+    .pct-row input { flex: 1; }
+    .pct-row span { font-size: 12px; color: #888; flex-shrink: 0; }
+    .btn-save-form { width: 100%; padding: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 4px; }
+    .btn-save-form:hover { opacity: 0.87; }
+    .btn-cancel-form { width: 100%; padding: 9px; background: #f5f5f0; color: #666; border: 1px solid #e0e0d8; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .msg { font-size: 13px; padding: 9px 12px; border-radius: 7px; margin-top: 6px; display: none; }
+    .msg.ok { color: #1a7a1a; background: #edfaed; border: 1px solid #a0d8a0; }
+    .msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
+    .prefix-hint { font-size: 11px; color: #aaa; margin-top: 2px; }
+
+    /* Dept sub-section */
+    .dept-section { margin-top: 12px; border-top: 1px solid #f0f0e8; padding-top: 12px; }
+    .dept-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; max-height: 200px; overflow-y: auto; }
+    .dept-item { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: #f0f8ff; border: 1px solid #c8e0f8; border-radius: 6px; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">S</div>
+    <div class="topbar-title">Product Setup</div>
+  </div>
+  <a class="back-link" href="admin.html">← Admin Dashboard</a>
+</div>
+
+<div class="tabs">
+  <div class="tab on" onclick="switchTab('categories')">📂 Categories</div>
+  <div class="tab" onclick="switchTab('brands')">🏷 Brands</div>
+  <div class="tab" onclick="switchTab('customers')">🛒 Customers</div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- CATEGORIES                             -->
+<!-- ══════════════════════════════════════ -->
+<div class="tab-panel on" id="tab-categories">
+  <div class="wrap">
+    <div class="grid2">
+      <!-- List -->
+      <div class="card">
+        <div class="card-title">All Categories <button class="btn-new" onclick="newCatForm()">+ New</button></div>
+        <div class="item-list" id="cat-list"><div class="empty-list">Loading...</div></div>
+      </div>
+      <!-- Form -->
+      <div class="card">
+        <div class="card-title" id="cat-form-title">New Category</div>
+        <div class="form-section">
+          <input type="hidden" id="cf-id" />
+          <div class="f"><label>Category *</label><input type="text" id="cf-cat" placeholder="e.g. Skin Care" oninput="genPrefix()" /></div>
+          <div class="f"><label>Sub-Category</label><input type="text" id="cf-sub" placeholder="e.g. Moisturizer" oninput="genPrefix()" /></div>
+          <div class="f"><label>Sub-Sub-Category</label><input type="text" id="cf-subsub" placeholder="e.g. Face Cream" oninput="genPrefix()" /></div>
+          <div class="fg2">
+            <div class="f">
+              <label>Model Prefix * (3 letters)</label>
+              <input type="text" id="cf-prefix" placeholder="SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:700;font-size:15px;" />
+              <div class="prefix-hint">Auto-generated · edit if needed</div>
+            </div>
+            <div class="f">
+              <label>Cosmetic Category?</label>
+              <select id="cf-cosmetic">
+                <option value="false">No</option>
+                <option value="true">Yes — requires INCI</option>
+              </select>
+            </div>
+          </div>
+          <div class="section-divider">Margin Thresholds (optional)</div>
+          <div class="fg2">
+            <div class="f"><label>Min Gross Margin %</label><div class="pct-row"><input type="number" id="cf-gross" placeholder="45" min="0" max="100" step="0.1" /><span>%</span></div></div>
+            <div class="f"><label>Min Net Margin %</label><div class="pct-row"><input type="number" id="cf-net" placeholder="30" min="0" max="100" step="0.1" /><span>%</span></div></div>
+          </div>
+          <div class="f"><label>Notes</label><textarea id="cf-notes" rows="2"></textarea></div>
+          <button class="btn-save-form" onclick="saveCat()">Save Category</button>
+          <button class="btn-cancel-form" onclick="newCatForm()" style="margin-top:6px;">Clear Form</button>
+          <div class="msg ok" id="cat-ok"></div>
+          <div class="msg err" id="cat-err"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- BRANDS                                 -->
+<!-- ══════════════════════════════════════ -->
+<div class="tab-panel" id="tab-brands">
+  <div class="wrap">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">All Brands <button class="btn-new" onclick="newBrandForm()">+ New</button></div>
+        <div class="item-list" id="brand-list"><div class="empty-list">Loading...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" id="brand-form-title">New Brand</div>
+        <div class="form-section">
+          <input type="hidden" id="bf-id" />
+          <div class="fg2">
+            <div class="f"><label>Brand Name *</label><input type="text" id="bf-name" placeholder="e.g. SkinMax" /></div>
+            <div class="f"><label>Brand Code *</label><input type="text" id="bf-code" placeholder="e.g. SM" maxlength="6" style="text-transform:uppercase" /></div>
+          </div>
+          <div class="fg2">
+            <div class="f">
+              <label>Type</label>
+              <select id="bf-type" onchange="toggleLicenseFields()">
+                <option value="house">House Brand</option>
+                <option value="licensed">Licensed Brand</option>
+                <option value="private_label">Private Label</option>
+              </select>
+            </div>
+            <div class="f"><label>Royalty %</label><div class="pct-row"><input type="number" id="bf-royalty" value="0" min="0" max="100" step="0.1" /><span>%</span></div></div>
+          </div>
+          <div id="bf-license-fields" style="display:none;">
+            <div class="f" style="margin-bottom:8px;"><label>Licensor Name</label><input type="text" id="bf-licensor" /></div>
+            <div class="f"><label>License Expiry</label><input type="date" id="bf-expiry" /></div>
+          </div>
+          <div class="f"><label>Notes</label><textarea id="bf-notes" rows="2"></textarea></div>
+          <button class="btn-save-form" onclick="saveBrand()">Save Brand</button>
+          <button class="btn-cancel-form" onclick="newBrandForm()" style="margin-top:6px;">Clear Form</button>
+          <div class="msg ok" id="brand-ok"></div>
+          <div class="msg err" id="brand-err"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- CUSTOMERS                              -->
+<!-- ══════════════════════════════════════ -->
+<div class="tab-panel" id="tab-customers">
+  <div class="wrap">
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">All Customers <button class="btn-new" onclick="newCustForm()">+ New</button></div>
+        <div class="item-list" id="cust-list"><div class="empty-list">Loading...</div></div>
+      </div>
+      <div class="card" style="overflow-y:auto;max-height:700px;">
+        <div class="card-title" id="cust-form-title">New Customer</div>
+        <div class="form-section">
+          <input type="hidden" id="xf-id" />
+          <div class="fg2">
+            <div class="f"><label>Customer Name *</label><input type="text" id="xf-name" placeholder="e.g. Target" /></div>
+            <div class="f"><label>Customer Code *</label><input type="text" id="xf-code" placeholder="e.g. TGT" maxlength="6" style="text-transform:uppercase" /></div>
+          </div>
+          <div class="fg2">
+            <div class="f"><label>Contact Name</label><input type="text" id="xf-contact" /></div>
+            <div class="f"><label>Contact Email</label><input type="email" id="xf-email" /></div>
+          </div>
+          <div class="section-divider">Default Terms (applies to all departments)</div>
+          <div class="fg2">
+            <div class="f"><label>Customer Margin %</label><div class="pct-row"><input type="number" id="xf-margin" placeholder="55" min="0" max="100" step="0.1" /><span>%</span></div></div>
+            <div class="f"><label>Returns Allowance %</label><div class="pct-row"><input type="number" id="xf-returns" placeholder="3" min="0" max="100" step="0.1" /><span>%</span></div></div>
+          </div>
+          <div class="fg2">
+            <div class="f"><label>Dilution %</label><div class="pct-row"><input type="number" id="xf-dilution" placeholder="2" min="0" max="100" step="0.1" /><span>%</span></div></div>
+            <div class="f"><label>Commission %</label><div class="pct-row"><input type="number" id="xf-commission" placeholder="5" min="0" max="100" step="0.1" /><span>%</span></div></div>
+          </div>
+          <div class="fg2">
+            <div class="f"><label>Ad Allowance %</label><div class="pct-row"><input type="number" id="xf-ad" placeholder="2" min="0" max="100" step="0.1" /><span>%</span></div></div>
+            <div class="f"></div>
+          </div>
+          <div class="section-divider">Our Margin Thresholds</div>
+          <div class="fg2">
+            <div class="f"><label>Min Gross Margin %</label><div class="pct-row"><input type="number" id="xf-mingross" placeholder="45" min="0" max="100" step="0.1" /><span>%</span></div></div>
+            <div class="f"><label>Min Net Margin %</label><div class="pct-row"><input type="number" id="xf-minnet" placeholder="30" min="0" max="100" step="0.1" /><span>%</span></div></div>
+          </div>
+          <div class="f"><label>Notes</label><textarea id="xf-notes" rows="2"></textarea></div>
+          <button class="btn-save-form" onclick="saveCust()">Save Customer</button>
+          <button class="btn-cancel-form" onclick="newCustForm()" style="margin-top:6px;">Clear Form</button>
+          <div class="msg ok" id="cust-ok"></div>
+          <div class="msg err" id="cust-err"></div>
+
+          <!-- Departments sub-section -->
+          <div class="dept-section" id="dept-section" style="display:none;">
+            <div class="card-title" style="border:none;padding:0;margin-bottom:8px;">Departments <button class="btn-new" onclick="showDeptForm(null)" style="font-size:11px;padding:3px 9px;">+ Add</button></div>
+            <div class="dept-list" id="dept-list"></div>
+            <div id="dept-form" style="display:none;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:8px;padding:12px;margin-top:8px;">
+              <input type="hidden" id="df-id" />
+              <div class="fg2">
+                <div class="f"><label>Department Name *</label><input type="text" id="df-name" placeholder="e.g. Health & Beauty" /></div>
+                <div class="f"><label>Dept Code</label><input type="text" id="df-code" placeholder="HB" maxlength="6" style="text-transform:uppercase" /></div>
+              </div>
+              <div class="fg2">
+                <div class="f"><label>Buyer Name</label><input type="text" id="df-buyer" /></div>
+                <div class="f"><label>Buyer Title</label><input type="text" id="df-title" /></div>
+              </div>
+              <div class="fg2">
+                <div class="f"><label>Buyer Email</label><input type="email" id="df-email" /></div>
+                <div class="f"><label>Buyer Phone</label><input type="tel" id="df-phone" /></div>
+              </div>
+              <div style="font-size:11px;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 4px;">Override Terms (blank = use customer defaults)</div>
+              <div class="fg2">
+                <div class="f"><label>Margin %</label><input type="number" id="df-margin" placeholder="inherit" min="0" max="100" step="0.1" /></div>
+                <div class="f"><label>Returns %</label><input type="number" id="df-returns" placeholder="inherit" min="0" max="100" step="0.1" /></div>
+              </div>
+              <div class="fg2">
+                <div class="f"><label>Dilution %</label><input type="number" id="df-dilution" placeholder="inherit" min="0" max="100" step="0.1" /></div>
+                <div class="f"><label>Commission %</label><input type="number" id="df-commission" placeholder="inherit" min="0" max="100" step="0.1" /></div>
+              </div>
+              <div class="f" style="margin-bottom:8px;"><label>Ad Allowance %</label><input type="number" id="df-ad" placeholder="inherit" min="0" max="100" step="0.1" /></div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn-save-form" style="margin-top:0;" onclick="saveDept()">Save Department</button>
+                <button class="btn-cancel-form" style="margin-top:0;width:auto;padding:9px 14px;" onclick="g('dept-form').style.display='none'">Cancel</button>
+              </div>
+              <div class="msg ok" id="dept-ok"></div>
+              <div class="msg err" id="dept-err"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var allCats=[], allBrands=[], allCusts=[], allDepts=[], currentCustId=null;
+
+function g(id){return document.getElementById(id);}
+function gv(id){var el=g(id);return el?el.value.trim():'';}
+function pf(id){return parseFloat(gv(id))||null;}
+function pi(id){return parseInt(gv(id))||null;}
+
+function showMsg(id,type,text){
+  var el=g(id+'-'+type);
+  if(!el)return;
+  el.textContent=text;
+  el.style.display='block';
+  if(type==='ok')setTimeout(function(){el.style.display='none';},4000);
+}
+
+// ── TABS ──
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(function(t,i){t.classList.remove('on');});
+  document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
+  var tabs=['categories','brands','customers'];
+  document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('on');
+  g('tab-'+name).classList.add('on');
+  if(name==='categories')loadCats();
+  if(name==='brands')loadBrands();
+  if(name==='customers')loadCusts();
+}
+
+// ════════════════════════════════════════
+// CATEGORIES
+// ════════════════════════════════════════
+async function loadCats(){
+  g('cat-list').innerHTML='<div class="empty-list">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){
+      var e=await r.json().catch(function(){return{};});
+      var msg='Load failed: '+(e.message||e.details||r.status);
+      g('cat-list').innerHTML='<div class="empty-list" style="color:#b00;">'+msg+'</div>';
+      alert('Categories: '+msg);
+      return;
+    }
+    allCats=await r.json();
+    renderCats();
+  }catch(e){
+    g('cat-list').innerHTML='<div class="empty-list" style="color:#b00;">Error: '+e.message+'</div>';
+    alert('Categories load error: '+e.message);
+  }
+}
+
+function renderCats(){
+  var el=g('cat-list');
+  if(!allCats.length){el.innerHTML='<div class="empty-list">No categories yet. Create your first one.</div>';return;}
+  el.innerHTML=allCats.map(function(c){
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<div class="list-item">'+
+      '<div>'+
+        '<div class="item-name">'+path+
+          '<span class="item-badge">'+c.model_prefix+'</span>'+
+          (c.is_cosmetic?'<span class="item-cosmetic">Cosmetic</span>':'')+
+        '</div>'+
+        '<div class="item-meta">'+(c.min_gross_margin_pct?'Min gross: '+c.min_gross_margin_pct+'%':'')+
+          (c.min_net_margin_pct?' · Min net: '+c.min_net_margin_pct+'%':'')+
+          ((!c.min_gross_margin_pct&&!c.min_net_margin_pct)?'No margin threshold':'')+'</div>'+
+      '</div>'+
+      '<div class="item-actions">'+
+        '<button class="btn-sm-edit" onclick="editCat(\''+c.id+'\')">Edit</button>'+
+        '<button class="btn-sm-del" onclick="deleteCat(\''+c.id+'\')">Delete</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function newCatForm(){
+  g('cf-id').value='';g('cf-cat').value='';g('cf-sub').value='';g('cf-subsub').value='';
+  g('cf-prefix').value='';g('cf-cosmetic').value='false';
+  g('cf-gross').value='';g('cf-net').value='';g('cf-notes').value='';
+  g('cat-form-title').textContent='New Category';
+  g('cat-ok').style.display='none';g('cat-err').style.display='none';
+}
+
+function editCat(id){
+  var c=allCats.find(function(x){return x.id===id;});if(!c)return;
+  g('cf-id').value=c.id;g('cf-cat').value=c.category||'';
+  g('cf-sub').value=c.sub_category||'';g('cf-subsub').value=c.sub_sub_category||'';
+  g('cf-prefix').value=c.model_prefix||'';g('cf-cosmetic').value=c.is_cosmetic?'true':'false';
+  g('cf-gross').value=c.min_gross_margin_pct||'';g('cf-net').value=c.min_net_margin_pct||'';
+  g('cf-notes').value=c.notes||'';
+  g('cat-form-title').textContent='Edit Category';
+  g('cat-ok').style.display='none';g('cat-err').style.display='none';
+  window.scrollTo(0,0);
+}
+
+function genPrefix(){
+  var c1=gv('cf-cat')?gv('cf-cat')[0].toUpperCase():'';
+  var c2=gv('cf-sub')?gv('cf-sub')[0].toUpperCase():'';
+  var c3=gv('cf-subsub')?gv('cf-subsub')[0].toUpperCase():'';
+  var auto=(c1+c2+c3).slice(0,3);
+  var prefixEl=g('cf-prefix');
+  if(prefixEl)prefixEl.value=auto;
+}
+
+async function saveCat(){
+  var cat=gv('cf-cat'),prefix=gv('cf-prefix').toUpperCase();
+  if(!cat){alert('Category name is required.');return;}
+  if(!prefix){alert('Model prefix is required.\n\nType the category name and it will auto-generate.\nOr type a 3-letter prefix manually.');return;}
+  var payload={
+    category:cat,
+    sub_category:gv('cf-sub')||null,
+    sub_sub_category:gv('cf-subsub')||null,
+    model_prefix:prefix,
+    is_cosmetic:g('cf-cosmetic').value==='true',
+    min_gross_margin_pct:pf('cf-gross'),
+    min_net_margin_pct:pf('cf-net'),
+    notes:gv('cf-notes')||null
+  };
+  var id=gv('cf-id');
+  var url=id?SB+'/rest/v1/categories?id=eq.'+id:SB+'/rest/v1/categories';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){
+      showMsg('cat','ok',id?'Category updated!':'Category saved!');
+      await loadCats();
+      if(!id)newCatForm();
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      var msg='Save failed: '+(e.message||e.details||r.status);
+      showMsg('cat','err',msg);alert(msg);
+    }
+  }catch(e){showMsg('cat','err','Error: '+e.message);alert('Save error: '+e.message);}
+}
+
+async function deleteCat(id){
+  if(!confirm('Delete this category? This cannot be undone.'))return;
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok)await loadCats();
+    else alert('Delete failed: '+r.status);
+  }catch(e){alert('Delete error: '+e.message);}
+}
+
+// ════════════════════════════════════════
+// BRANDS
+// ════════════════════════════════════════
+async function loadBrands(){
+  g('brand-list').innerHTML='<div class="empty-list">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){var e=await r.json().catch(function(){return{};});var msg='Load failed: '+(e.message||e.details||r.status);g('brand-list').innerHTML='<div class="empty-list" style="color:#b00;">'+msg+'</div>';alert('Brands: '+msg);return;}
+    allBrands=await r.json();
+    renderBrands();
+  }catch(e){g('brand-list').innerHTML='<div class="empty-list" style="color:#b00;">Error: '+e.message+'</div>';alert('Brands load error: '+e.message);}
+}
+
+function renderBrands(){
+  var el=g('brand-list');
+  if(!allBrands.length){el.innerHTML='<div class="empty-list">No brands yet.</div>';return;}
+  el.innerHTML=allBrands.map(function(b){
+    var type=b.is_licensed?'Licensed':b.is_private_label?'Private Label':'House Brand';
+    return '<div class="list-item">'+
+      '<div>'+
+        '<div class="item-name">'+b.brand_name+'<span class="item-badge">'+b.brand_code+'</span></div>'+
+        '<div class="item-meta">'+type+(b.royalty_percentage?' · '+b.royalty_percentage+'% royalty':'')+'</div>'+
+      '</div>'+
+      '<div class="item-actions">'+
+        '<button class="btn-sm-edit" onclick="editBrand(\''+b.id+'\')">Edit</button>'+
+        '<button class="btn-sm-del" onclick="deleteBrand(\''+b.id+'\')">Delete</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function newBrandForm(){
+  g('bf-id').value='';g('bf-name').value='';g('bf-code').value='';
+  g('bf-type').value='house';g('bf-royalty').value='0';
+  g('bf-licensor').value='';g('bf-expiry').value='';g('bf-notes').value='';
+  g('bf-license-fields').style.display='none';
+  g('brand-form-title').textContent='New Brand';
+  g('brand-ok').style.display='none';g('brand-err').style.display='none';
+}
+
+function editBrand(id){
+  var b=allBrands.find(function(x){return x.id===id;});if(!b)return;
+  g('bf-id').value=b.id;g('bf-name').value=b.brand_name||'';g('bf-code').value=b.brand_code||'';
+  g('bf-type').value=b.is_licensed?'licensed':b.is_private_label?'private_label':'house';
+  g('bf-royalty').value=b.royalty_percentage||0;
+  g('bf-licensor').value=b.licensor_name||'';g('bf-expiry').value=b.license_expiry||'';
+  g('bf-notes').value=b.notes||'';
+  g('brand-form-title').textContent='Edit Brand';
+  toggleLicenseFields();
+  g('brand-ok').style.display='none';g('brand-err').style.display='none';
+  window.scrollTo(0,0);
+}
+
+function toggleLicenseFields(){
+  g('bf-license-fields').style.display=g('bf-type').value==='licensed'?'block':'none';
+}
+
+async function saveBrand(){
+  var name=gv('bf-name'),code=gv('bf-code').toUpperCase();
+  if(!name||!code){alert('Brand name and code are required.');return;}
+  var type=g('bf-type').value;
+  var payload={brand_name:name,brand_code:code,is_licensed:type==='licensed',is_private_label:type==='private_label',royalty_percentage:parseFloat(gv('bf-royalty'))||0,licensor_name:gv('bf-licensor')||null,license_expiry:gv('bf-expiry')||null,notes:gv('bf-notes')||null,is_active:true};
+  var id=gv('bf-id');
+  var url=id?SB+'/rest/v1/brands?id=eq.'+id:SB+'/rest/v1/brands';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showMsg('brand','ok',id?'Brand updated!':'Brand saved!');await loadBrands();if(!id)newBrandForm();}
+    else{var e=await r.json().catch(function(){return{};});var msg='Save failed: '+(e.message||e.details||r.status);showMsg('brand','err',msg);alert(msg);}
+  }catch(e){showMsg('brand','err','Error: '+e.message);alert('Save error: '+e.message);}
+}
+
+async function deleteBrand(id){
+  if(!confirm('Delete this brand?'))return;
+  try{await fetch(SB+'/rest/v1/brands?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});await loadBrands();}
+  catch(e){alert('Delete error: '+e.message);}
+}
+
+// ════════════════════════════════════════
+// CUSTOMERS
+// ════════════════════════════════════════
+async function loadCusts(){
+  g('cust-list').innerHTML='<div class="empty-list">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){var e=await r.json().catch(function(){return{};});var msg='Load failed: '+(e.message||e.details||r.status);g('cust-list').innerHTML='<div class="empty-list" style="color:#b00;">'+msg+'</div>';alert('Customers: '+msg);return;}
+    allCusts=await r.json();
+    renderCusts();
+  }catch(e){g('cust-list').innerHTML='<div class="empty-list" style="color:#b00;">Error: '+e.message+'</div>';alert('Customers load error: '+e.message);}
+}
+
+function renderCusts(){
+  var el=g('cust-list');
+  if(!allCusts.length){el.innerHTML='<div class="empty-list">No customers yet.</div>';return;}
+  el.innerHTML=allCusts.map(function(c){
+    return '<div class="list-item">'+
+      '<div>'+
+        '<div class="item-name">'+c.customer_name+'<span class="item-badge">'+c.customer_code+'</span></div>'+
+        '<div class="item-meta">Margin: '+(c.default_margin_pct||'—')+'% · Returns: '+(c.default_returns_pct||'—')+'% · Dilution: '+(c.default_dilution_pct||'—')+'%</div>'+
+      '</div>'+
+      '<div class="item-actions">'+
+        '<button class="btn-sm-edit" onclick="editCust(\''+c.id+'\')">Edit</button>'+
+        '<button class="btn-sm-del" onclick="deleteCust(\''+c.id+'\')">Delete</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function newCustForm(){
+  g('xf-id').value='';g('xf-name').value='';g('xf-code').value='';
+  g('xf-contact').value='';g('xf-email').value='';
+  ['xf-margin','xf-returns','xf-dilution','xf-commission','xf-ad','xf-mingross','xf-minnet'].forEach(function(id){g(id).value='';});
+  g('xf-notes').value='';
+  g('cust-form-title').textContent='New Customer';
+  g('cust-ok').style.display='none';g('cust-err').style.display='none';
+  g('dept-section').style.display='none';
+  currentCustId=null;
+}
+
+function editCust(id){
+  var c=allCusts.find(function(x){return x.id===id;});if(!c)return;
+  g('xf-id').value=c.id;g('xf-name').value=c.customer_name||'';g('xf-code').value=c.customer_code||'';
+  g('xf-contact').value=c.contact_name||'';g('xf-email').value=c.contact_email||'';
+  g('xf-margin').value=c.default_margin_pct||'';g('xf-returns').value=c.default_returns_pct||'';
+  g('xf-dilution').value=c.default_dilution_pct||'';g('xf-commission').value=c.default_commission_pct||'';
+  g('xf-ad').value=c.default_ad_allowance_pct||'';
+  g('xf-mingross').value=c.min_gross_margin_pct||'';g('xf-minnet').value=c.min_net_margin_pct||'';
+  g('xf-notes').value=c.notes||'';
+  g('cust-form-title').textContent='Edit Customer';
+  g('cust-ok').style.display='none';g('cust-err').style.display='none';
+  currentCustId=id;
+  g('dept-section').style.display='block';
+  loadDepts(id);
+  window.scrollTo(0,0);
+}
+
+async function saveCust(){
+  var name=gv('xf-name'),code=gv('xf-code').toUpperCase();
+  if(!name||!code){alert('Customer name and code are required.');return;}
+  var payload={customer_name:name,customer_code:code,contact_name:gv('xf-contact')||null,contact_email:gv('xf-email')||null,default_margin_pct:pf('xf-margin'),default_returns_pct:pf('xf-returns'),default_dilution_pct:pf('xf-dilution'),default_commission_pct:pf('xf-commission'),default_ad_allowance_pct:pf('xf-ad'),min_gross_margin_pct:pf('xf-mingross'),min_net_margin_pct:pf('xf-minnet'),notes:gv('xf-notes')||null,is_active:true};
+  var id=gv('xf-id');
+  var url=id?SB+'/rest/v1/customers?id=eq.'+id:SB+'/rest/v1/customers';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(r.ok){
+      var result=await r.json();
+      var saved=Array.isArray(result)?result[0]:result;
+      if(saved&&saved.id){g('xf-id').value=saved.id;currentCustId=saved.id;g('dept-section').style.display='block';loadDepts(saved.id);}
+      showMsg('cust','ok',id?'Customer updated!':'Customer saved! Now add departments below.');
+      await loadCusts();
+    }else{var e=await r.json().catch(function(){return{};});var msg='Save failed: '+(e.message||e.details||r.status);showMsg('cust','err',msg);alert(msg);}
+  }catch(e){showMsg('cust','err','Error: '+e.message);alert('Save error: '+e.message);}
+}
+
+async function deleteCust(id){
+  if(!confirm('Delete this customer and all their departments?'))return;
+  try{await fetch(SB+'/rest/v1/customer_departments?customer_id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});await fetch(SB+'/rest/v1/customers?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});await loadCusts();}
+  catch(e){alert('Delete error: '+e.message);}
+}
+
+// ════════════════════════════════════════
+// DEPARTMENTS
+// ════════════════════════════════════════
+async function loadDepts(custId){
+  try{
+    var r=await fetch(SB+'/rest/v1/customer_departments?customer_id=eq.'+custId+'&select=*&order=department_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Departments load failed: '+r.status);return;}
+    allDepts=await r.json();
+    renderDepts();
+  }catch(e){alert('Departments load error: '+e.message);}
+}
+
+function renderDepts(){
+  var el=g('dept-list');
+  if(!allDepts.length){el.innerHTML='<div style="font-size:12px;color:#bbb;">No departments yet.</div>';return;}
+  el.innerHTML=allDepts.map(function(d){
+    return '<div class="dept-item">'+
+      '<div><strong>'+d.department_name+'</strong>'+(d.department_code?' ['+d.department_code+']':'')+
+      (d.buyer_name?' · '+d.buyer_name:'')+
+      (d.margin_pct?'<br><span style="color:#999;">Margin: '+d.margin_pct+'%</span>':'')+'</div>'+
+      '<div style="display:flex;gap:4px;">'+
+        '<button class="btn-sm-edit" onclick="showDeptForm(\''+d.id+'\')">Edit</button>'+
+        '<button class="btn-sm-del" onclick="deleteDept(\''+d.id+'\')">Del</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function showDeptForm(id){
+  g('dept-form').style.display='block';
+  if(!id){
+    ['df-id','df-name','df-code','df-buyer','df-title','df-email','df-phone','df-margin','df-returns','df-dilution','df-commission','df-ad'].forEach(function(fid){g(fid).value='';});
+  }else{
+    var d=allDepts.find(function(x){return x.id===id;});if(!d)return;
+    g('df-id').value=d.id;g('df-name').value=d.department_name||'';g('df-code').value=d.department_code||'';
+    g('df-buyer').value=d.buyer_name||'';g('df-title').value=d.buyer_title||'';
+    g('df-email').value=d.buyer_email||'';g('df-phone').value=d.buyer_phone||'';
+    g('df-margin').value=d.margin_pct||'';g('df-returns').value=d.returns_pct||'';
+    g('df-dilution').value=d.dilution_pct||'';g('df-commission').value=d.commission_pct||'';
+    g('df-ad').value=d.ad_allowance_pct||'';
+  }
+  g('dept-ok').style.display='none';g('dept-err').style.display='none';
+}
+
+async function saveDept(){
+  if(!currentCustId){alert('Please save the customer first.');return;}
+  var name=gv('df-name');if(!name){alert('Department name is required.');return;}
+  var payload={customer_id:currentCustId,department_name:name,department_code:gv('df-code').toUpperCase()||null,buyer_name:gv('df-buyer')||null,buyer_title:gv('df-title')||null,buyer_email:gv('df-email')||null,buyer_phone:gv('df-phone')||null,margin_pct:pf('df-margin'),returns_pct:pf('df-returns'),dilution_pct:pf('df-dilution'),commission_pct:pf('df-commission'),ad_allowance_pct:pf('df-ad'),is_active:true};
+  var id=gv('df-id');
+  var url=id?SB+'/rest/v1/customer_departments?id=eq.'+id:SB+'/rest/v1/customer_departments';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showMsg('dept','ok','Department saved!');g('dept-form').style.display='none';await loadDepts(currentCustId);}
+    else{var e=await r.json().catch(function(){return{};});var msg='Save failed: '+(e.message||e.details||r.status);showMsg('dept','err',msg);alert(msg);}
+  }catch(e){showMsg('dept','err','Error: '+e.message);alert('Save error: '+e.message);}
+}
+
+async function deleteDept(id){
+  if(!confirm('Delete this department?'))return;
+  try{await fetch(SB+'/rest/v1/customer_departments?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});await loadDepts(currentCustId);}
+  catch(e){alert('Delete error: '+e.message);}
+}
+
+// Load categories on page open
+loadCats();
+</script>
+</body>
+</html>
