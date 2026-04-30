@@ -3483,28 +3483,15 @@ if(localStorage.getItem('admin_session')==='1'){
   loadData();
 }
 // ── SendGrid Email ──
-var SG_KEY=['SG.ENlkbj--SB6u7Acx36sPuA','neLPh7z1BA-Wm-ubP1yeUp8at6MEO1BRc0zd3FGRYco'].join('.');
+
 async function sendEmail(toEmail,toName,subject,body,replyTo){
-  var fromEmail='sourcing@tbgsourcing.net';
-  var fromName='Allan Amsel — TBG Sourcing';
-  var r=await fetch('https://api.sendgrid.com/v3/mail/send',{
+  var r=await fetch('/api/send-email',{
     method:'POST',
-    headers:{
-      'Authorization':'Bearer '+SG_KEY,
-      'Content-Type':'application/json'
-    },
-    body:JSON.stringify({
-      personalizations:[{to:[{email:toEmail,name:toName||''}]}],
-      from:{email:fromEmail,name:fromName},
-      reply_to:{email:replyTo||fromEmail,name:fromName},
-      subject:subject,
-      content:[{type:'text/plain',value:body}]
-    })
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net'})
   });
-  if(!r.ok){
-    var e=await r.json().catch(function(){return{};});
-    throw new Error((e.errors&&e.errors[0]&&e.errors[0].message)||r.status);
-  }
+  var d=await r.json().catch(function(){return{};});
+  if(!r.ok){throw new Error(d.error||r.status);}
   return true;
 }
 
