@@ -420,7 +420,7 @@
                 <div class="mf"><label>Contact Name</label><input type="text" id="customer-contact" /></div>
                 <div class="mf"><label>Contact Email</label><input type="email" id="customer-email" /></div>
               </div>
-              <div class="section-header">Default Margin & Deduction Terms</div>
+              <div class="section-header">Default Margin & Deduction Terms (applies to all departments unless overridden)</div>
               <div class="mf-row">
                 <div class="mf"><label>Customer Margin %</label><div class="pct-field"><input type="number" id="cust-margin" placeholder="55" min="0" max="100" step="0.1" /><span>%</span></div></div>
                 <div class="mf"><label>Returns Allowance %</label><div class="pct-field"><input type="number" id="cust-returns" placeholder="3" min="0" max="100" step="0.1" /><span>%</span></div></div>
@@ -443,6 +443,42 @@
               <div class="form-msg ok" id="customer-ok">Customer saved!</div>
               <div class="form-msg err" id="customer-err"></div>
             </div>
+            <!-- Departments section — shows after customer is saved -->
+            <div id="dept-section" style="display:none;margin-top:1rem;border-top:1px solid #f0f0e8;padding-top:1rem;">
+              <div class="mgr-card-title">Departments <button class="btn-add-new" onclick="showDeptForm(null)" style="font-size:11px;padding:4px 10px;">+ Add Department</button></div>
+              <div id="dept-list" style="margin-bottom:10px;"></div>
+              <div id="dept-form" style="display:none;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;padding:12px;">
+                <input type="hidden" id="dept-id" />
+                <div class="mf-row">
+                  <div class="mf"><label>Department Name *</label><input type="text" id="dept-name" placeholder="e.g. Health & Beauty" /></div>
+                  <div class="mf"><label>Department Code</label><input type="text" id="dept-code" placeholder="e.g. HB" maxlength="6" style="text-transform:uppercase" /></div>
+                </div>
+                <div class="mf-row">
+                  <div class="mf"><label>Buyer Name</label><input type="text" id="dept-buyer-name" /></div>
+                  <div class="mf"><label>Buyer Title</label><input type="text" id="dept-buyer-title" /></div>
+                </div>
+                <div class="mf-row">
+                  <div class="mf"><label>Buyer Email</label><input type="email" id="dept-buyer-email" /></div>
+                  <div class="mf"><label>Buyer Phone</label><input type="tel" id="dept-buyer-phone" /></div>
+                </div>
+                <div class="section-header">Override Terms (leave blank to use customer defaults)</div>
+                <div class="mf-row">
+                  <div class="mf"><label>Customer Margin %</label><div class="pct-field"><input type="number" id="dept-margin" placeholder="inherit" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                  <div class="mf"><label>Returns %</label><div class="pct-field"><input type="number" id="dept-returns" placeholder="inherit" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                </div>
+                <div class="mf-row">
+                  <div class="mf"><label>Dilution %</label><div class="pct-field"><input type="number" id="dept-dilution" placeholder="inherit" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                  <div class="mf"><label>Commission %</label><div class="pct-field"><input type="number" id="dept-commission" placeholder="inherit" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                </div>
+                <div class="mf"><label>Ad Allowance %</label><div class="pct-field" style="max-width:160px;"><input type="number" id="dept-adallowance" placeholder="inherit" min="0" max="100" step="0.1" /><span>%</span></div></div>
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                  <button class="btn-save-form" style="flex:1;" onclick="saveDept()">Save Department</button>
+                  <button class="btn-edit" onclick="g('dept-form').style.display='none'">Cancel</button>
+                </div>
+                <div class="form-msg ok" id="dept-ok">Department saved!</div>
+                <div class="form-msg err" id="dept-err"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -463,12 +499,12 @@
             <div class="mgr-card-title" id="category-form-title">New Category</div>
             <div class="mgr-form">
               <input type="hidden" id="category-id" />
-              <div class="mf"><label>Category *</label><input type="text" id="cat-category" placeholder="e.g. Skin Care" /></div>
-              <div class="mf"><label>Sub-Category</label><input type="text" id="cat-sub" placeholder="e.g. Moisturizer" /></div>
-              <div class="mf"><label>Sub-Sub-Category</label><input type="text" id="cat-subsub" placeholder="e.g. Face Cream" /></div>
+              <div class="mf"><label>Category *</label><input type="text" id="cat-category" placeholder="e.g. Skin Care" oninput="autoPrefix()" /></div>
+              <div class="mf"><label>Sub-Category</label><input type="text" id="cat-sub" placeholder="e.g. Moisturizer" oninput="autoPrefix()" /></div>
+              <div class="mf"><label>Sub-Sub-Category</label><input type="text" id="cat-subsub" placeholder="e.g. Face Cream" oninput="autoPrefix()" /></div>
               <div class="mf-row">
                 <div class="mf">
-                  <label>Model Prefix * (3 letters, unique)</label>
+                  <label>Model Prefix * (auto-generated, editable)</label>
                   <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;" />
                 </div>
                 <div class="mf">
@@ -1434,6 +1470,152 @@ async function deleteCategory(id){
   await fetch(SB+'/rest/v1/categories?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   await loadCategories();
 }
+
+// ── DEPARTMENTS ──
+var allDepts=[];
+var currentCustomerId=null;
+
+async function loadDepts(customerId){
+  try{
+    var r=await fetch(SB+'/rest/v1/customer_departments?customer_id=eq.'+customerId+'&select=*&order=department_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allDepts=await r.json();
+    renderDepts();
+  }catch(e){console.log('loadDepts:',e);}
+}
+
+function renderDepts(){
+  var el=g('dept-list');if(!el)return;
+  if(!allDepts.length){el.innerHTML='<div style="font-size:12px;color:#bbb;margin-bottom:8px;">No departments yet. Add your first department.</div>';return;}
+  el.innerHTML=allDepts.map(function(d){
+    return '<div class="mgr-item" style="margin-bottom:6px;">'+
+      '<div><div class="mgr-item-name" style="font-size:12px;">'+d.department_name+(d.department_code?' <span class="cat-tree-prefix">'+d.department_code+'</span>':'')+
+      (d.buyer_name?' · '+d.buyer_name:'')+'</div>'+
+      '<div class="mgr-item-meta">'+
+        (d.margin_pct?'Margin: '+d.margin_pct+'% ':'')+
+        (d.returns_pct?'Returns: '+d.returns_pct+'% ':'')+
+        (d.dilution_pct?'Dilution: '+d.dilution_pct+'%':'')+
+      '</div></div>'+
+      '<div class="mgr-item-actions">'+
+        '<button class="btn-edit" onclick="showDeptForm(\''+d.id+'\')" style="font-size:11px;">Edit</button>'+
+        '<button class="btn-del" onclick="deleteDept(\''+d.id+'\')" style="font-size:11px;">Delete</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+function showDeptForm(id){
+  g('dept-form').style.display='block';
+  if(!id){
+    g('dept-id').value='';g('dept-name').value='';g('dept-code').value='';
+    g('dept-buyer-name').value='';g('dept-buyer-title').value='';
+    g('dept-buyer-email').value='';g('dept-buyer-phone').value='';
+    g('dept-margin').value='';g('dept-returns').value='';
+    g('dept-dilution').value='';g('dept-commission').value='';g('dept-adallowance').value='';
+  }else{
+    var d=allDepts.find(function(x){return x.id===id;});if(!d)return;
+    g('dept-id').value=d.id;g('dept-name').value=d.department_name||'';
+    g('dept-code').value=d.department_code||'';g('dept-buyer-name').value=d.buyer_name||'';
+    g('dept-buyer-title').value=d.buyer_title||'';g('dept-buyer-email').value=d.buyer_email||'';
+    g('dept-buyer-phone').value=d.buyer_phone||'';
+    g('dept-margin').value=d.margin_pct||'';g('dept-returns').value=d.returns_pct||'';
+    g('dept-dilution').value=d.dilution_pct||'';g('dept-commission').value=d.commission_pct||'';
+    g('dept-adallowance').value=d.ad_allowance_pct||'';
+  }
+  g('dept-ok').style.display='none';g('dept-err').style.display='none';
+}
+
+async function saveDept(){
+  if(!currentCustomerId){return;}
+  var name=g('dept-name').value.trim();
+  if(!name){showFormMsg('dept-err','Department name is required.');return;}
+  var payload={
+    customer_id:currentCustomerId,
+    department_name:name,
+    department_code:g('dept-code').value.trim().toUpperCase()||null,
+    buyer_name:g('dept-buyer-name').value.trim()||null,
+    buyer_title:g('dept-buyer-title').value.trim()||null,
+    buyer_email:g('dept-buyer-email').value.trim()||null,
+    buyer_phone:g('dept-buyer-phone').value.trim()||null,
+    margin_pct:parseFloat(g('dept-margin').value)||null,
+    returns_pct:parseFloat(g('dept-returns').value)||null,
+    dilution_pct:parseFloat(g('dept-dilution').value)||null,
+    commission_pct:parseFloat(g('dept-commission').value)||null,
+    ad_allowance_pct:parseFloat(g('dept-adallowance').value)||null,
+    is_active:true
+  };
+  var id=g('dept-id').value;
+  var url=id?SB+'/rest/v1/customer_departments?id=eq.'+id:SB+'/rest/v1/customer_departments';
+  var method=id?'PATCH':'POST';
+  try{
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(r.ok){showFormMsg('dept-ok','Department saved!');g('dept-form').style.display='none';await loadDepts(currentCustomerId);}
+    else{var e=await r.json().catch(function(){return{};});showFormMsg('dept-err','Save failed: '+(e.message||e.details||r.status));}
+  }catch(e){showFormMsg('dept-err','Error: '+e.message);}
+}
+
+async function deleteDept(id){
+  if(!confirm('Delete this department?'))return;
+  await fetch(SB+'/rest/v1/customer_departments?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadDepts(currentCustomerId);
+}
+
+// ── AUTO PREFIX for categories ──
+function autoPrefix(){
+  var prefixEl=g('cat-prefix');
+  // Only auto-generate if field is empty or was previously auto-generated
+  if(prefixEl.dataset.userEdited==='true')return;
+  var cat=g('cat-category').value.trim();
+  var sub=g('cat-sub').value.trim();
+  var subsub=g('cat-subsub').value.trim();
+  var parts=[cat,sub,subsub].filter(Boolean);
+  if(!parts.length){prefixEl.value='';return;}
+  // Take first letter of each word across all levels, up to 5 chars
+  var letters='';
+  parts.forEach(function(p){
+    p.split(/\s+/).forEach(function(word){
+      if(word&&letters.length<5)letters+=word[0].toUpperCase();
+    });
+  });
+  // Take first 3-5 meaningful chars
+  prefixEl.value=letters.slice(0,Math.min(5,Math.max(3,parts.length*2)));
+}
+
+// ── Override edit function to show dept section ──
+var _origEditCustomer=editCustomer;
+editCustomer=async function(id){
+  _origEditCustomer(id);
+  currentCustomerId=id;
+  g('dept-section').style.display='block';
+  g('dept-form').style.display='none';
+  await loadDepts(id);
+};
+
+// ── Override save to capture customer id ──
+var _origSaveCustomer=saveCustomer;
+saveCustomer=async function(){
+  var id=g('customer-id').value;
+  await _origSaveCustomer();
+  // After save, if new customer, get the ID from DB and show dept section
+  if(!id){
+    await loadCustomers();
+    var name=g('customer-name').value.trim();
+    var found=allCustomers.find(function(c){return c.customer_name===name;});
+    if(found){
+      currentCustomerId=found.id;
+      g('customer-id').value=found.id;
+      g('dept-section').style.display='block';
+    }
+  }
+};
+
+// ── Category prefix user edit flag ──
+document.addEventListener('DOMContentLoaded',function(){
+  var prefixEl=g('cat-prefix');
+  if(prefixEl){
+    prefixEl.addEventListener('input',function(){
+      this.dataset.userEdited='true';
+    });
+  }
+});
 
 // ── Shared form message helper ──
 function showFormMsg(id,msg){
