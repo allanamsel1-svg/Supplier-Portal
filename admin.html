@@ -988,7 +988,7 @@ async function loadData(){
 
   // Load supporting data - all independent
   loadRFQs();
-  loadCategories();
+  await loadCategories();
   loadBrands();
   loadCustomers();
 }
@@ -1373,6 +1373,7 @@ async function saveDrawerEdit(){
       // Re-open drawer to refresh all displayed values
       await openDrawer(f.id,null);
       var ok=g('d-edit-ok');if(ok){ok.style.display='block';setTimeout(function(){ok.style.display='none';},3000);}
+      alert('✓ Factory details saved successfully!');
       await loadData();
     }else{
       var err=await r.json().catch(function(){return{};});
@@ -1645,30 +1646,35 @@ async function loadFactoryPhotos(factoryId){
 }
 
 async function uploadFactoryPhotos(input){
-  var f=currentDrawerFactory;if(!f)return;
+  var f=currentDrawerFactory;if(!f){alert('No factory selected.');return;}
   var files=Array.from(input.files);if(!files.length)return;
+  var errors=[];
   for(var i=0;i<files.length;i++){
     var file=files[i];
-    // Resize image
-    var resized=await resizeImageAdmin(file,1600,0.85);
-    var blob=await fetch(resized).then(function(r){return r.blob();});
-    var path=(f.user_id||f.id)+'/photos/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     try{
+      var resized=await resizeImageAdmin(file,1600,0.85);
+      var blob=await fetch(resized).then(function(r2){return r2.blob();});
+      var path=(f.user_id||f.id)+'/photos/'+Date.now()+'_'+i+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       var uploadR=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
         method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob
       });
       if(uploadR.ok){
         var photoUrl=SB+'/storage/v1/object/public/factory-files/'+path;
-        await fetch(SB+'/rest/v1/factory_photos',{
+        var dbR=await fetch(SB+'/rest/v1/factory_photos',{
           method:'POST',
           headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify({factory_id:f.id,photo_url:photoUrl,photo_name:file.name,uploaded_by:'admin'})
         });
+        if(!dbR.ok){var de=await dbR.json().catch(function(){return{};});errors.push('DB save failed: '+(de.message||dbR.status));}
+      }else{
+        var ue=await uploadR.json().catch(function(){return{};});
+        errors.push('Upload failed for '+file.name+': '+(ue.message||ue.error||uploadR.status));
       }
-    }catch(e){console.log('photo upload error:',e);}
+    }catch(e){errors.push('Error with '+file.name+': '+e.message);}
   }
   input.value='';
   await loadFactoryPhotos(f.id);
+  if(errors.length)alert('Photo upload issues:\n'+errors.join('\n'));
 }
 
 async function deleteFactoryPhoto(photoId,factoryId){
@@ -1711,12 +1717,13 @@ async function loadDrawerCategories(factoryId){
   if(!allCategories.length){
     try{
       var cr=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      allCategories=await cr.json();
-    }catch(e){}
+      if(cr.ok)allCategories=await cr.json();
+      else alert('Could not load categories: '+cr.status+'. Please go to setup.html and create categories first.');
+    }catch(e){alert('Category load error: '+e.message);}
   }
 
   if(!allCategories.length){
-    el.innerHTML='<div style="font-size:12px;color:#bbb;">No categories set up yet. Go to the Categories section to add them first.</div>';
+    el.innerHTML='<div style="font-size:12px;color:#bbb;">No categories found. <a href="setup.html" target="_blank" style="color:#2266cc;">Open Product Setup →</a></div>';
     return;
   }
 
