@@ -514,6 +514,7 @@ function renderPhotos(photos){
 async function uploadPhotos(input){
   var files=Array.from(input.files);
   if(!files.length)return;
+  // Photos are auto-resized to max 1600px so size is handled
   showMsg('photo-msg','ok','Uploading '+files.length+' photo'+(files.length>1?'s':'')+'...');
   var errors=[];
   for(var i=0;i<files.length;i++){
@@ -521,7 +522,7 @@ async function uploadPhotos(input){
     try{
       var dataUrl=await resizePhoto(file,1600,0.85);
       var blob=await fetch(dataUrl).then(function(r){return r.blob();});
-      var path=(factory.user_id||FACTORY_ID)+'/photos/'+Date.now()+'_'+i+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      var path=FACTORY_ID+'/photos/'+Date.now()+'_'+i+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       var up=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
       if(up.ok){
         var url=SB+'/storage/v1/object/public/factory-files/'+path;
@@ -566,18 +567,17 @@ async function deletePhoto(photoId){
 async function loadFiles(){
   var folders=['catalogs','overview','quotes','certifications','audits'];
   var listIds=['catalog-list','overview-list','quotes-list','certs-file-list','audits-list'];
-  var userId=factory.user_id||FACTORY_ID;
   for(var i=0;i<folders.length;i++){
     var folder=folders[i];
     var listId=listIds[i];
     try{
-      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},body:JSON.stringify({prefix:userId+'/'+folder+'/',limit:20})});
+      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},body:JSON.stringify({prefix:FACTORY_ID+'/'+folder+'/',limit:20})});
       var items=await r.json();
       var el=g(listId);
       if(!el)continue;
       if(Array.isArray(items)&&items.filter(function(f){return f.name;}).length){
         el.innerHTML=items.filter(function(f){return f.name;}).map(function(f){
-          var url=SB+'/storage/v1/object/public/factory-files/'+userId+'/'+folder+'/'+f.name;
+          var url=SB+'/storage/v1/object/public/factory-files/'+FACTORY_ID+'/'+folder+'/'+f.name;
           return '<div class="file-row"><span class="file-name">'+f.name+'</span><a class="file-link" href="'+url+'" target="_blank">View / Download</a></div>';
         }).join('');
       }else{el.innerHTML='';}
@@ -589,17 +589,37 @@ function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'
 
 async function uploadFile(input,folder,fileType){
   var file=input.files[0];if(!file)return;
-  var userId=factory.user_id||FACTORY_ID;
+  // Check file size — Supabase free plan limit is 50MB
+  var maxMB=50;
+  var fileMB=file.size/1024/1024;
+  if(fileMB>maxMB){
+    alert('File is too large: '+fileMB.toFixed(1)+'MB\n\nMaximum file size is '+maxMB+'MB.\n\nPlease compress the file before uploading:\n- PDFs: use Adobe Acrobat, Smallpdf.com, or ilovepdf.com\n- PowerPoint: File → Compress Media\n- Excel: remove unused sheets and large images');
+    input.value='';
+    return;
+  }
   var name=(factory.factory_name_english||'Factory').replace(/[^a-zA-Z0-9\s]/g,'').trim();
   var ext=file.name.split('.').pop();
-  var path=userId+'/'+folder+'/'+name+'_'+fileType+'_'+dateStamp()+'.'+ext;
-  showMsg('file-msg','ok','Uploading...');
+  var safeName=name+'_'+fileType+'_'+dateStamp()+'.'+ext;
+  // Always use FACTORY_ID as root path for consistency
+  var path=FACTORY_ID+'/'+folder+'/'+safeName;
+  showMsg('file-msg','ok','Uploading '+file.name+'...');
   try{
-    var r=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:file});
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},
+      body:file
+    });
     input.value='';
-    if(r.ok){await loadFiles();showMsg('file-msg','ok','✓ Uploaded!');}
-    else{var e=await r.json().catch(function(){return{};});var m='Upload failed: '+(e.message||e.error||r.status);showMsg('file-msg','err',m);alert(m);}
-  }catch(e){showMsg('file-msg','err','Error: '+e.message);alert(e.message);}
+    if(r.ok){
+      await loadFiles();
+      showMsg('file-msg','ok','✓ '+file.name+' uploaded!');
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      var m='Upload failed: '+(e.message||e.error||r.status);
+      showMsg('file-msg','err',m);
+      alert(m+'\n\nMake sure the factory-files storage bucket has an INSERT policy for anon users in Supabase.');
+    }
+  }catch(e){showMsg('file-msg','err','Error: '+e.message);alert('Upload error: '+e.message);}
 }
 
 // ── Invite ──
