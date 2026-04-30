@@ -1056,6 +1056,7 @@ function renderAll(){
   g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
   renderFollowUps();
   populateUploadDropdown();
+  initCardClicks();
 }
 
 function factoryCard(f){
@@ -1066,22 +1067,49 @@ function factoryCard(f){
   var filesSummary=fileCount?'<span>📎 '+fileCount+' file'+(fileCount===1?'':'s')+'</span>':'';
   var locCount=(factoryLocations[f.id]||[]).length;
   var locSummary=locCount?'<span>📍 '+locCount+' additional location'+(locCount===1?'':'s')+'</span>':'';
-  var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(\''+f.id+'\',event)">✓ Approve</button>':'';
-  var rfqBtn='<button class="btn-rfq" onclick="openRFQ(\''+f.id+'\',event)">✉ Send RFQ</button>';
-  var viewBtn='<button class="btn-view" onclick="openDrawer(\''+f.id+'\',event)">View Details →</button>';
   var invStatus=f.invitation_status||'not_invited';
   var invLabels={'not_invited':'Not Invited','invited':'Invited','opened':'Opened','registered':'Registered','completed':'Completed','follow_up_sent':'Follow-up Sent','declined':'Declined','no_response':'No Response'};
   var invBadge='<span class="inv-badge inv-'+invStatus+'">'+(invLabels[invStatus]||invStatus)+'</span>';
   var invBtnLabel=invStatus==='not_invited'?'✉ Invite':(invStatus==='follow_up_sent'||invStatus==='no_response'?'✉ Follow-up':'✉ Re-invite');
-  var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInvite(\''+f.id+'\',event)">'+invBtnLabel+'</button>':'';
-  return '<div class="fc" onclick="openDrawer(\''+f.id+'\',event)">'+
-    '<div class="fc-top"><div><div class="fc-name">'+(f.factory_name_english||'—')+invBadge+'</div><div class="fc-local">'+(f.factory_name_local||'&nbsp;')+'</div></div>'+
+
+  // Use data-id + data-action instead of inline onclick to avoid quote escaping bugs
+  var approveBtn=f.status==='pending'?'<button class="btn-approve" data-action="approve" data-id="'+f.id+'">✓ Approve</button>':'';
+  var invBtn=f.sales_email?'<button class="btn-invite" data-action="invite" data-id="'+f.id+'">'+invBtnLabel+'</button>':'';
+  var rfqBtn='<button class="btn-rfq" data-action="rfq" data-id="'+f.id+'">✉ Send RFQ</button>';
+  var viewBtn='<button class="btn-view" data-action="view" data-id="'+f.id+'">View Details →</button>';
+
+  return '<div class="fc" data-action="view" data-id="'+f.id+'">'+
+    '<div class="fc-top"><div><div class="fc-name">'+esc(f.factory_name_english||'—')+invBadge+'</div><div class="fc-local">'+esc(f.factory_name_local||'')+'</div></div>'+
     '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
-    '<div class="fc-meta"><span>📍 '+([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
-    '<span>✉ '+(f.sales_email||'—')+'</span>'+
+    '<div class="fc-meta"><span>📍 '+esc([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+
+    '<span>✉ '+esc(f.sales_email||'—')+'</span>'+
     (filesSummary||'')+(locSummary||'')+'</div>'+
     (certs?'<div class="fc-certs">'+certs+moreCerts+'</div>':'')+
     '<div class="fc-actions">'+approveBtn+invBtn+rfqBtn+viewBtn+'</div></div>';
+}
+
+function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+
+// ── Single event delegation for all factory list clicks ──
+function initCardClicks(){
+  ['recent-list','all-list','pending-list','followup-list'].forEach(function(listId){
+    var el=g(listId);
+    if(!el||el.dataset.delegated)return;
+    el.dataset.delegated='1';
+    el.addEventListener('click',function(e){
+      var btn=e.target.closest('[data-action]');
+      if(!btn)return;
+      e.stopPropagation();
+      var action=btn.dataset.action;
+      var id=btn.dataset.id;
+      if(!id)return;
+      if(action==='view')openDrawer(id,e);
+      else if(action==='approve')approveCard(id,e);
+      else if(action==='invite')sendInvite(id,e);
+      else if(action==='rfq')openRFQ(id,e);
+    });
+  });
 }
 
 function filterFactories(){
@@ -1097,7 +1125,8 @@ function filterFactories(){
 // ── Approve ──
 async function approveCard(id,e){
   if(e)e.stopPropagation();
-  var btn=e&&e.target;if(btn){btn.disabled=true;btn.textContent='Approving...';}
+  var btn=e?e.target.closest('[data-action="approve"]'):null;
+  if(btn){btn.disabled=true;btn.textContent='Approving...';}
   var ok=await doApprove(id);
   if(!ok&&btn){btn.disabled=false;btn.textContent='✓ Approve';}
 }
@@ -1704,22 +1733,34 @@ var drawerFactoryCategories=[];
 
 async function loadDrawerCategories(factoryId){
   var el=g('d-factory-cats');
-  if(!el)return;
+  if(!el){alert('d-factory-cats element not found in drawer HTML');return;}
   el.innerHTML='<div style="font-size:12px;color:#bbb;">Loading...</div>';
 
-  // Load factory's current category selections
+  // Step 1: Load this factory's existing category selections
+  drawerFactoryCategories=[];
   try{
     var r=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+factoryId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    drawerFactoryCategories=await r.json();
-  }catch(e){drawerFactoryCategories=[];}
+    if(r.ok){
+      var rows=await r.json();
+      drawerFactoryCategories=Array.isArray(rows)?rows:[];
+    }else{
+      var re=await r.json().catch(function(){return{};});
+      alert('factory_categories load failed: '+(re.message||re.details||r.status));
+    }
+  }catch(e){alert('factory_categories fetch error: '+e.message);}
 
-  // Load all categories if not yet loaded
+  // Step 2: Make sure allCategories is loaded
   if(!allCategories.length){
     try{
       var cr=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      if(cr.ok)allCategories=await cr.json();
-      else alert('Could not load categories: '+cr.status+'. Please go to setup.html and create categories first.');
-    }catch(e){alert('Category load error: '+e.message);}
+      if(cr.ok){
+        var cats=await cr.json();
+        allCategories=Array.isArray(cats)?cats:[];
+      }else{
+        var cre=await cr.json().catch(function(){return{};});
+        alert('categories load failed: '+(cre.message||cre.details||cr.status));
+      }
+    }catch(e){alert('categories fetch error: '+e.message);}
   }
 
   if(!allCategories.length){
@@ -1727,13 +1768,14 @@ async function loadDrawerCategories(factoryId){
     return;
   }
 
-  // Build selected keys set
+  // Step 3: Build selected keys lookup
   var selectedKeys={};
   drawerFactoryCategories.forEach(function(row){
     var key=row.category+'|'+(row.sub_category||'')+'|'+(row.sub_sub_category||'');
     selectedKeys[key]=true;
   });
 
+  // Step 4: Render checkboxes
   el.innerHTML=allCategories.map(function(c){
     var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
     var checked=selectedKeys[key]?'checked':'';
