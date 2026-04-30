@@ -526,23 +526,25 @@ async function saveDraft(id){
           var photoUrl=SB+'/storage/v1/object/public/factory-files/'+photoPath;
           await fetch(SB+'/rest/v1/factory_photos',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify({factory_id:factoryId,photo_url:photoUrl,photo_name:photo.file.name,uploaded_by:'admin'})});
         }
-      }catch(e){console.log('photo upload error:',e);}
+      }catch(e){alert('Photo upload error: '+e.message);}
     }
 
     // Step 5: Upload catalog
     if(card.catalogFile){
       try{
         var catPath=factoryId+'/catalogs/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Catalog_'+dateStamp()+'.'+card.catalogFile.name.split('.').pop();
-        await fetch(SB+'/storage/v1/object/factory-files/'+catPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.catalogFile});
-      }catch(e){console.log('catalog upload error:',e);}
+        var catR=await fetch(SB+'/storage/v1/object/factory-files/'+catPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.catalogFile});
+        if(!catR.ok){var catE=await catR.json().catch(function(){return{};});alert('Catalog upload failed: '+(catE.message||catE.error||catR.status)+'.\n\nThe factory was saved. You can upload the catalog from the factory detail page.');}
+      }catch(e){alert('Catalog upload error: '+e.message);}
     }
 
     // Step 6: Upload quote sheet
     if(card.quoteFile){
       try{
         var qtPath=factoryId+'/quotes/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Quote Sheet_'+dateStamp()+'.'+card.quoteFile.name.split('.').pop();
-        await fetch(SB+'/storage/v1/object/factory-files/'+qtPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.quoteFile});
-      }catch(e){console.log('quote upload error:',e);}
+        var qtR=await fetch(SB+'/storage/v1/object/factory-files/'+qtPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.quoteFile});
+        if(!qtR.ok){var qtE=await qtR.json().catch(function(){return{};});alert('Quote sheet upload failed: '+(qtE.message||qtE.error||qtR.status)+'.\n\nThe factory was saved. You can upload from the factory detail page.');}
+      }catch(e){alert('Quote upload error: '+e.message);}
     }
 
     // Success
