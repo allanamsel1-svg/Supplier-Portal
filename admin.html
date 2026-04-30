@@ -967,24 +967,32 @@ function showPanel(name){
   if(name==='rfq'){loadRFQs();loadCategories();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
-  if(name==='categories')loadCategories();
+  if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
 }
 
 // ── Load all data ──
 async function loadData(){
+  // Load factories
   try{
     var r=await fetch(SB+'/rest/v1/factories?select=*&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Failed to load factories: '+r.status);return;}
     var d=await r.json();
     allFactories=Array.isArray(d)?d:[];
-    await loadAllFiles();
-    await loadAllLocations();
-    await loadAllCerts();
-    renderAll();
-    loadRFQs();
-    loadCategories();
-    loadBrands();
-    loadCustomers();
-  }catch(e){console.log('load error:',e);}
+  }catch(e){alert('Error loading factories: '+e.message);return;}
+
+  // Load files, locations, certs - failures are non-blocking
+  try{await loadAllFiles();}catch(e){console.log('loadAllFiles error:',e);}
+  try{await loadAllLocations();}catch(e){console.log('loadAllLocations error:',e);}
+  try{await loadAllCerts();}catch(e){console.log('loadAllCerts error:',e);}
+
+  // Render factories
+  try{renderAll();}catch(e){console.log('renderAll error:',e);}
+
+  // Load supporting data - all independent
+  loadRFQs();
+  loadCategories();
+  loadBrands();
+  loadCustomers();
 }
 
 async function loadAllFiles(){
@@ -2114,9 +2122,10 @@ var allBrands=[];
 async function loadBrands(){
   try{
     var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Brands load failed: '+(err.message||err.details||r.status));return;}
     allBrands=await r.json();
     renderBrands();
-  }catch(e){console.log('loadBrands:',e);}
+  }catch(e){alert('Brands load error: '+e.message);}
 }
 function renderBrands(){
   var el=g('brand-list');if(!el)return;
@@ -2189,9 +2198,10 @@ var allCustomers=[];
 async function loadCustomers(){
   try{
     var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Customers load failed: '+(err.message||err.details||r.status));return;}
     allCustomers=await r.json();
     renderCustomers();
-  }catch(e){console.log('loadCustomers:',e);}
+  }catch(e){alert('Customers load error: '+e.message);}
 }
 function renderCustomers(){
   var el=g('customer-list');if(!el)return;
@@ -2264,9 +2274,11 @@ var allCategories=[];
 async function loadCategories(){
   try{
     var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Categories load failed: '+(err.message||err.details||r.status));return;}
     allCategories=await r.json();
+    if(!Array.isArray(allCategories)){alert('Categories returned unexpected data: '+JSON.stringify(allCategories).slice(0,100));allCategories=[];return;}
     renderCategories();
-  }catch(e){console.log('loadCategories:',e);}
+  }catch(e){alert('Categories load error: '+e.message);}
 }
 function renderCategories(){
   var el=g('category-list');if(!el)return;
@@ -2306,7 +2318,8 @@ function editCategory(id){
 }
 async function saveCategory(){
   var cat=g('cat-category').value.trim(),prefix=g('cat-prefix').value.trim().toUpperCase();
-  if(!cat||!prefix){showFormMsg('category-err','Category and model prefix are required.');return;}
+  if(!cat){alert('Please enter a category name.');return;}
+  if(!prefix){alert('Model prefix is required. Type a category name to auto-generate it, or type a prefix manually.');return;}
   var payload={
     category:cat,sub_category:g('cat-sub').value.trim()||null,
     sub_sub_category:g('cat-subsub').value.trim()||null,
