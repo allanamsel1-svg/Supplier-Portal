@@ -1084,9 +1084,10 @@ async function doApprove(id){
 
 // ── Supplier Detail Drawer ──
 async function openDrawer(id,e){
+  try{
   if(e)e.stopPropagation();
   var f=allFactories.find(function(x){return x.id===id;});
-  if(!f)return;
+  if(!f){console.error('Factory not found:',id);return;}
   currentDrawerFactory=f;
 
   // Header
@@ -1210,13 +1211,14 @@ async function openDrawer(id,e){
     else{inviteBtn.textContent='✉ Send Invitation Email';inviteBtn.disabled=false;}
   }
 
-  // Load editable categories
-  await loadDrawerCategories(f.id);
+  // Load editable categories (wrapped so failure doesn't block drawer)
+  try{ await loadDrawerCategories(f.id); }catch(ex){ console.log('cat load err:',ex); }
 
   // Open drawer
   g('drawer-overlay').classList.add('on');
   g('supplier-drawer').classList.add('open');
   g('supplier-drawer').scrollTop=0;
+  }catch(ex){console.error('openDrawer error:',ex);}
 }
 
 function closeDrawer(){
