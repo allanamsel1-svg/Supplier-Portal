@@ -1561,22 +1561,16 @@ async function deleteDept(id){
 // ── AUTO PREFIX for categories ──
 function autoPrefix(){
   var prefixEl=g('cat-prefix');
-  // Only auto-generate if field is empty or was previously auto-generated
   if(prefixEl.dataset.userEdited==='true')return;
   var cat=g('cat-category').value.trim();
   var sub=g('cat-sub').value.trim();
   var subsub=g('cat-subsub').value.trim();
-  var parts=[cat,sub,subsub].filter(Boolean);
-  if(!parts.length){prefixEl.value='';return;}
-  // Take first letter of each word across all levels, up to 5 chars
-  var letters='';
-  parts.forEach(function(p){
-    p.split(/\s+/).forEach(function(word){
-      if(word&&letters.length<5)letters+=word[0].toUpperCase();
-    });
-  });
-  // Take first 3-5 meaningful chars
-  prefixEl.value=letters.slice(0,Math.min(5,Math.max(3,parts.length*2)));
+  // Always exactly 3 letters: first letter of category, sub, sub-sub
+  var c1=cat?cat[0].toUpperCase():'';
+  var c2=sub?sub[0].toUpperCase():'';
+  var c3=subsub?subsub[0].toUpperCase():'';
+  var prefix=(c1+c2+c3).slice(0,3);
+  prefixEl.value=prefix;
 }
 
 // ── Override edit function to show dept section ──
