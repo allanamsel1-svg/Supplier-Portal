@@ -1283,7 +1283,7 @@ async function openDrawer(id,e){
   }
 
   // Load editable categories and photos (wrapped so failure doesn't block drawer)
-  try{ await loadDrawerCategories(f.id); }catch(ex){ console.log('cat load err:',ex); }
+  try{ await loadDrawerCategories(f.id); }catch(ex){ alert('Category drawer error: '+ex.message); var el=g('d-factory-cats');if(el)el.innerHTML='<div style="color:#b00;font-size:12px;">Error: '+ex.message+'</div>'; }
   try{ await loadFactoryPhotos(f.id); }catch(ex){ console.log('photo load err:',ex); }
 
   // Open drawer
@@ -1742,9 +1742,15 @@ async function loadDrawerCategories(factoryId){
       drawerFactoryCategories=Array.isArray(rows)?rows:[];
     }else{
       var re=await r.json().catch(function(){return{};});
-      alert('factory_categories load failed: '+(re.message||re.details||r.status));
+      el.innerHTML='<div style="color:#b00;font-size:12px;">factory_categories error: '+(re.message||re.details||r.status)+'</div>';
+      alert('factory_categories RLS error: '+(re.message||re.details||r.status)+'\n\nThis means the anon policy is missing. Run fix_all_rls.sql in Supabase.');
+      return;
     }
-  }catch(e){alert('factory_categories fetch error: '+e.message);}
+  }catch(e){
+    el.innerHTML='<div style="color:#b00;font-size:12px;">fetch error: '+e.message+'</div>';
+    alert('factory_categories fetch error: '+e.message);
+    return;
+  }
 
   // Step 2: Make sure allCategories is loaded
   if(!allCategories.length){
