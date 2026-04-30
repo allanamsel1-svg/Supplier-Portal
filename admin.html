@@ -2033,6 +2033,29 @@ function selectAllFactories(selectAll){
   });
 }
 
+function renderFactoryMatchList(factories){
+  var el=g('factory-match-list');
+  if(!factories.length){el.innerHTML='<div style="font-size:13px;color:#bbb;">No factories to display.</div>';return;}
+  el.innerHTML=factories.map(function(f){
+    var checked=selectedFactoryIds[f.id]?'checked':'';
+    var hasEmail=f.sales_email?'':' <span style="color:#e08800;font-size:10px;">⚠ No email</span>';
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;margin-bottom:6px;cursor:pointer;">'+
+      '<input type="checkbox" class="factory-match-cb" data-fid="'+f.id+'" value="'+f.id+'" '+checked+' style="width:16px;height:16px;flex-shrink:0;cursor:pointer;" />'+
+      '<div style="flex:1;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(f.factory_name_english||'—')+hasEmail+'</div>'+
+        '<div style="font-size:11px;color:#999;margin-top:2px;">'+
+          (f.city?f.city+', ':'')+esc(f.country||'—')+
+          ' · '+(f.sales_email?f.sales_email:'No email on file')+
+        '</div>'+
+      '</div>'+
+    '</label>';
+  }).join('');
+  // Attach change listeners
+  el.querySelectorAll('.factory-match-cb').forEach(function(cb){
+    cb.addEventListener('change',function(){toggleFactorySelect(this.dataset.fid);});
+  });
+}
+
 
 async function sendRFQEmails(rfq){
   var apiKey=localStorage.getItem('anthropic_key')||'';
