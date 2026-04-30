@@ -301,7 +301,8 @@
       <button class="sitem" id="nav-all" onclick="showPanel('all')"><span class="sicon">🏭</span> All Factories <span class="scount" id="cnt-all">0</span></button>
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
       <div class="slabel">Outreach</div>
-      <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">⏰</span> Follow-ups <span class="scount" id="cnt-followup">0</span></button>
+      <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
+      <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
@@ -403,6 +404,13 @@
 
       <!-- RFQ List view -->
       <div id="rfq-list-view" style="padding:1.25rem 1.5rem;">
+        <div id="rfq-quotes-received" style="margin-bottom:1.25rem;display:none;">
+          <div style="font-size:11px;font-weight:600;color:#1a7a1a;text-transform:uppercase;letter-spacing:0.07em;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;">
+            <span>🎉 New quotes received!</span>
+            <button onclick="g('rfq-quotes-received').style.display='none'" style="background:none;border:none;font-size:16px;cursor:pointer;color:#1a7a1a;">×</button>
+          </div>
+          <div id="rfq-new-quotes-list" style="margin-top:8px;"></div>
+        </div>
         <div id="rfq-list-items"><div class="empty">No RFQs yet. Create your first one.</div></div>
       </div>
 
@@ -1838,7 +1846,35 @@ async function loadRFQs(){
     allRFQs=await r.json();
     renderRFQList();
     g('cnt-rfq').textContent=allRFQs.length;
+    checkNewQuotes();
   }catch(e){console.log('loadRFQs:',e);}
+}
+
+async function checkNewQuotes(){
+  try{
+    // Find any quotes submitted in the last 24 hours
+    var since=new Date(Date.now()-86400000).toISOString();
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?select=*,rfqs(project_number,item_description),factories(factory_name_english)&created_at=gte.'+since+'&order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok)return;
+    var quotes=await r.json();
+    if(!quotes.length)return;
+    var el=g('rfq-quotes-received');
+    var listEl=g('rfq-new-quotes-list');
+    if(!el||!listEl)return;
+    el.style.display='block';
+    listEl.innerHTML=quotes.map(function(q){
+      var rfq=q.rfqs||{};
+      var f=q.factories||{};
+      var time=new Date(q.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      return '<div style="background:#fff;border:1px solid #a0d8a0;border-radius:8px;padding:10px 12px;margin-bottom:6px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' submitted Option '+q.quote_option+'</div>'+
+        '<div style="font-size:12px;color:#555;margin-top:2px;">'+(rfq.project_number||'—')+' · '+(rfq.item_description||'—')+' · $'+(q.unit_fob_price||'—')+' FOB</div>'+
+        '<div style="font-size:11px;color:#999;margin-top:2px;">'+time+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){console.log('checkNewQuotes error:',e);}
 }
 
 function renderRFQList(){
