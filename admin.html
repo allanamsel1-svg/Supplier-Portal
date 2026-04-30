@@ -433,22 +433,39 @@
             <div class="mf-row">
               <div class="mf">
                 <label>Category *</label>
-                <select id="rfq-category-id" onchange="rfqCategoryChanged()">
+                <select id="rfq-category-id" onchange="rfqCategoryChanged();suggestDutyTariff();">
                   <option value="">— Select Category —</option>
                 </select>
               </div>
               <div class="mf">
-                <label>Unit of Measure *</label>
-                <select id="rfq-uom">
-                  <option value="">— Select —</option>
-                  <option>ml</option><option>L</option><option>g</option><option>kg</option>
-                  <option>oz</option><option>fl oz</option><option>units</option>
-                  <option>pairs</option><option>sets</option><option>pcs</option>
+                <label>Unit Type</label>
+                <select id="rfq-unit-type">
+                  <option value="each">Each</option>
+                  <option value="pair">Pair</option>
+                  <option value="set">Set</option>
+                  <option value="pack">Pack</option>
+                  <option value="dozen">Dozen</option>
+                  <option value="box">Box</option>
                 </select>
               </div>
             </div>
-            <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" /></div>
+            <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" oninput="rfqDescChanged()" /></div>
             <div class="mf"><label>Basic Specifications *</label><textarea id="rfq-specs" rows="4" placeholder="Describe the product specifications. For cosmetics include key actives, texture, fragrance preference, target skin type, etc."></textarea></div>
+            <div class="mf-row">
+              <div class="mf"><label>Quote Quantity</label><input type="number" id="rfq-quantity" placeholder="e.g. 10000" min="1" /></div>
+              <div class="mf"><label>Product Size</label><input type="text" id="rfq-product-size" placeholder="N/A" /></div>
+              <div class="mf"><label>Size Unit</label>
+                <select id="rfq-uom">
+                  <option value="N/A" selected>N/A</option>
+                  <option value="ml">ml</option><option value="L">L</option>
+                  <option value="g">g</option><option value="kg">kg</option>
+                  <option value="oz">oz</option><option value="fl oz">fl oz</option>
+                  <option value="lb">lb</option><option value="mm">mm</option>
+                  <option value="cm">cm</option><option value="m">m</option>
+                  <option value="in">in</option>
+                </select>
+              </div>
+            </div>
             <div class="mf-row">
               <div class="mf"><label>Color</label>
                 <select id="rfq-color">
@@ -585,12 +602,14 @@
           </div>
 
           <!-- Estimated dimensions -->
-          <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Estimated Unit Dimensions (for freight calc)</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div class="mf"><label>Length (cm)</label><input type="number" id="rfq-est-len" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Width (cm)</label><input type="number" id="rfq-est-wid" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Height (cm)</label><input type="number" id="rfq-est-hgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.001" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+          <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Estimated Master Carton Dimensions (for freight calc)</div>
+          <div style="font-size:11px;color:#999;margin-bottom:8px;">Always rectangular — CBM per unit = carton CBM ÷ master case pack</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div class="mf"><label>Carton L (cm)</label><input type="number" id="rfq-est-len" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Carton W (cm)</label><input type="number" id="rfq-est-wid" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Carton H (cm)</label><input type="number" id="rfq-est-hgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.001" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Units/Carton</label><input type="number" id="rfq-units-per-carton" step="1" placeholder="= master pack" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
             <div class="mf"><label>Est. CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
@@ -2050,7 +2069,8 @@ function openRFQForm(id){
 
 function resetRFQForm(){
   g('rfq-id').value='';
-  g('rfq-category-id').value='';g('rfq-uom').value='';
+  g('rfq-category-id').value='';g('rfq-uom').value='N/A';
+  g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
   g('rfq-description').value='';g('rfq-specs').value='';
   g('rfq-color').value='';g('rfq-quantity').value='';
   g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
@@ -2322,15 +2342,18 @@ async function suggestDutyTariff(){
 
   try{
     var prompt='I am importing the following product into the USA:\n'+
-      'Product: '+desc+'\n'+
-      'Category: '+catText+'\n'+
-      'Country of manufacture: '+country+'\n\n'+
-      'As of today April 2026, what are the estimated:\n'+
-      '1. Base import duty rate (%)\n'+
-      '2. Additional tariff rate (%) including Section 301 tariffs and any IEEPA tariffs\n'+
-      '3. Total effective rate (%)\n\n'+
-      'Return ONLY a JSON object with these exact keys:\n'+
-      '{"duty_pct": number, "tariff_pct": number, "total_pct": number, "notes": "brief explanation including any important caveats"}\n'+
+      'Product description: '+desc+'\n'+
+      'Product category: '+catText+'\n'+
+      'Specifications: '+(g('rfq-specs').value||'N/A')+'\n'+
+      'Country of manufacture: '+(country||'China (assumed)')+'\n'+
+      'Product size: '+(g('rfq-product-size').value||'N/A')+' '+(g('rfq-uom').value||'')+'\n\n'+
+      'Based on the product description above, as of April 2026, what are the estimated:\n'+
+      '1. Most likely HTS code for this product\n'+
+      '2. Base import duty rate (%)\n'+
+      '3. Additional tariff rate (%) including Section 301 tariffs and any IEEPA tariffs currently in effect\n'+
+      '4. Total effective rate (%)\n\n'+
+      'Return ONLY a JSON object:\n'+
+      '{"hts_code": "XXXX.XX.XXXX", "duty_pct": number, "tariff_pct": number, "total_pct": number, "notes": "brief explanation"}\n'+
       'No markdown, no extra text.';
 
     var r=await fetch('https://api.anthropic.com/v1/messages',{
@@ -2384,7 +2407,9 @@ async function saveRFQ(action){
     category:catRow?catRow.category:null,
     sub_category:catRow?catRow.sub_category:null,
     sub_sub_category:catRow?catRow.sub_sub_category:null,
-    unit_of_measure:g('rfq-uom').value||null,
+    unit_type:g('rfq-unit-type').value||'each',
+    product_size:g('rfq-product-size').value==='N/A'?null:g('rfq-product-size').value||null,
+    unit_of_measure:g('rfq-uom').value==='N/A'?null:g('rfq-uom').value||null,
     color_code:g('rfq-color').value||null,
     quote_quantity:parseInt(g('rfq-quantity').value)||null,
     inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
