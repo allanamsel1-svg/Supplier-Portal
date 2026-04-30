@@ -693,7 +693,7 @@
               <div class="mf-row">
                 <div class="mf">
                   <label>Model Prefix * (auto-generated, editable)</label>
-                  <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;" />
+                  <input type="text" id="cat-prefix" placeholder="e.g. SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:600;" oninput="this.dataset.userEdited='true'" />
                 </div>
                 <div class="mf">
                   <label>Cosmetic Category?</label>
@@ -2287,7 +2287,9 @@ function renderCategories(){
 }
 function newCategoryForm(){
   g('category-id').value='';g('cat-category').value='';g('cat-sub').value='';
-  g('cat-subsub').value='';g('cat-prefix').value='';g('cat-cosmetic').value='false';
+  g('cat-subsub').value='';
+  var prefixEl=g('cat-prefix');if(prefixEl){prefixEl.value='';prefixEl.dataset.userEdited='false';}
+  g('cat-cosmetic').value='false';
   g('cat-min-gross').value='';g('cat-min-net').value='';g('cat-notes').value='';
   g('category-form-title').textContent='New Category';
   g('category-ok').style.display='none';g('category-err').style.display='none';
@@ -2457,16 +2459,6 @@ saveCustomer=async function(){
     }
   }
 };
-
-// ── Category prefix user edit flag ──
-document.addEventListener('DOMContentLoaded',function(){
-  var prefixEl=g('cat-prefix');
-  if(prefixEl){
-    prefixEl.addEventListener('input',function(){
-      this.dataset.userEdited='true';
-    });
-  }
-});
 
 // ── Shared form message helper ──
 function showFormMsg(id,msg){
