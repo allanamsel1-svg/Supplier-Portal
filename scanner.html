@@ -4,37 +4,37 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Business Card Scanner — Supplier Portal</title>
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-W8YDH8LTSB');</script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
     .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
     .topbar-l { display: flex; align-items: center; gap: 10px; }
     .tm { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
-    .topbar-title { font-size: 14px; font-weight: 600; color: #1a1a2e; }
+    .topbar-title { font-size: 14px; font-weight: 600; }
     .back-link { font-size: 13px; color: #888; text-decoration: none; }
     .back-link:hover { color: #1a1a2e; }
-    .main { max-width: 760px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+    .main { max-width: 800px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
     .page-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
     .page-sub { font-size: 13px; color: #999; margin-bottom: 1.5rem; }
     .api-warn { background: #fffbea; border: 1px solid #f0d840; border-radius: 9px; padding: 12px 14px; font-size: 13px; color: #7a6000; margin-bottom: 1.25rem; display: none; }
     .top-banner { background: #edfaed; border: 1px solid #a0d8a0; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #1a6a1a; margin-bottom: 1rem; display: none; }
-    .upload-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
 
-    /* Desktop drop zone */
+    /* Upload zone */
+    .upload-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
     .drop-zone { border: 2px dashed #d0d0c8; border-radius: 10px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; }
-    .drop-zone:hover { border-color: #1a1a2e; background: #f8f8f4; }
-    .drop-zone.drag-over { border-color: #1a1a2e; background: #f8f8f4; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #1a1a2e; background: #f8f8f4; }
     .drop-icon { font-size: 36px; margin-bottom: 10px; }
     .drop-title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 4px; }
     .drop-sub { font-size: 13px; color: #999; margin-bottom: 14px; }
     .browse-btn { display: inline-block; padding: 9px 20px; background: #1a1a2e; color: #fff; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; }
-
-    /* Mobile buttons */
     .mobile-btns { display: none; gap: 10px; }
     .mob-btn { flex: 1; padding: 16px 10px; border: 1px solid #e0e0d8; border-radius: 10px; background: #f8f8f4; font-size: 13px; font-weight: 500; color: #1a1a2e; cursor: pointer; text-align: center; position: relative; font-family: inherit; }
     .mob-btn input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
     .mob-icon { font-size: 24px; display: block; margin-bottom: 6px; }
-    @media(max-width:600px) { .drop-zone { display: none; } .mobile-btns { display: flex; } .main { padding: 1rem 0.75rem 4rem; } }
+    @media(max-width:600px) { .drop-zone{display:none;} .mobile-btns{display:flex;} .main{padding:1rem 0.75rem 4rem;} }
 
     /* Scan bar */
     .scan-bar { display: none; align-items: center; gap: 12px; margin-bottom: 1rem; }
@@ -44,7 +44,7 @@
     .scan-count { font-size: 13px; color: #999; }
 
     /* Card items */
-    .queue { display: flex; flex-direction: column; gap: 12px; }
+    .queue { display: flex; flex-direction: column; gap: 16px; }
     .card-item { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; overflow: hidden; }
     .card-item.processing { border-color: #c0d0f0; }
     .card-item.done { border-color: #b8ddb8; }
@@ -65,40 +65,47 @@
 
     /* Review form */
     .ci-review { padding: 0 14px 14px; border-top: 1px solid #f0f0e8; }
-    .ci-review-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 0; }
+    .section-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; padding: 12px 0 8px; border-bottom: 1px solid #f5f5f0; margin-bottom: 10px; }
     .rf { margin-bottom: 8px; }
     .rf label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
-    .rf input { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
-    .rf input:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 2px rgba(26,26,46,0.06); }
+    .rf input, .rf select, .rf textarea { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .rf input:focus, .rf select:focus, .rf textarea:focus { outline: none; border-color: #1a1a2e; box-shadow: 0 0 0 2px rgba(26,26,46,0.06); }
+    .rf textarea { resize: vertical; min-height: 70px; }
     .rg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .rg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    @media(max-width:560px) { .rg2,.rg3 { grid-template-columns: 1fr; } }
-    .ci-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .btn-save { flex: 1; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .rg4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    @media(max-width:560px) { .rg2,.rg3,.rg4 { grid-template-columns: 1fr; } }
+
+    /* Category checkboxes */
+    .cat-list { display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto; border: 1px solid #e8e8e0; border-radius: 8px; padding: 8px; background: #fafaf8; }
+    .cat-label { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; color: #1a1a2e; }
+    .cat-label:hover { background: #f0f0e8; }
+    .cat-label input { width: 14px; height: 14px; flex-shrink: 0; }
+    .cat-label:has(input:checked) { background: #eef2ff; }
+
+    /* Photo grid */
+    .photo-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .photo-preview { position: relative; width: 80px; height: 60px; border-radius: 6px; overflow: hidden; border: 1px solid #e0e0d8; }
+    .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-preview-del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,0.55); color: #fff; border: none; border-radius: 3px; font-size: 10px; cursor: pointer; padding: 1px 4px; line-height: 1.4; }
+    .upload-zone-sm { border: 1.5px dashed #d0d0c8; border-radius: 8px; padding: 10px; text-align: center; cursor: pointer; font-size: 12px; color: #999; margin-top: 6px; }
+    .upload-zone-sm:hover { border-color: #1a1a2e; background: #f8f8f4; }
+
+    /* Actions */
+    .ci-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .btn-save { flex: 1; padding: 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-save:hover { opacity: 0.87; }
     .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-discard { padding: 10px 14px; background: #f5f5f0; color: #888; border: 1px solid #e0e0d8; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
+    .btn-discard { padding: 12px 16px; background: #f5f5f0; color: #888; border: 1px solid #e0e0d8; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit; }
     .btn-discard:hover { background: #eee; }
     .ci-msg { font-size: 12px; border-radius: 6px; padding: 8px 10px; margin-top: 8px; display: none; }
     .ci-msg.ok { color: #1a7a1a; background: #edfaed; border: 1px solid #a0d8a0; }
     .ci-msg.err { color: #b00; background: #fff0f0; border: 1px solid #fdd; }
+
+    .cert-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
+    .cert-cb { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; cursor: pointer; }
+    .cert-cb input { width: 13px; height: 13px; }
   </style>
-  <!-- Google Analytics -->
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
-  <script>
-    window.dataLayer=window.dataLayer||[];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js',new Date());
-    gtag('config','G-W8YDH8LTSB');
-  </script>
-<!-- Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-W8YDH8LTSB');
-</script>
 </head>
 <body>
 
@@ -112,20 +119,18 @@
 
 <div class="main">
   <div class="page-title">Business Card Scanner</div>
-  <div class="page-sub">Upload or photograph business cards. Claude reads each one and extracts all contact details for review before saving.</div>
+  <div class="page-sub">Upload or photograph business cards. Claude extracts contact details — then complete the full factory profile before saving.</div>
 
   <div class="api-warn" id="api-warn">⚠ No Anthropic API key found. <a href="admin.html" style="color:#7a6000;font-weight:600;">Add your key in Admin Settings →</a></div>
   <div class="top-banner" id="top-banner"></div>
 
   <div class="upload-card">
-    <!-- Desktop -->
     <div class="drop-zone" id="drop-zone">
       <div class="drop-icon">📇</div>
       <div class="drop-title">Drop business card photos here</div>
-      <div class="drop-sub">JPG, PNG, HEIC supported &nbsp;·&nbsp; Multiple files at once</div>
+      <div class="drop-sub">JPG, PNG, HEIC &nbsp;·&nbsp; Multiple cards at once</div>
       <label class="browse-btn">Browse Files<input type="file" id="file-input" accept="image/*" multiple style="display:none" /></label>
     </div>
-    <!-- Mobile -->
     <div class="mobile-btns">
       <label class="mob-btn"><span class="mob-icon">📷</span>Take Photo<input type="file" accept="image/*" capture="environment" style="display:none" id="cam-input" /></label>
       <label class="mob-btn"><span class="mob-icon">🖼</span>Choose Photo<input type="file" accept="image/*" multiple style="display:none" id="lib-input" /></label>
@@ -141,323 +146,432 @@
 </div>
 
 <script>
-var SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
-var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
-var cards = [];
-var counter = 0;
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var cards=[], counter=0, allCategories=[];
 
-function g(id) { return document.getElementById(id); }
+function g(id){return document.getElementById(id);}
 
-// ── Init on load ──
-window.addEventListener('load', function () {
-  if (!localStorage.getItem('anthropic_key')) g('api-warn').style.display = 'block';
-
-  // File input (desktop browse button)
-  g('file-input').addEventListener('change', function () { handleFiles(this.files); this.value = ''; });
-
-  // Mobile inputs
-  g('cam-input').addEventListener('change', function () { handleFiles(this.files); this.value = ''; });
-  g('lib-input').addEventListener('change', function () { handleFiles(this.files); this.value = ''; });
-
-  // Drag & drop
-  var dz = g('drop-zone');
-  dz.addEventListener('dragover', function (e) { e.preventDefault(); dz.classList.add('drag-over'); });
-  dz.addEventListener('dragleave', function () { dz.classList.remove('drag-over'); });
-  dz.addEventListener('drop', function (e) {
-    e.preventDefault();
-    dz.classList.remove('drag-over');
-    handleFiles(e.dataTransfer.files);
-  });
+// ── Init ──
+window.addEventListener('load',function(){
+  if(!localStorage.getItem('anthropic_key'))g('api-warn').style.display='block';
+  g('file-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
+  g('cam-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
+  g('lib-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
+  var dz=g('drop-zone');
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag-over');});
+  dz.addEventListener('dragleave',function(){dz.classList.remove('drag-over');});
+  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files);});
+  loadCategories();
 });
 
-// ── Handle selected files ──
-function handleFiles(files) {
-  if (!files || !files.length) return;
-  Array.from(files).forEach(function (file) {
-    // Accept any image — don't filter by MIME type as HEIC may have no type
-    var id = 'c' + (++counter);
-    var card = { id: id, file: file, dataUrl: null, status: 'pending', data: null, errorMsg: '', multiCount: 0 };
+async function loadCategories(){
+  try{
+    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allCategories=await r.json();
+  }catch(e){}
+}
+
+// ── Handle files ──
+function handleFiles(files){
+  if(!files||!files.length)return;
+  Array.from(files).forEach(function(file){
+    var id='c'+(++counter);
+    var card={id:id,file:file,dataUrl:null,status:'pending',data:null,errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null};
     cards.push(card);
-    // Show card immediately with pending status
-    renderCard(card);
-    updateBar();
-    // Load image — use createObjectURL for better compatibility with iPhone photos
-    var url = URL.createObjectURL(file);
-    var img = new Image();
-    img.onload = function() {
-      // Draw to canvas to force JPEG conversion (handles HEIC renamed as jpg)
-      var canvas = document.createElement('canvas');
-      var max = 1600;
-      var w = img.width, h = img.height;
-      if (w > max || h > max) {
-        if (w > h) { h = Math.round(h * max / w); w = max; }
-        else { w = Math.round(w * max / h); h = max; }
-      }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      card.dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    renderCard(card);updateBar();
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      var canvas=document.createElement('canvas'),max=1600,w=img.width,h=img.height;
+      if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      card.dataUrl=canvas.toDataURL('image/jpeg',0.85);
       URL.revokeObjectURL(url);
-      renderCard(card);
-      updateBar();
+      renderCard(card);updateBar();
     };
-    img.onerror = function() {
-      // Fallback to FileReader if object URL fails
+    img.onerror=function(){
       URL.revokeObjectURL(url);
-      var reader = new FileReader();
-      reader.onload = function(e) { card.dataUrl = e.target.result; renderCard(card); updateBar(); };
+      var reader=new FileReader();
+      reader.onload=function(e){card.dataUrl=e.target.result;renderCard(card);updateBar();};
       reader.readAsDataURL(file);
     };
-    img.src = url;
+    img.src=url;
   });
 }
 
-// ── Scan bar ──
-function updateBar() {
-  var pending = cards.filter(function (c) { return c.status === 'pending'; }).length;
-  g('scan-bar').style.display = cards.length ? 'flex' : 'none';
-  g('scan-count').textContent = pending + ' card' + (pending === 1 ? '' : 's') + ' ready to scan';
-  g('scan-btn').disabled = pending === 0;
+function updateBar(){
+  var pending=cards.filter(function(c){return c.status==='pending';}).length;
+  g('scan-bar').style.display=cards.length?'flex':'none';
+  g('scan-count').textContent=pending+' card'+(pending===1?'':'s')+' ready to scan';
+  g('scan-btn').disabled=pending===0;
 }
 
-// ── Render a card block ──
-function renderCard(card) {
-  var existing = g(card.id);
-  if (existing) existing.remove();
+// ── Render card ──
+function renderCard(card){
+  var old=g(card.id);if(old)old.remove();
+  var cls='card-item'+(card.status==='processing'?' processing':card.status==='done'?' done':card.status==='saved'?' saved':card.status==='error'?' error':'');
+  var stText='',stCls='';
+  if(card.status==='pending')stText='Ready to scan';
+  else if(card.status==='processing'){stText='<span class="spinner"></span>Reading with AI...';stCls='reading';}
+  else if(card.status==='done'){stText=card.multiCount>1?'✓ Found '+card.multiCount+' cards':'✓ Extracted — complete profile and save';stCls='ok';}
+  else if(card.status==='done_err'){stText='Partial read — review and complete manually';stCls='err';}
+  else if(card.status==='saved'){stText='✓ Saved to database';stCls='ok';}
+  else if(card.status==='error'){stText=card.errorMsg||'Could not read card';stCls='err';}
 
-  var cls = 'card-item' + (card.status === 'processing' ? ' processing' : card.status === 'done' ? ' done' : card.status === 'saved' ? ' saved' : card.status === 'error' ? ' error' : '');
+  var thumb=card.dataUrl?'<img class="ci-thumb" src="'+card.dataUrl+'" />':'<div class="ci-thumb"></div>';
+  var removeBtn=(card.status==='pending'||card.status==='error')?'<button class="ci-remove" onclick="removeCard(\''+card.id+'\')">×</button>':'';
 
-  var stText = '', stCls = '';
-  if (card.status === 'pending') { stText = 'Ready to scan'; }
-  else if (card.status === 'processing') { stText = '<span class="spinner"></span>Reading with AI...'; stCls = 'reading'; }
-  else if (card.status === 'done') { stText = card.multiCount > 1 ? '✓ Found ' + card.multiCount + ' cards — each shown separately' : '✓ Extracted — review and save below'; stCls = 'ok'; }
-  else if (card.status === 'done_err') { stText = 'Partial read — review what was found'; stCls = 'err'; }
-  else if (card.status === 'saved') { stText = '✓ Saved as draft factory'; stCls = 'ok'; }
-  else if (card.status === 'error') { stText = card.errorMsg || 'Could not read card'; stCls = 'err'; }
+  var review='';
+  if((card.status==='done'||card.status==='done_err')&&card.data){
+    var d=card.data;
+    review='<div class="ci-review">'+
 
-  var thumb = card.dataUrl ? '<img class="ci-thumb" src="' + card.dataUrl + '" />' : '<div class="ci-thumb"></div>';
-  var removeBtn = (card.status === 'pending' || card.status === 'error') ? '<button class="ci-remove" onclick="removeCard(\'' + card.id + '\')">×</button>' : '';
+    // ── SECTION 1: Company ──
+    '<div class="section-title">Company Information</div>'+
+    '<div class="rg2">'+fi(card.id,'name_en','Company Name (English)',d.factory_name_english)+fi(card.id,'name_local','Company Name (Local Language)',d.factory_name_local)+'</div>'+
+    '<div class="rg3">'+
+      fi(card.id,'years','Years in Business','')+
+      '<div class="rf"><label>Annual Revenue (USD)</label><select id="'+card.id+'_revenue"><option value="">— Select —</option><option>Under $1M</option><option>$1M–$5M</option><option>$5M–$10M</option><option>$10M–$50M</option><option>$50M–$100M</option><option>Over $100M</option></select></div>'+
+      fi(card.id,'export','Export %','')+
+    '</div>'+
 
-  var review = '';
-  if ((card.status === 'done' || card.status === 'done_err') && card.data) {
-    var d = card.data;
-    review = '<div class="ci-review">' +
-      '<div class="ci-review-title">Review Extracted Details — Edit if Needed</div>' +
-      '<div class="rg2">' + f(card.id, 'name_en', 'Company Name (English)', d.factory_name_english) + f(card.id, 'name_local', 'Company Name (Local Language)', d.factory_name_local) + '</div>' +
-      '<div class="rg3">' + f(card.id, 'contact', 'Contact Name', d.sales_contact_name) + f(card.id, 'title', 'Title / Position', d.contact_title) + f(card.id, 'email', 'Email', d.sales_email, 'email') + '</div>' +
-      '<div class="rg3">' + f(card.id, 'mobile', 'Mobile', d.sales_mobile, 'tel') + f(card.id, 'telephone', 'Telephone', d.telephone, 'tel') + f(card.id, 'wechat', 'WeChat / QR Code', d.sales_wechat) + '</div>' +
-      '<div class="rg3">' + f(card.id, 'whatsapp', 'WhatsApp', d.sales_whatsapp, 'tel') + f(card.id, 'website', 'Website', d.website) + f(card.id, 'country', 'Country', d.country) + '</div>' +
-      '<div class="rg2">' + f(card.id, 'city', 'City', d.city) + f(card.id, 'address', 'Street Address', d.address) + '</div>' +
-      f(card.id, 'categories', 'Products / What They Make', d.product_categories) +
-      f(card.id, 'notes', 'Additional Notes', d.notes) +
-      '<div class="ci-actions">' +
-        '<button class="btn-save" id="' + card.id + '_savebtn" onclick="saveDraft(\'' + card.id + '\')">✓ Save as Draft Factory</button>' +
-        '<button class="btn-discard" onclick="removeCard(\'' + card.id + '\')">Discard</button>' +
-      '</div>' +
-      '<div class="ci-msg ok" id="' + card.id + '_ok"></div>' +
-      '<div class="ci-msg err" id="' + card.id + '_err"></div>' +
+    // ── SECTION 2: Contact ──
+    '<div class="section-title">Primary Sales Contact</div>'+
+    '<div class="rg3">'+fi(card.id,'contact','Contact Name',d.sales_contact_name)+fi(card.id,'title','Title / Position',d.contact_title)+fi(card.id,'email','Email',d.sales_email,'email')+'</div>'+
+    '<div class="rg3">'+fi(card.id,'mobile','Mobile',d.sales_mobile,'tel')+fi(card.id,'telephone','Telephone',d.telephone,'tel')+fi(card.id,'wechat','WeChat / QR Code',d.sales_wechat)+'</div>'+
+    '<div class="rg2">'+fi(card.id,'whatsapp','WhatsApp',d.sales_whatsapp,'tel')+fi(card.id,'website','Website',d.website)+'</div>'+
+
+    // ── SECTION 3: Address ──
+    '<div class="section-title">Factory Address</div>'+
+    '<div class="rg2">'+fi(card.id,'address','Street Address',d.address)+fi(card.id,'city','City',d.city)+'</div>'+
+    '<div class="rg3">'+fi(card.id,'state','State / Province','')+fi(card.id,'postal','Postal Code','')+fi(card.id,'country','Country',d.country)+'</div>'+
+
+    // ── SECTION 4: Capacity ──
+    '<div class="section-title">Factory Capacity</div>'+
+    '<div class="rg4">'+fi(card.id,'emp','Total Employees','')+fi(card.id,'eng','Engineers / R&D','')+fi(card.id,'qc','QC Staff','')+fi(card.id,'lines','Production Lines','')+'</div>'+
+    '<div class="rg3">'+fi(card.id,'sqm','Floor Space (m²)','')+fi(card.id,'inj','Injection Machines','')+fi(card.id,'cap','Monthly Capacity (units)','')+'</div>'+
+    '<div class="rf"><label>Capacity Notes</label><textarea id="'+card.id+'_capnotes" rows="2"></textarea></div>'+
+
+    // ── SECTION 5: Products ──
+    '<div class="section-title">Products</div>'+
+    '<div class="rf"><label>What They Manufacture (free text)</label><textarea id="'+card.id+'_categories" rows="2">'+esc(d.product_categories||'')+'</textarea></div>'+
+
+    // ── SECTION 6: Manufacturing Categories ──
+    '<div class="section-title">Manufacturing Categories (select all that apply)</div>'+
+    buildCatCheckboxes(card.id)+
+
+    // ── SECTION 7: Certifications ──
+    '<div class="section-title">Certifications</div>'+
+    '<div class="cert-grid">'+
+    ['ISO 9001','ISO 14001','ISO 45001','ISO 13485','BSCI','Sedex','SA8000','ETL','UL','CE','FCC','FDA','RoHS','REACH','GRS','OEKO-TEX','FSC','GOTS','HACCP','BRC','GMP','Leaping Bunny','Cruelty Free','Vegan','Organic','CCC','KC','PSE','BIS','COSMOS'].map(function(c){
+      return '<label class="cert-cb"><input type="checkbox" class="scanner-cert" data-cardid="'+card.id+'" value="'+c+'" /> '+c+'</label>';
+    }).join('')+
+    '</div>'+
+    '<div class="rf" style="margin-top:8px;"><label>Other Certifications</label><input type="text" id="'+card.id+'_cert_other" placeholder="e.g. TS16949, Kosher..." /></div>'+
+
+    // ── SECTION 8: Factory Photos ──
+    '<div class="section-title">Factory Photos</div>'+
+    '<p style="font-size:12px;color:#999;margin-bottom:8px;">Upload photos of the factory, production floor, showroom, etc.</p>'+
+    '<div class="photo-grid" id="'+card.id+'_photoGrid"></div>'+
+    '<label class="upload-zone-sm">'+
+      '📷 Click to add factory photos (JPG, PNG)'+
+      '<input type="file" accept="image/*" multiple style="display:none" onchange="addFactoryPhotos(\''+card.id+'\',this)" />'+
+    '</label>'+
+
+    // ── SECTION 9: Files ──
+    '<div class="section-title">Catalog & Files</div>'+
+    '<div class="rf"><label>Product Catalog (PDF or PowerPoint)</label>'+
+      '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;cursor:pointer;">'+
+        '<span style="font-size:18px;">📄</span>'+
+        '<span style="font-size:12px;color:#888;" id="'+card.id+'_catLabel">Click to attach catalog</span>'+
+        '<input type="file" accept=".pdf,.pptx,.ppt" style="display:none" id="'+card.id+'_catalog" onchange="catalogChosen(\''+card.id+'\',this)" />'+
+      '</label>'+
+    '</div>'+
+    '<div class="rf"><label>Quote Sheet (Excel)</label>'+
+      '<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;cursor:pointer;">'+
+        '<span style="font-size:18px;">📊</span>'+
+        '<span style="font-size:12px;color:#888;" id="'+card.id+'_qtLabel">Click to attach quote sheet</span>'+
+        '<input type="file" accept=".xlsx,.xls" style="display:none" id="'+card.id+'_quote" onchange="quoteChosen(\''+card.id+'\',this)" />'+
+      '</label>'+
+    '</div>'+
+
+    // ── SECTION 10: Notes ──
+    '<div class="section-title">Additional Notes</div>'+
+    '<div class="rf"><textarea id="'+card.id+'_notes" rows="2" placeholder="Met at Canton Fair, follow up required, etc.">'+esc(d.notes||'')+'</textarea></div>'+
+
+    // ── Actions ──
+    '<div class="ci-actions">'+
+      '<button class="btn-save" id="'+card.id+'_savebtn" onclick="saveDraft(\''+card.id+'\')">✓ Save Factory to Database</button>'+
+      '<button class="btn-discard" onclick="removeCard(\''+card.id+'\')">Discard</button>'+
+    '</div>'+
+    '<div class="ci-msg ok" id="'+card.id+'_ok"></div>'+
+    '<div class="ci-msg err" id="'+card.id+'_err"></div>'+
     '</div>';
   }
 
-  var el = document.createElement('div');
-  el.id = card.id;
-  el.className = cls;
-  el.innerHTML =
-    '<div class="ci-top">' + thumb +
-    '<div class="ci-info"><div class="ci-filename">' + esc(card.file.name) + '</div><div class="ci-status ' + stCls + '">' + stText + '</div></div>' +
-    removeBtn + '</div>' + review;
-
+  var el=document.createElement('div');
+  el.id=card.id;el.className=cls;
+  el.innerHTML='<div class="ci-top">'+thumb+'<div class="ci-info"><div class="ci-filename">'+esc(card.file.name)+'</div><div class="ci-status '+stCls+'">'+stText+'</div></div>'+removeBtn+'</div>'+review;
   g('queue').appendChild(el);
 }
 
-function f(cid, key, label, val, type) {
-  return '<div class="rf"><label>' + label + '</label><input type="' + (type || 'text') + '" id="' + cid + '_' + key + '" value="' + esc(val || '') + '" /></div>';
+function fi(cid,key,label,val,type){
+  return '<div class="rf"><label>'+label+'</label><input type="'+(type||'text')+'" id="'+cid+'_'+key+'" value="'+esc(val||'')+'" /></div>';
 }
 
-function esc(v) { return (v || '').toString().replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function buildCatCheckboxes(cardId){
+  if(!allCategories.length)return '<div style="font-size:12px;color:#bbb;padding:8px;">No categories set up yet — add them in Admin → Categories first.</div>';
+  return '<div class="cat-list">'+allCategories.map(function(c){
+    var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
+    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<label class="cat-label"><input type="checkbox" class="scanner-cat-cb" data-cardid="'+cardId+'" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'" /> '+path+(c.is_cosmetic?' <span style="font-size:10px;background:#fce8f0;color:#880044;border:1px solid #f0b8d0;padding:1px 5px;border-radius:8px;margin-left:4px;">Cosmetic</span>':'')+'</label>';
+  }).join('')+'</div>';
+}
 
-function removeCard(id) {
-  cards = cards.filter(function (c) { return c.id !== id; });
-  var el = g(id); if (el) el.remove();
+function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+function removeCard(id){
+  cards=cards.filter(function(c){return c.id!==id;});
+  var el=g(id);if(el)el.remove();updateBar();
+}
+
+// ── Factory photos management ──
+function addFactoryPhotos(cardId,input){
+  var card=cards.find(function(c){return c.id===cardId;});if(!card)return;
+  Array.from(input.files).forEach(function(file){
+    var url=URL.createObjectURL(file);
+    card.factoryPhotos.push({file:file,previewUrl:url});
+  });
+  input.value='';
+  renderPhotoGrid(card);
+}
+
+function renderPhotoGrid(card){
+  var grid=g(card.id+'_photoGrid');if(!grid)return;
+  grid.innerHTML=card.factoryPhotos.map(function(p,i){
+    return '<div class="photo-preview"><img src="'+p.previewUrl+'" /><button class="photo-preview-del" onclick="removePhoto(\''+card.id+'\','+i+')">✕</button></div>';
+  }).join('');
+}
+
+function removePhoto(cardId,idx){
+  var card=cards.find(function(c){return c.id===cardId;});if(!card)return;
+  URL.revokeObjectURL(card.factoryPhotos[idx].previewUrl);
+  card.factoryPhotos.splice(idx,1);
+  renderPhotoGrid(card);
+}
+
+function catalogChosen(cardId,input){
+  var file=input.files[0];if(!file)return;
+  var card=cards.find(function(c){return c.id===cardId;});if(!card)return;
+  card.catalogFile=file;
+  var lbl=g(cardId+'_catLabel');if(lbl)lbl.textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
+}
+
+function quoteChosen(cardId,input){
+  var file=input.files[0];if(!file)return;
+  var card=cards.find(function(c){return c.id===cardId;});if(!card)return;
+  card.quoteFile=file;
+  var lbl=g(cardId+'_qtLabel');if(lbl)lbl.textContent=file.name+' ('+(file.size/1024/1024).toFixed(1)+' MB)';
+}
+
+// ── Scan all ──
+async function scanAll(){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(!apiKey){g('api-warn').style.display='block';window.scrollTo(0,0);return;}
+  var pending=cards.filter(function(c){return c.status==='pending';});
+  g('scan-btn').disabled=true;
+  for(var i=0;i<pending.length;i++){await scanCard(pending[i],apiKey);}
   updateBar();
 }
 
-// ── Resize image before sending to API ──
-function resizeImage(dataUrl, maxPx, quality) {
-  return new Promise(function (resolve) {
-    var img = new Image();
-    img.onload = function () {
-      var w = img.width, h = img.height;
-      if (w > maxPx || h > maxPx) {
-        if (w > h) { h = Math.round(h * maxPx / w); w = maxPx; }
-        else { w = Math.round(w * maxPx / h); h = maxPx; }
-      }
-      var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+async function scanCard(card,apiKey){
+  card.status='processing';renderCard(card);
+  try{
+    var resized=await resizeImg(card.dataUrl,1600,0.85);
+    var base64=resized.split(',')[1];
+    var prompt='This image may contain one or more business cards. Treat each as a completely independent record.\nCRITICAL: NEVER mix data from different cards. IGNORE fax numbers entirely. Decode any QR codes — WeChat QR goes in sales_wechat, website QR in website.\nReturn ONLY a JSON array with these keys for each card (empty string if not found):\n[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]\nReturn ONLY the raw JSON array, no markdown.';
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},{type:'text',text:prompt}]}]})});
+    var d=await resp.json();
+    if(d.error){card.status='error';card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';}
+    else if(d.content&&d.content[0]&&d.content[0].text){
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+      var dataArr=null;
+      try{var p=JSON.parse(raw);dataArr=Array.isArray(p)?p:[p];}catch(e){}
+      if(!dataArr){try{var m=raw.match(/\[[\s\S]*\]/);if(m){var p2=JSON.parse(m[0]);dataArr=Array.isArray(p2)?p2:[p2];}}catch(e){}}
+      if(!dataArr){try{var objs=[],re=/\{[\s\S]+?\}/g,om;while((om=re.exec(raw))!==null){try{var ob=JSON.parse(om[0]);if('factory_name_english'in ob)objs.push(ob);}catch(e){}}if(objs.length)dataArr=objs;}catch(e){}}
+      if(dataArr&&dataArr.length){
+        card.data=dataArr[0];card.status='done';
+        if(dataArr.length>1){card.multiCount=dataArr.length;for(var mi=1;mi<dataArr.length;mi++){var nid='c'+(++counter);var nc={id:nid,file:card.file,dataUrl:card.dataUrl,status:'done',data:dataArr[mi],errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null,quoteFile:null};cards.push(nc);renderCard(nc);}}
+      }else{card.data={notes:raw};card.status='done_err';}
+    }else{card.status='error';card.errorMsg='Unexpected API response';}
+  }catch(e){card.status='error';card.errorMsg='Connection error: '+e.message;}
+  renderCard(card);
+}
+
+function resizeImg(dataUrl,maxPx,quality){
+  return new Promise(function(resolve){
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      resolve(c.toDataURL('image/jpeg',quality));
     };
-    img.src = dataUrl;
+    img.src=dataUrl;
   });
 }
 
-// ── Scan all pending ──
-async function scanAll() {
-  var apiKey = localStorage.getItem('anthropic_key') || '';
-  if (!apiKey) { g('api-warn').style.display = 'block'; window.scrollTo(0, 0); return; }
-  var pending = cards.filter(function (c) { return c.status === 'pending'; });
-  g('scan-btn').disabled = true;
-  for (var i = 0; i < pending.length; i++) { await scanCard(pending[i], apiKey); }
-  updateBar();
-}
+// ── Save full factory profile ──
+async function saveDraft(id){
+  var card=cards.find(function(c){return c.id===id;});if(!card)return;
+  var btn=g(id+'_savebtn');if(btn){btn.disabled=true;btn.textContent='Saving...';}
 
-// ── Scan a single card ──
-async function scanCard(card, apiKey) {
-  card.status = 'processing';
-  renderCard(card);
+  var gv=function(k){var el=g(id+'_'+k);return el?el.value.trim():'';};
 
-  try {
-    // dataUrl already resized to 1600px at load time
-    var base64 = card.dataUrl.split(',')[1];
+  // Required: company name
+  var nameEn=gv('name_en')||gv('name_local')||gv('contact')||'Unknown Factory';
+  var nameEl=g(id+'_name_en');if(nameEl&&!nameEl.value.trim())nameEl.value=nameEn;
 
-    var prompt = 'This image may contain one or more business cards. Treat each physically separate card as a completely independent record.\n\nCRITICAL RULES:\n1. NEVER mix information from different cards. Each card is its own object.\n2. Only assign a field value if it physically appears on THAT specific card. Use empty string if not found on that card.\n3. A phone number, email, or name from card A must NEVER appear in card B.\n4. Carefully look at the physical boundaries of each card before extracting.\n5. IGNORE fax numbers completely. Do not put fax numbers in any field.\n6. If there is a QR code on a card, try to decode it. If it is a WeChat ID or WeChat URL put it in sales_wechat. If it is a website URL put it in website.\n\nReturn ONLY a JSON array (even for one card). Each element must use these exact keys (empty string if not found on that card):\n[\n  {\n    "factory_name_english": "",\n    "factory_name_local": "",\n    "sales_contact_name": "",\n    "contact_title": "",\n    "sales_email": "",\n    "sales_mobile": "",\n    "telephone": "",\n    "sales_wechat": "",\n    "sales_whatsapp": "",\n    "website": "",\n    "address": "",\n    "city": "",\n    "country": "",\n    "product_categories": "",\n    "notes": ""\n  }\n]\n\nReturn ONLY the raw JSON array. No markdown, no explanation.';
+  // Certifications
+  var certs=[];
+  document.querySelectorAll('.scanner-cert[data-cardid="'+id+'"]:checked').forEach(function(cb){certs.push(cb.value);});
+  var certOther=gv('cert_other');if(certOther)certs.push(certOther);
 
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-          { type: 'text', text: prompt }
-        ]}]
-      })
-    });
+  // Build notes from title + website + notes
+  var extras=[gv('title')?'Title: '+gv('title'):'',gv('website')?'Website: '+gv('website'):'',gv('notes')||''].filter(Boolean).join(' | ');
 
-    var d = await resp.json();
-
-    if (d.error) {
-      card.status = 'error';
-      card.errorMsg = 'API error: ' + d.error.message + ' (' + d.error.type + ')';
-    } else if (d.content && d.content[0] && d.content[0].text) {
-      var raw = d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-      var dataArr = null;
-
-      // Try 1: direct parse
-      try { var p = JSON.parse(raw); dataArr = Array.isArray(p) ? p : [p]; } catch(e) {}
-
-      // Try 2: extract [...] array
-      if (!dataArr) {
-        try {
-          var m = raw.match(/\[[\s\S]*\]/);
-          if (m) { var p2 = JSON.parse(m[0]); dataArr = Array.isArray(p2) ? p2 : [p2]; }
-        } catch(e) {}
-      }
-
-      // Try 3: extract individual {...} objects that have factory_name_english key
-      if (!dataArr) {
-        try {
-          var objs = [], re = /\{[\s\S]+?\}/g, om;
-          while ((om = re.exec(raw)) !== null) {
-            try { var ob = JSON.parse(om[0]); if ('factory_name_english' in ob) objs.push(ob); } catch(e) {}
-          }
-          if (objs.length) dataArr = objs;
-        } catch(e) {}
-      }
-
-      if (dataArr && dataArr.length) {
-        card.data = dataArr[0];
-        card.status = 'done';
-        if (dataArr.length > 1) {
-          card.multiCount = dataArr.length;
-          for (var mi = 1; mi < dataArr.length; mi++) {
-            var newId = 'c' + (++counter);
-            var newCard = { id: newId, file: card.file, dataUrl: card.dataUrl, status: 'done', data: dataArr[mi], errorMsg: '', multiCount: 0 };
-            cards.push(newCard);
-            renderCard(newCard);
-          }
-        }
-      } else {
-        card.data = { notes: raw };
-        card.status = 'done_err';
-      }
-    } else {
-      card.status = 'error';
-      card.errorMsg = 'Unexpected API response: ' + JSON.stringify(d).slice(0, 200);
-    }
-  } catch(e) {
-    card.status = 'error';
-    card.errorMsg = 'Connection error: ' + e.message;
-  }
-
-  renderCard(card);
-}
-
-// ── Save draft to Supabase ──
-async function saveDraft(id) {
-  var card = cards.find(function (c) { return c.id === id; });
-  if (!card) return;
-  var btn = g(id + '_savebtn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
-
-  var gv = function (k) { var el = g(id + '_' + k); return el ? el.value.trim() : ''; };
-
-  // Fall back through names if English is empty
-  var nameEn = gv('name_en') || gv('name_local') || gv('contact') || 'Unknown Factory';
-  var nameEl = g(id + '_name_en'); if (nameEl && !nameEl.value.trim()) nameEl.value = nameEn;
-
-  var extras = [gv('title') ? 'Title: ' + gv('title') : '', gv('website') ? 'Website: ' + gv('website') : '', gv('notes') || ''].filter(Boolean).join(' | ');
-  var cats = gv('categories');
-
-  var payload = {
-    factory_name_english: nameEn,
-    factory_name_local: gv('name_local') || null,
-    sales_contact_name: gv('contact') || null,
-    sales_email: gv('email') || null,
-    sales_mobile: gv('mobile') || null,
-    telephone: gv('telephone') || null,
-    sales_wechat: gv('wechat') || null,
-    sales_whatsapp: gv('whatsapp') || null,
-    address: gv('address') || null,
-    city: gv('city') || null,
-    country: gv('country') || null,
-    product_categories: cats ? [cats] : [],
-    internal_notes: extras || null,
-    status: 'pending'
+  var payload={
+    factory_name_english:nameEn,
+    factory_name_local:gv('name_local')||null,
+    sales_contact_name:gv('contact')||null,
+    sales_email:gv('email')||null,
+    sales_mobile:gv('mobile')||null,
+    telephone:gv('telephone')||null,
+    sales_wechat:gv('wechat')||null,
+    sales_whatsapp:gv('whatsapp')||null,
+    address:gv('address')||null,
+    city:gv('city')||null,
+    state_province:gv('state')||null,
+    postal_code:gv('postal')||null,
+    country:gv('country')||null,
+    years_in_business:parseInt(gv('years'))||null,
+    annual_revenue_usd:gv('revenue')||null,
+    export_percentage:parseInt(gv('export'))||null,
+    product_categories:gv('categories')?[gv('categories')]:[],
+    certifications:certs,
+    internal_notes:extras||null,
+    status:'pending'
   };
 
-  try {
-    var r = await fetch(SB + '/rest/v1/factories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Prefer': 'return=minimal' },
-      body: JSON.stringify(payload)
+  try{
+    // Step 1: Save factory record — use return=representation to get factory ID back
+    var r=await fetch(SB+'/rest/v1/factories',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=representation'},
+      body:JSON.stringify(payload)
     });
-    if (r.ok) {
-      card.status = 'saved';
-      var okEl = g(id + '_ok');
-      if (okEl) { okEl.textContent = '✓ Saved! Find "' + nameEn + '" in Admin Dashboard under Pending.'; okEl.style.display = 'block'; }
-      if (btn) { btn.disabled = true; btn.textContent = '✓ Saved'; }
-      var banner = g('top-banner');
-      banner.textContent = '✓ ' + nameEn + ' saved as a draft factory.';
-      banner.style.display = 'block';
-      setTimeout(function () { banner.style.display = 'none'; }, 6000);
-    } else {
-      var errData = await r.json().catch(function () { return {}; });
-      var errEl = g(id + '_err');
-      if (errEl) { errEl.textContent = 'Save failed: ' + (errData.message || errData.details || r.status); errEl.style.display = 'block'; }
-      if (btn) { btn.disabled = false; btn.textContent = '✓ Save as Draft Factory'; }
+
+    if(!r.ok){
+      var errData=await r.json().catch(function(){return{};});
+      showMsg(id,'err','Save failed: '+(errData.message||errData.details||r.status));
+      if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';}
+      return;
     }
-  } catch(e) {
-    var errEl = g(id + '_err');
-    if (errEl) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
-    if (btn) { btn.disabled = false; btn.textContent = '✓ Save as Draft Factory'; }
+
+    var result=await r.json();
+    var factory=Array.isArray(result)?result[0]:result;
+    var factoryId=factory?factory.id:null;
+
+    if(!factoryId){
+      showMsg(id,'err','Save failed: could not get factory ID back from database.');
+      if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';}
+      return;
+    }
+
+    // Step 2: Save manufacturing categories
+    var catChecked=[];
+    document.querySelectorAll('.scanner-cat-cb[data-cardid="'+id+'"]:checked').forEach(function(cb){
+      catChecked.push({factory_id:factoryId,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false});
+    });
+    if(catChecked.length){
+      await fetch(SB+'/rest/v1/factory_categories',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},
+        body:JSON.stringify(catChecked)
+      });
+    }
+
+    // Step 3: Save capacity to factory_locations
+    var emp=parseInt(gv('emp')),eng=parseInt(gv('eng')),qc=parseInt(gv('qc')),lines=parseInt(gv('lines')),sqm=parseInt(gv('sqm')),inj=parseInt(gv('inj')),cap=parseInt(gv('cap')),capnotes=gv('capnotes');
+    if(emp||eng||qc||lines||sqm||inj||cap||capnotes){
+      await fetch(SB+'/rest/v1/factory_locations',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},
+        body:JSON.stringify({factory_id:factoryId,location_type:'factory',location_name:'Main Factory',is_primary:true,employees_total:emp||null,employees_engineers:eng||null,employees_qc:qc||null,production_lines:lines||null,floor_space_sqm:sqm||null,injection_machines:inj||null,monthly_capacity_units:cap||null,monthly_capacity_notes:capnotes||null,address:gv('address')||null,city:gv('city')||null,country:gv('country')||null})
+      });
+    }
+
+    // Step 4: Upload factory photos
+    for(var pi=0;pi<card.factoryPhotos.length;pi++){
+      var photo=card.factoryPhotos[pi];
+      try{
+        var resized=await resizeImg(await fileToDataUrl(photo.file),1600,0.85);
+        var blob=await fetch(resized).then(function(r2){return r2.blob();});
+        var photoPath=factoryId+'/photos/'+Date.now()+'_'+pi+'_'+photo.file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        var upR=await fetch(SB+'/storage/v1/object/factory-files/'+photoPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob});
+        if(upR.ok){
+          var photoUrl=SB+'/storage/v1/object/public/factory-files/'+photoPath;
+          await fetch(SB+'/rest/v1/factory_photos',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify({factory_id:factoryId,photo_url:photoUrl,photo_name:photo.file.name,uploaded_by:'admin'})});
+        }
+      }catch(e){console.log('photo upload error:',e);}
+    }
+
+    // Step 5: Upload catalog
+    if(card.catalogFile){
+      try{
+        var catPath=factoryId+'/catalogs/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Catalog_'+dateStamp()+'.'+card.catalogFile.name.split('.').pop();
+        await fetch(SB+'/storage/v1/object/factory-files/'+catPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.catalogFile});
+      }catch(e){console.log('catalog upload error:',e);}
+    }
+
+    // Step 6: Upload quote sheet
+    if(card.quoteFile){
+      try{
+        var qtPath=factoryId+'/quotes/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Quote Sheet_'+dateStamp()+'.'+card.quoteFile.name.split('.').pop();
+        await fetch(SB+'/storage/v1/object/factory-files/'+qtPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/octet-stream','x-upsert':'true'},body:card.quoteFile});
+      }catch(e){console.log('quote upload error:',e);}
+    }
+
+    // Success
+    card.status='saved';
+    showMsg(id,'ok','✓ '+nameEn+' saved with all details, categories, and files!');
+    if(btn){btn.disabled=true;btn.textContent='✓ Saved';}
+    var banner=g('top-banner');
+    banner.textContent='✓ '+nameEn+' saved to your supplier database.';
+    banner.style.display='block';
+    setTimeout(function(){banner.style.display='none';},6000);
+
+  }catch(e){
+    showMsg(id,'err','Error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';}
   }
 }
+
+function fileToDataUrl(file){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onload=function(e){resolve(e.target.result);};
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getFullYear()).slice(-2);}
+
+function showMsg(id,type,text){var el=g(id+'_'+type);if(el){el.textContent=text;el.style.display='block';}}
 </script>
 </body>
 </html>
