@@ -698,7 +698,13 @@ async function sendInvite(){
   var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(factory.factory_name_english||'');
   try{
     var btn=g('inv-btn');btn.disabled=true;btn.textContent='Sending...';
-    await emailjs.send('service_aawsxwi','template_er5zzqp',{to_email:factory.sales_email,contact_name:factory.sales_contact_name||'Team',email_body:emailBody,invite_link:link,reply_to:myEmail,subject:subject});
+    await sendEmail(
+      factory.sales_email,
+      factory.sales_contact_name||'Team',
+      subject,
+      emailBody+'\n\nPortal: '+link,
+      myEmail
+    );
     var newStatus=isFollowUp?'follow_up_sent':'invited';
     await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({invitation_status:newStatus,invitation_sent_at:new Date().toISOString()})});
     factory.invitation_status=newStatus;
@@ -731,8 +737,10 @@ async function deleteFactory(){
     else{var e=await r.json().catch(function(){return{};});alert('Delete failed: '+(e.message||e.details||r.status));}
   }catch(e){alert('Delete error: '+e.message);}
 }
+
+var SG_KEY='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';
+async function sendEmail(toEmail,toName,subject,body,replyTo){var r=await fetch('https://api.sendgrid.com/v3/mail/send',{method:'POST',headers:{'Authorization':'Bearer '+SG_KEY,'Content-Type':'application/json'},body:JSON.stringify({personalizations:[{to:[{email:toEmail,name:toName||''}]}],from:{email:'sourcing@tbgsourcing.net',name:'TBG Sourcing'},reply_to:{email:replyTo||'sourcing@tbgsourcing.net'},subject:subject,content:[{type:'text/plain',value:body}]})});if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error((e.errors&&e.errors[0]&&e.errors[0].message)||r.status);}return true;}
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script>emailjs.init('6A1UTdzNuQ8z546HR');</script>
+
 </body>
 </html>

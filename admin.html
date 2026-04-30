@@ -277,8 +277,7 @@
     .mc-act { font-size:14px;font-weight:700; }
 
 </style>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-  <script>emailjs.init("6A1UTdzNuQ8z546HR");</script>
+  
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
   <script>
@@ -330,6 +329,8 @@
       <div class="slabel">Outreach</div>
       <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
+      <div class="slabel">Communications</div>
+      <button class="sitem" id="nav-inbox" onclick="showPanel('inbox');loadInbox();"><span class="sicon">📬</span> Inbox <span class="scount" id="cnt-inbox">0</span></button>
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
@@ -398,6 +399,59 @@
           <div id="rfq-viewed-list"><div class="empty">Loading...</div></div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- ── INBOX PANEL ── -->
+    <div class="panel" id="panel-inbox">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">Inbox</div><div class="ph-sub">All email communications with factories</div></div>
+        <button onclick="showComposeModal()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+      </div>
+
+      <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+
+        <!-- Left pane — thread list -->
+        <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" onclick="filterInbox('unread')" id="itab-unread">Unread</button>
+            <button class="rfq-tab" onclick="filterInbox('all')" id="itab-all">All</button>
+            <button class="rfq-tab" onclick="filterInbox('sent')" id="itab-sent">Sent</button>
+            <button class="rfq-tab" onclick="filterInbox('archived')" id="itab-archived">Archived</button>
+          </div>
+          <div id="inbox-thread-list" style="overflow-y:auto;flex:1;">
+            <div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Right pane — thread detail -->
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="inbox-detail-empty" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;">
+            <div style="font-size:32px;margin-bottom:12px;">📬</div>
+            <div style="font-size:14px;">Select a message to read</div>
+          </div>
+          <div id="inbox-detail-pane" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Compose Modal -->
+    <div id="compose-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:flex-end;justify-content:flex-end;padding:1rem;">
+      <div style="background:#fff;border-radius:12px;width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+        <div style="padding:12px 16px;background:#1a1a2e;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:#fff;font-size:14px;font-weight:600;">New Message</span>
+          <button onclick="g('compose-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+        </div>
+        <div style="padding:1rem;">
+          <div style="margin-bottom:8px;"><input type="text" id="compose-to" placeholder="To (factory email)" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
+          <div style="margin-bottom:8px;"><input type="text" id="compose-subject" placeholder="Subject" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
+          <div style="margin-bottom:8px;"><textarea id="compose-body" rows="8" placeholder="Message..." style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;"></textarea></div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button onclick="g('compose-modal').style.display='none'" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>
+            <button onclick="sendComposedEmail()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Send ✉</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1169,6 +1223,7 @@ function showPanel(name){
   if(name==='upload')initAdminUpload();
   if(name==='rfq'){loadRFQs();loadCategories();}
   if(name==='rfq-followup')loadRFQFollowups();
+  if(name==='inbox')loadInbox();
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
@@ -1680,14 +1735,13 @@ async function sendRFQ(){
   var sendBtn=document.querySelector('.btn-send');
   if(sendBtn){sendBtn.disabled=true;sendBtn.textContent='Sending...';}
   try{
-    await emailjs.send('service_aawsxwi','template_er5zzqp',{
-      to_email:f.sales_email,
-      contact_name:f.sales_contact_name||'Team',
-      email_body:fullBody,
-      invite_link:'https://project-7o416.vercel.app',
-      reply_to:myEmail,
-      subject:subject
-    });
+    await sendEmail(
+      f.sales_email,
+      f.sales_contact_name||'Team',
+      subject,
+      fullBody+'\n\nPortal: '+'https://project-7o416.vercel.app',
+      myEmail
+    );
     if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='Send RFQ ✉';}
     g('rfq-msg').style.display='block';
     g('rfq-file-link').value='';
@@ -2799,14 +2853,13 @@ async function sendRFQEmails(rfq){
       'Please log into our supplier portal to review the full specifications and submit your quote.\n\n'+
       'Best regards,\nAllan Amsel\nSupplier Sourcing';
     try{
-      await emailjs.send('service_aawsxwi','template_er5zzqp',{
-        to_email:f.sales_email,
-        contact_name:f.sales_contact_name||'Team',
-        email_body:emailBody,
-        invite_link:portalUrl,
-        reply_to:myEmail,
-        subject:'New RFQ — '+rfq.project_number+' — '+rfq.item_description
-      });
+      await sendEmail(
+      f.sales_email,
+      f.sales_contact_name||'Team',
+      'New RFQ — '+rfq.project_number+' — '+rfq.item_description,
+      emailBody+'\n\nPortal: '+portalUrl,
+      myEmail
+    );
     }catch(ex){
       failed.push(f.factory_name_english);
       console.log('Email failed for '+f.factory_name_english+':',ex);
@@ -3271,14 +3324,13 @@ async function sendRFQFollowup(assignmentId,factoryName,email,contactName,projec
   var firstName=(contactName||'').split(' ')[0]||'Team';
   var body='Dear '+firstName+',\n\nThis is a friendly reminder that we sent you a Request for Quotation ('+projectNum+') for '+itemDesc+'.\n\nWe have not yet received your quote. Please log into our supplier portal at your earliest convenience to review and submit your quote.\n\nBest regards,\nAllan Amsel\nSupplier Sourcing';
   try{
-    await emailjs.send('service_aawsxwi','template_er5zzqp',{
-      to_email:email,
-      contact_name:contactName||'Team',
-      email_body:body,
-      invite_link:'https://project-7o416.vercel.app',
-      reply_to:myEmail,
-      subject:'Reminder: RFQ '+projectNum+' — '+itemDesc
-    });
+    await sendEmail(
+      email,
+      contactName||'Team',
+      'Reminder: RFQ '+projectNum+' — '+itemDesc,
+      body+'\n\nPortal: https://project-7o416.vercel.app',
+      myEmail
+    );
     // Update status
     await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+assignmentId,{
       method:'PATCH',
@@ -3358,14 +3410,13 @@ async function doSendInvite(f){
   document.querySelectorAll('.btn-invite').forEach(function(b){b.disabled=true;b.textContent='Sending...';});
   var inviteDrawerBtn=g('d-invite-btn');if(inviteDrawerBtn){inviteDrawerBtn.disabled=true;inviteDrawerBtn.textContent='Sending...';}
   try{
-    await emailjs.send('service_aawsxwi','template_er5zzqp',{
-      to_email:f.sales_email,
-      contact_name:f.sales_contact_name||'Team',
-      email_body:emailBody,
-      invite_link:link,
-      reply_to:myEmail,
-      subject:subject
-    });
+    await sendEmail(
+      f.sales_email,
+      f.sales_contact_name||'Team',
+      subject,
+      emailBody+'\n\nPortal: '+link,
+      myEmail
+    );
     alert('✓ Invitation sent to '+f.sales_email);
   }catch(ex){
     alert('Email failed to send: '+(ex.text||ex.message||JSON.stringify(ex)));
@@ -3431,6 +3482,241 @@ if(localStorage.getItem('admin_session')==='1'){
   g('main').style.display='flex';
   loadData();
 }
+// ── SendGrid Email ──
+var SG_KEY='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';
+async function sendEmail(toEmail,toName,subject,body,replyTo){
+  var fromEmail='sourcing@tbgsourcing.net';
+  var fromName='Allan Amsel — TBG Sourcing';
+  var r=await fetch('https://api.sendgrid.com/v3/mail/send',{
+    method:'POST',
+    headers:{
+      'Authorization':'Bearer '+SG_KEY,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      personalizations:[{to:[{email:toEmail,name:toName||''}]}],
+      from:{email:fromEmail,name:fromName},
+      reply_to:{email:replyTo||fromEmail,name:fromName},
+      subject:subject,
+      content:[{type:'text/plain',value:body}]
+    })
+  });
+  if(!r.ok){
+    var e=await r.json().catch(function(){return{};});
+    throw new Error((e.errors&&e.errors[0]&&e.errors[0].message)||r.status);
+  }
+  return true;
+}
+
+// ── INBOX ──
+var currentInboxFilter='unread';
+var currentThreadId=null;
+
+async function loadInbox(){
+  var el=g('inbox-thread-list');
+  if(!el)return;
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div>';
+  try{
+    var query=SB+'/rest/v1/email_threads?select=*&order=last_message_at.desc&limit=50';
+    if(currentInboxFilter==='unread')query+='&status=eq.unread';
+    else if(currentInboxFilter==='sent')query+='&direction=eq.outbound';
+    else if(currentInboxFilter==='archived')query+='&status=eq.archived';
+    var r=await fetch(query,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){el.innerHTML='<div style="padding:1rem;color:#b00;font-size:13px;">Load failed: '+r.status+'</div>';return;}
+    var threads=await r.json();
+
+    // Update unread count
+    var unreadCount=threads.filter(function(t){return t.status==='unread';}).length;
+    g('cnt-inbox').textContent=unreadCount||'';
+
+    if(!threads.length){
+      el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No messages yet.</div>';
+      return;
+    }
+
+    el.innerHTML=threads.map(function(t){
+      var isSelected=t.id===currentThreadId;
+      var isUnread=t.status==='unread';
+      var date=new Date(t.last_message_at||t.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+      var dirIcon=t.direction==='inbound'?'←':'→';
+      return '<div class="rfq-list-item'+(isSelected?' selected':'')+(isUnread?' ':'')+'" data-tid="'+t.id+'" onclick="openThread(this.dataset.tid)" style="'+(isUnread?'font-weight:600;background:#f8f8ff;':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
+          '<div style="font-size:12px;color:#1a1a2e;">'+(t.from_name||t.from_email||t.to_email||'—')+'</div>'+
+          '<div style="font-size:11px;color:#bbb;">'+date+'</div>'+
+        '</div>'+
+        '<div style="font-size:12px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+dirIcon+' '+(t.subject||'—')+'</div>'+
+        (isUnread?'<div style="width:8px;height:8px;background:#2244cc;border-radius:50%;float:right;margin-top:-16px;"></div>':'')+
+      '</div>';
+    }).join('');
+  }catch(e){el.innerHTML='<div style="padding:1rem;color:#b00;font-size:13px;">Error: '+e.message+'</div>';}
+}
+
+function filterInbox(filter){
+  currentInboxFilter=filter;
+  document.querySelectorAll('.rfq-tab').forEach(function(t){
+    if(t.id&&t.id.startsWith('itab-'))t.classList.remove('on');
+  });
+  var tab=g('itab-'+filter);if(tab)tab.classList.add('on');
+  loadInbox();
+}
+
+async function openThread(threadId){
+  currentThreadId=threadId;
+  g('inbox-detail-empty').style.display='none';
+  g('inbox-detail-pane').style.display='block';
+  g('inbox-detail-pane').innerHTML='<div style="color:#bbb;font-size:13px;">Loading...</div>';
+
+  try{
+    // Mark as read
+    await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'read'})
+    });
+
+    // Load messages
+    var r=await fetch(SB+'/rest/v1/email_messages?thread_id=eq.'+threadId+'&select=*&order=sent_at',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var messages=await r.json();
+
+    // Load thread info
+    var rt=await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var threads=await rt.json();
+    var thread=threads[0]||{};
+
+    renderThreadDetail(thread,messages);
+    loadInbox(); // refresh list to show read status
+  }catch(e){g('inbox-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error: '+e.message+'</div>';}
+}
+
+function renderThreadDetail(thread,messages){
+  var el=g('inbox-detail-pane');
+  var replyTo=thread.from_email||'';
+
+  var html=
+    '<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e0e0d8;">'+
+      '<div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">'+(thread.subject||'—')+'</div>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<button data-tid="'+thread.id+'" onclick="archiveThread(this.dataset.tid)" style="font-size:12px;padding:5px 10px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;cursor:pointer;">Archive</button>'+
+        '<button onclick="showReply()" style="font-size:12px;padding:5px 10px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;">↩ Reply</button>'+
+      '</div>'+
+    '</div>'+
+    messages.map(function(m){
+      var isInbound=m.direction==='inbound';
+      var date=new Date(m.sent_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      return '<div style="margin-bottom:1.5rem;padding:1rem;background:'+(isInbound?'#f8f8f4':'#eef2ff')+';border-radius:10px;border:1px solid '+(isInbound?'#e8e8e0':'#c0d0f0')+';">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">'+
+          '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+(isInbound?'From: '+(m.from_name||m.from_email):'From: TBG Sourcing')+'</div>'+
+          '<div style="font-size:11px;color:#bbb;">'+date+'</div>'+
+        '</div>'+
+        '<div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap;">'+(m.body_text||m.body_html||'')+'</div>'+
+      '</div>';
+    }).join('')+
+    // Reply box
+    '<div id="reply-box" style="display:none;margin-top:1rem;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;">'+
+      '<div style="padding:8px 12px;background:#f8f8f4;border-bottom:1px solid #e0e0d8;font-size:12px;color:#888;">Reply to: <span id="reply-to-addr">'+replyTo+'</span></div>'+
+      '<textarea id="reply-body" rows="5" style="width:100%;padding:12px;border:none;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Write your reply..."></textarea>'+
+      '<div style="padding:8px 12px;background:#f8f8f4;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:8px;">'+
+        '<button onclick="hideReplyBox()" style="padding:7px 14px;background:#fff;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;cursor:pointer;">Cancel</button>'+
+        '<button onclick="sendCurrentReply()" style="padding:7px 14px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">Send Reply ✉</button>'+
+      '</div>'+
+    '</div>';
+
+  el.innerHTML=html;
+}
+
+function showReply(){
+  var box=g('reply-box');
+  if(box){box.style.display='block';g('reply-body').focus();}
+}
+function hideReplyBox(){
+  var box=g('reply-box');if(box)box.style.display='none';
+}
+function sendCurrentReply(){
+  if(!currentThreadId)return;
+  var toEl=g('reply-to-addr');
+  var to=toEl?toEl.textContent:'';
+  var subj='Re: '+(document.querySelector('#inbox-detail-pane [style*="font-size:18px"]')||{textContent:''}).textContent;
+  sendReply(currentThreadId,to,subj);
+}
+function sendReplyFromBtn(btn){
+  sendReply(btn.dataset.tid,btn.dataset.to,btn.dataset.subj);
+}
+
+async function sendReply(threadId,toEmail,subject,originalThreadId){
+  var body=g('reply-body').value.trim();
+  if(!body){alert('Please write a reply first.');return;}
+  try{
+    await sendEmail(toEmail,'',subject,body,'sourcing@tbgsourcing.net');
+    // Save outbound message
+    await fetch(SB+'/rest/v1/email_messages',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({thread_id:threadId,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+    });
+    await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({last_message_at:new Date().toISOString(),status:'read'})
+    });
+    g('reply-body').value='';
+    g('reply-box').style.display='none';
+    openThread(threadId);
+    alert('Reply sent!');
+  }catch(e){alert('Send failed: '+e.message);}
+}
+
+async function archiveThread(threadId){
+  await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
+    method:'PATCH',
+    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({status:'archived'})
+  });
+  currentThreadId=null;
+  g('inbox-detail-empty').style.display='flex';
+  g('inbox-detail-pane').style.display='none';
+  loadInbox();
+}
+
+function showComposeModal(){
+  g('compose-to').value='';
+  g('compose-subject').value='';
+  g('compose-body').value='';
+  g('compose-modal').style.display='flex';
+}
+
+async function sendComposedEmail(){
+  var to=g('compose-to').value.trim();
+  var subject=g('compose-subject').value.trim();
+  var body=g('compose-body').value.trim();
+  if(!to||!subject||!body){alert('Please fill in all fields.');return;}
+  try{
+    await sendEmail(to,'',subject,body,'sourcing@tbgsourcing.net');
+    // Save to threads
+    var r=await fetch(SB+'/rest/v1/email_threads',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({subject:subject,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:to,direction:'outbound',status:'read'})
+    });
+    var threads=await r.json();
+    var thread=Array.isArray(threads)?threads[0]:threads;
+    if(thread&&thread.id){
+      await fetch(SB+'/rest/v1/email_messages',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({thread_id:thread.id,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:to,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+      });
+    }
+    g('compose-modal').style.display='none';
+    showPanel('inbox');
+    loadInbox();
+    alert('Email sent!');
+  }catch(e){alert('Send failed: '+e.message);}
+}
+
 </script>
 </body>
 </html>
