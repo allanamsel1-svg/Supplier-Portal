@@ -1067,6 +1067,10 @@ function renderAll(){
   populateUploadDropdown();
 }
 
+function openFactoryDetail(id){
+  window.open('factory-detail.html?id='+id,'_blank');
+}
+
 function factoryCard(f){
   var certs=(f.certifications||[]).slice(0,6).map(function(c){return '<span class="ctag">'+c+'</span>';}).join('');
   var moreCerts=(f.certifications||[]).length>6?'<span class="ctag">+'+(f.certifications.length-6)+' more</span>':'';
@@ -1084,9 +1088,9 @@ function factoryCard(f){
   var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(allFactories.find(function(x){return x.id===\''+fid+'\'})?allFactories.find(function(x){return x.id===\''+fid+'\'}).id:\'\',event)">✓ Approve</button>':'';
   var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInviteById(\''+fid+'\',event)">'+invBtnLabel+'</button>':'';
   var rfqBtn='<button class="btn-rfq" onclick="openRFQById(\''+fid+'\',event)">✉ Send RFQ</button>';
-  var viewBtn='<button class="btn-view" onclick="event.stopPropagation();window.open(\'factory-detail.html?id='+fid+'\',\'_blank\')">View Details →</button>';
+  var viewBtn='<button class="btn-view" onclick="event.stopPropagation();openFactoryDetail(\''+fid+'\');">View Details →</button>';
 
-  return '<div class="fc" onclick="window.open(\'factory-detail.html?id='+fid+'\',\'_blank\')">'+
+  return '<div class="fc" onclick="openFactoryDetail(\''+fid+'\')">'+
     '<div class="fc-top"><div><div class="fc-name">'+esc(f.factory_name_english||'—')+invBadge+(f.factory_id?'<span style="font-size:10px;color:#bbb;font-family:monospace;margin-left:6px;font-weight:400;">'+f.factory_id+'</span>':'')+'</div><div class="fc-local">'+esc(f.factory_name_local||'')+'</div></div>'+
     '<span class="fc-status '+(f.status==='approved'?'st-approved':'st-pending')+'">'+(f.status||'pending')+'</span></div>'+
     '<div class="fc-meta"><span>📍 '+esc([f.city,f.country].filter(Boolean).join(', ')||'—')+'</span>'+

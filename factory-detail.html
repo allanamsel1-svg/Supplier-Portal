@@ -308,7 +308,6 @@ function showMsg(id,type,text){
 window.addEventListener('load',function(){
   var params=new URLSearchParams(window.location.search);
   FACTORY_ID=params.get('id');
-  alert('Page loaded. Factory ID: '+(FACTORY_ID?FACTORY_ID:'MISSING'));
   if(!FACTORY_ID){alert('No factory ID in URL. Go back to the dashboard.');return;}
   loadFactory();
 });
@@ -324,15 +323,11 @@ function switchTab(name){
 // ── Load factory ──
 async function loadFactory(){
   try{
-    alert('Fetching factory from Supabase...');
     var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    alert('Fetch response status: '+r.status);
     if(!r.ok){alert('Failed to load factory: '+r.status);return;}
     var rows=await r.json();
-    alert('Rows returned: '+rows.length);
     if(!rows.length){alert('Factory not found.');return;}
     factory=rows[0];
-    alert('Factory found: '+factory.factory_name_english);
     populateForm();
     loadCategories();
     loadCerts();
@@ -545,8 +540,12 @@ async function uploadPhotos(input){
   else showMsg('photo-msg','ok','✓ Photos uploaded!');
 }
 
-async function deleteFile(factoryId,folder,filename){
-  if(!confirm('Delete '+filename.replace(/^\d{8}_\d{4}_/,'')+'?'))return;
+async function deleteFile(btn){
+  var factoryId=btn.dataset.fid;
+  var folder=btn.dataset.folder;
+  var filename=btn.dataset.name;
+  var displayName=filename.replace(/^\d{8}_\d{4}_/,'');
+  if(!confirm('Delete '+displayName+'?'))return;
   try{
     var r=await fetch(SB+'/storage/v1/object/factory-files/'+factoryId+'/'+folder+'/'+filename,{
       method:'DELETE',
@@ -606,7 +605,7 @@ async function loadFiles(){
             '</div>'+
             '<div style="display:flex;gap:8px;align-items:center;">'+
               '<a class="file-link" href="'+url+'" target="_blank">View</a>'+
-              '<button onclick="deleteFile(''+FACTORY_ID+'',''+folder+'',''+f.name+'')" style="font-size:11px;color:#b00;background:none;border:none;cursor:pointer;padding:0;">Delete</button>'+
+              '<button onclick="deleteFile(this)" data-fid="'+FACTORY_ID+'" data-folder="'+folder+'" data-name="'+f.name+'" style="font-size:11px;color:#b00;background:none;border:none;cursor:pointer;padding:0;">Delete</button>'+
             '</div>'+
           '</div>';
         }).join('');
