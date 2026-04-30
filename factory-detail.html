@@ -308,6 +308,7 @@ function showMsg(id,type,text){
 window.addEventListener('load',function(){
   var params=new URLSearchParams(window.location.search);
   FACTORY_ID=params.get('id');
+  alert('Page loaded. Factory ID from URL: '+(FACTORY_ID||'MISSING'));
   if(!FACTORY_ID){alert('No factory ID in URL. Go back to the dashboard.');return;}
   loadFactory();
 });
@@ -323,11 +324,15 @@ function switchTab(name){
 // ── Load factory ──
 async function loadFactory(){
   try{
+    alert('Fetching factory from Supabase...');
     var r=await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    alert('Fetch response status: '+r.status);
     if(!r.ok){alert('Failed to load factory: '+r.status);return;}
     var rows=await r.json();
+    alert('Rows returned: '+rows.length);
     if(!rows.length){alert('Factory not found.');return;}
     factory=rows[0];
+    alert('Factory found: '+factory.factory_name_english);
     populateForm();
     loadCategories();
     loadCerts();
