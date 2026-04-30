@@ -145,6 +145,12 @@
     .cat-tree-sub { font-size: 12px; color: #666; margin-top: 2px; }
     .cat-tree-prefix { font-size: 11px; font-family: monospace; background: #f0f0e8; color: #666; padding: 2px 6px; border-radius: 4px; margin-left: 6px; }
     .cosmetic-badge { font-size: 10px; background: #fce8f0; color: #880044; border: 1px solid #f0b8d0; padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
+    .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+    .photo-thumb { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 4/3; background: #f0f0e8; border: 1px solid #e0e0d8; }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb-del { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.5); color: #fff; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; padding: 2px 6px; }
+    .photo-upload-zone { border: 2px dashed #d0d0c8; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; font-size: 13px; color: #999; margin-top: 8px; }
+    .photo-upload-zone:hover { border-color: #1a1a2e; background: #f8f8f4; }
 
     /* ── RFQ Modal ── */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; display: none; align-items: center; justify-content: center; }
@@ -897,6 +903,17 @@
     </div>
 
     <div class="d-section">
+      <div class="d-section-title">Factory Photos
+        <label style="font-size:11px;padding:3px 8px;background:#1a1a2e;color:#fff;border-radius:5px;cursor:pointer;font-weight:500;margin-left:8px;">
+          + Add Photo
+          <input type="file" accept="image/*" multiple style="display:none" onchange="uploadFactoryPhotos(this)" />
+        </label>
+      </div>
+      <div class="photo-grid" id="d-photos"></div>
+      <div id="d-photos-empty" style="font-size:13px;color:#ccc;font-style:italic;margin-top:6px;">No photos uploaded yet</div>
+    </div>
+
+    <div class="d-section">
       <div class="d-section-title">Uploaded Files</div>
       <div class="d-files" id="d-files"><span class="no-data">No files uploaded</span></div>
     </div>
@@ -1237,8 +1254,9 @@ async function openDrawer(id,e){
     else{inviteBtn.textContent='✉ Send Invitation Email';inviteBtn.disabled=false;}
   }
 
-  // Load editable categories (wrapped so failure doesn't block drawer)
+  // Load editable categories and photos (wrapped so failure doesn't block drawer)
   try{ await loadDrawerCategories(f.id); }catch(ex){ console.log('cat load err:',ex); }
+  try{ await loadFactoryPhotos(f.id); }catch(ex){ console.log('photo load err:',ex); }
 
   // Open drawer
   g('drawer-overlay').classList.add('on');
@@ -1596,6 +1614,79 @@ async function adminUpload(){
     g('admin-upload-err').textContent='Error: '+e.message;
     g('admin-upload-err').style.display='block';
   }
+}
+
+// ── FACTORY PHOTOS ──
+async function loadFactoryPhotos(factoryId){
+  var grid=g('d-photos');
+  var empty=g('d-photos-empty');
+  if(!grid)return;
+  grid.innerHTML='';
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_photos?factory_id=eq.'+factoryId+'&select=*&order=display_order',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var photos=await r.json();
+    if(!Array.isArray(photos)||!photos.length){
+      if(empty)empty.style.display='block';
+      return;
+    }
+    if(empty)empty.style.display='none';
+    grid.innerHTML=photos.map(function(p){
+      return '<div class="photo-thumb">'+
+        '<img src="'+p.photo_url+'" alt="'+(p.caption||'Factory photo')+'" onclick="window.open(\''+p.photo_url+'\',\'_blank\')" style="cursor:zoom-in;" />'+
+        (p.caption?'<div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.5);color:#fff;font-size:10px;padding:3px 5px;">'+p.caption+'</div>':'')+
+        '<button class="photo-thumb-del" onclick="deleteFactoryPhoto(\''+p.id+'\',\''+factoryId+'\')" title="Delete">✕</button>'+
+      '</div>';
+    }).join('');
+  }catch(e){console.log('loadFactoryPhotos error:',e);}
+}
+
+async function uploadFactoryPhotos(input){
+  var f=currentDrawerFactory;if(!f)return;
+  var files=Array.from(input.files);if(!files.length)return;
+  for(var i=0;i<files.length;i++){
+    var file=files[i];
+    // Resize image
+    var resized=await resizeImageAdmin(file,1600,0.85);
+    var blob=await fetch(resized).then(function(r){return r.blob();});
+    var path=f.user_id+'/photos/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    try{
+      var uploadR=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
+        method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:blob
+      });
+      if(uploadR.ok){
+        var photoUrl=SB+'/storage/v1/object/public/factory-files/'+path;
+        await fetch(SB+'/rest/v1/factory_photos',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({factory_id:f.id,photo_url:photoUrl,photo_name:file.name,uploaded_by:'admin'})
+        });
+      }
+    }catch(e){console.log('photo upload error:',e);}
+  }
+  input.value='';
+  await loadFactoryPhotos(f.id);
+}
+
+async function deleteFactoryPhoto(photoId,factoryId){
+  if(!confirm('Delete this photo?'))return;
+  await fetch(SB+'/rest/v1/factory_photos?id=eq.'+photoId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  await loadFactoryPhotos(factoryId);
+}
+
+function resizeImageAdmin(file,maxPx,quality){
+  return new Promise(function(resolve){
+    var url=URL.createObjectURL(file);
+    var img=new Image();
+    img.onload=function(){
+      var w=img.width,h=img.height;
+      if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
+      var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.src=url;
+  });
 }
 
 // ── FACTORY CATEGORY EDITOR (Admin Drawer) ──
