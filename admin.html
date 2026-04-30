@@ -330,8 +330,15 @@
       <div class="ph"><div class="ph-title">All Factories</div><div class="ph-sub">Complete supplier database</div></div>
       <div class="sbar">
         <input type="text" id="search-input" placeholder="Search by name, country, category..." oninput="filterFactories()" />
-        <select id="cat-filter" onchange="filterFactories()">
-          <option value="">All Categories</option>
+        <select id="cert-filter" onchange="filterFactories()">
+          <option value="">All Certifications</option>
+          <option>ISO 9001</option><option>ISO 14001</option><option>ISO 45001</option><option>ISO 13485</option>
+          <option>ETL</option><option>UL</option><option>CE</option><option>FCC</option><option>FDA</option>
+          <option>RoHS</option><option>REACH</option><option>BSCI</option><option>Sedex</option>
+          <option>SA8000</option><option>GRS</option><option>OEKO-TEX</option><option>FSC</option>
+          <option>HACCP</option><option>BRC</option><option>GMP</option><option>CCC</option>
+          <option>Leaping Bunny</option><option>Cruelty Free</option><option>Vegan</option><option>Organic</option>
+          <option>COSMOS</option><option>Health Canada</option><option>Prop 65 Compliant</option>
         </select>
       </div>
       <div class="factory-list" id="all-list"><div class="empty">Loading...</div></div>
@@ -1058,7 +1065,6 @@ function renderAll(){
   g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
   renderFollowUps();
   populateUploadDropdown();
-  populateCatFilter();
 }
 
 function factoryCard(f){
@@ -1093,24 +1099,12 @@ function factoryCard(f){
 function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 
-function populateCatFilter(){
-  var sel=g('cat-filter');if(!sel)return;
-  var current=sel.value;
-  sel.innerHTML='<option value="">All Categories</option>';
-  var cats=[];
-  allFactories.forEach(function(f){(f.product_categories||[]).forEach(function(c){if(c&&!cats.includes(c))cats.push(c);});});
-  // Also add from allCategories if loaded
-  allCategories.forEach(function(c){if(c.category&&!cats.includes(c.category))cats.push(c.category);});
-  cats.sort().forEach(function(c){sel.innerHTML+='<option value="'+c+'"'+(c===current?' selected':'')+'>'+c+'</option>';});
-}
-
 function filterFactories(){
   var search=g('search-input').value.toLowerCase();
-  var cat=g('cat-filter').value;
+  var cert=g('cert-filter').value;
   var filtered=allFactories.filter(function(f){
     var text=[f.factory_name_english,f.factory_name_local,f.city,f.country].concat(f.product_categories||[]).join(' ').toLowerCase();
-    var catMatch=!cat||text.includes(cat.toLowerCase());
-    return(!search||text.includes(search))&&catMatch;
+    return(!search||text.includes(search))&&(!cert||(f.certifications||[]).includes(cert));
   });
   g('all-list').innerHTML=filtered.map(factoryCard).join('')||'<div class="empty">No factories match your search.</div>';
 }
