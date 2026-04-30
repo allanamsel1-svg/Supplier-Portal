@@ -1087,7 +1087,7 @@ function factoryCard(f){
   var fid=f.id;
   var approveBtn=f.status==='pending'?'<button class="btn-approve" onclick="approveCard(allFactories.find(function(x){return x.id===\''+fid+'\'})?allFactories.find(function(x){return x.id===\''+fid+'\'}).id:\'\',event)">✓ Approve</button>':'';
   var invBtn=f.sales_email?'<button class="btn-invite" onclick="sendInviteById(\''+fid+'\',event)">'+invBtnLabel+'</button>':'';
-  var rfqBtn='<button class="btn-rfq" onclick="openRFQById(\''+fid+'\',event)">✉ Send RFQ</button>';
+  var rfqBtn='';
   var viewBtn='<button class="btn-view" onclick="event.stopPropagation();openFactoryDetail(\''+fid+'\');">View Details →</button>';
 
   return '<div class="fc" onclick="openFactoryDetail(\''+fid+'\')">'+
@@ -1097,7 +1097,7 @@ function factoryCard(f){
     '<span>✉ '+esc(f.sales_email||'—')+'</span>'+
     (filesSummary||'')+(locSummary||'')+'</div>'+
     (certs?'<div class="fc-certs">'+certs+moreCerts+'</div>':'')+
-    '<div class="fc-actions">'+approveBtn+invBtn+rfqBtn+viewBtn+'</div></div>';
+    '<div class="fc-actions">'+approveBtn+invBtn+viewBtn+'</div></div>';
 }
 
 function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1159,10 +1159,7 @@ function sendInviteById(id,e){
   if(e)e.stopPropagation();
   sendInvite(id,e);
 }
-function openRFQById(id,e){
-  if(e)e.stopPropagation();
-  openRFQ(id,e);
-}
+
 
 async function openDrawer(id,e){
   try{
@@ -1456,16 +1453,7 @@ function rfqFromDrawer(){
 }
 
 // ── RFQ ──
-function openRFQ(id,e){
-  if(e)e.stopPropagation();
-  currentRFQFactory=allFactories.find(function(f){return f.id===id;});
-  if(!currentRFQFactory)return;
-  g('rfq-to').textContent='To: '+(currentRFQFactory.sales_contact_name||'Factory Contact')+' <'+(currentRFQFactory.sales_email||'')+'>'; 
-  g('rfq-body').value='';g('rfq-msg').style.display='none';
-  g('rfq-modal').classList.add('on');
-  generateRFQ();
-}
-function closeRFQ(){g('rfq-modal').classList.remove('on');currentRFQFactory=null;}
+
 
 async function generateRFQ(){
   var apiKey=localStorage.getItem('anthropic_key')||'';
@@ -2160,47 +2148,19 @@ async function saveRFQ(action){
 }
 
 async function sendRFQEmails(rfq){
-  var apiKey=localStorage.getItem('anthropic_key')||'';
   var myEmail=localStorage.getItem('from_email')||'';
   var factories=allFactories.filter(function(f){return selectedFactoryIds[f.id];});
   var portalUrl='https://project-7o416.vercel.app';
+  var failed=[];
 
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
     if(!f.sales_email)continue;
-    var emailBody='';
-
-    if(apiKey){
-      try{
-        var prompt='Write a professional RFQ email to a factory.\n\n'+
-          'Project: '+rfq.project_number+'\n'+
-          'Factory: '+f.factory_name_english+'\n'+
-          'Contact: '+(f.sales_contact_name||'Team')+'\n'+
-          'Product: '+rfq.item_description+'\n'+
-          'Specifications: '+(rfq.detailed_specifications||'See portal')+'\n'+
-          'Quantity: '+(rfq.quote_quantity||'TBD')+'\n'+
-          'Unit of Measure: '+(rfq.unit_of_measure||'TBD')+'\n'+
-          'Inner Case Pack: '+(rfq.inner_case_pack||'TBD')+'\n'+
-          'Master Case Pack: '+(rfq.master_case_pack||'TBD')+'\n\n'+
-          'The factory logs into our portal to submit their quote.\n\n'+
-          'Rules:\n- Address contact by first name\n- Sign as Allan Amsel, Sourcing\n- No placeholders\n- Concise and professional\n- Do not include the portal link\n- Write ONLY the email body';
-        var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
-        var d=await r.json();
-        if(d.content&&d.content[0])emailBody=d.content[0].text;
-      }catch(e){}
-    }
-
-    if(!emailBody){
-      var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
-      emailBody='Dear '+firstName+',\n\n'+
-        'We have a new sourcing project and would like to invite you to submit a quote.\n\n'+
-        'Project: '+rfq.project_number+'\n'+
-        'Product: '+rfq.item_description+'\n'+
-        'Quantity: '+(rfq.quote_quantity||'TBD')+'\n\n'+
-        'Please log into our supplier portal to view the full specifications and submit your quote.\n\n'+
-        'Best regards,\nAllan Amsel\nSourcing';
-    }
-
+    var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
+    var emailBody='Dear '+firstName+',\n\n'+
+      'Our sourcing team has sent you a new Request for Quotation ('+rfq.project_number+').\n\n'+
+      'Please log into our supplier portal to review the full specifications and submit your quote.\n\n'+
+      'Best regards,\nAllan Amsel\nSupplier Sourcing';
     try{
       await emailjs.send('service_aawsxwi','template_er5zzqp',{
         to_email:f.sales_email,
@@ -2208,10 +2168,14 @@ async function sendRFQEmails(rfq){
         email_body:emailBody,
         invite_link:portalUrl,
         reply_to:myEmail,
-        subject:'RFQ — '+rfq.project_number+' — '+rfq.item_description
+        subject:'New RFQ — '+rfq.project_number+' — '+rfq.item_description
       });
-    }catch(ex){console.log('Email failed for '+f.factory_name_english+':',ex);}
+    }catch(ex){
+      failed.push(f.factory_name_english);
+      console.log('Email failed for '+f.factory_name_english+':',ex);
+    }
   }
+  if(failed.length)alert('Note: emails failed for: '+failed.join(', '));
 }
 
 // ── BRANDS ──

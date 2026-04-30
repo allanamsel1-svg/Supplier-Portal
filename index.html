@@ -1478,7 +1478,6 @@ async function loadMyRFQs(){
     var r=await fetch(SB+'/rest/v1/rfq_factory_assignments?factory_id=eq.'+FACTORY_ID+'&select=*,rfqs(*)',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
-    alert('Response status: '+r.status);
     if(!r.ok){
       var e=await r.json().catch(function(){return{};});
       el.innerHTML='<div style="font-size:13px;color:#b00;">Load failed: '+(e.message||r.status)+'</div>';
@@ -1486,7 +1485,6 @@ async function loadMyRFQs(){
       return;
     }
     var assignments=await r.json();
-    alert('Assignments found: '+assignments.length);
     if(!assignments.length){
       el.innerHTML='<div style="font-size:13px;color:#bbb;padding:1rem 0;">No RFQs assigned to you yet. Check back soon.</div>';
       return;
