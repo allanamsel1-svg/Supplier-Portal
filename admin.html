@@ -810,22 +810,22 @@
         </div>
 
         <!-- Admin-Only Margin Calculator -->
-        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;">
+        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;overflow:hidden;">
           <div class="mgr-card-title" style="color:#5522aa;display:flex;justify-content:space-between;align-items:center;">
             <span>🔒 Margin Calculator — Admin Only</span>
-            <button onclick="calcMargins()" style="padding:6px 16px;background:#5522aa;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">Calculate</button>
+            <button onclick="calcMargins()" style="padding:6px 14px;background:#5522aa;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">Calculate</button>
           </div>
-          <div style="padding:0 1rem 1rem;">
+          <div style="padding:0 1rem 1rem;overflow:hidden;">
 
-            <!-- PRICING -->
+            <!-- ROW 1: Retail + Customer Margin -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="mf"><label>Comp Retail Price ($)</label><input type="number" id="rfq-comp-retail" step="0.01" placeholder="e.g. 6.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Target Retail Price ($)</label><input type="number" id="rfq-target-retail" step="0.01" placeholder="e.g. 4.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Comp Retail ($)</label><input type="number" id="rfq-comp-retail" step="0.01" placeholder="e.g. 6.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Target Retail ($)</label><input type="number" id="rfq-target-retail" step="0.01" placeholder="e.g. 4.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Customer Margin %</label><input type="number" id="rfq-cust-margin" step="0.1" placeholder="e.g. 55" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             </div>
 
-            <!-- CUSTOMER & BRAND -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <!-- ROW 2: Customer + Brand -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
               <div class="mf"><label>Customer (auto-fills deductions)</label>
                 <select id="rfq-customer-id" onchange="rfqCustomerChanged()" style="border-color:#c8b8f0;width:100%;padding:8px;font-size:13px;border-radius:6px;font-family:inherit;background:#fff;">
                   <option value="">— Select Customer —</option>
@@ -838,31 +838,33 @@
               </div>
             </div>
 
-            <!-- UNIT DIMENSIONS -->
+            <!-- ROW 3: Unit dimensions -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Unit Dimensions</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:6px;">
-              <div class="mf"><label>Unit L (cm)</label><input type="number" id="rfq-unit-l" step="0.1" placeholder="e.g. 5" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Unit W (cm)</label><input type="number" id="rfq-unit-w" step="0.1" placeholder="e.g. 5" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Unit H (cm)</label><input type="number" id="rfq-unit-h" step="0.1" placeholder="e.g. 10" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Unit CBM (auto)</label><input type="number" id="rfq-unit-cbm" readonly step="0.000001" style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Width (cm)</label><input type="number" id="rfq-unit-l" step="0.1" placeholder="cm" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Depth (cm)</label><input type="number" id="rfq-unit-w" step="0.1" placeholder="cm" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Height (cm)</label><input type="number" id="rfq-unit-h" step="0.1" placeholder="cm" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Unit CBM (auto)</label><input type="number" id="rfq-unit-cbm" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
 
-            <!-- CARTON STRUCTURE -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:6px;">
+            <!-- ROW 4: Carton structure -->
+            <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Carton Structure</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
               <div class="mf"><label>Units per Inner</label><input type="number" id="rfq-inner-pack" step="1" placeholder="e.g. 12" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Inner CBM (auto)</label><input type="number" id="rfq-inner-cbm" readonly step="0.000001" style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Inner CBM (auto)</label><input type="number" id="rfq-inner-cbm" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Inners per Master</label><input type="number" id="rfq-master-pack" step="1" placeholder="e.g. 4" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Master CBM (auto)</label><input type="number" id="rfq-master-cbm" readonly step="0.000001" style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Master CBM (auto)</label><input type="number" id="rfq-master-cbm" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
 
-            <!-- FREIGHT -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:6px;">
+            <!-- ROW 5: Freight -->
+            <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Freight</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
               <div class="mf"><label>Units per 40HC FCL (auto)</label><input type="number" id="rfq-units-per-cont" readonly style="background:#f5f0ff;border-color:#c8b8f0;font-weight:600;" /></div>
               <div class="mf"><label>Container Cost ($)</label><input type="number" id="rfq-container-cost" step="1" placeholder="e.g. 6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Est. Freight/Unit (auto)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;font-weight:600;" /></div>
             </div>
 
-            <!-- DUTY & TARIFF -->
+            <!-- ROW 6: Duty & Tariff -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Duty &amp; Tariff</div>
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:6px;">
               <div class="mf"><label>Country of Manufacture</label>
@@ -880,32 +882,31 @@
               <div class="mf"><label>Est. Tariff % (AI suggested)</label><input type="number" id="rfq-est-tariff" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             </div>
             <div id="rfq-duty-note" style="display:none;background:#fff8e0;border:1px solid #e0c840;border-radius:7px;padding:8px 12px;font-size:12px;color:#665500;margin-bottom:8px;"></div>
-            <div style="margin-bottom:12px;"><button onclick="suggestDutyTariff()" style="padding:7px 14px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button></div>
+            <div style="margin-bottom:12px;">
+              <button onclick="suggestDutyTariff()" style="padding:7px 14px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button>
+            </div>
 
-            <!-- DEDUCTIONS -->
+            <!-- ROW 7: Deductions — 3 cols then 2 cols -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Deductions <span style="font-weight:400;font-size:10px;color:#888;">(auto-filled when customer selected)</span></div>
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:6px;">
               <div class="mf"><label>Returns %</label><input type="number" id="rfq-est-returns" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Dilution %</label><input type="number" id="rfq-est-dilution" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Commission %</label><input type="number" id="rfq-est-commission" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
               <div class="mf"><label>Ad Allowance %</label><input type="number" id="rfq-est-ad" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Royalty %</label><input type="number" id="rfq-est-royalty" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            </div>
-
-            <!-- TARGET MARGIN -->
-            <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:12px;align-items:end;">
-              <div class="mf"><label style="color:#5522aa;font-weight:600;">Target Gross Margin % (default 80%)</label><input type="number" id="rfq-target-gross" step="1" value="80" oninput="calcMargins()" style="border-color:#5522aa;border-width:2px;font-size:16px;font-weight:600;" /></div>
-              <div style="font-size:12px;color:#888;padding-bottom:4px;">Adjust this to see what FOB price you can afford. Higher margin = lower max FOB.</div>
+              <div class="mf"><label style="color:#5522aa;font-weight:600;">Target Gross Margin %</label><input type="number" id="rfq-target-gross" step="1" value="80" oninput="calcMargins()" style="border-color:#5522aa;border-width:2px;" /></div>
             </div>
 
             <!-- RESULTS -->
             <div id="rfq-margin-results" style="display:none;background:#1a1a2e;border-radius:10px;padding:1rem;">
               <div style="font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Results</div>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;">
-                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Target Wholesale</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-wholesale">—</div></div>
-                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Target FOB Price</div><div style="font-size:20px;font-weight:700;color:#60ff60;" id="res-max-fob">—</div></div>
-                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Landed Cost</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-landed">—</div></div>
-                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Freight/Unit</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-freight-disp">—</div></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Target Wholesale</div><div style="font-size:15px;font-weight:700;color:#fff;" id="res-wholesale">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Target FOB Price</div><div style="font-size:22px;font-weight:700;color:#60ff60;" id="res-max-fob">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Landed Cost</div><div style="font-size:15px;font-weight:700;color:#fff;" id="res-landed">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Freight/Unit</div><div style="font-size:15px;font-weight:700;color:#fff;" id="res-freight-disp">—</div></div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                 <div style="background:#ffffff15;border-radius:8px;padding:10px;">
