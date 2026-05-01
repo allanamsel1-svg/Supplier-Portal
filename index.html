@@ -1659,12 +1659,11 @@ async function loadMyQuotes(rfqId){
                 '<input type="file" id="eq-inci-'+q.id+'" accept=".pdf,.txt,.doc,.docx" style="display:none" data-lbl="eq-inci-label-'+q.id+'" onchange="updateFileLabel(this)" />'+
               '</label></div>'+
               // Cert doc upload
-              '<div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">Upload Certification Document</label>'+
-              '<label style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f8f4;border:1.5px dashed #ccc;border-radius:7px;cursor:pointer;">'+
-                '<span style="font-size:16px;">🏅</span>'+
-                '<span style="font-size:12px;color:#888;" id="eq-cert-label-'+q.id+'">Upload certificate (PDF or image)</span>'+
-                '<input type="file" id="eq-cert-'+q.id+'" accept=".pdf,.jpg,.jpeg,.png" style="display:none" data-lbl="eq-cert-label-'+q.id+'" onchange="updateFileLabel(this)" />'+
-              '</label></div>'+
+              '<div style="margin-bottom:10px;">'+
+                '<div style="font-size:11px;color:#888;margin-bottom:6px;">Certification Documents</div>'+
+                '<div id="eq-cert-list-'+q.id+'" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>'+
+                '<button data-qid="'+q.id+'" onclick="addCertUpload(this.dataset.qid)" style="width:100%;padding:7px;background:#f8f8f4;border:1.5px dashed #ccc;border-radius:7px;font-size:12px;color:#888;cursor:pointer;font-family:inherit;">+ Add Certification Document</button>'+
+              '</div>'+
               '<div style="display:flex;gap:8px;">'+
                 '<button data-qid="'+q.id+'" onclick="updateQuote(this.dataset.qid)" style="flex:1;padding:9px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Save Updates</button>'+
                 '<button data-qid="'+q.id+'" onclick="toggleEditQuote(this.dataset.qid)" style="padding:9px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>'+
@@ -1766,6 +1765,27 @@ async function submitQuote(){
   }
 }
 
+function addCertUpload(quoteId){
+  var list=g('eq-cert-list-'+quoteId);
+  if(!list)return;
+  var count=list.children.length+1;
+  var id='eq-cert-file-'+quoteId+'-'+count;
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;align-items:center;gap:6px;';
+  row.innerHTML=
+    '<label style="flex:1;display:flex;align-items:center;gap:6px;padding:7px 10px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;cursor:pointer;">'+
+      '<span style="font-size:14px;">🏅</span>'+
+      '<span class="cert-lbl" style="font-size:12px;color:#888;flex:1;">Certification '+count+' — click to select</span>'+
+      '<input type="file" id="'+id+'" accept=".pdf,.jpg,.jpeg,.png" style="display:none" />'+
+    '</label>'+
+    '<button onclick="this.parentNode.remove()" style="padding:4px 8px;background:none;border:1px solid #fdd;color:#b00;border-radius:5px;cursor:pointer;font-size:11px;">✕</button>';
+  list.appendChild(row);
+  // Wire up file input label
+  var fileInput=row.querySelector('input[type="file"]');
+  var lbl=row.querySelector('.cert-lbl');
+  fileInput.addEventListener('change',function(){if(this.files[0])lbl.textContent=this.files[0].name;});
+}
+
 function updateFileLabel(input){
   var lbl=g(input.dataset.lbl);
   if(lbl)lbl.textContent=input.files[0]?input.files[0].name:'No file selected';
@@ -1773,7 +1793,14 @@ function updateFileLabel(input){
 
 function toggleEditQuote(quoteId){
   var el=g('edit-quote-'+quoteId);
-  if(el)el.style.display=el.style.display==='none'?'block':'none';
+  if(!el)return;
+  var showing=el.style.display==='none';
+  el.style.display=showing?'block':'none';
+  // Add one cert row by default when opening
+  if(showing){
+    var list=g('eq-cert-list-'+quoteId);
+    if(list&&!list.children.length)addCertUpload(quoteId);
+  }
 }
 
 async function updateQuote(quoteId){
@@ -1826,11 +1853,14 @@ async function updateQuote(quoteId){
       }
     }
 
-    // Upload cert doc if selected
-    var certFile=g('eq-cert-'+quoteId).files[0];
-    if(certFile){
-      var certPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_cert_'+Date.now()+'.'+certFile.name.split('.').pop();
-      await fetch(SB+'/storage/v1/object/factory-files/'+certPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:certFile});
+    // Upload multiple cert docs
+    var certInputs=document.querySelectorAll('[id^="eq-cert-file-'+quoteId+'"]');
+    for(var ci=0;ci<certInputs.length;ci++){
+      var certFile=certInputs[ci].files[0];
+      if(certFile){
+        var certPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_cert_'+Date.now()+'_'+ci+'.'+certFile.name.split('.').pop();
+        await fetch(SB+'/storage/v1/object/factory-files/'+certPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:certFile});
+      }
     }
 
     var okEl=g('eq-ok-'+quoteId);
