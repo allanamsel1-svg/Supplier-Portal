@@ -984,9 +984,31 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
       fld('Weight (kg)',numIn('pk-mwt',pv(pkg,'master_weight_kg'),'0.001'))+
       fld('Status',sel('pk-mst','<option value="estimated"'+(pv(pkg,'master_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv(pkg,'master_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv(pkg,'master_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option>'))
     )+
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'+
       '<span style="font-size:12px;color:#888;">CBM: <strong id="cbm-master">'+(mCbm||'—')+'</strong></span>'+
       '<button data-level="master" onclick="reqDimConf(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
+    '</div>'+
+    '<div id="container-calc" style="background:#eef2ff;border:1px solid #c0d0f0;border-radius:8px;padding:10px 12px;margin-bottom:14px;">'+
+      '<div style="font-size:10px;font-weight:600;color:#2244cc;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Container Calculator</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
+        '<div style="text-align:center;"><div style="font-size:10px;color:#555;margin-bottom:3px;">20GP (25 CBM)</div>'+
+          '<div id="cc-20gp-m" style="font-size:14px;font-weight:700;color:#1a1a2e;">—</div><div style="font-size:10px;color:#888;">masters</div>'+
+          '<div id="cc-20gp-u" style="font-size:11px;color:#555;margin-top:2px;">— units</div>'+
+        '</div>'+
+        '<div style="text-align:center;"><div style="font-size:10px;color:#555;margin-bottom:3px;">40GP (54 CBM)</div>'+
+          '<div id="cc-40gp-m" style="font-size:14px;font-weight:700;color:#1a1a2e;">—</div><div style="font-size:10px;color:#888;">masters</div>'+
+          '<div id="cc-40gp-u" style="font-size:11px;color:#555;margin-top:2px;">— units</div>'+
+        '</div>'+
+        '<div style="text-align:center;border:2px solid #c0d0f0;border-radius:7px;padding:4px;"><div style="font-size:10px;color:#2244cc;font-weight:600;margin-bottom:3px;">40HC (67 CBM) ★</div>'+
+          '<div id="cc-40hc-m" style="font-size:14px;font-weight:700;color:#1a1a2e;">—</div><div style="font-size:10px;color:#888;">masters</div>'+
+          '<div id="cc-40hc-u" style="font-size:11px;color:#555;margin-top:2px;">— units</div>'+
+        '</div>'+
+        '<div style="text-align:center;"><div style="font-size:10px;color:#555;margin-bottom:3px;">45HC (86 CBM)</div>'+
+          '<div id="cc-45hc-m" style="font-size:14px;font-weight:700;color:#1a1a2e;">—</div><div style="font-size:10px;color:#888;">masters</div>'+
+          '<div id="cc-45hc-u" style="font-size:11px;color:#555;margin-top:2px;">— units</div>'+
+        '</div>'+
+      '</div>'+
+      '<div id="cc-note" style="font-size:10px;color:#888;margin-top:6px;">Enter master carton dimensions and qty/master to calculate.</div>'+
     '</div>'+
 
     // Pallet
@@ -1139,6 +1161,46 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
 }
 
 // ── Calculation helpers ──
+function calcContainers(masterCbm,masterQty,innerQty){
+  // Standard usable CBM per container type (85% efficiency)
+  var containers={
+    '20gp':25.0*0.85,'40gp':54.0*0.85,'40hc':67.0*0.85,'45hc':86.0*0.85
+  };
+  var result={};
+  Object.keys(containers).forEach(function(type){
+    var cbm=containers[type];
+    var masters=masterCbm>0?Math.floor(cbm/masterCbm):0;
+    var units=masters*(masterQty||0);
+    var inners=innerQty&&innerQty>0?Math.floor(masters*(masterQty/innerQty)):null;
+    result[type]={masters:masters,units:units,inners:inners,cbmUsed:parseFloat((masters*masterCbm).toFixed(3))};
+  });
+  return result;
+}
+
+function updateContainerCalc(){
+  var mCbm=parseFloat(g('cbm-master')?g('cbm-master').textContent:0)||0;
+  var mQty=parseInt(g('pk-mq')?g('pk-mq').value:0)||0;
+  var iQty=parseInt(g('pk-iq')?g('pk-iq').value:0)||0;
+  var noteEl=g('cc-note');
+
+  if(!mCbm||!mQty){
+    ['20gp','40gp','40hc','45hc'].forEach(function(t){
+      var me=g('cc-'+t+'-m');var ue=g('cc-'+t+'-u');
+      if(me)me.textContent='—';if(ue)ue.textContent='— units';
+    });
+    if(noteEl)noteEl.textContent='Enter master carton dimensions and qty/master to calculate.';
+    return;
+  }
+
+  var calc=calcContainers(mCbm,mQty,iQty);
+  ['20gp','40gp','40hc','45hc'].forEach(function(t){
+    var me=g('cc-'+t+'-m');var ue=g('cc-'+t+'-u');
+    if(me)me.textContent=calc[t].masters.toLocaleString();
+    if(ue)ue.textContent=calc[t].units.toLocaleString()+' units'+(calc[t].inners?' · '+calc[t].inners+' inners':'');
+  });
+  if(noteEl)noteEl.textContent='Based on '+mCbm+' CBM/master · '+mQty+' units/master'+(iQty?' · '+iQty+' units/inner':'')+' · 85% load efficiency';
+}
+
 function calcCbm(l,w,h){
   l=parseFloat(l)||0;w=parseFloat(w)||0;h=parseFloat(h)||0;
   if(!l||!w||!h)return null;
@@ -1155,6 +1217,9 @@ function recalcAll(){
   if(g('cbm-master'))g('cbm-master').textContent=mCbm||'—';
   if(g('cs-master-cbm'))g('cs-master-cbm').value=mCbm||'';
 
+  // Update container calculator
+  updateContainerCalc();
+
   // Costs
   var fob=parseFloat(g('cs-fob')?g('cs-fob').value:0)||0;
   var pkg=parseFloat(g('cs-pkg')?g('cs-pkg').value:0)||0;
@@ -1169,10 +1234,30 @@ function recalcAll(){
   if(g('cs-tariff-unit'))g('cs-tariff-unit').value=tariffU?'$'+tariffU.toFixed(4):'';
 
   // Freight estimate
+  // LCL: (master CBM / master qty) * rate per CBM
+  // FCL: container rate / (masters per container * master qty) = rate per unit
   var mq=parseFloat(g('pk-mq')?g('pk-mq').value:0)||0;
   var fr=parseFloat(g('cs-freight-rate')?g('cs-freight-rate').value:0)||0;
+  var mode=g('cs-freight-mode')?g('cs-freight-mode').value:'ocean_lcl';
   var fEst=0;
-  if(mCbm&&mq&&fr){fEst=parseFloat(((mCbm/mq)*fr).toFixed(4));}
+  if(fr&&mq){
+    if(mode==='ocean_lcl'&&mCbm){
+      // LCL: rate per CBM * CBM per unit
+      fEst=parseFloat(((mCbm/mq)*fr).toFixed(4));
+    } else if(mode==='ocean_fcl'&&mCbm){
+      // FCL: container rate / total units in container
+      // Use 40HC as default (most common)
+      var cont=g('cs-freight-cont')?g('cs-freight-cont').value||'40hc':'40hc';
+      var contCbm={'20gp':25*0.85,'40gp':54*0.85,'40hc':67*0.85,'45hc':86*0.85}[cont.toLowerCase()]||67*0.85;
+      var mastersPerCont=mCbm>0?Math.floor(contCbm/mCbm):0;
+      var unitsPerCont=mastersPerCont*mq;
+      if(unitsPerCont>0)fEst=parseFloat((fr/unitsPerCont).toFixed(4));
+    } else if(mode==='air'){
+      // Air: rate per KG * unit weight
+      var uwt=parseFloat(g('pk-uwt')?g('pk-uwt').value:0)||0;
+      if(uwt)fEst=parseFloat((uwt*fr).toFixed(4));
+    }
+  }
   if(g('cs-freight-est'))g('cs-freight-est').value=fEst?'$'+fEst.toFixed(4):'';
   var fAct=parseFloat(g('cs-freight-actual')?g('cs-freight-actual').value:0)||0;
 

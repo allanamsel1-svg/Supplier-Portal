@@ -250,7 +250,8 @@ async function openSku(skuId){
         '<tr><td>Pallet</td><td>'+(pkg.pallet_qty||'—')+'</td>'+
         '<td>'+(pkg.pallet_length_cm?pkg.pallet_length_cm+' × '+pkg.pallet_width_cm+' × '+pkg.pallet_height_cm:'—')+'</td>'+
         '<td>'+(pkg.pallet_weight_kg||'—')+'</td><td>—</td><td>—</td></tr>':'')+
-      '</tbody></table>'
+      '</tbody></table>'+
+      renderContainerCalc(pkg)
     :'<div style="font-size:12px;color:#bbb;">No packaging data.</div>')+
   '</div>'+
 
@@ -332,6 +333,56 @@ async function openSku(skuId){
 
   det.innerHTML=html;
 }
+
+// ── Shared container calculator ──
+function calcContainers(masterCbm,masterQty,innerQty){
+  var containers={'20gp':25.0*0.85,'40gp':54.0*0.85,'40hc':67.0*0.85,'45hc':86.0*0.85};
+  var result={};
+  Object.keys(containers).forEach(function(type){
+    var cbm=containers[type];
+    var masters=masterCbm>0?Math.floor(cbm/masterCbm):0;
+    var units=masters*(masterQty||0);
+    var inners=innerQty&&innerQty>0?Math.floor(masters*(masterQty/innerQty)):null;
+    result[type]={masters:masters,units:units,inners:inners};
+  });
+  return result;
+}
+
+function renderContainerCalc(pkg){
+  var mCbm=null;
+  if(pkg&&pkg.master_length_cm&&pkg.master_width_cm&&pkg.master_height_cm){
+    mCbm=parseFloat(((pkg.master_length_cm*pkg.master_width_cm*pkg.master_height_cm)/1000000).toFixed(6));
+  }
+  var mQty=pkg?pkg.master_qty:0;
+  var iQty=pkg?pkg.inner_qty:0;
+
+  if(!mCbm||!mQty){
+    return '<div style="font-size:11px;color:#bbb;margin-top:8px;">Enter master carton dimensions and qty/master to see container calculations.</div>';
+  }
+
+  var calc=calcContainers(mCbm,mQty,iQty);
+  var types=[['20gp','20GP','25'],['40gp','40GP','54'],['40hc','40HC','67'],['45hc','45HC','86']];
+
+  return '<div style="background:#eef2ff;border:1px solid #c0d0f0;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
+    '<div style="font-size:10px;font-weight:600;color:#2244cc;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Container Calculator <span style="font-weight:400;color:#888;">(85% efficiency)</span></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
+    types.map(function(t){
+      var type=t[0];var label=t[1];var cbm=t[2];
+      var c=calc[type];
+      var isMain=type==='40hc';
+      return '<div style="text-align:center;'+(isMain?'border:2px solid #c0d0f0;border-radius:7px;padding:4px;':'')+'">'+
+        '<div style="font-size:10px;color:'+(isMain?'#2244cc':'#555')+';font-weight:'+(isMain?'600':'400')+';margin-bottom:3px;">'+label+' ('+cbm+' CBM)'+(isMain?' ★':'')+'</div>'+
+        '<div style="font-size:15px;font-weight:700;color:#1a1a2e;">'+c.masters.toLocaleString()+'</div>'+
+        '<div style="font-size:10px;color:#888;">masters</div>'+
+        '<div style="font-size:11px;color:#555;margin-top:2px;">'+c.units.toLocaleString()+' units</div>'+
+        (c.inners?'<div style="font-size:10px;color:#888;">'+c.inners.toLocaleString()+' inners</div>':'')+
+      '</div>';
+    }).join('')+
+    '</div>'+
+    '<div style="font-size:10px;color:#888;margin-top:6px;">'+mCbm+' CBM/master · '+mQty+' units/master'+(iQty?' · '+iQty+' units/inner':'')+'</div>'+
+  '</div>';
+}
+
 
 init();
 </script>
