@@ -2584,6 +2584,7 @@ function renderQuoteCard(q,rfq,idx,versions){
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMoreInfo(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">? Request More Info</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="saveQuoteToFactory(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f5f5f0;color:#555;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">💾 Save to Factory</button>'+
+        (q.status==='accepted'?'<a data-qid="'+q.id+'" data-rid="'+rfq.id+'" href="setup.html?from_quote='+q.id+'&rfq='+rfq.id+'" target="_blank" style="padding:8px 16px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:7px;font-size:12px;cursor:pointer;text-decoration:none;font-weight:600;">＋ Create SKU</a>':'')+
       '</div>'+
     '</div>'+
   '</div>';
@@ -2641,12 +2642,7 @@ async function acceptQuote(quoteId,rfqId,factoryName){
 
     await loadRFQs();
     openRFQDetail(rfqId);
-
-    // Show Create SKU prompt
-    if(confirm('Quote accepted! Email sent to factory.\n\nWould you like to create a SKU from this quote now?')){
-      var skuUrl='setup.html?from_quote='+quoteId+'&rfq='+rfqId;
-      window.open(skuUrl,'_blank');
-    }
+    alert('Quote accepted! Email sent to factory. Use the + Create SKU button on the quote to create a SKU.');
   }catch(e){alert('Error: '+e.message);}
 }
 
