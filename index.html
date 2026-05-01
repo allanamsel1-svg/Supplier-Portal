@@ -1617,14 +1617,61 @@ async function loadMyQuotes(rfqId){
     if(!r.ok)return;
     var quotes=await r.json();
     if(!quotes.length){el.innerHTML='';return;}
+    var statusColors={submitted:'#c8f0c8',accepted:'#a0d8ff',rejected:'#fdd',more_info_requested:'#fff8c0'};
+    var statusLabels={submitted:'Submitted',accepted:'✓ Accepted',rejected:'✗ Rejected',more_info_requested:'⚠ More Info Needed'};
     el.innerHTML='<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Your Submitted Quotes</div>'+
       quotes.map(function(q){
-        return '<div style="background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'+
-          '<div style="display:flex;justify-content:space-between;align-items:center;">'+
+        var status=q.status||'submitted';
+        var statusColor=statusColors[status]||'#c8f0c8';
+        var statusLabel=statusLabels[status]||status;
+        var canEdit=status==='submitted'||status==='more_info_requested';
+        var adminNotes=q.admin_notes&&status==='more_info_requested'?
+          '<div style="background:#fff8c0;border:1px solid #e0c840;border-radius:6px;padding:8px;margin-top:8px;font-size:12px;color:#665500;">'+
+            '<strong>Additional information requested:</strong><br>'+q.admin_notes+
+          '</div>':'';
+        return '<div style="background:#f8f8f4;border:1px solid #e0e0d8;border-radius:8px;padding:12px;margin-bottom:10px;">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
             '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">Option '+q.quote_option+' — $'+parseFloat(q.unit_fob_price).toFixed(2)+' FOB</div>'+
-            '<span style="font-size:11px;color:#1a7a1a;background:#c8f0c8;padding:2px 8px;border-radius:10px;">Submitted</span>'+
+            '<div style="display:flex;gap:6px;align-items:center;">'+
+              '<span style="font-size:11px;background:'+statusColor+';padding:2px 8px;border-radius:10px;">'+statusLabel+'</span>'+
+              (canEdit?'<button data-qid="'+q.id+'" onclick="toggleEditQuote(this.dataset.qid)" style="font-size:11px;padding:3px 8px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;">Edit</button>':'')+
+            '</div>'+
           '</div>'+
-          (q.factory_specifications?'<div style="font-size:12px;color:#555;margin-top:4px;">'+q.factory_specifications+'</div>':'')+
+          (q.factory_specifications?'<div style="font-size:12px;color:#555;">'+q.factory_specifications+'</div>':'')+
+          adminNotes+
+          // Edit form (hidden by default)
+          (canEdit?
+            '<div id="edit-quote-'+q.id+'" style="display:none;margin-top:12px;border-top:1px solid #e0e0d8;padding-top:12px;">'+
+              '<div style="font-size:12px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">Update Quote</div>'+
+              '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+                '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">FOB Price (USD)</label>'+
+                '<input type="number" id="eq-fob-'+q.id+'" value="'+q.unit_fob_price+'" step="0.01" style="width:100%;padding:7px;font-size:13px;border:1px solid #ddd;border-radius:6px;font-family:inherit;" /></div>'+
+                '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">HTS Code</label>'+
+                '<input type="text" id="eq-hts-'+q.id+'" value="'+(q.hts_code_factory||'')+'" placeholder="e.g. 3304.99.5000" style="width:100%;padding:7px;font-size:13px;border:1px solid #ddd;border-radius:6px;font-family:inherit;" /></div>'+
+              '</div>'+
+              '<div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">Updated Specifications</label>'+
+              '<textarea id="eq-specs-'+q.id+'" rows="3" style="width:100%;padding:7px;font-size:13px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;">'+(q.factory_specifications||'')+'</textarea></div>'+
+              // INCI upload
+              '<div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">Upload INCI List (if required)</label>'+
+              '<label style="display:flex;align-items:center;gap:8px;padding:8px;background:#fce8f0;border:1.5px dashed #f0b8d0;border-radius:7px;cursor:pointer;">'+
+                '<span style="font-size:16px;">🧴</span>'+
+                '<span style="font-size:12px;color:#880044;" id="eq-inci-label-'+q.id+'">'+(q.inci_document_url?'✓ INCI uploaded — click to replace':'Upload INCI list (PDF)')+'</span>'+
+                '<input type="file" id="eq-inci-'+q.id+'" accept=".pdf,.txt,.doc,.docx" style="display:none" data-lbl="eq-inci-label-'+q.id+'" onchange="updateFileLabel(this)" />'+
+              '</label></div>'+
+              // Cert doc upload
+              '<div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">Upload Certification Document</label>'+
+              '<label style="display:flex;align-items:center;gap:8px;padding:8px;background:#f8f8f4;border:1.5px dashed #ccc;border-radius:7px;cursor:pointer;">'+
+                '<span style="font-size:16px;">🏅</span>'+
+                '<span style="font-size:12px;color:#888;" id="eq-cert-label-'+q.id+'">Upload certificate (PDF or image)</span>'+
+                '<input type="file" id="eq-cert-'+q.id+'" accept=".pdf,.jpg,.jpeg,.png" style="display:none" data-lbl="eq-cert-label-'+q.id+'" onchange="updateFileLabel(this)" />'+
+              '</label></div>'+
+              '<div style="display:flex;gap:8px;">'+
+                '<button data-qid="'+q.id+'" onclick="updateQuote(this.dataset.qid)" style="flex:1;padding:9px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Save Updates</button>'+
+                '<button data-qid="'+q.id+'" onclick="toggleEditQuote(this.dataset.qid)" style="padding:9px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>'+
+              '</div>'+
+              '<div style="font-size:12px;color:#1a7a1a;margin-top:6px;display:none;" id="eq-ok-'+q.id+'">✓ Quote updated successfully!</div>'+
+            '</div>'
+          :'')+
         '</div>';
       }).join('');
     var used=quotes.map(function(q){return q.quote_option;});
@@ -1716,6 +1763,67 @@ async function submitQuote(){
     g('q-err').style.display='block';
     alert('Submit error: '+e.message);
     btn.disabled=false;btn.textContent='Submit Quote';
+  }
+}
+
+function updateFileLabel(input){
+  var lbl=g(input.dataset.lbl);
+  if(lbl)lbl.textContent=input.files[0]?input.files[0].name:'No file selected';
+}
+
+function toggleEditQuote(quoteId){
+  var el=g('edit-quote-'+quoteId);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+
+async function updateQuote(quoteId){
+  var fob=parseFloat(g('eq-fob-'+quoteId).value)||0;
+  if(!fob){alert('Please enter a valid FOB price.');return;}
+  var btn=document.querySelector('[data-qid="'+quoteId+'"][onclick*="updateQuote"]');
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+
+  var payload={
+    unit_fob_price:fob,
+    hts_code_factory:g('eq-hts-'+quoteId).value.trim()||null,
+    factory_specifications:g('eq-specs-'+quoteId).value.trim()||null,
+    status:'submitted',
+    updated_at:new Date().toISOString()
+  };
+
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||r.status);}
+
+    // Upload INCI if selected
+    var inciFile=g('eq-inci-'+quoteId).files[0];
+    if(inciFile){
+      var inciPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_inci_update.'+inciFile.name.split('.').pop();
+      var inciR=await fetch(SB+'/storage/v1/object/factory-files/'+inciPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:inciFile});
+      if(inciR.ok){
+        var inciUrl=SB+'/storage/v1/object/public/factory-files/'+inciPath;
+        await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({inci_document_url:inciUrl})});
+      }
+    }
+
+    // Upload cert doc if selected
+    var certFile=g('eq-cert-'+quoteId).files[0];
+    if(certFile){
+      var certPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_cert_'+Date.now()+'.'+certFile.name.split('.').pop();
+      await fetch(SB+'/storage/v1/object/factory-files/'+certPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:certFile});
+    }
+
+    var okEl=g('eq-ok-'+quoteId);
+    if(okEl)okEl.style.display='block';
+    if(btn){btn.disabled=false;btn.textContent='Save Updates';}
+    // Reload quotes to show updated status
+    if(currentRFQ)loadMyQuotes(currentRFQ.id);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Save Updates';}
+    alert('Update failed: '+e.message);
   }
 }
 
