@@ -330,7 +330,11 @@
       <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
       <div class="slabel">Communications</div>
-      <button class="sitem" id="nav-inbox" onclick="showPanel('inbox');loadInbox();"><span class="sicon">📬</span> Inbox <span class="scount" id="cnt-inbox">0</span></button>
+      <button class="sitem" id="nav-inbox-sourcing" onclick="showPanel('inbox-sourcing');loadInbox('sourcing');"><span class="sicon">📬</span> Sourcing <span class="scount" id="cnt-inbox-sourcing">0</span></button>
+      <button class="sitem" id="nav-inbox-sales" onclick="showPanel('inbox-sales');loadInbox('sales');"><span class="sicon">📬</span> Sales <span class="scount" id="cnt-inbox-sales">0</span></button>
+      <button class="sitem" id="nav-inbox-accounting" onclick="showPanel('inbox-accounting');loadInbox('accounting');"><span class="sicon">📬</span> Accounting <span class="scount" id="cnt-inbox-accounting">0</span></button>
+      <button class="sitem" id="nav-inbox-graphics" onclick="showPanel('inbox-graphics');loadInbox('graphics');"><span class="sicon">📬</span> Graphics <span class="scount" id="cnt-inbox-graphics">0</span></button>
+      <button class="sitem" id="nav-inbox-logistics" onclick="showPanel('inbox-logistics');loadInbox('logistics');"><span class="sicon">📬</span> Logistics <span class="scount" id="cnt-inbox-logistics">0</span></button>
       <div class="slabel">AI Tools</div>
       <button class="sitem" id="nav-chat" onclick="showPanel('chat')"><span class="sicon">✦</span> AI Assistant</button>
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
@@ -402,49 +406,142 @@
       </div>
     </div>
 
-    <!-- ── INBOX PANEL ── -->
-    <div class="panel" id="panel-inbox">
+    <!-- SOURCING INBOX -->
+    <div class="panel" id="panel-inbox-sourcing">
       <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
-        <div><div class="ph-title">Inbox</div><div class="ph-sub">All email communications with factories</div></div>
-        <button onclick="showComposeModal()" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+        <div><div class="ph-title">📬 Sourcing</div><div class="ph-sub">Factory sourcing communications · sourcing@tbgsourcing.net</div></div>
+        <button data-dept="sourcing" onclick="showComposeModal(this.dataset.dept)" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
       </div>
-
       <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
-
-        <!-- Left pane — thread list -->
         <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
           <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
-            <button class="rfq-tab on" onclick="filterInbox('unread')" id="itab-unread">Unread</button>
-            <button class="rfq-tab" onclick="filterInbox('all')" id="itab-all">All</button>
-            <button class="rfq-tab" onclick="filterInbox('sent')" id="itab-sent">Sent</button>
-            <button class="rfq-tab" onclick="filterInbox('archived')" id="itab-archived">Archived</button>
+            <button class="rfq-tab on" data-dept="sourcing" data-filter="unread" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sourcing-unread">Unread</button>
+            <button class="rfq-tab" data-dept="sourcing" data-filter="read" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sourcing-read">Read</button>
+            <button class="rfq-tab" data-dept="sourcing" data-filter="sent" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sourcing-sent">Sent</button>
+            <button class="rfq-tab" data-dept="sourcing" data-filter="archived" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sourcing-archived">Archived</button>
           </div>
-          <div id="inbox-thread-list" style="overflow-y:auto;flex:1;">
-            <div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div>
-          </div>
+          <div id="inbox-list-sourcing" style="overflow-y:auto;flex:1;"><div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div></div>
         </div>
-
-        <!-- Right pane — thread detail -->
         <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
-          <div id="inbox-detail-empty" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;">
-            <div style="font-size:32px;margin-bottom:12px;">📬</div>
-            <div style="font-size:14px;">Select a message to read</div>
-          </div>
-          <div id="inbox-detail-pane" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+          <div id="inbox-empty-sourcing" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;"><div style="font-size:32px;margin-bottom:12px;">📬</div><div style="font-size:14px;">Select a message to read</div></div>
+          <div id="inbox-detail-sourcing" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
         </div>
-
       </div>
     </div>
 
+    <!-- SALES INBOX -->
+    <div class="panel" id="panel-inbox-sales">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">📬 Sales</div><div class="ph-sub">Sales and customer communications · sales@tbgsourcing.net</div></div>
+        <button data-dept="sales" onclick="showComposeModal(this.dataset.dept)" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+      </div>
+      <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+        <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" data-dept="sales" data-filter="unread" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sales-unread">Unread</button>
+            <button class="rfq-tab" data-dept="sales" data-filter="read" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sales-read">Read</button>
+            <button class="rfq-tab" data-dept="sales" data-filter="sent" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sales-sent">Sent</button>
+            <button class="rfq-tab" data-dept="sales" data-filter="archived" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-sales-archived">Archived</button>
+          </div>
+          <div id="inbox-list-sales" style="overflow-y:auto;flex:1;"><div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="inbox-empty-sales" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;"><div style="font-size:32px;margin-bottom:12px;">📬</div><div style="font-size:14px;">Select a message to read</div></div>
+          <div id="inbox-detail-sales" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTING INBOX -->
+    <div class="panel" id="panel-inbox-accounting">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">📬 Accounting</div><div class="ph-sub">Invoices, payments and financial · accounting@tbgsourcing.net</div></div>
+        <button data-dept="accounting" onclick="showComposeModal(this.dataset.dept)" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+      </div>
+      <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+        <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" data-dept="accounting" data-filter="unread" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-accounting-unread">Unread</button>
+            <button class="rfq-tab" data-dept="accounting" data-filter="read" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-accounting-read">Read</button>
+            <button class="rfq-tab" data-dept="accounting" data-filter="sent" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-accounting-sent">Sent</button>
+            <button class="rfq-tab" data-dept="accounting" data-filter="archived" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-accounting-archived">Archived</button>
+          </div>
+          <div id="inbox-list-accounting" style="overflow-y:auto;flex:1;"><div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="inbox-empty-accounting" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;"><div style="font-size:32px;margin-bottom:12px;">📬</div><div style="font-size:14px;">Select a message to read</div></div>
+          <div id="inbox-detail-accounting" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GRAPHICS INBOX -->
+    <div class="panel" id="panel-inbox-graphics">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">📬 Graphics</div><div class="ph-sub">Design and artwork communications · graphics@tbgsourcing.net</div></div>
+        <button data-dept="graphics" onclick="showComposeModal(this.dataset.dept)" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+      </div>
+      <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+        <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" data-dept="graphics" data-filter="unread" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-graphics-unread">Unread</button>
+            <button class="rfq-tab" data-dept="graphics" data-filter="read" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-graphics-read">Read</button>
+            <button class="rfq-tab" data-dept="graphics" data-filter="sent" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-graphics-sent">Sent</button>
+            <button class="rfq-tab" data-dept="graphics" data-filter="archived" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-graphics-archived">Archived</button>
+          </div>
+          <div id="inbox-list-graphics" style="overflow-y:auto;flex:1;"><div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="inbox-empty-graphics" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;"><div style="font-size:32px;margin-bottom:12px;">📬</div><div style="font-size:14px;">Select a message to read</div></div>
+          <div id="inbox-detail-graphics" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOGISTICS INBOX -->
+    <div class="panel" id="panel-inbox-logistics">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">📬 Logistics</div><div class="ph-sub">Shipping and freight communications · logistics@tbgsourcing.net</div></div>
+        <button data-dept="logistics" onclick="showComposeModal(this.dataset.dept)" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">✉ Compose</button>
+      </div>
+      <div style="display:flex;height:calc(100vh - 120px);overflow:hidden;">
+        <div style="width:300px;min-width:260px;border-right:1px solid #e0e0d8;display:flex;flex-direction:column;flex-shrink:0;">
+          <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
+            <button class="rfq-tab on" data-dept="logistics" data-filter="unread" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-logistics-unread">Unread</button>
+            <button class="rfq-tab" data-dept="logistics" data-filter="read" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-logistics-read">Read</button>
+            <button class="rfq-tab" data-dept="logistics" data-filter="sent" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-logistics-sent">Sent</button>
+            <button class="rfq-tab" data-dept="logistics" data-filter="archived" onclick="filterInbox(this.dataset.dept,this.dataset.filter,this)" id="itab-logistics-archived">Archived</button>
+          </div>
+          <div id="inbox-list-logistics" style="overflow-y:auto;flex:1;"><div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div></div>
+        </div>
+        <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;">
+          <div id="inbox-empty-logistics" style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#bbb;"><div style="font-size:32px;margin-bottom:12px;">📬</div><div style="font-size:14px;">Select a message to read</div></div>
+          <div id="inbox-detail-logistics" style="display:none;padding:1.25rem;flex:1;overflow-y:auto;"></div>
+        </div>
+      </div>
+    </div>
+
+
     <!-- Compose Modal -->
     <div id="compose-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:flex-end;justify-content:flex-end;padding:1rem;">
-      <div style="background:#fff;border-radius:12px;width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+      <div style="background:#fff;border-radius:12px;width:520px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
         <div style="padding:12px 16px;background:#1a1a2e;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
           <span style="color:#fff;font-size:14px;font-weight:600;">New Message</span>
           <button onclick="g('compose-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
         </div>
         <div style="padding:1rem;">
-          <div style="margin-bottom:8px;"><input type="text" id="compose-to" placeholder="To (factory email)" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
+          <div style="margin-bottom:8px;">
+            <select id="compose-from" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;">
+              <option value="sourcing@tbgsourcing.net">From: sourcing@tbgsourcing.net</option>
+              <option value="sales@tbgsourcing.net">From: sales@tbgsourcing.net</option>
+              <option value="accounting@tbgsourcing.net">From: accounting@tbgsourcing.net</option>
+              <option value="graphics@tbgsourcing.net">From: graphics@tbgsourcing.net</option>
+              <option value="logistics@tbgsourcing.net">From: logistics@tbgsourcing.net</option>
+            </select>
+          </div>
+          <div style="margin-bottom:8px;"><input type="text" id="compose-to" placeholder="To" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
+          <div style="margin-bottom:8px;"><input type="text" id="compose-cc" placeholder="CC (optional)" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
+          <div style="margin-bottom:8px;"><input type="text" id="compose-bcc" placeholder="BCC (optional)" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
           <div style="margin-bottom:8px;"><input type="text" id="compose-subject" placeholder="Subject" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;" /></div>
           <div style="margin-bottom:8px;"><textarea id="compose-body" rows="8" placeholder="Message..." style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;resize:vertical;"></textarea></div>
           <div style="display:flex;justify-content:flex-end;gap:8px;">
@@ -1223,12 +1320,17 @@ function showPanel(name){
   if(name==='upload')initAdminUpload();
   if(name==='rfq'){loadRFQs();loadCategories();}
   if(name==='rfq-followup')loadRFQFollowups();
-  if(name==='inbox'){
-    loadInbox();
-    // Auto-refresh every 30 seconds while inbox is open
+  // Handle department inboxes
+  var depts=['sourcing','sales','accounting','graphics','logistics'];
+  var isDept=depts.some(function(d){return name==='inbox-'+d;});
+  if(isDept){
+    var dept=name.replace('inbox-','');
+    currentDept=dept;
+    loadInbox(dept);
     if(window._inboxTimer)clearInterval(window._inboxTimer);
     window._inboxTimer=setInterval(function(){
-      if(document.getElementById('panel-inbox').classList.contains('on'))loadInbox();
+      var activePanel=document.getElementById('panel-inbox-'+currentDept);
+      if(activePanel&&activePanel.classList.contains('on'))loadInbox(currentDept);
       else clearInterval(window._inboxTimer);
     },30000);
   } else {
@@ -3494,11 +3596,11 @@ if(localStorage.getItem('admin_session')==='1'){
 }
 // ── SendGrid Email ──
 
-async function sendEmail(toEmail,toName,subject,body,replyTo){
+async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
   var r=await fetch('/api/send-email',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net'})
+    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net',cc:cc||'',bcc:bcc||''})
   });
   var d=await r.json().catch(function(){return{};});
   if(!r.ok){throw new Error(d.error||r.status);}
@@ -3506,28 +3608,55 @@ async function sendEmail(toEmail,toName,subject,body,replyTo){
 }
 
 // ── INBOX ──
-var currentInboxFilter='unread';
+var currentDept='sourcing';
 var currentThreadId=null;
+var inboxFilters={sourcing:'unread',sales:'unread',accounting:'unread',graphics:'unread',logistics:'unread'};
 
-async function loadInbox(){
-  var el=g('inbox-thread-list');
+var deptEmails={
+  sourcing:'sourcing@tbgsourcing.net',
+  sales:'sales@tbgsourcing.net',
+  accounting:'accounting@tbgsourcing.net',
+  graphics:'graphics@tbgsourcing.net',
+  logistics:'logistics@tbgsourcing.net'
+};
+
+async function loadInbox(dept){
+  if(dept)currentDept=dept;
+  var filter=inboxFilters[currentDept]||'unread';
+  var el=g('inbox-list-'+currentDept);
   if(!el)return;
   el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div>';
+
   try{
-    var query=SB+'/rest/v1/email_threads?select=*&order=last_message_at.desc&limit=50';
-    if(currentInboxFilter==='unread')query+='&status=eq.unread';
-    else if(currentInboxFilter==='sent')query+='&direction=eq.outbound';
-    else if(currentInboxFilter==='archived')query+='&status=eq.archived';
+    var deptEmail=deptEmails[currentDept];
+    var query=SB+'/rest/v1/email_threads?order=last_message_at.desc&limit=50';
+    if(filter==='sent'){
+      query+='&direction=eq.outbound&from_email=eq.'+encodeURIComponent(deptEmail);
+    }else if(filter==='archived'){
+      query+='&status=eq.archived';
+      query+='&or=(to_email.eq.'+encodeURIComponent(deptEmail)+',from_email.eq.'+encodeURIComponent(deptEmail)+')';
+    }else if(filter==='read'){
+      query+='&status=eq.read';
+      query+='&direction=eq.inbound&to_email=eq.'+encodeURIComponent(deptEmail);
+    }else{
+      // unread
+      query+='&status=eq.unread';
+      query+='&to_email=eq.'+encodeURIComponent(deptEmail);
+    }
+
     var r=await fetch(query,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     if(!r.ok){el.innerHTML='<div style="padding:1rem;color:#b00;font-size:13px;">Load failed: '+r.status+'</div>';return;}
     var threads=await r.json();
 
-    // Update unread count
-    var unreadCount=threads.filter(function(t){return t.status==='unread';}).length;
-    g('cnt-inbox').textContent=unreadCount||'';
+    // Update badge
+    var unreadQ=SB+'/rest/v1/email_threads?status=eq.unread&to_email=eq.'+encodeURIComponent(deptEmail);
+    var ur=await fetch(unreadQ,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact','Range':'0-0'}});
+    var unreadCount=parseInt(ur.headers.get('Content-Range').split('/')[1])||0;
+    var badge=g('cnt-inbox-'+currentDept);
+    if(badge)badge.textContent=unreadCount||'';
 
     if(!threads.length){
-      el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No messages yet.</div>';
+      el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No messages.</div>';
       return;
     }
 
@@ -3538,83 +3667,86 @@ async function loadInbox(){
       var dirIcon=t.direction==='inbound'?'←':'→';
       return '<div class="rfq-list-item'+(isSelected?' selected':'')+(isUnread?' ':'')+'" data-tid="'+t.id+'" onclick="openThread(this.dataset.tid)" style="'+(isUnread?'font-weight:600;background:#f8f8ff;':'')+'">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'+
-          '<div style="font-size:12px;color:#1a1a2e;">'+(t.from_name||t.from_email||t.to_email||'—')+'</div>'+
-          '<div style="font-size:11px;color:#bbb;">'+date+'</div>'+
+          '<div style="font-size:12px;color:#1a1a2e;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+(t.from_name||t.from_email||t.to_email||'—')+'</div>'+
+          '<div style="font-size:11px;color:#bbb;margin-left:6px;flex-shrink:0;">'+date+'</div>'+
         '</div>'+
         '<div style="font-size:12px;color:#666;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+dirIcon+' '+(t.subject||'—')+'</div>'+
-        (isUnread?'<div style="width:8px;height:8px;background:#2244cc;border-radius:50%;float:right;margin-top:-16px;"></div>':'')+
+        (isUnread?'<div style="width:7px;height:7px;background:#2244cc;border-radius:50%;float:right;margin-top:-14px;"></div>':'')+
       '</div>';
     }).join('');
   }catch(e){el.innerHTML='<div style="padding:1rem;color:#b00;font-size:13px;">Error: '+e.message+'</div>';}
 }
 
-function filterInbox(filter){
-  currentInboxFilter=filter;
-  document.querySelectorAll('.rfq-tab').forEach(function(t){
-    if(t.id&&t.id.startsWith('itab-'))t.classList.remove('on');
-  });
-  var tab=g('itab-'+filter);if(tab)tab.classList.add('on');
-  loadInbox();
+function filterInbox(dept,filter,tabEl){
+  currentDept=dept;
+  inboxFilters[dept]=filter;
+  // Update tab styling
+  document.querySelectorAll('[id^="itab-'+dept+'"]').forEach(function(t){t.classList.remove('on');});
+  if(tabEl)tabEl.classList.add('on');
+  else{var t=g('itab-'+dept+'-'+filter);if(t)t.classList.add('on');}
+  loadInbox(dept);
 }
 
 async function openThread(threadId){
   currentThreadId=threadId;
-  g('inbox-detail-empty').style.display='none';
-  g('inbox-detail-pane').style.display='block';
-  g('inbox-detail-pane').innerHTML='<div style="color:#bbb;font-size:13px;">Loading...</div>';
+  loadInbox();
+  var detailEl=g('inbox-detail-'+currentDept);
+  var emptyEl=g('inbox-empty-'+currentDept);
+  if(!detailEl)return;
+  if(emptyEl)emptyEl.style.display='none';
+  detailEl.style.display='block';
+  detailEl.innerHTML='<div style="color:#bbb;font-size:13px;">Loading...</div>';
 
   try{
-    // Mark as read
     await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({status:'read'})
     });
 
-    // Load messages
-    var r=await fetch(SB+'/rest/v1/email_messages?thread_id=eq.'+threadId+'&select=*&order=sent_at',{
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-    });
+    var r=await fetch(SB+'/rest/v1/email_messages?thread_id=eq.'+threadId+'&select=*&order=sent_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var messages=await r.json();
-
-    // Load thread info
-    var rt=await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId+'&select=*',{
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
-    });
+    var rt=await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var threads=await rt.json();
     var thread=threads[0]||{};
-
     renderThreadDetail(thread,messages);
-    loadInbox(); // refresh list to show read status
-  }catch(e){g('inbox-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error: '+e.message+'</div>';}
+    loadInbox();
+  }catch(e){detailEl.innerHTML='<div style="color:#b00;font-size:13px;">Error: '+e.message+'</div>';}
 }
 
 function renderThreadDetail(thread,messages){
-  var el=g('inbox-detail-pane');
+  var el=g('inbox-detail-'+currentDept);
+  if(!el)return;
   var replyTo=thread.from_email||'';
+  var fromEmail=deptEmails[currentDept];
 
   var html=
     '<div style="margin-bottom:1rem;padding-bottom:1rem;border-bottom:1px solid #e0e0d8;">'+
-      '<div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">'+(thread.subject||'—')+'</div>'+
-      '<div style="display:flex;gap:8px;">'+
-        '<button data-tid="'+thread.id+'" onclick="archiveThread(this.dataset.tid)" style="font-size:12px;padding:5px 10px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;cursor:pointer;">Archive</button>'+
-        '<button onclick="showReply()" style="font-size:12px;padding:5px 10px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;">↩ Reply</button>'+
+      '<div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">'+(thread.subject||'—')+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+        '<button data-tid="'+thread.id+'" onclick="archiveThread(this.dataset.tid)" style="font-size:12px;padding:5px 12px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;cursor:pointer;">📁 Archive</button>'+
+        '<button onclick="showReply()" style="font-size:12px;padding:5px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;cursor:pointer;">↩ Reply</button>'+
       '</div>'+
     '</div>'+
     messages.map(function(m){
       var isInbound=m.direction==='inbound';
       var date=new Date(m.sent_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
       return '<div style="margin-bottom:1.5rem;padding:1rem;background:'+(isInbound?'#f8f8f4':'#eef2ff')+';border-radius:10px;border:1px solid '+(isInbound?'#e8e8e0':'#c0d0f0')+';">'+
-        '<div style="display:flex;justify-content:space-between;margin-bottom:8px;">'+
-          '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+(isInbound?'From: '+(m.from_name||m.from_email):'From: TBG Sourcing')+'</div>'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">'+
+          '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+(isInbound?'From: '+(m.from_name?m.from_name+' <'+m.from_email+'>':m.from_email):'From: '+(m.from_email||fromEmail))+'</div>'+
           '<div style="font-size:11px;color:#bbb;">'+date+'</div>'+
         '</div>'+
-        '<div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap;">'+(m.body_text||m.body_html||'')+'</div>'+
+        '<div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap;">'+(m.body_text||'')+'</div>'+
       '</div>';
     }).join('')+
-    // Reply box
     '<div id="reply-box" style="display:none;margin-top:1rem;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;">'+
-      '<div style="padding:8px 12px;background:#f8f8f4;border-bottom:1px solid #e0e0d8;font-size:12px;color:#888;">Reply to: <span id="reply-to-addr">'+replyTo+'</span></div>'+
+      '<div style="padding:8px 12px;background:#f8f8f4;border-bottom:1px solid #e0e0d8;font-size:12px;color:#555;">'+
+        '<div>To: <span id="reply-to-addr">'+replyTo+'</span></div>'+
+        '<div style="margin-top:4px;display:flex;gap:8px;">'+
+          '<input type="text" id="reply-cc" placeholder="CC" style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;" />'+
+          '<input type="text" id="reply-bcc" placeholder="BCC" style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-size:12px;font-family:inherit;" />'+
+        '</div>'+
+      '</div>'+
       '<textarea id="reply-body" rows="5" style="width:100%;padding:12px;border:none;font-size:13px;font-family:inherit;resize:vertical;" placeholder="Write your reply..."></textarea>'+
       '<div style="padding:8px 12px;background:#f8f8f4;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:8px;">'+
         '<button onclick="hideReplyBox()" style="padding:7px 14px;background:#fff;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;cursor:pointer;">Cancel</button>'+
@@ -3623,44 +3755,43 @@ function renderThreadDetail(thread,messages){
     '</div>';
 
   el.innerHTML=html;
+  // Store thread data for reply
+  el.dataset.threadId=thread.id;
+  el.dataset.replyTo=replyTo;
+  el.dataset.subject='Re: '+(thread.subject||'');
 }
 
 function showReply(){
   var box=g('reply-box');
   if(box){box.style.display='block';g('reply-body').focus();}
 }
-function hideReplyBox(){
-  var box=g('reply-box');if(box)box.style.display='none';
-}
+function hideReplyBox(){var box=g('reply-box');if(box)box.style.display='none';}
+
 function sendCurrentReply(){
-  if(!currentThreadId)return;
-  var toEl=g('reply-to-addr');
-  var to=toEl?toEl.textContent:'';
-  var subj='Re: '+(document.querySelector('#inbox-detail-pane [style*="font-size:18px"]')||{textContent:''}).textContent;
-  sendReply(currentThreadId,to,subj);
-}
-function sendReplyFromBtn(btn){
-  sendReply(btn.dataset.tid,btn.dataset.to,btn.dataset.subj);
+  var el=g('inbox-detail-'+currentDept);
+  if(!el)return;
+  sendReply(el.dataset.threadId,el.dataset.replyTo,el.dataset.subject);
 }
 
-async function sendReply(threadId,toEmail,subject,originalThreadId){
+async function sendReply(threadId,toEmail,subject){
   var body=g('reply-body').value.trim();
   if(!body){alert('Please write a reply first.');return;}
+  var cc=g('reply-cc')?g('reply-cc').value.trim():'';
+  var bcc=g('reply-bcc')?g('reply-bcc').value.trim():'';
+  var fromEmail=deptEmails[currentDept];
   try{
-    await sendEmail(toEmail,'',subject,body,'sourcing@tbgsourcing.net');
-    // Save outbound message
+    await sendEmail(toEmail,'',subject,body,fromEmail,cc,bcc);
     await fetch(SB+'/rest/v1/email_messages',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({thread_id:threadId,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+      body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:'TBG Sourcing',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
     });
     await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({last_message_at:new Date().toISOString(),status:'read'})
     });
-    g('reply-body').value='';
-    g('reply-box').style.display='none';
+    hideReplyBox();
     openThread(threadId);
     alert('Reply sent!');
   }catch(e){alert('Send failed: '+e.message);}
@@ -3673,30 +3804,40 @@ async function archiveThread(threadId){
     body:JSON.stringify({status:'archived'})
   });
   currentThreadId=null;
-  g('inbox-detail-empty').style.display='flex';
-  g('inbox-detail-pane').style.display='none';
+  var detailEl=g('inbox-detail-'+currentDept);
+  var emptyEl=g('inbox-empty-'+currentDept);
+  if(detailEl)detailEl.style.display='none';
+  if(emptyEl)emptyEl.style.display='flex';
   loadInbox();
 }
 
-function showComposeModal(){
+function showComposeModal(dept){
+  if(dept)currentDept=dept;
   g('compose-to').value='';
+  g('compose-cc').value='';
+  g('compose-bcc').value='';
   g('compose-subject').value='';
   g('compose-body').value='';
+  // Set from dropdown to current dept
+  var fromSel=g('compose-from');
+  if(fromSel&&deptEmails[currentDept])fromSel.value=deptEmails[currentDept];
   g('compose-modal').style.display='flex';
 }
 
 async function sendComposedEmail(){
+  var fromEmail=g('compose-from').value;
   var to=g('compose-to').value.trim();
+  var cc=g('compose-cc').value.trim();
+  var bcc=g('compose-bcc').value.trim();
   var subject=g('compose-subject').value.trim();
   var body=g('compose-body').value.trim();
-  if(!to||!subject||!body){alert('Please fill in all fields.');return;}
+  if(!to||!subject||!body){alert('Please fill in To, Subject and Message.');return;}
   try{
-    await sendEmail(to,'',subject,body,'sourcing@tbgsourcing.net');
-    // Save to threads
+    await sendEmail(to,'',subject,body,fromEmail,cc,bcc);
     var r=await fetch(SB+'/rest/v1/email_threads',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify({subject:subject,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:to,direction:'outbound',status:'read'})
+      body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:'TBG Sourcing',to_email:to,direction:'outbound',status:'read',last_message_at:new Date().toISOString()})
     });
     var threads=await r.json();
     var thread=Array.isArray(threads)?threads[0]:threads;
@@ -3704,16 +3845,14 @@ async function sendComposedEmail(){
       await fetch(SB+'/rest/v1/email_messages',{
         method:'POST',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({thread_id:thread.id,from_email:'sourcing@tbgsourcing.net',from_name:'TBG Sourcing',to_email:to,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+        body:JSON.stringify({thread_id:thread.id,from_email:fromEmail,from_name:'TBG Sourcing',to_email:to,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
       });
     }
     g('compose-modal').style.display='none';
-    showPanel('inbox');
     loadInbox();
-    alert('Email sent!');
+    alert('Email sent from '+fromEmail+'!');
   }catch(e){alert('Send failed: '+e.message);}
 }
-
 </script>
 </body>
 </html>
