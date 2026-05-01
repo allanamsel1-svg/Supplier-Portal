@@ -2641,7 +2641,12 @@ async function acceptQuote(quoteId,rfqId,factoryName){
 
     await loadRFQs();
     openRFQDetail(rfqId);
-    alert('Quote accepted! Email sent to factory with next steps.');
+
+    // Show Create SKU prompt
+    if(confirm('Quote accepted! Email sent to factory.\n\nWould you like to create a SKU from this quote now?')){
+      var skuUrl='setup.html?from_quote='+quoteId+'&rfq='+rfqId;
+      window.open(skuUrl,'_blank');
+    }
   }catch(e){alert('Error: '+e.message);}
 }
 

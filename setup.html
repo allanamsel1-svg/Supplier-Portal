@@ -310,9 +310,9 @@ function switchTab(name){
 // CATEGORIES
 // ════════════════════════════════════════
 async function loadCats(){
-  g('cat-list').innerHTML='<div class="empty-list">Loading...</div>';
+  if(g('cat-list'))g('cat-list').innerHTML='<div class="empty-list">Loading...</div>';
   try{
-    var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{
+    var r=await fetch(SB+'/rest/v1/categories?select=id,category,sub_category,sub_sub_category,model_prefix&order=category,sub_category,sub_sub_category',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
     if(!r.ok){
@@ -450,7 +450,7 @@ async function deleteCat(id){
 // BRANDS
 // ════════════════════════════════════════
 async function loadBrands(){
-  g('brand-list').innerHTML='<div class="empty-list">Loading...</div>';
+  if(g('brand-list'))g('brand-list').innerHTML='<div class="empty-list">Loading...</div>';
   try{
     var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     if(!r.ok){var e=await r.json().catch(function(){return{};});var msg='Load failed: '+(e.message||e.details||r.status);g('brand-list').innerHTML='<div class="empty-list" style="color:#b00;">'+msg+'</div>';alert('Brands: '+msg);return;}
@@ -528,7 +528,7 @@ async function deleteBrand(id){
 // CUSTOMERS
 // ════════════════════════════════════════
 async function loadCusts(){
-  g('cust-list').innerHTML='<div class="empty-list">Loading...</div>';
+  if(g('cust-list'))g('cust-list').innerHTML='<div class="empty-list">Loading...</div>';
   try{
     var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     if(!r.ok){var e=await r.json().catch(function(){return{};});var msg='Load failed: '+(e.message||e.details||r.status);g('cust-list').innerHTML='<div class="empty-list" style="color:#b00;">'+msg+'</div>';alert('Customers: '+msg);return;}
@@ -1142,6 +1142,104 @@ async function duplicateSku(skuId){
   setTimeout(generateModelNumber,100);
   alert('SKU duplicated as draft. Update the model number and save.');
 }
+
+// ── Pre-fill SKU from accepted quote ──
+async function loadSkuFromQuote(quoteId, rfqId){
+  try{
+    var [qr,rr]=await Promise.all([
+      fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(id,factory_name_english,sales_email,sales_contact_name)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
+      fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();})
+    ]);
+    var q=qr[0]; var rfq=rr[0];
+    if(!q||!rfq)return;
+
+    // Switch to SKU tab
+    switchTab('skus');
+
+    // Build a partial SKU object from the quote/rfq data
+    var partialSku={
+      description:rfq.item_description||'',
+      detailed_description:rfq.product_description||'',
+      brand_id:rfq.brand_id||null,
+      category_id:rfq.category_id||null,
+      is_cosmetic:rfq.category==='Cosmetics'||rfq.category==='Skincare'||rfq.category==='Haircare',
+      has_inner_carton:rfq.has_inner_carton!==false,
+      has_pallet:rfq.has_pallet||false,
+      shelf_life_days:rfq.shelf_life_days||null,
+      status:'draft'
+    };
+
+    // Build partial packaging from quote dimensions
+    var partialPkg={
+      unit_length_cm:q.unit_length_cm||null,
+      unit_width_cm:q.unit_width_cm||null,
+      unit_height_cm:q.unit_height_cm||null,
+      unit_weight_kg:q.unit_weight_kg||null,
+      inner_qty:q.inner_qty||null,
+      master_qty:q.master_qty||null,
+      unit_dim_status:'factory_confirmed',
+      inner_dim_status:'factory_confirmed',
+      master_dim_status:'factory_confirmed'
+    };
+
+    // Build partial factory source
+    var f=q.factories||{};
+    var partialSources=[{
+      id:'__new__',
+      factory_id:q.factory_id,
+      rfq_quote_id:quoteId,
+      fob_price:q.unit_fob_price,
+      status:'active',
+      factories:{factory_name_english:f.factory_name_english},
+      rfq_quotes:{unit_fob_price:q.unit_fob_price,quote_option:q.quote_option}
+    }];
+
+    // Build partial costing
+    var partialCosting={
+      fob_price:parseFloat(q.unit_fob_price)||0,
+      gross_margin_pct:q.gross_margin_pct||null,
+      net_margin_pct:q.net_margin_pct||null,
+      landed_cost:q.landed_cost_per_unit||null
+    };
+
+    renderSkuForm(partialSku,partialPkg,[],partialSources,partialCosting);
+
+    // Set brand and category dropdowns
+    if(rfq.brand_id&&g('sf-brand'))g('sf-brand').value=rfq.brand_id;
+    if(rfq.category_id&&g('sf-category'))g('sf-category').value=rfq.category_id;
+
+    // Store quote/rfq refs for saving factory source later
+    g('sku-form-area').dataset.fromQuote=quoteId;
+    g('sku-form-area').dataset.fromRfq=rfqId;
+    g('sku-form-area').dataset.factoryId=q.factory_id;
+
+    // Generate model number
+    setTimeout(generateModelNumber,200);
+
+    // Show banner
+    var banner=document.createElement('div');
+    banner.style.cssText='background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#1a7a1a;';
+    banner.textContent='✓ Pre-filled from accepted quote — '+rfq.project_number+' · '+(f.factory_name_english||'')+'  · $'+parseFloat(q.unit_fob_price||0).toFixed(2)+' FOB. Review and save.';
+    var formArea=g('sku-form-area');
+    if(formArea&&formArea.firstChild)formArea.insertBefore(banner,formArea.firstChild.nextSibling);
+
+  }catch(e){console.log('loadSkuFromQuote error:',e);}
+}
+
+// Check URL params on load
+window.addEventListener('DOMContentLoaded',async function(){
+  var params=new URLSearchParams(window.location.search);
+  var fromQuote=params.get('from_quote');
+  var fromRfq=params.get('rfq');
+  if(fromQuote&&fromRfq){
+    // Wait for brands/cats to load first
+    await loadCats();
+    await loadBrands();
+    await loadCusts();
+    await loadSkuTab();
+    await loadSkuFromQuote(fromQuote,fromRfq);
+  }
+});
 
 </script>
 </body>
