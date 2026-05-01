@@ -2222,24 +2222,42 @@ async function loadRFQs(){
 
 async function checkNewQuotes(){
   try{
-    // Find any quotes submitted in the last 24 hours
     var since=new Date(Date.now()-86400000).toISOString();
+    // Check new submissions
     var r=await fetch(SB+'/rest/v1/rfq_quotes?select=*,rfqs(project_number,item_description),factories(factory_name_english)&created_at=gte.'+since+'&order=created_at.desc',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
-    if(!r.ok)return;
-    var quotes=await r.json();
-    if(!quotes.length)return;
+    var newQuotes=r.ok?await r.json():[];
+
+    // Check updated quotes (updated_at recent but created_at older)
+    var r2=await fetch(SB+'/rest/v1/rfq_quotes?select=*,rfqs(project_number,item_description),factories(factory_name_english)&updated_at=gte.'+since+'&order=updated_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var updatedQuotes=r2.ok?await r2.json():[];
+    // Filter to only truly updated ones
+    updatedQuotes=updatedQuotes.filter(function(q){
+      return q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(new Date(q.created_at).getTime()+60000);
+    });
+
+    var allActivity=[].concat(newQuotes,updatedQuotes);
+    // Deduplicate by id
+    var seen={};
+    allActivity=allActivity.filter(function(q){if(seen[q.id])return false;seen[q.id]=true;return true;});
+
+    if(!allActivity.length)return;
     var el=g('rfq-quotes-received');
     var listEl=g('rfq-new-quotes-list');
     if(!el||!listEl)return;
     el.style.display='block';
-    listEl.innerHTML=quotes.map(function(q){
+    listEl.innerHTML=allActivity.map(function(q){
       var rfq=q.rfqs||{};
       var f=q.factories||{};
-      var time=new Date(q.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-      return '<div style="background:#fff;border:1px solid #a0d8a0;border-radius:8px;padding:10px 12px;margin-bottom:6px;">'+
-        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' submitted Option '+q.quote_option+'</div>'+
+      var isUpdated=q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(new Date(q.created_at).getTime()+60000);
+      var time=new Date(isUpdated?q.updated_at:q.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+      return '<div style="background:#fff;border:1px solid '+(isUpdated?'#e0c040':'#a0d8a0')+';border-radius:8px;padding:10px 12px;margin-bottom:6px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+
+          (isUpdated?'🔄 ':'🆕 ')+(f.factory_name_english||'—')+(isUpdated?' updated':' submitted')+' Option '+q.quote_option+
+        '</div>'+
         '<div style="font-size:12px;color:#555;margin-top:2px;">'+(rfq.project_number||'—')+' · '+(rfq.item_description||'—')+' · $'+(q.unit_fob_price||'—')+' FOB</div>'+
         '<div style="font-size:11px;color:#999;margin-top:2px;">'+time+'</div>'+
       '</div>';
@@ -2319,18 +2337,26 @@ async function openRFQDetail(rfqId){
     });
     var assignments=await r.json();
 
-    var q=await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&select=*,factories(factory_name_english)',{
+    var q=await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name)',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
     var quotes=await q.json();
 
-    renderRFQDetailPane(rfq,assignments,quotes);
+    // Load version history for updated quotes
+    var quoteVersions={};
+    var updatedQuotes=quotes.filter(function(q){return q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(new Date(q.created_at).getTime()+60000);});
+    for(var i=0;i<updatedQuotes.length;i++){
+      var vr=await fetch(SB+'/rest/v1/rfq_quote_versions?quote_id=eq.'+updatedQuotes[i].id+'&select=*&order=version_number.asc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      if(vr.ok){var vrows=await vr.json();if(vrows.length)quoteVersions[updatedQuotes[i].id]=vrows;}
+    }
+
+    renderRFQDetailPane(rfq,assignments,quotes,quoteVersions);
   }catch(e){
     g('rfq-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error loading: '+e.message+'</div>';
   }
 }
 
-function renderRFQDetailPane(rfq,assignments,quotes){
+function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
   var el=g('rfq-detail-pane');
   var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
   var qtyStr=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'each')+' — '+uomStr:'—';
@@ -2386,7 +2412,7 @@ function renderRFQDetailPane(rfq,assignments,quotes){
     (quotes.length?
       '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Quotes Received</div>'+
       quotes.map(function(q,idx){
-        return renderQuoteCard(q,rfq,idx);
+        return renderQuoteCard(q,rfq,idx,quoteVersions&&quoteVersions[q.id]);
       }).join('')
     :'<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No quotes received yet.</div>')+
   '';
@@ -2447,20 +2473,78 @@ async function loadHistoricalBenchmarks(rfq,containerEl){
   }catch(e){console.log('benchmark error:',e);}
 }
 
-function renderQuoteCard(q,rfq,idx){
+function buildDiffSection(oldSnapshot,newQuote){
+  var fields=[
+    {key:'unit_fob_price',label:'FOB Price',format:function(v){return v?'$'+parseFloat(v).toFixed(2):'—';}},
+    {key:'hts_code_factory',label:'HTS Code',format:function(v){return v||'—';}},
+    {key:'factory_specifications',label:'Specifications',format:function(v){return v?v.substring(0,40)+(v.length>40?'...':''):'—';}},
+    {key:'unit_length_cm',label:'Length (cm)',format:function(v){return v||'—';}},
+    {key:'unit_width_cm',label:'Width (cm)',format:function(v){return v||'—';}},
+    {key:'unit_height_cm',label:'Height (cm)',format:function(v){return v||'—';}},
+    {key:'unit_weight_kg',label:'Weight (kg)',format:function(v){return v||'—';}},
+    {key:'moq',label:'MOQ',format:function(v){return v?v.toLocaleString():'—';}},
+    {key:'inci_document_url',label:'INCI List',format:function(v){return v?'Uploaded':'Missing';}},
+    {key:'hts_code_status',label:'HTS Status',format:function(v){return v||'—';}}
+  ];
+
+  var changedFields=fields.filter(function(f){
+    var oldVal=oldSnapshot[f.key];
+    var newVal=newQuote[f.key];
+    return String(oldVal||'')!==String(newVal||'');
+  });
+
+  if(!changedFields.length)return '';
+
+  var rows=changedFields.map(function(f){
+    var oldVal=f.format(oldSnapshot[f.key]);
+    var newVal=f.format(newQuote[f.key]);
+    var fobChange='';
+    if(f.key==='unit_fob_price'){
+      var delta=parseFloat(newQuote[f.key]||0)-parseFloat(oldSnapshot[f.key]||0);
+      fobChange='<span style="color:'+(delta<0?'#3B6D11':'#A32D2D')+';font-weight:500;">'+(delta<0?'':'+')+'$'+Math.abs(delta).toFixed(2)+(delta<0?' ↓':' ↑')+'</span>';
+    }
+    var isGood=f.key==='inci_document_url'&&newVal==='Uploaded';
+    var isNum=f.key==='unit_fob_price';
+    return '<div style="display:grid;grid-template-columns:120px 1fr 1fr 80px;font-size:11px;border-top:0.5px solid var(--color-border-tertiary);">'+
+      '<div style="padding:5px 8px;color:var(--color-text-primary);">'+f.label+'</div>'+
+      '<div style="padding:5px 8px;color:#A32D2D;text-decoration:line-through;">'+oldVal+'</div>'+
+      '<div style="padding:5px 8px;color:var(--color-text-primary);font-weight:500;">'+(isGood?'<span style="color:#3B6D11;">'+newVal+'</span>':newVal)+'</div>'+
+      '<div style="padding:5px 8px;">'+(isNum?fobChange:(isGood?'<span style="color:#3B6D11;">Added</span>':'Updated'))+'</div>'+
+    '</div>';
+  }).join('');
+
+  return '<div style="margin-bottom:12px;border:0.5px solid #FAC775;border-radius:8px;overflow:hidden;">'+
+    '<div style="display:grid;grid-template-columns:120px 1fr 1fr 80px;font-size:10px;background:#FAEEDA;">'+
+      '<div style="padding:5px 8px;color:#633806;font-weight:500;">Changed field</div>'+
+      '<div style="padding:5px 8px;color:#633806;font-weight:500;">Before</div>'+
+      '<div style="padding:5px 8px;color:#633806;font-weight:500;">After</div>'+
+      '<div style="padding:5px 8px;color:#633806;font-weight:500;">Delta</div>'+
+    '</div>'+
+    rows+
+  '</div>';
+}
+
+function renderQuoteCard(q,rfq,idx,versions){
   var f=q.factories||{};
   var fob=parseFloat(q.unit_fob_price)||0;
   var maxFob=parseFloat(rfq.max_fob_price)||0;
   var fobColor=maxFob?(fob<=maxFob?'#1a7a1a':'#b00'):'#1a1a2e';
   var fobFlag=maxFob?(fob<=maxFob?'✓ Under target':'⚠ Over target $'+maxFob.toFixed(2)):'';
+  var isUpdated=q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(q.created_at);
+  var submittedDate=q.created_at?new Date(q.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  var updatedDate=isUpdated?new Date(q.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
 
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
-      '<div>'+
-        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
+      '<div style="flex:1;">'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+          '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
+          (isUpdated?'<span style="font-size:10px;background:#fff0c0;color:#886600;border:1px solid #e0c040;padding:2px 7px;border-radius:10px;font-weight:600;">🔄 Updated '+updatedDate+'</span>':'')+
+        '</div>'+
         '<div style="font-size:12px;margin-top:2px;">'+
           '<span style="font-size:16px;font-weight:700;color:'+fobColor+';">$'+fob.toFixed(2)+' FOB</span>'+
           (fobFlag?'<span style="font-size:11px;margin-left:8px;color:'+fobColor+';">'+fobFlag+'</span>':'')+
+          '<span style="font-size:11px;color:#bbb;margin-left:8px;">Submitted '+submittedDate+'</span>'+
         '</div>'+
       '</div>'+
       '<span style="color:#bbb;font-size:18px;">▾</span>'+
@@ -2490,6 +2574,9 @@ function renderQuoteCard(q,rfq,idx){
       (q.factory_product_image_url?'<div style="margin-bottom:12px;"><img src="'+q.factory_product_image_url+'" style="max-height:160px;border-radius:8px;border:1px solid #e0e0d8;" /></div>':'')+
       // INCI document
       (q.inci_document_url?'<div style="margin-bottom:12px;"><a href="'+q.inci_document_url+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">🧴 View INCI Document</a></div>':'')+
+      // Version diff section
+      (isUpdated&&versions&&versions.length?buildDiffSection(versions[versions.length-1].snapshot,q):'')+
+
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+

@@ -1791,6 +1791,23 @@ async function updateQuote(quoteId){
   };
 
   try{
+    // First load current quote to save as version snapshot
+    var cur=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var curRows=await cur.json();
+    if(curRows&&curRows.length){
+      var currentQuote=curRows[0];
+      // Count existing versions
+      var vr=await fetch(SB+'/rest/v1/rfq_quote_versions?quote_id=eq.'+quoteId+'&select=version_number&order=version_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+      var versions=await vr.json();
+      var nextVersion=(versions&&versions.length?versions[0].version_number:0)+1;
+      // Save snapshot of current state before updating
+      await fetch(SB+'/rest/v1/rfq_quote_versions',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({quote_id:quoteId,version_number:nextVersion,snapshot:currentQuote,changed_by:'factory'})
+      });
+    }
+
     var r=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
