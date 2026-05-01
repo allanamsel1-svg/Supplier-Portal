@@ -91,7 +91,7 @@
   <div class="tab on" onclick="switchTab('categories')">📂 Categories</div>
   <div class="tab" onclick="switchTab('brands')">🏷 Brands</div>
   <div class="tab" onclick="switchTab('customers')">🛒 Customers</div>
-  <div class="tab" onclick="switchTab('skus');loadSkuTab();">📦 SKUs</div>
+  <div class="tab" onclick="switchTab('skus')">📦 SKUs</div>
 </div>
 
 <!-- ══════════════════════════════════════ -->
@@ -297,10 +297,11 @@ function showMsg(id,type,text){
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t,i){t.classList.remove('on');});
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
-  var tabs=['categories','brands','customers'];
+  var tabs=['categories','brands','customers','skus'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('on');
   g('tab-'+name).classList.add('on');
   if(name==='categories')loadCats();
+  if(name==='skus')loadSkuTab();
   if(name==='brands')loadBrands();
   if(name==='customers')loadCusts();
 }
@@ -678,6 +679,10 @@ var currentSkuId=null;
 
 async function loadSkuTab(){
   try{
+    // Load brands/cats/custs if not already loaded
+    if(!allBrands.length)await loadBrands();
+    if(!allCats.length)await loadCats();
+    if(!allCusts.length)await loadCusts();
     var r=await fetch(SB+'/rest/v1/skus?select=*,brands(brand_name,brand_prefix),categories(category,sub_category,sub_sub_category,model_prefix)&order=created_at.desc',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
