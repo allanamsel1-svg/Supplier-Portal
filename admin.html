@@ -851,6 +851,11 @@
               <div class="mf"><label>Container Cost (full container $)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Est. Freight/Unit ($)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
+            <div id="rfq-container-qty" style="display:none;background:#f0eaff;border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
+              <span style="font-weight:600;color:#5522aa;">Container quantities (40HC, 85% load): </span>
+              <span id="rfq-masters-per-cont" style="color:#1a1a2e;"></span> masters &nbsp;·&nbsp;
+              <span id="rfq-units-per-cont" style="font-weight:600;color:#1a1a2e;"></span> units
+            </div>
 
             <!-- Row 4: Duty & Tariff -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Duty &amp; Tariff</div>
@@ -2808,6 +2813,8 @@ function resetRFQForm(){
   g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
   g('rfq-description').value='';g('rfq-specs').value='';
   g('rfq-color').value='';g('rfq-quantity').value='';
+  // Reset deductions to 0
+  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){if(g(id))g(id).value='0';});
   g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
   g('rfq-pkg-notes').value='';
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
@@ -2994,6 +3001,16 @@ function calcMargins(){
   var freightPerUnit=cbmPerUnit>0?parseFloat((cbmPerUnit*(containerCost/usableCbm)).toFixed(4)):0;
   if(freightPerUnit>0)g('rfq-est-freight').value=freightPerUnit.toFixed(4);
   if(g('res-freight-disp'))g('res-freight-disp').textContent=freightPerUnit?'$'+freightPerUnit.toFixed(4):'—';
+
+  // Show container quantities
+  var contQtyEl=g('rfq-container-qty');
+  if(masterCbm>0&&masterQty>0&&contQtyEl){
+    var mastersPerCont=Math.floor(usableCbm/masterCbm);
+    var unitsPerCont=mastersPerCont*masterQty;
+    contQtyEl.style.display='block';
+    if(g('rfq-masters-per-cont'))g('rfq-masters-per-cont').textContent=mastersPerCont.toLocaleString();
+    if(g('rfq-units-per-cont'))g('rfq-units-per-cont').textContent=unitsPerCont.toLocaleString();
+  } else if(contQtyEl){contQtyEl.style.display='none';}
 
   // Duty & tariff applied to FOB (we calculate on FOB not wholesale at RFQ stage)
   var dutyPct=parseFloat(g('rfq-est-duty').value)||0;
