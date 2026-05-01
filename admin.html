@@ -810,106 +810,109 @@
         </div>
 
         <!-- Admin-Only Margin Calculator -->
-        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;max-width:100%;overflow:hidden;">
+        <div class="mgr-card" style="margin-bottom:1rem;border:2px solid #e8e0ff;background:#fafaff;">
           <div class="mgr-card-title" style="color:#5522aa;">🔒 Margin Calculator — Admin Only (not visible to factory)
-            <button onclick="calcMargins()" style="padding:5px 12px;background:#5522aa;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;">Calculate</button>
+            <button onclick="calcMargins()" style="float:right;padding:6px 16px;background:#5522aa;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">Calculate</button>
           </div>
+          <div class="mf-grid" style="padding:0 1rem 1rem;">
 
-          <!-- Pricing targets -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label style="color:#5522aa;">Comp Retail Price ($)</label><input type="number" id="rfq-comp-retail" step="0.01" placeholder="e.g. 7.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label style="color:#5522aa;">Target Retail Price ($)</label><input type="number" id="rfq-target-retail" step="0.01" placeholder="e.g. 6.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label style="color:#5522aa;">Customer Margin %</label><input type="number" id="rfq-cust-margin" step="0.1" placeholder="e.g. 55" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-          </div>
-
-          <!-- Customer selector -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label style="color:#5522aa;">Customer (optional — auto-fills deductions)</label>
-              <select id="rfq-customer-id" onchange="rfqCustomerChanged()" style="border-color:#c8b8f0;">
-                <option value="">— Select Customer —</option>
-              </select>
+            <!-- Row 1: Retail pricing -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Comp Retail Price ($)</label><input type="number" id="rfq-comp-retail" step="0.01" placeholder="e.g. 9.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Target Retail Price ($)</label><input type="number" id="rfq-target-retail" step="0.01" placeholder="e.g. 9.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Customer Margin %</label><input type="number" id="rfq-cust-margin" step="0.1" placeholder="e.g. 55" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             </div>
-            <div class="mf"><label style="color:#5522aa;">Brand (optional — for royalty %)</label>
-              <select id="rfq-brand-id" onchange="rfqBrandChanged()" style="border-color:#c8b8f0;">
-                <option value="">— Select Brand —</option>
-              </select>
-            </div>
-          </div>
 
-          <!-- Estimated dimensions -->
-          <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Estimated Master Carton Dimensions (for freight calc)</div>
-          <div style="font-size:11px;color:#999;margin-bottom:8px;">Always rectangular — CBM per unit = carton CBM ÷ master case pack</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div class="mf"><label>Carton L (cm)</label><input type="number" id="rfq-est-len" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Carton W (cm)</label><input type="number" id="rfq-est-wid" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Carton H (cm)</label><input type="number" id="rfq-est-hgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.001" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Units/Carton</label><input type="number" id="rfq-units-per-carton" step="1" placeholder="= master pack" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Master Carton CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label>Container Cost (full container $)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Est. Freight/Unit</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
-          </div>
-
-          <!-- Duty & Tariff -->
-          <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Duty & Tariff</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:6px;">
-            <div class="mf"><label>Likely Country of Manufacture</label>
-              <select id="rfq-country-mfg" onchange="suggestDutyTariff()" style="border-color:#c8b8f0;">
-                <option value="">— Select —</option>
-                <option>China</option><option>Vietnam</option><option>India</option><option>Cambodia</option>
-                <option>Bangladesh</option><option>Indonesia</option><option>Mexico</option><option>Taiwan</option>
-                <option>South Korea</option><option>Thailand</option><option>Malaysia</option><option>Other</option>
-              </select>
-            </div>
-            <div class="mf"><label>Est. Duty % <span style="font-size:10px;color:#999;">(AI suggested)</span></label><input type="number" id="rfq-est-duty" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Est. Tariff % <span style="font-size:10px;color:#999;">(AI suggested)</span></label><input type="number" id="rfq-est-tariff" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-          </div>
-          <div style="font-size:12px;color:#888;background:#f5f0ff;border:1px solid #c8b8f0;border-radius:6px;padding:8px;margin-bottom:12px;display:none;" id="rfq-duty-note"></div>
-          <button onclick="suggestDutyTariff()" style="font-size:12px;padding:6px 12px;background:#f5f0ff;color:#5522aa;border:1px solid #c8b8f0;border-radius:6px;cursor:pointer;font-family:inherit;margin-bottom:12px;">✦ Ask AI to suggest duty & tariff rates</button>
-
-          <!-- Deductions -->
-          <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Deductions</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-            <div class="mf"><label>Returns %</label><input type="number" id="rfq-est-returns" step="0.1" value="3" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Dilution %</label><input type="number" id="rfq-est-dilution" step="0.1" value="2" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Commission %</label><input type="number" id="rfq-est-commission" step="0.1" value="5" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label>Ad Allowance %</label><input type="number" id="rfq-est-ad" step="0.1" value="2" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Royalty %</label><input type="number" id="rfq-est-royalty" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"></div>
-          </div>
-
-          <!-- Thresholds -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label style="color:#5522aa;">Min Gross Margin %</label><input type="number" id="rfq-min-gross" step="0.1" placeholder="e.g. 45" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label style="color:#5522aa;">Min Net Margin %</label><input type="number" id="rfq-min-net" step="0.1" placeholder="e.g. 30" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-          </div>
-
-          <!-- Results -->
-          <div id="rfq-margin-results" style="display:none;background:#1a1a2e;border-radius:10px;padding:1rem;color:#fff;">
-            <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:#aaa;margin-bottom:10px;">Estimated Results</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-              <div><div style="font-size:10px;color:#aaa;">Target Wholesale</div><div style="font-size:15px;font-weight:700;" id="res-wholesale">—</div></div>
-              <div><div style="font-size:10px;color:#aaa;">Max FOB Price</div><div style="font-size:15px;font-weight:700;color:#f0d060;" id="res-max-fob">—</div></div>
-              <div><div style="font-size:10px;color:#aaa;">Est. Landed Cost</div><div style="font-size:15px;font-weight:700;" id="res-landed">—</div></div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-              <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:10px;">
-                <div style="font-size:11px;color:#aaa;">Est. Gross Margin</div>
-                <div style="font-size:22px;font-weight:700;" id="res-gross-margin">—</div>
-                <div style="font-size:11px;color:#aaa;margin-top:2px;" id="res-gross-flag"></div>
+            <!-- Row 2: Customer & Brand -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Customer (optional — auto-fills deductions)</label>
+                <select id="rfq-customer-id" onchange="rfqCustomerChanged()" style="border-color:#c8b8f0;width:100%;padding:8px;font-size:13px;border-radius:6px;font-family:inherit;background:#fff;">
+                  <option value="">— Select Customer —</option>
+                </select>
               </div>
-              <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:10px;">
-                <div style="font-size:11px;color:#aaa;">Est. Net Margin</div>
-                <div style="font-size:22px;font-weight:700;" id="res-net-margin">—</div>
-                <div style="font-size:11px;color:#aaa;margin-top:2px;" id="res-net-flag"></div>
+              <div class="mf"><label>Brand (optional — for royalty %)</label>
+                <select id="rfq-brand-id" onchange="rfqBrandChanged()" style="border-color:#c8b8f0;width:100%;padding:8px;font-size:13px;border-radius:6px;font-family:inherit;background:#fff;">
+                  <option value="">— Select Brand —</option>
+                </select>
               </div>
             </div>
+
+            <!-- Row 3: Freight calculation -->
+            <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Estimated Master Carton Dimensions (for freight calc)</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px;">CBM per unit = carton CBM ÷ master case pack (enter master case pack in Product Information above)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Carton L (cm)</label><input type="number" id="rfq-est-len" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Carton W (cm)</label><input type="number" id="rfq-est-wid" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Carton H (cm)</label><input type="number" id="rfq-est-hgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Master Carton CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Container Cost (full container $)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Est. Freight/Unit ($)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+            </div>
+
+            <!-- Row 4: Duty & Tariff -->
+            <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Duty &amp; Tariff</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Likely Country of Manufacture</label>
+                <select id="rfq-country-mfg" onchange="calcMargins()" style="border-color:#c8b8f0;width:100%;padding:8px;font-size:13px;border-radius:6px;font-family:inherit;background:#fff;">
+                  <option value="China">China</option>
+                  <option value="Vietnam">Vietnam</option>
+                  <option value="Korea">Korea</option>
+                  <option value="India">India</option>
+                  <option value="Bangladesh">Bangladesh</option>
+                  <option value="Mexico">Mexico</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="mf"><label>Est. Duty % (AI suggested)</label><input type="number" id="rfq-est-duty" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Est. Tariff % (AI suggested)</label><input type="number" id="rfq-est-tariff" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+            <div id="rfq-duty-note" style="display:none;background:#fff8e0;border:1px solid #e0c840;border-radius:7px;padding:8px 12px;font-size:12px;color:#665500;margin-bottom:10px;"></div>
+            <div style="margin-bottom:12px;">
+              <button onclick="suggestDutyTariff()" style="padding:7px 14px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button>
+            </div>
+
+            <!-- Row 5: Deductions — default 0 until customer selected -->
+            <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Deductions <span style="font-weight:400;font-size:10px;color:#888;">(auto-filled when customer selected above)</span></div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Returns %</label><input type="number" id="rfq-est-returns" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Dilution %</label><input type="number" id="rfq-est-dilution" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Commission %</label><input type="number" id="rfq-est-commission" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Ad Allowance %</label><input type="number" id="rfq-est-ad" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Royalty %</label><input type="number" id="rfq-est-royalty" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+
+            <!-- Row 6: Min margins -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div class="mf"><label style="color:#5522aa;">Min Gross Margin %</label><input type="number" id="rfq-min-gross" step="0.1" value="50" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label style="color:#5522aa;">Min Net Margin %</label><input type="number" id="rfq-min-net" step="0.1" value="45" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+
+            <!-- Results -->
+            <div id="rfq-margin-results" style="display:none;background:#1a1a2e;border-radius:10px;padding:1rem;">
+              <div style="font-size:11px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Estimated Results</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Target Wholesale</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-wholesale">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Max FOB Price</div><div style="font-size:16px;font-weight:700;color:#ffcc44;" id="res-max-fob">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Landed Cost</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-landed">—</div></div>
+                <div><div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Freight/Unit</div><div style="font-size:16px;font-weight:700;color:#fff;" id="res-freight-disp">—</div></div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div style="background:#ffffff15;border-radius:8px;padding:10px;">
+                  <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Gross Margin</div>
+                  <div style="font-size:20px;font-weight:700;" id="res-gross-margin">—</div>
+                  <div style="font-size:11px;margin-top:2px;" id="res-gross-flag"></div>
+                </div>
+                <div style="background:#ffffff15;border-radius:8px;padding:10px;">
+                  <div style="font-size:11px;color:#aaa;margin-bottom:4px;">Est. Net Margin</div>
+                  <div style="font-size:20px;font-weight:700;" id="res-net-margin">—</div>
+                  <div style="font-size:11px;margin-top:2px;" id="res-net-flag"></div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -2969,61 +2972,70 @@ function calcMargins(){
   var compRetail=parseFloat(g('rfq-comp-retail').value)||0;
   var targetRetail=parseFloat(g('rfq-target-retail').value)||compRetail;
   var custMargin=parseFloat(g('rfq-cust-margin').value)||0;
-  var wholesale=custMargin>0?targetRetail*(1-custMargin/100):0;
+  var wholesale=custMargin>0&&targetRetail>0?targetRetail*(1-custMargin/100):0;
 
-  // CBM calculation
+  // CBM calculation from master carton dimensions
   var l=parseFloat(g('rfq-est-len').value)||0;
   var w=parseFloat(g('rfq-est-wid').value)||0;
   var h=parseFloat(g('rfq-est-hgt').value)||0;
-  var cbm=l&&w&&h?(l*w*h/1000000):0;
-  if(cbm>0){g('rfq-est-cbm').value=cbm.toFixed(6);}
+  var masterCbm=l&&w&&h?(l*w*h/1000000):0;
+  if(masterCbm>0)g('rfq-est-cbm').value=masterCbm.toFixed(6);
 
-  // Freight calculation: container cost / (container CBM / unit CBM) = cost per unit
+  // Master case pack from Product Information section
+  var masterQty=parseFloat(g('rfq-master-pack')?g('rfq-master-pack').value:0)||0;
+
+  // CBM per unit = master carton CBM / units per master carton
+  var cbmPerUnit=masterCbm&&masterQty?masterCbm/masterQty:masterCbm;
+
+  // Freight per unit = CBM per unit * (container cost / usable CBM of container)
+  // Using 40HC = 67 CBM * 85% efficiency = 56.95 usable CBM
   var containerCost=parseFloat(g('rfq-container-cost').value)||6000;
-  var usableCBM=26.5; // 40' HQ usable CBM
-  var freightPerUnit=cbm>0?cbm*(containerCost/usableCBM):0;
+  var usableCbm=56.95;
+  var freightPerUnit=cbmPerUnit>0?parseFloat((cbmPerUnit*(containerCost/usableCbm)).toFixed(4)):0;
   if(freightPerUnit>0)g('rfq-est-freight').value=freightPerUnit.toFixed(4);
+  if(g('res-freight-disp'))g('res-freight-disp').textContent=freightPerUnit?'$'+freightPerUnit.toFixed(4):'—';
 
-  // Duty & tariff on wholesale (approximation at RFQ stage)
+  // Duty & tariff applied to FOB (we calculate on FOB not wholesale at RFQ stage)
   var dutyPct=parseFloat(g('rfq-est-duty').value)||0;
   var tariffPct=parseFloat(g('rfq-est-tariff').value)||0;
 
-  // Deductions
-  var returnsPct=parseFloat(g('rfq-est-returns').value)||0;
-  var dilutionPct=parseFloat(g('rfq-est-dilution').value)||0;
-  var commissionPct=parseFloat(g('rfq-est-commission').value)||0;
+  // Deductions as % of wholesale
+  var retPct=parseFloat(g('rfq-est-returns').value)||0;
+  var dilPct=parseFloat(g('rfq-est-dilution').value)||0;
+  var comPct=parseFloat(g('rfq-est-commission').value)||0;
   var adPct=parseFloat(g('rfq-est-ad').value)||0;
-  var royaltyPct=parseFloat(g('rfq-est-royalty').value)||0;
+  var royPct=parseFloat(g('rfq-est-royalty').value)||0;
+  var totalDedPct=retPct+dilPct+comPct+adPct+royPct;
 
   var minGross=parseFloat(g('rfq-min-gross').value)||0;
   var minNet=parseFloat(g('rfq-min-net').value)||0;
 
   if(!wholesale){g('rfq-margin-results').style.display='none';return;}
 
-  // Total deductions per unit
-  var deductionsPerUnit=wholesale*(returnsPct+dilutionPct+commissionPct+adPct+royaltyPct)/100;
+  var dedPerUnit=wholesale*(totalDedPct/100);
 
-  // Max FOB = wholesale - freight - duty% of wholesale - tariff% of wholesale - deductions - min gross margin
-  // Working backwards: FOB = wholesale * (1 - minGross/100) - freight - deductions
-  var maxFOB=wholesale*(1-minGross/100)-freightPerUnit-deductionsPerUnit;
+  // Max FOB working backwards from min gross margin:
+  // wholesale = landedCost / (1 - minGross/100)
+  // landedCost = FOB + freight + duty(FOB) + tariff(FOB)
+  // landedCost = FOB * (1 + duty%/100 + tariff%/100) + freight
+  // FOB * (1 + duty/100 + tariff/100) = wholesale*(1-minGross/100) - freight
+  var dutyTariffFactor=1+(dutyPct+tariffPct)/100;
+  var maxFOB=dutyTariffFactor>0?(wholesale*(1-minGross/100)-freightPerUnit)/dutyTariffFactor:0;
   if(maxFOB<0)maxFOB=0;
 
-  // Estimated landed cost assuming max FOB
+  // Landed cost at max FOB
   var dutyOnFOB=maxFOB*dutyPct/100;
   var tariffOnFOB=maxFOB*tariffPct/100;
   var landedCost=maxFOB+freightPerUnit+dutyOnFOB+tariffOnFOB;
 
-  // Gross margin
+  // Margins
   var grossMargin=wholesale>0?((wholesale-landedCost)/wholesale*100):0;
+  var netMargin=grossMargin-totalDedPct;
 
-  // Net margin
-  var netMargin=wholesale>0?((wholesale-landedCost-deductionsPerUnit)/wholesale*100):0;
-
-  // Show results
   g('rfq-margin-results').style.display='block';
   g('res-wholesale').textContent='$'+wholesale.toFixed(2);
-  g('res-max-fob').textContent='$'+maxFOB.toFixed(2);
-  g('res-landed').textContent='$'+landedCost.toFixed(2);
+  g('res-max-fob').textContent=maxFOB>0?'$'+maxFOB.toFixed(2):'$0.00';
+  g('res-landed').textContent=landedCost>0?'$'+landedCost.toFixed(2):'—';
 
   var grossEl=g('res-gross-margin');
   grossEl.textContent=grossMargin.toFixed(1)+'%';
@@ -3036,17 +3048,21 @@ function calcMargins(){
   g('res-net-flag').textContent=minNet&&netMargin<minNet?'⚠ Below '+minNet+'% threshold':'✓ Above threshold';
 }
 
+
 function rfqCustomerChanged(){
-  var custId=g('rfq-customer-id').value;
+  var custId=g('rfq-customer-id')?g('rfq-customer-id').value:'';
+  // Always reset deductions to 0 first
+  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){
+    if(g(id))g(id).value='0';
+  });
+  if(!custId){calcMargins();return;}
   var cust=allCustomers.find(function(c){return c.id===custId;});
-  if(!cust)return;
-  if(cust.default_margin_pct)g('rfq-cust-margin').value=cust.default_margin_pct;
-  if(cust.default_returns_pct)g('rfq-est-returns').value=cust.default_returns_pct;
-  if(cust.default_dilution_pct)g('rfq-est-dilution').value=cust.default_dilution_pct;
-  if(cust.default_commission_pct)g('rfq-est-commission').value=cust.default_commission_pct;
-  if(cust.default_ad_allowance_pct)g('rfq-est-ad').value=cust.default_ad_allowance_pct;
-  if(cust.min_gross_margin_pct)g('rfq-min-gross').value=cust.min_gross_margin_pct;
-  if(cust.min_net_margin_pct)g('rfq-min-net').value=cust.min_net_margin_pct;
+  if(!cust){calcMargins();return;}
+  if(cust.default_margin_pct&&g('rfq-cust-margin'))g('rfq-cust-margin').value=cust.default_margin_pct;
+  if(cust.default_returns_pct&&g('rfq-est-returns'))g('rfq-est-returns').value=cust.default_returns_pct;
+  if(cust.default_dilution_pct&&g('rfq-est-dilution'))g('rfq-est-dilution').value=cust.default_dilution_pct;
+  if(cust.default_commission_pct&&g('rfq-est-commission'))g('rfq-est-commission').value=cust.default_commission_pct;
+  if(cust.default_ad_allowance_pct&&g('rfq-est-ad'))g('rfq-est-ad').value=cust.default_ad_allowance_pct;
   calcMargins();
 }
 
