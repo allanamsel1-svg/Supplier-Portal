@@ -717,7 +717,18 @@ async function deleteDept(id){
   catch(e){alert('Delete error: '+e.message);}
 }
 
-// ── Page initialization ──
+// ── Shared email proxy ──
+async function sendEmail(toEmail,toName,subject,body,replyTo){
+  try{
+    var r=await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net'})});
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok)throw new Error(d.error||r.status);
+    return true;
+  }catch(e){throw e;}
+}
+
+// ── Page init ──
 async function initPage(){
   var params=new URLSearchParams(window.location.search);
   var fromQuote=params.get('from_quote');
@@ -727,408 +738,424 @@ async function initPage(){
     await loadSkuTab();
     switchTab('skus');
     await loadSkuFromQuote(fromQuote,fromRfq);
-  } else {
+  }else{
     loadCats();
   }
 }
 initPage();
 
-// ── SKU TAB ──
+// ── SKU state ──
 var allSkus=[];
 var currentSkuId=null;
 var allFreightRates=[];
+// Store pending source from quote before SKU is saved
+var pendingSource=null;
 
+// ── Load SKU tab ──
 async function loadSkuTab(){
+  if(!allBrands.length)await loadBrands();
+  if(!allCats.length)await loadCats();
+  if(!allCusts.length)await loadCusts();
   try{
-    if(!allBrands.length)await loadBrands();
-    if(!allCats.length)await loadCats();
-    if(!allCusts.length)await loadCusts();
-    var [sr,fr]=await Promise.all([
+    var results=await Promise.all([
       fetch(SB+'/rest/v1/skus?select=*,brands(brand_name,brand_code),categories(category,sub_category,model_prefix)&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}),
       fetch(SB+'/rest/v1/freight_rates?is_active=eq.true&order=origin_country,mode',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];})
     ]);
-    allSkus=sr;
-    allFreightRates=fr;
+    allSkus=results[0];
+    allFreightRates=results[1];
     renderSkuList();
-  }catch(e){console.log('loadSkuTab error:',e);}
+  }catch(e){console.error('loadSkuTab:',e);}
 }
 
 function renderSkuList(){
   var el=g('sku-list');if(!el)return;
-  var search=(g('sku-search')?g('sku-search').value||'':'').toLowerCase();
-  var filtered=allSkus.filter(function(s){
-    return !search||(s.model_number||'').toLowerCase().includes(search)||(s.description||'').toLowerCase().includes(search);
-  });
-  if(!filtered.length){el.innerHTML='<div style="padding:1rem;text-align:center;font-size:12px;color:#bbb;">No SKUs found.</div>';return;}
-  var statusColors={active:'#e8f8e8',draft:'#f5f5e8',discontinued:'#fff0f0',archived:'#f0f0f0'};
-  el.innerHTML=filtered.map(function(s){
+  var q=(g('sku-search')?g('sku-search').value||'':'').toLowerCase();
+  var list=allSkus.filter(function(s){return !q||(s.model_number||'').toLowerCase().includes(q)||(s.description||'').toLowerCase().includes(q);});
+  if(!list.length){el.innerHTML='<div style="padding:1rem;text-align:center;font-size:12px;color:#bbb;">No SKUs yet.</div>';return;}
+  var sc={active:'#e8f8e8',draft:'#f5f5e8',discontinued:'#fff0f0',archived:'#f0f0f0'};
+  el.innerHTML=list.map(function(s){
     var b=s.brands||{};
-    var isSelected=s.id===currentSkuId;
-    return '<div data-sid="'+s.id+'" onclick="openSkuForm(this.dataset.sid)" style="padding:9px 10px;border-radius:7px;cursor:pointer;margin-bottom:3px;background:'+(isSelected?'#eef2ff':'transparent')+';border:1px solid '+(isSelected?'#c0d0f0':'transparent')+';">'+
+    var sel=s.id===currentSkuId;
+    return '<div data-sid="'+s.id+'" onclick="openSkuForm(this.dataset.sid)" style="padding:9px 10px;border-radius:7px;cursor:pointer;margin-bottom:3px;background:'+(sel?'#eef2ff':'transparent')+';border:1px solid '+(sel?'#c0d0f0':'transparent')+';">'+
       '<div style="font-size:11px;font-weight:600;font-family:monospace;color:#1a1a2e;">'+s.model_number+'</div>'+
-      '<div style="font-size:11px;color:#666;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.description+'</div>'+
-      '<div style="margin-top:3px;display:flex;gap:4px;">'+
-        '<span style="font-size:10px;padding:1px 5px;border-radius:6px;background:'+(statusColors[s.status]||'#f5f5f0')+';">'+s.status+'</span>'+
-        '<span style="font-size:10px;color:#aaa;">'+(b.brand_name||'')+'</span>'+
-      '</div>'+
+      '<div style="font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.description+'</div>'+
+      '<div style="margin-top:3px;display:flex;gap:4px;"><span style="font-size:10px;padding:1px 5px;border-radius:5px;background:'+(sc[s.status]||'#f5f5f0')+';">'+s.status+'</span><span style="font-size:10px;color:#aaa;">'+(b.brand_name||'')+'</span></div>'+
     '</div>';
   }).join('');
 }
 
+// ── Open SKU form ──
 async function openSkuForm(skuId){
   currentSkuId=skuId;
+  pendingSource=null;
   renderSkuList();
   var area=g('sku-form-area');
-  area.innerHTML='<div style="padding:2rem;text-align:center;font-size:13px;color:#bbb;">Loading...</div>';
-  var sku=null,pkg=null,variations=[],sources=[],costing=null,certs=[];
+  if(!area)return;
+  area.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
+
+  var sku=null,pkg=null,vars=[],sources=[],costing=null,certs=[];
+
   if(skuId){
     try{
-      var results=await Promise.all([
+      // Load sku + packaging + variations + sources in parallel
+      var r1=await Promise.all([
         fetch(SB+'/rest/v1/skus?id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
         fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+skuId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
         fetch(SB+'/rest/v1/sku_variations?sku_id=eq.'+skuId+'&order=created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
         fetch(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english,country,sales_email,sales_contact_name)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
-        fetch(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
-        fetch(SB+'/rest/v1/rfq_quote_cert_assets?select=*,rfq_quotes!inner(sku_factory_sources!inner(sku_id))&rfq_quotes.sku_factory_sources.sku_id=eq.'+skuId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];})
+        fetch(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();})
       ]);
-      sku=results[0][0]||null;
-      pkg=results[1][0]||null;
-      variations=results[2]||[];
-      sources=results[3]||[];
-      costing=results[4][0]||null;
-      certs=results[5]||[];
-    }catch(e){console.log('openSkuForm load error:',e);}
+      sku=r1[0][0]||null;
+      pkg=r1[1][0]||null;
+      vars=r1[2]||[];
+      sources=r1[3]||[];
+      costing=r1[4][0]||null;
+
+      // Load certs via sku_factory_sources -> rfq_quote_cert_assets
+      if(sources.length){
+        var quoteIds=sources.map(function(s){return s.rfq_quote_id;}).filter(Boolean);
+        if(quoteIds.length){
+          var certQ=quoteIds.map(function(id){return 'quote_id=eq.'+id;}).join(',');
+          var cr=await fetch(SB+'/rest/v1/rfq_quote_cert_assets?or=('+certQ+')&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+          if(cr.ok)certs=await cr.json();
+        }
+        // Also fetch INCI docs from quotes
+        var inciIds=sources.map(function(s){return s.rfq_quote_id;}).filter(Boolean);
+        if(inciIds.length){
+          var inciQ=inciIds.map(function(id){return 'id=eq.'+id;}).join(',');
+          var ir=await fetch(SB+'/rest/v1/rfq_quotes?or=('+inciQ+')&select=id,inci_document_url&neq.inci_document_url.null',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+          if(ir.ok){
+            var inciRows=await ir.json();
+            inciRows.forEach(function(row){
+              if(row.inci_document_url){
+                certs.push({id:'inci_'+row.id,file_url:row.inci_document_url,file_name:'INCI List',cert_type:'INCI'});
+              }
+            });
+          }
+        }
+      }
+    }catch(e){console.error('openSkuForm load:',e);}
   }
-  renderSkuForm(sku,pkg,variations,sources,costing,certs);
+  renderSkuForm(sku,pkg,vars,sources,costing,certs);
 }
 
-function calcCbm(l,w,h){
-  if(!l||!w||!h)return null;
-  return parseFloat(((parseFloat(l)*parseFloat(w)*parseFloat(h))/1000000).toFixed(6));
+// ── Helpers ──
+function fv(sku,f,d){var v=(sku&&sku[f]!=null)?sku[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
+function pv(pkg,f,d){var v=(pkg&&pkg[f]!=null)?pkg[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
+function cv(c,f,d){var v=(c&&c[f]!=null)?c[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
+
+function dimSt(s){
+  var m={estimated:'⚪ Estimated',factory_confirmed:'🟡 Factory Confirmed',admin_verified:'🟢 Admin Verified'};
+  var bg={estimated:'#f5f5e8',factory_confirmed:'#fff8e0',admin_verified:'#edfaed'};
+  return '<span style="font-size:10px;padding:2px 6px;border-radius:5px;background:'+(bg[s]||bg.estimated)+'">'+(m[s]||'Estimated')+'</span>';
 }
 
-function dimStatusBadge(status){
-  var map={estimated:'⚪ Estimated',factory_confirmed:'🟡 Factory Confirmed',admin_verified:'🟢 Admin Verified'};
-  var colors={estimated:'#f5f5e8',factory_confirmed:'#fff8e0',admin_verified:'#e8f8e8'};
-  return '<span style="font-size:10px;padding:2px 6px;border-radius:6px;background:'+(colors[status]||'#f5f5e8')+';white-space:nowrap;">'+(map[status]||status)+'</span>';
+function numIn(id,val,step,ph){
+  return '<input type="number" id="'+id+'" value="'+(val||'')+'" step="'+(step||'0.01')+'" placeholder="'+(ph||'')+'" oninput="recalcAll()" style="width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" />';
+}
+function txtIn(id,val,ph,extra){
+  return '<input type="text" id="'+id+'" value="'+(val||'')+'" placeholder="'+(ph||'')+'" '+(extra||'')+' style="width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" />';
+}
+function sel(id,opts,extra){
+  return '<select id="'+id+'" '+(extra||'')+' style="width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;">'+opts+'</select>';
+}
+function fld(label,inp,note){
+  return '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;">'+label+'</label>'+inp+(note?'<div style="font-size:10px;color:#aaa;margin-top:2px;">'+note+'</div>':'')+' </div>';
+}
+function card(title,body,extra){
+  return '<div style="background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;'+(extra||'')+'"><div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:1rem;padding-bottom:8px;border-bottom:1px solid #f0f0e8;">'+title+'</div>'+body+'</div>';
+}
+function grid(cols,gap,items){
+  return '<div style="display:grid;grid-template-columns:'+cols+';gap:'+(gap||'10px')+';margin-bottom:10px;">'+items+'</div>';
 }
 
+// ── Render form ──
 function renderSkuForm(sku,pkg,variations,sources,costing,certs){
-  var area=g('sku-form-area');
-  if(!area)return;
+  var area=g('sku-form-area');if(!area)return;
   var isNew=!sku||!sku.id;
-  var v=function(f,d){var val=(sku&&sku[f]!=null)?sku[f]:d;return (val===null||val===undefined)?'':val;};
-  var pv=function(f,d){var val=(pkg&&pkg[f]!=null)?pkg[f]:d;return (val===null||val===undefined)?'':val;};
-  var cv=function(f,d){var val=(costing&&costing[f]!=null)?costing[f]:d;return (val===null||val===undefined)?'':val;};
 
   var brandOpts='<option value="">— Brand —</option>'+allBrands.map(function(b){
     return '<option value="'+b.id+'" data-prefix="'+b.brand_code+'"'+(sku&&sku.brand_id===b.id?' selected':'')+'>'+b.brand_name+'</option>';
   }).join('');
   var catOpts='<option value="">— Category —</option>'+allCats.map(function(c){
-    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
-    return '<option value="'+c.id+'" data-prefix="'+c.model_prefix+'"'+(sku&&sku.category_id===c.id?' selected':'')+'>'+path+'</option>';
+    var p=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+    return '<option value="'+c.id+'" data-prefix="'+c.model_prefix+'"'+(sku&&sku.category_id===c.id?' selected':'')+'>'+p+'</option>';
   }).join('');
   var custOpts='<option value="">— Customer —</option>'+allCusts.map(function(c){
-    return '<option value="'+c.id+'" data-suffix="'+(c.customer_suffix||'')+'" data-returns="'+(c.default_returns_pct||0)+'" data-dilution="'+(c.default_dilution_pct||0)+'" data-ad="'+(c.default_ad_allowance_pct||0)+'" data-commission="'+(c.default_commission_pct||0)+'"'+(sku&&sku.customer_id===c.id?' selected':'')+'>'+c.customer_name+'</option>';
+    return '<option value="'+c.id+'" data-suffix="'+(c.customer_suffix||'')+'" data-ret="'+(c.default_returns_pct||0)+'" data-dil="'+(c.default_dilution_pct||0)+'" data-ad="'+(c.default_ad_allowance_pct||0)+'" data-com="'+(c.default_commission_pct||0)+'"'+(sku&&sku.customer_id===c.id?' selected':'')+'>'+c.customer_name+'</option>';
   }).join('');
 
-  // Build freight rate options
-  var originCountries=[...new Set(allFreightRates.map(function(r){return r.origin_country;}))];
-  var freightOriginOpts='<option value="">— Select origin —</option>'+originCountries.map(function(c){return '<option value="'+c+'"'+(costing&&costing.freight_origin===c?' selected':'')+'>'+c+'</option>';}).join('');
+  var origins=[...new Set(allFreightRates.map(function(r){return r.origin_country;}))];
+  var freightOriginOpts='<option value="">— Origin —</option>'+origins.map(function(o){
+    return '<option value="'+o+'"'+(cv(costing,'freight_origin')=== o?' selected':'')+'>'+o+'</option>';
+  }).join('');
 
-  // Compute CBMs
-  var uCbm=calcCbm(pv('unit_length_cm'),pv('unit_width_cm'),pv('unit_height_cm'));
-  var iCbm=calcCbm(pv('inner_length_cm'),pv('inner_width_cm'),pv('inner_height_cm'));
-  var mCbm=calcCbm(pv('master_length_cm'),pv('master_width_cm'),pv('master_height_cm'));
+  // Compute CBMs for display
+  var uCbm=calcCbm(pv(pkg,'unit_length_cm'),pv(pkg,'unit_width_cm'),pv(pkg,'unit_height_cm'));
+  var iCbm=calcCbm(pv(pkg,'inner_length_cm'),pv(pkg,'inner_width_cm'),pv(pkg,'inner_height_cm'));
+  var mCbm=calcCbm(pv(pkg,'master_length_cm'),pv(pkg,'master_width_cm'),pv(pkg,'master_height_cm'));
 
-  var html='<div style="padding:1.5rem;max-width:900px;">'+
+  var html='<div style="padding:1.5rem;max-width:860px;">'+
 
-  // ── HEADER ──
-  '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
+  // Header
+  '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">'+
     '<div>'+
-      '<div style="font-size:18px;font-weight:700;font-family:monospace;color:#1a1a2e;">'+(isNew?'New SKU':v('model_number'))+'</div>'+
-      '<div style="font-size:13px;color:#888;margin-top:2px;">'+(isNew?'Fill in details below':v('description'))+'</div>'+
+      '<div style="font-size:18px;font-weight:700;font-family:monospace;">'+(isNew?'New SKU':fv(sku,'model_number'))+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:2px;">'+(isNew?'Create a new SKU':fv(sku,'description'))+'</div>'+
     '</div>'+
-    '<div style="display:flex;gap:8px;align-items:center;">'+
-      (!isNew?'<button data-skuid="'+v('id')+'" onclick="duplicateSku(this.dataset.skuid)" style="padding:7px 12px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">⧉ Duplicate</button>':'')+
-      (!isNew?'<a href="skus.html?id='+v('id')+'" target="_blank" style="padding:7px 12px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;text-decoration:none;color:#2244cc;">View in Library →</a>':'')+
-    '</div>'+
-  '</div>'+
-
-  // ── SECTION 1: BASIC INFO ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title">Basic Information</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
-      '<div class="f"><label>Brand *</label><select id="sf-brand" onchange="onBrandCatChange()">'+brandOpts+'</select></div>'+
-      '<div class="f"><label>Category *</label><select id="sf-category" onchange="onBrandCatChange()">'+catOpts+'</select></div>'+
-    '</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
-      '<div class="f"><label>Model Number</label>'+
-        '<div style="display:flex;gap:4px;">'+
-          '<input type="text" id="sf-model" value="'+v('model_number')+'" placeholder="Auto-generated" style="flex:1;font-family:monospace;font-size:13px;" />'+
-          '<button onclick="generateModelNumber()" title="Generate" style="padding:6px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;font-size:12px;cursor:pointer;">↺</button>'+
-        '</div>'+
-      '</div>'+
-      '<div class="f"><label>Status</label><select id="sf-status">'+
-        ['draft','active','discontinued','archived'].map(function(s){return '<option value="'+s+'"'+(v('status','draft')===s?' selected':'')+'>'+s.charAt(0).toUpperCase()+s.slice(1)+'</option>';}).join('')+
-      '</select></div>'+
-      '<div class="f"><label>Shelf Life (days, default 1080)</label><input type="number" id="sf-shelf" value="'+v('shelf_life_days',1080)+'" /></div>'+
-    '</div>'+
-    '<div class="f" style="margin-bottom:8px;"><label>Description *</label><input type="text" id="sf-desc" value="'+v('description')+'" placeholder="e.g. 100ml Facial Moisturizer SPF30" /></div>'+
-    '<div class="f" style="margin-bottom:8px;"><label>Detailed Description</label><textarea id="sf-detail" rows="2" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+v('detailed_description')+'</textarea></div>'+
-    '<div style="display:flex;gap:16px;margin-top:4px;">'+
-      '<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-cosmetic"'+(v('is_cosmetic')?'checked':'')+' /> Cosmetic</label>'+
-      '<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-inner"'+(v('has_inner_carton',true)?'checked':'')+' onchange="toggleSection(\'sf-inner-dims\',this.checked)" /> Has inner carton</label>'+
-      '<label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-pallet"'+(v('has_pallet')?'checked':'')+' onchange="toggleSection(\'sf-pallet-dims\',this.checked)" /> Has pallet</label>'+
+    '<div style="display:flex;gap:8px;">'+
+      (!isNew?'<button data-sid="'+sku.id+'" onclick="duplicateSku(this.dataset.sid)" style="padding:7px 12px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">⧉ Duplicate</button>':'')+
+      (!isNew?'<a href="skus.html?id='+sku.id+'" target="_blank" style="padding:7px 12px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;text-decoration:none;color:#2244cc;">Library →</a>':'')+
     '</div>'+
   '</div>'+
 
-  // ── SECTION 2: CUSTOMER ASSIGNMENT ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title">Customer Assignment</div>'+
-    '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px;">'+
-      '<input type="checkbox" id="sf-cust-specific"'+(v('is_customer_specific')?'checked':'')+' onchange="toggleSection(\'sf-cust-section\',this.checked)" />'+
-      'This item is customer-specific (adds customer suffix to model number)'+
-    '</label>'+
-    '<div id="sf-cust-section" style="display:'+(v('is_customer_specific')?'block':'none')+';">'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">'+
-        '<div class="f"><label>Customer</label><select id="sf-customer" onchange="onCustomerChange()">'+custOpts+'</select></div>'+
-        '<div class="f"><label>Suffix (auto-filled)</label><input type="text" id="sf-cust-suffix" value="'+v('customer_suffix')+'" style="font-family:monospace;" oninput="updateModelPreview()" /></div>'+
-      '</div>'+
-      '<div style="font-size:12px;color:#888;">Full model number: <span id="sf-model-preview" style="font-family:monospace;font-weight:600;color:#1a1a2e;"></span></div>'+
-    '</div>'+
-  '</div>'+
+  // ── 1. BASIC INFO ──
+  card('Basic Information',
+    grid('1fr 1fr','10px',
+      fld('Brand *',sel('sf-brand',brandOpts,'onchange="onBrandCatChange()"'))+
+      fld('Category *',sel('sf-category',catOpts,'onchange="onBrandCatChange()"'))
+    )+
+    grid('1fr 1fr 1fr','10px',
+      fld('Model Number','<div style="display:flex;gap:4px;"><input type="text" id="sf-model" value="'+fv(sku,'model_number')+'" placeholder="Auto-generated" style="flex:1;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" /><button onclick="generateModelNumber()" style="padding:6px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;font-size:12px;cursor:pointer;" title="Generate">↺</button></div>')+
+      fld('Status',sel('sf-status','<option value="draft"'+(fv(sku,'status','draft')==='draft'?' selected':'')+'>Draft</option><option value="active"'+(fv(sku,'status')==='active'?' selected':'')+'>Active</option><option value="discontinued"'+(fv(sku,'status')==='discontinued'?' selected':'')+'>Discontinued</option><option value="archived"'+(fv(sku,'status')==='archived'?' selected':'')+'>Archived</option>'))+
+      fld('Shelf Life (days)',numIn('sf-shelf',fv(sku,'shelf_life_days',1080),'1','Default 1080'))
+    )+
+    fld('Description *','<input type="text" id="sf-desc" value="'+fv(sku,'description')+'" placeholder="e.g. 100ml Facial Moisturizer SPF30" style="width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" />')+
+    '<div style="margin-top:8px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em;">Detailed Description</label><textarea id="sf-detail" rows="2" style="width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+fv(sku,'detailed_description')+'</textarea></div>'+
+    '<div style="display:flex;gap:16px;margin-top:8px;">'+
+      '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="sf-cosmetic"'+(fv(sku,'is_cosmetic')?'checked':'')+' /> Cosmetic</label>'+
+      '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="sf-inner"'+(fv(sku,'has_inner_carton',true)?'checked':'')+' onchange="document.getElementById(\'sf-inner-dims\').style.display=this.checked?\'block\':\'none\'" /> Has Inner Carton</label>'+
+      '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="sf-pallet"'+(fv(sku,'has_pallet')?'checked':'')+' onchange="document.getElementById(\'sf-pallet-dims\').style.display=this.checked?\'block\':\'none\'" /> Has Pallet</label>'+
+    '</div>'
+  )+
 
-  // ── SECTION 3: DIMENSIONS & PACKAGING ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title">Packaging & Dimensions</div>'+
+  // ── 2. CUSTOMER ASSIGNMENT ──
+  card('Customer Assignment',
+    '<label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:10px;"><input type="checkbox" id="sf-cust-specific"'+(fv(sku,'is_customer_specific')?'checked':'')+' onchange="document.getElementById(\'sf-cust-section\').style.display=this.checked?\'block\':\'none\';onCustomerChange()" /> This item is customer-specific (adds suffix to model number)</label>'+
+    '<div id="sf-cust-section" style="display:'+(fv(sku,'is_customer_specific')?'block':'none')+';">'+
+      grid('1fr 1fr','10px',
+        fld('Customer',sel('sf-customer',custOpts,'onchange="onCustomerChange()"'))+
+        fld('Suffix','<input type="text" id="sf-cust-suffix" value="'+fv(sku,'customer_suffix')+'" style="width:100%;padding:6px 8px;font-size:13px;font-family:monospace;border:1px solid #e0e0d8;border-radius:6px;" oninput="updateModelPreview()" />')
+      )+
+      '<div style="font-size:12px;color:#888;">Full model: <span id="sf-model-preview" style="font-family:monospace;font-weight:600;color:#1a1a2e;"></span></div>'+
+    '</div>'
+  )+
 
+  // ── 3. DIMENSIONS ──
+  card('Packaging & Dimensions',
     // Unit
-    '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">UNIT &nbsp;'+dimStatusBadge(pv('unit_dim_status','estimated'))+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
-      '<div class="f"><label>L (cm)</label><input type="number" id="pk-ul" step="0.01" value="'+pv('unit_length_cm')+'" oninput="calcCbmField(\'unit\')" /></div>'+
-      '<div class="f"><label>W (cm)</label><input type="number" id="pk-uw" step="0.01" value="'+pv('unit_width_cm')+'" oninput="calcCbmField(\'unit\')" /></div>'+
-      '<div class="f"><label>H (cm)</label><input type="number" id="pk-uh" step="0.01" value="'+pv('unit_height_cm')+'" oninput="calcCbmField(\'unit\')" /></div>'+
-      '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-uwt" step="0.001" value="'+pv('unit_weight_kg')+'" /></div>'+
-      '<div class="f"><label>Status</label><select id="pk-ust"><option value="estimated"'+(pv('unit_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv('unit_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv('unit_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option></select></div>'+
-    '</div>'+
-    '<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">'+
-      '<div style="font-size:12px;color:#888;">CBM est: <span id="cbm-unit" style="font-weight:600;color:#1a1a2e;">'+(uCbm||'—')+'</span></div>'+
-      '<button data-level="unit" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
+    '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">UNIT &nbsp;'+dimSt(pv(pkg,'unit_dim_status','estimated'))+'</div>'+
+    grid('1fr 1fr 1fr 1fr 1fr','8px',
+      fld('L (cm)',numIn('pk-ul',pv(pkg,'unit_length_cm'),'0.01'))+
+      fld('W (cm)',numIn('pk-uw',pv(pkg,'unit_width_cm'),'0.01'))+
+      fld('H (cm)',numIn('pk-uh',pv(pkg,'unit_height_cm'),'0.01'))+
+      fld('Weight (kg)',numIn('pk-uwt',pv(pkg,'unit_weight_kg'),'0.001'))+
+      fld('Status',sel('pk-ust','<option value="estimated"'+(pv(pkg,'unit_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv(pkg,'unit_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv(pkg,'unit_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option>'))
+    )+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'+
+      '<span style="font-size:12px;color:#888;">CBM: <strong id="cbm-unit">'+(uCbm||'—')+'</strong></span>'+
+      '<button data-level="unit" onclick="reqDimConf(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
     '</div>'+
 
     // Inner
-    '<div id="sf-inner-dims" style="display:'+(v('has_inner_carton',true)?'block':'none')+';">'+
-      '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">INNER CARTON &nbsp;'+dimStatusBadge(pv('inner_dim_status','estimated'))+'</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
-        '<div class="f"><label>Qty/Inner</label><input type="number" id="pk-iq" value="'+pv('inner_qty')+'" /></div>'+
-        '<div class="f"><label>L (cm)</label><input type="number" id="pk-il" step="0.01" value="'+pv('inner_length_cm')+'" oninput="calcCbmField(\'inner\')" /></div>'+
-        '<div class="f"><label>W (cm)</label><input type="number" id="pk-iw" step="0.01" value="'+pv('inner_width_cm')+'" oninput="calcCbmField(\'inner\')" /></div>'+
-        '<div class="f"><label>H (cm)</label><input type="number" id="pk-ih" step="0.01" value="'+pv('inner_height_cm')+'" oninput="calcCbmField(\'inner\')" /></div>'+
-        '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-iwt" step="0.001" value="'+pv('inner_weight_kg')+'" /></div>'+
-        '<div class="f"><label>Status</label><select id="pk-ist"><option value="estimated"'+(pv('inner_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv('inner_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv('inner_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option></select></div>'+
-      '</div>'+
-      '<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">'+
-        '<div style="font-size:12px;color:#888;">CBM est: <span id="cbm-inner" style="font-weight:600;color:#1a1a2e;">'+(iCbm||'—')+'</span></div>'+
-        '<button data-level="inner" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
+    '<div id="sf-inner-dims" style="display:'+(fv(sku,'has_inner_carton',true)?'block':'none')+';">'+
+      '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">INNER CARTON &nbsp;'+dimSt(pv(pkg,'inner_dim_status','estimated'))+'</div>'+
+      grid('1fr 1fr 1fr 1fr 1fr 1fr','8px',
+        fld('Qty/Inner',numIn('pk-iq',pv(pkg,'inner_qty'),'1'))+
+        fld('L (cm)',numIn('pk-il',pv(pkg,'inner_length_cm'),'0.01'))+
+        fld('W (cm)',numIn('pk-iw',pv(pkg,'inner_width_cm'),'0.01'))+
+        fld('H (cm)',numIn('pk-ih',pv(pkg,'inner_height_cm'),'0.01'))+
+        fld('Weight (kg)',numIn('pk-iwt',pv(pkg,'inner_weight_kg'),'0.001'))+
+        fld('Status',sel('pk-ist','<option value="estimated"'+(pv(pkg,'inner_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv(pkg,'inner_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv(pkg,'inner_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option>'))
+      )+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'+
+        '<span style="font-size:12px;color:#888;">CBM: <strong id="cbm-inner">'+(iCbm||'—')+'</strong></span>'+
+        '<button data-level="inner" onclick="reqDimConf(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
       '</div>'+
     '</div>'+
 
     // Master
-    '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">MASTER CARTON &nbsp;'+dimStatusBadge(pv('master_dim_status','estimated'))+'</div>'+
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
-      '<div class="f"><label>Qty/Master</label><input type="number" id="pk-mq" value="'+pv('master_qty')+'" /></div>'+
-      '<div class="f"><label>L (cm)</label><input type="number" id="pk-ml" step="0.01" value="'+pv('master_length_cm')+'" oninput="calcCbmField(\'master\')" /></div>'+
-      '<div class="f"><label>W (cm)</label><input type="number" id="pk-mw" step="0.01" value="'+pv('master_width_cm')+'" oninput="calcCbmField(\'master\')" /></div>'+
-      '<div class="f"><label>H (cm)</label><input type="number" id="pk-mh" step="0.01" value="'+pv('master_height_cm')+'" oninput="calcCbmField(\'master\')" /></div>'+
-      '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-mwt" step="0.001" value="'+pv('master_weight_kg')+'" /></div>'+
-      '<div class="f"><label>Status</label><select id="pk-mst"><option value="estimated"'+(pv('master_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv('master_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv('master_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option></select></div>'+
-    '</div>'+
-    '<div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">'+
-      '<div style="font-size:12px;color:#888;">CBM est: <span id="cbm-master" style="font-weight:600;color:#1a1a2e;">'+(mCbm||'—')+'</span></div>'+
-      '<button data-level="master" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
+    '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">MASTER CARTON &nbsp;'+dimSt(pv(pkg,'master_dim_status','estimated'))+'</div>'+
+    grid('1fr 1fr 1fr 1fr 1fr 1fr','8px',
+      fld('Qty/Master',numIn('pk-mq',pv(pkg,'master_qty'),'1'))+
+      fld('L (cm)',numIn('pk-ml',pv(pkg,'master_length_cm'),'0.01'))+
+      fld('W (cm)',numIn('pk-mw',pv(pkg,'master_width_cm'),'0.01'))+
+      fld('H (cm)',numIn('pk-mh',pv(pkg,'master_height_cm'),'0.01'))+
+      fld('Weight (kg)',numIn('pk-mwt',pv(pkg,'master_weight_kg'),'0.001'))+
+      fld('Status',sel('pk-mst','<option value="estimated"'+(pv(pkg,'master_dim_status','estimated')==='estimated'?' selected':'')+'>Estimated</option><option value="factory_confirmed"'+(pv(pkg,'master_dim_status')==='factory_confirmed'?' selected':'')+'>Factory Confirmed</option><option value="admin_verified"'+(pv(pkg,'master_dim_status')==='admin_verified'?' selected':'')+'>Admin Verified</option>'))
+    )+
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">'+
+      '<span style="font-size:12px;color:#888;">CBM: <strong id="cbm-master">'+(mCbm||'—')+'</strong></span>'+
+      '<button data-level="master" onclick="reqDimConf(this.dataset.level)" style="font-size:11px;padding:4px 8px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;">✉ Request confirmation</button>'+
     '</div>'+
 
     // Pallet
-    '<div id="sf-pallet-dims" style="display:'+(v('has_pallet')?'block':'none')+';">'+
+    '<div id="sf-pallet-dims" style="display:'+(fv(sku,'has_pallet')?'block':'none')+';">'+
       '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">PALLET</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;">'+
-        '<div class="f"><label>Qty/Pallet</label><input type="number" id="pk-pq" value="'+pv('pallet_qty')+'" /></div>'+
-        '<div class="f"><label>L (cm)</label><input type="number" id="pk-pl" step="0.01" value="'+pv('pallet_length_cm')+'" /></div>'+
-        '<div class="f"><label>W (cm)</label><input type="number" id="pk-pw" step="0.01" value="'+pv('pallet_width_cm')+'" /></div>'+
-        '<div class="f"><label>H (cm)</label><input type="number" id="pk-ph" step="0.01" value="'+pv('pallet_height_cm')+'" /></div>'+
-        '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-pwt" step="0.001" value="'+pv('pallet_weight_kg')+'" /></div>'+
-      '</div>'+
+      grid('1fr 1fr 1fr 1fr 1fr','8px',
+        fld('Qty/Pallet',numIn('pk-pq',pv(pkg,'pallet_qty'),'1'))+
+        fld('L (cm)',numIn('pk-pl',pv(pkg,'pallet_length_cm'),'0.01'))+
+        fld('W (cm)',numIn('pk-pw',pv(pkg,'pallet_width_cm'),'0.01'))+
+        fld('H (cm)',numIn('pk-ph',pv(pkg,'pallet_height_cm'),'0.01'))+
+        fld('Weight (kg)',numIn('pk-pwt',pv(pkg,'pallet_weight_kg'),'0.001'))
+      )+
+    '</div>'
+  )+
+
+  // ── 4. COSTING ──
+  card('Costing & Freight',
+    // Trade info
+    grid('1fr 1fr 1fr','10px',
+      fld('HTS Code',txtIn('cs-hts',cv(costing,'hts_code'),'e.g. 3304.99.5000')+'<button onclick="aiSuggestHTS()" style="margin-top:4px;width:100%;font-size:11px;padding:3px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;">✦ AI Suggest Duty & Tariff</button>')+
+      fld('Country of Origin',txtIn('cs-origin',cv(costing,'country_of_origin','China')))+
+      fld('FOB Port',txtIn('cs-port',cv(costing,'fob_port'),'e.g. Yantian, Shekou'))
+    )+
+    // FOB costs
+    grid('1fr 1fr 1fr','10px',
+      fld('FOB Price (USD)',numIn('cs-fob',cv(costing,'fob_price'),'0.0001','e.g. 2.8500'))+
+      fld('Packaging Cost/unit',numIn('cs-pkg',cv(costing,'packaging_price'),'0.0001','e.g. 0.3500'))+
+      fld('Total FOB','<input type="text" id="cs-total-fob" readonly style="width:100%;padding:6px 8px;font-size:13px;font-weight:600;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;" />')
+    )+
+    // Freight calculator
+    '<div style="background:#f8f8f4;border-radius:8px;padding:12px;margin-bottom:10px;">'+
+      '<div style="font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">FREIGHT CALCULATOR</div>'+
+      grid('1fr 1fr 1fr 1fr','8px',
+        fld('Origin Country',sel('cs-freight-origin',freightOriginOpts,'onchange="updateFreightDests()"'))+
+        fld('Destination',sel('cs-freight-dest','<option value="">— Select —</option>','onchange="autoFillFreight()"'))+
+        fld('Mode',sel('cs-freight-mode','<option value="ocean_lcl"'+(cv(costing,'freight_mode')==='ocean_lcl'?' selected':'')+'>Ocean LCL (per CBM)</option><option value="ocean_fcl"'+(cv(costing,'freight_mode')==='ocean_fcl'?' selected':'')+'>Ocean FCL (per container)</option><option value="air"'+(cv(costing,'freight_mode')==='air'?' selected':'')+'>Air (per KG)</option>','onchange="autoFillFreight()"'))+
+        fld('Container',sel('cs-freight-cont','<option value="">N/A</option><option value="20GP">20GP</option><option value="40HC">40HC</option>','onchange="autoFillFreight()"'))
+      )+
+      grid('1fr 1fr 1fr 1fr','8px',
+        fld('Rate (CBM/Container/KG)',numIn('cs-freight-rate',cv(costing,'freight_rate_per_cbm'),'0.01','e.g. 180'))+
+        fld('Master CBM (auto)','<input type="text" id="cs-master-cbm" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#f0f0e8;border:1px solid #e0e0d8;border-radius:6px;" value="'+(mCbm||'')+'" />')+
+        fld('Freight/unit (est.)','<input type="text" id="cs-freight-est" readonly style="width:100%;padding:6px 8px;font-size:13px;font-weight:600;background:#f0f0e8;border:1px solid #e0e0d8;border-radius:6px;" />')+
+        fld('Freight/unit (actual)',numIn('cs-freight-actual',cv(costing,'freight_actual_per_unit'),'0.0001','After landing'))
+      )+
     '</div>'+
-  '</div>'+
-
-  // ── SECTION 4: COSTING ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title">Costing & Freight</div>'+
-
-    // Trade details
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div class="f"><label>HTS Code</label><input type="text" id="cs-hts" value="'+cv('hts_code')+'" placeholder="e.g. 3304.99.5000" /><button onclick="suggestHTS()" style="margin-top:4px;font-size:11px;padding:3px 8px;background:#f0f4ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;width:100%;">✦ AI Suggest Duty & Tariff</button></div>'+
-      '<div class="f"><label>Country of Origin</label><input type="text" id="cs-origin" value="'+cv('country_of_origin','China')+'" /></div>'+
-      '<div class="f"><label>FOB Port</label><input type="text" id="cs-port" value="'+cv('fob_port')+'" placeholder="e.g. Shenzhen" /></div>'+
-    '</div>'+
-
-    // FOB & packaging costs
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div class="f"><label>FOB Price (USD)</label><input type="number" id="cs-fob" step="0.0001" value="'+cv('fob_price')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Packaging Cost/unit</label><input type="number" id="cs-pkg" step="0.0001" value="'+cv('packaging_price')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Total FOB (calc)</label><input type="text" id="cs-total-fob" readonly style="background:#f8f8f4;font-weight:600;" value="'+cv('total_fob')+'" /></div>'+
-    '</div>'+
-
-    // Freight
-    '<div style="background:#f8f8f4;border-radius:8px;padding:12px;margin-bottom:12px;">'+
-      '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:8px;">FREIGHT CALCULATOR</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">'+
-        '<div class="f"><label>Origin Country</label><select id="cs-freight-origin" onchange="updateFreightRates()">'+freightOriginOpts+'</select></div>'+
-        '<div class="f"><label>Destination</label><select id="cs-freight-dest" onchange="updateFreightRates()"><option value="">— Select —</option></select></div>'+
-        '<div class="f"><label>Mode</label><select id="cs-freight-mode" onchange="updateFreightRates()"><option value="ocean_lcl">Ocean LCL</option><option value="ocean_fcl">Ocean FCL</option><option value="air">Air</option></select></div>'+
-        '<div class="f"><label>Container</label><select id="cs-freight-container"><option value="">N/A (LCL/Air)</option><option value="20GP">20GP</option><option value="40HC">40HC</option></select></div>'+
-      '</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">'+
-        '<div class="f"><label>Rate/CBM or /KG</label><input type="number" id="cs-freight-rate" step="0.01" value="'+cv('freight_rate_per_cbm')+'" oninput="recalcCosting()" placeholder="e.g. 180" /></div>'+
-        '<div class="f"><label>Master CBM (auto)</label><input type="text" id="cs-master-cbm-ref" readonly style="background:#f0f0e8;" value="'+(mCbm||'')+'" /></div>'+
-        '<div class="f"><label>Freight/unit (est)</label><input type="text" id="cs-freight-est" readonly style="background:#f0f0e8;font-weight:600;" value="'+cv('freight_per_unit')+'" /></div>'+
-        '<div class="f"><label>Freight/unit (actual)</label><input type="number" id="cs-freight-actual" step="0.0001" value="'+cv('freight_actual_per_unit')+'" oninput="recalcCosting()" placeholder="Enter after landing" /></div>'+
-      '</div>'+
-    '</div>'+
-
-    // Duty & Tariff
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div class="f"><label>Duty % <span id="cs-duty-source" style="font-size:10px;color:#888;"></span></label><input type="number" id="cs-duty" step="0.01" value="'+cv('duty_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Duty/unit (calc)</label><input type="text" id="cs-duty-unit" readonly style="background:#f8f8f4;" /></div>'+
-      '<div class="f"><label>Tariff % <span id="cs-tariff-source" style="font-size:10px;color:#888;"></span></label><input type="number" id="cs-tariff" step="0.01" value="'+cv('tariff_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Tariff/unit (calc)</label><input type="text" id="cs-tariff-unit" readonly style="background:#f8f8f4;" /></div>'+
-    '</div>'+
-
-    // Landed cost
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div class="f"><label>Landed Cost/unit — Estimated</label><input type="text" id="cs-landed-est" readonly style="background:#fff8e0;font-weight:600;font-size:14px;" /></div>'+
-      '<div class="f"><label>Landed Cost/unit — Actual</label><input type="text" id="cs-landed-actual" readonly style="background:#edfaed;font-weight:600;font-size:14px;" /></div>'+
-    '</div>'+
-
+    // Duty & tariff
+    grid('1fr 1fr 1fr 1fr','10px',
+      fld('Duty %',numIn('cs-duty',cv(costing,'duty_pct'),'0.01','e.g. 6.5')+'<span id="cs-duty-src" style="font-size:10px;color:#888;"></span>')+
+      fld('Duty/unit (calc)','<input type="text" id="cs-duty-unit" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;" />')+
+      fld('Tariff %',numIn('cs-tariff',cv(costing,'tariff_pct'),'0.01','e.g. 25')+'<span id="cs-tariff-src" style="font-size:10px;color:#888;"></span>')+
+      fld('Tariff/unit (calc)','<input type="text" id="cs-tariff-unit" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;" />')
+    )+
+    // Landed costs
+    grid('1fr 1fr','10px',
+      fld('Landed Cost — Estimated','<input type="text" id="cs-landed-est" readonly style="width:100%;padding:8px;font-size:14px;font-weight:700;background:#fff8e0;border:1px solid #e0c840;border-radius:6px;" />')+
+      fld('Landed Cost — Actual','<input type="text" id="cs-landed-actual" readonly style="width:100%;padding:8px;font-size:14px;font-weight:700;background:#edfaed;border:1px solid #a0d8a0;border-radius:6px;" />')
+    )+
     // Pricing
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div class="f"><label>Wholesale Price</label><input type="number" id="cs-wholesale" step="0.01" value="'+cv('wholesale_price')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Retail Price</label><input type="number" id="cs-retail" step="0.01" value="'+cv('retail_price')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>MOQ</label><input type="number" id="cs-moq" value="'+cv('moq')+'" /></div>'+
-    '</div>'+
-
+    grid('1fr 1fr 1fr','10px',
+      fld('Wholesale Price',numIn('cs-wholesale',cv(costing,'wholesale_price'),'0.01'))+
+      fld('Retail Price',numIn('cs-retail',cv(costing,'retail_price'),'0.01'))+
+      fld('MOQ',numIn('cs-moq',cv(costing,'moq'),'1'))
+    )+
     // Deductions
-    '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:8px;">DEDUCTIONS <span style="font-weight:400;font-size:10px;">(auto-filled from customer if assigned)</span></div>'+
-    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;">'+
-      '<div class="f"><label>Returns %</label><input type="number" id="cs-returns" step="0.01" value="'+cv('returns_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Ad Allowance %</label><input type="number" id="cs-ad" step="0.01" value="'+cv('ad_allowance_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Dilution %</label><input type="number" id="cs-dilution" step="0.01" value="'+cv('dilution_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Commission %</label><input type="number" id="cs-commission" step="0.01" value="'+cv('commission_pct')+'" oninput="recalcCosting()" /></div>'+
-      '<div class="f"><label>Royalty %</label><input type="number" id="cs-royalty" step="0.01" value="'+cv('royalty_pct')+'" oninput="recalcCosting()" /></div>'+
-    '</div>'+
-
+    '<div style="font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">DEDUCTIONS <span style="font-weight:400;">(auto-filled from customer)</span></div>'+
+    grid('repeat(5,1fr)','8px',
+      fld('Returns %',numIn('cs-returns',cv(costing,'returns_pct'),'0.01'))+
+      fld('Ad Allow. %',numIn('cs-ad',cv(costing,'ad_allowance_pct'),'0.01'))+
+      fld('Dilution %',numIn('cs-dilution',cv(costing,'dilution_pct'),'0.01'))+
+      fld('Commission %',numIn('cs-commission',cv(costing,'commission_pct'),'0.01'))+
+      fld('Royalty %',numIn('cs-royalty',cv(costing,'royalty_pct'),'0.01'))
+    )+
     // Margin summary
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">'+
-      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;color:#aaa;margin-bottom:4px;">TOTAL DEDUCTIONS</div><div id="cs-total-ded" style="font-size:16px;font-weight:700;">—</div></div>'+
-      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;color:#aaa;margin-bottom:4px;">GROSS MARGIN</div><div id="cs-gross" style="font-size:16px;font-weight:700;">—</div></div>'+
-      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;color:#aaa;margin-bottom:4px;">NET MARGIN</div><div id="cs-net" style="font-size:16px;font-weight:700;">—</div></div>'+
-      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;color:#aaa;margin-bottom:4px;">MARGIN ON ACTUAL</div><div id="cs-net-actual" style="font-size:16px;font-weight:700;">—</div></div>'+
-    '</div>'+
-  '</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
+      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Deductions</div><div id="cs-ded" style="font-size:16px;font-weight:700;">—</div></div>'+
+      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Gross Margin</div><div id="cs-gross" style="font-size:16px;font-weight:700;">—</div></div>'+
+      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Net Margin</div><div id="cs-net" style="font-size:16px;font-weight:700;">—</div></div>'+
+      '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Net (Actual)</div><div id="cs-net-act" style="font-size:16px;font-weight:700;">—</div></div>'+
+    '</div>'
+  )+
 
-  // ── SECTION 5: FACTORY SOURCES ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">Factory Sources <button onclick="showAddSourceModal()" style="font-size:11px;padding:3px 8px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;">+ Add Factory</button></div>'+
+  // ── 5. FACTORY SOURCES ──
+  card('Factory Sources',
     '<div id="sf-sources">'+
-      (sources.length?
-        sources.map(function(s){
-          var f=s.factories||{};
-          var statusColors={active:'#e8f8e8',backup:'#fff8e0',discontinued:'#fff0f0'};
-          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:6px;">'+
-            '<div>'+
-              '<div style="font-size:13px;font-weight:500;">'+f.factory_name_english+'</div>'+
-              '<div style="font-size:11px;color:#888;">'+(f.country||'China')+' · FOB $'+parseFloat(s.fob_price||0).toFixed(2)+'</div>'+
-            '</div>'+
-            '<select data-sid="'+s.id+'" onchange="updateSourceStatus(this)" style="font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;">'+
-              ['active','backup','discontinued'].map(function(st){return '<option value="'+st+'"'+(s.status===st?' selected':'')+'>'+st.charAt(0).toUpperCase()+st.slice(1)+'</option>';}).join('')+
-            '</select>'+
-          '</div>';
-        }).join('')
-      :'<div style="font-size:13px;color:#bbb;">Factory sources are added from accepted RFQ quotes. Use + Add Factory to add additional approved sources.</div>')+
+    (sources.length?
+      sources.map(function(s){
+        var f=s.factories||{};
+        var sc={active:'#e8f8e8',backup:'#fff8e0',discontinued:'#fff0f0'};
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:6px;">'+
+          '<div>'+
+            '<div style="font-size:13px;font-weight:500;color:#1a1a2e;">'+f.factory_name_english+'</div>'+
+            '<div style="font-size:11px;color:#888;">'+(f.country||'China')+' · FOB $'+parseFloat(s.fob_price||0).toFixed(2)+'</div>'+
+          '</div>'+
+          '<select data-sid="'+s.id+'" onchange="updateSrcStatus(this)" style="font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;background:'+(sc[s.status]||'#f5f5f0')+';">'+
+            ['active','backup','discontinued'].map(function(st){return '<option value="'+st+'"'+(s.status===st?' selected':'')+'>'+st.charAt(0).toUpperCase()+st.slice(1)+'</option>';}).join('')+
+          '</select>'+
+        '</div>';
+      }).join('')
+    :'<div style="font-size:12px;color:#bbb;margin-bottom:8px;">No factory sources yet. Sources are added from accepted RFQ quotes.</div>')+
     '</div>'+
-  '</div>'+
+    '<button onclick="showAddSource()" style="margin-top:8px;padding:7px 14px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">+ Add Factory Source</button>',
+    ''
+  )+
 
-  // ── SECTION 6: VARIATIONS ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">Variations <button onclick="addVariationRow()" style="font-size:11px;padding:3px 8px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;">+ Add</button></div>'+
+  // ── 6. VARIATIONS ──
+  card('Variations',
     '<div id="sf-variations">'+
-      (variations.length?
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:4px;padding:0 4px;"><div style="font-size:10px;color:#aaa;">TYPE</div><div style="font-size:10px;color:#aaa;">VALUE</div><div style="font-size:10px;color:#aaa;">SUFFIX</div><div style="font-size:10px;color:#aaa;">FULL MODEL #</div><div></div></div>'+
-        variations.map(function(vr){
-          return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:4px;">'+
-            '<input type="text" value="'+vr.variation_type+'" class="var-type" style="padding:6px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
-            '<input type="text" value="'+vr.variation_value+'" class="var-value" style="padding:6px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
-            '<input type="text" value="'+vr.model_suffix+'" class="var-suffix" style="padding:6px;font-size:12px;font-family:monospace;border:1px solid #e0e0d8;border-radius:5px;" oninput="updateVarModel(this)" />'+
-            '<input type="text" value="'+vr.model_number_full+'" class="var-model" readonly style="padding:6px;font-size:12px;font-family:monospace;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:5px;" />'+
-            '<span style="font-size:10px;color:#1a7a1a;white-space:nowrap;">UPC: '+(vr.upc_unit||'pending')+'</span>'+
-          '</div>';
-        }).join('')
-      :'<div style="font-size:13px;color:#bbb;">No variations. Add colors or sizes with + Add.</div>')+
+    (variations.length?
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:4px;"><span style="font-size:10px;color:#aaa;">TYPE</span><span style="font-size:10px;color:#aaa;">VALUE</span><span style="font-size:10px;color:#aaa;">SUFFIX</span><span style="font-size:10px;color:#aaa;">MODEL #</span><span></span></div>'+
+      variations.map(function(v){
+        return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:4px;">'+
+          '<input type="text" value="'+v.variation_type+'" class="var-type" style="padding:5px 7px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
+          '<input type="text" value="'+v.variation_value+'" class="var-value" style="padding:5px 7px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
+          '<input type="text" value="'+v.model_suffix+'" class="var-suffix" style="padding:5px 7px;font-size:12px;font-family:monospace;border:1px solid #e0e0d8;border-radius:5px;" />'+
+          '<input type="text" value="'+v.model_number_full+'" class="var-model" readonly style="padding:5px 7px;font-size:12px;font-family:monospace;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:5px;" />'+
+          '<span style="font-size:10px;color:#1a7a1a;align-self:center;white-space:nowrap;">'+(v.upc_unit||'no UPC')+'</span>'+
+        '</div>';
+      }).join('')
+    :'<div style="font-size:12px;color:#bbb;">No variations yet.</div>')+
     '</div>'+
-  '</div>'+
+    '<button onclick="addVarRow()" style="margin-top:8px;padding:7px 14px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;">+ Add Variation</button>'
+  )+
 
-  // ── SECTION 7: CERTIFICATIONS ──
-  '<div class="card" style="margin-bottom:1rem;">'+
-    '<div class="card-title">Certifications & Documents</div>'+
-    (certs.length?
+  // ── 7. CERTIFICATIONS ──
+  card('Certifications & Documents',
+    (certs&&certs.length?
       '<div style="display:flex;flex-wrap:wrap;gap:8px;">'+
       certs.map(function(c){
-        return '<a href="'+c.file_url+'" target="_blank" style="display:flex;align-items:center;gap:6px;padding:7px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;text-decoration:none;color:#1a1a2e;">'+
-          '🏅 '+(c.cert_type||c.file_name||'Document')+
+        return '<a href="'+c.file_url+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;text-decoration:none;color:#1a1a2e;">'+
+          (c.cert_type==='INCI'?'🧴':'🏅')+' '+(c.cert_type||'Document')+
+          (c.file_name&&c.file_name!==c.cert_type?' <span style="color:#aaa;font-size:10px;">'+c.file_name+'</span>':'')+
         '</a>';
       }).join('')+
       '</div>'
-    :'<div style="font-size:13px;color:#bbb;">Certifications are automatically populated from the accepted factory quote. Upload certs in the factory portal.</div>')+
-  '</div>'+
+    :'<div style="font-size:12px;color:#bbb;">Certifications are pulled from the accepted factory quote. Upload documents in the factory portal when submitting a quote.</div>')
+  )+
 
-  // ── SAVE BUTTON ──
+  // ── SAVE ──
   '<div style="display:flex;gap:10px;align-items:center;padding-bottom:2rem;">'+
     '<button onclick="saveSku()" style="padding:11px 28px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Save SKU</button>'+
     '<span id="sku-save-msg" style="font-size:13px;"></span>'+
   '</div>'+
-
-  '</div>'; // end padding div
+  '</div>';
 
   area.innerHTML=html;
-
-  // Post-render
   updateModelPreview();
-  recalcCosting();
-  if(sources.length){var firstSrc=sources[0];var f=firstSrc.factories||{};if(f.country&&g('cs-origin'))g('cs-origin').value=f.country;}
-  updateFreightRates();
+  recalcAll();
+  // Initialize freight dest dropdown if origin is set
+  if(cv(costing,'freight_origin')){updateFreightDests();}
 }
 
-function toggleSection(id,show){var el=g(id);if(el)el.style.display=show?'block':'none';}
-
-function calcCbmField(level){
-  var l=parseFloat(g('pk-'+level[0]+'l')?g('pk-'+level[0]+'l').value:0);
-  var w=parseFloat(g('pk-'+level[0]+'w')?g('pk-'+level[0]+'w').value:0);
-  var h=parseFloat(g('pk-'+level[0]+'h')?g('pk-'+level[0]+'h').value:0);
-  // Map level to field IDs
-  var ids={unit:{l:'pk-ul',w:'pk-uw',h:'pk-uh',disp:'cbm-unit'},inner:{l:'pk-il',w:'pk-iw',h:'pk-ih',disp:'cbm-inner'},master:{l:'pk-ml',w:'pk-mw',h:'pk-mh',disp:'cbm-master'}};
-  var id=ids[level];if(!id)return;
-  var lv=parseFloat(g(id.l)?g(id.l).value:0)||0;
-  var wv=parseFloat(g(id.w)?g(id.w).value:0)||0;
-  var hv=parseFloat(g(id.h)?g(id.h).value:0)||0;
-  var cbm=lv&&wv&&hv?((lv*wv*hv)/1000000).toFixed(6):'—';
-  var dispEl=g(id.disp);if(dispEl)dispEl.textContent=cbm;
-  // Update master CBM ref in freight calculator
-  if(level==='master'){var mRef=g('cs-master-cbm-ref');if(mRef)mRef.value=cbm!=='—'?cbm:'';}
-  recalcCosting();
+// ── Calculation helpers ──
+function calcCbm(l,w,h){
+  l=parseFloat(l)||0;w=parseFloat(w)||0;h=parseFloat(h)||0;
+  if(!l||!w||!h)return null;
+  return parseFloat(((l*w*h)/1000000).toFixed(6));
 }
 
-function recalcCosting(){
+function recalcAll(){
+  // CBMs
+  var uCbm=calcCbm(g('pk-ul')?g('pk-ul').value:0,g('pk-uw')?g('pk-uw').value:0,g('pk-uh')?g('pk-uh').value:0);
+  var iCbm=calcCbm(g('pk-il')?g('pk-il').value:0,g('pk-iw')?g('pk-iw').value:0,g('pk-ih')?g('pk-ih').value:0);
+  var mCbm=calcCbm(g('pk-ml')?g('pk-ml').value:0,g('pk-mw')?g('pk-mw').value:0,g('pk-mh')?g('pk-mh').value:0);
+  if(g('cbm-unit'))g('cbm-unit').textContent=uCbm||'—';
+  if(g('cbm-inner'))g('cbm-inner').textContent=iCbm||'—';
+  if(g('cbm-master'))g('cbm-master').textContent=mCbm||'—';
+  if(g('cs-master-cbm'))g('cs-master-cbm').value=mCbm||'';
+
+  // Costs
   var fob=parseFloat(g('cs-fob')?g('cs-fob').value:0)||0;
   var pkg=parseFloat(g('cs-pkg')?g('cs-pkg').value:0)||0;
   var totalFob=fob+pkg;
@@ -1136,269 +1163,254 @@ function recalcCosting(){
 
   var duty=parseFloat(g('cs-duty')?g('cs-duty').value:0)||0;
   var tariff=parseFloat(g('cs-tariff')?g('cs-tariff').value:0)||0;
-  var dutyUnit=totalFob*(duty/100);
-  var tariffUnit=totalFob*(tariff/100);
-  if(g('cs-duty-unit'))g('cs-duty-unit').value=dutyUnit?'$'+dutyUnit.toFixed(4):'';
-  if(g('cs-tariff-unit'))g('cs-tariff-unit').value=tariffUnit?'$'+tariffUnit.toFixed(4):'';
+  var dutyU=totalFob*(duty/100);
+  var tariffU=totalFob*(tariff/100);
+  if(g('cs-duty-unit'))g('cs-duty-unit').value=dutyU?'$'+dutyU.toFixed(4):'';
+  if(g('cs-tariff-unit'))g('cs-tariff-unit').value=tariffU?'$'+tariffU.toFixed(4):'';
 
-  // Freight estimate from CBM
-  var masterCbm=parseFloat(g('cs-master-cbm-ref')?g('cs-master-cbm-ref').value:0)||0;
-  var masterQty=parseFloat(g('pk-mq')?g('pk-mq').value:0)||0;
-  var freightRate=parseFloat(g('cs-freight-rate')?g('cs-freight-rate').value:0)||0;
-  var freightEst=0;
-  if(masterCbm&&masterQty&&freightRate){
-    freightEst=parseFloat(((masterCbm/masterQty)*freightRate).toFixed(4));
-  }
-  if(g('cs-freight-est'))g('cs-freight-est').value=freightEst?'$'+freightEst.toFixed(4):'';
+  // Freight estimate
+  var mq=parseFloat(g('pk-mq')?g('pk-mq').value:0)||0;
+  var fr=parseFloat(g('cs-freight-rate')?g('cs-freight-rate').value:0)||0;
+  var fEst=0;
+  if(mCbm&&mq&&fr){fEst=parseFloat(((mCbm/mq)*fr).toFixed(4));}
+  if(g('cs-freight-est'))g('cs-freight-est').value=fEst?'$'+fEst.toFixed(4):'';
+  var fAct=parseFloat(g('cs-freight-actual')?g('cs-freight-actual').value:0)||0;
 
-  var freightActual=parseFloat(g('cs-freight-actual')?g('cs-freight-actual').value:0)||0;
+  // Landed
+  var lEst=totalFob+fEst+dutyU+tariffU;
+  var lAct=fAct?totalFob+fAct+dutyU+tariffU:0;
+  if(g('cs-landed-est'))g('cs-landed-est').value=lEst?'$'+lEst.toFixed(4):'';
+  if(g('cs-landed-actual'))g('cs-landed-actual').value=lAct?'$'+lAct.toFixed(4):'';
 
-  var landedEst=totalFob+freightEst+dutyUnit+tariffUnit;
-  var landedActual=freightActual?totalFob+freightActual+dutyUnit+tariffUnit:0;
-  if(g('cs-landed-est'))g('cs-landed-est').value=landedEst?'$'+landedEst.toFixed(4):'';
-  if(g('cs-landed-actual'))g('cs-landed-actual').value=landedActual?'$'+landedActual.toFixed(4):'';
-
-  var wholesale=parseFloat(g('cs-wholesale')?g('cs-wholesale').value:0)||0;
-  var returns=parseFloat(g('cs-returns')?g('cs-returns').value:0)||0;
+  // Margins
+  var ws=parseFloat(g('cs-wholesale')?g('cs-wholesale').value:0)||0;
+  var ret=parseFloat(g('cs-returns')?g('cs-returns').value:0)||0;
   var ad=parseFloat(g('cs-ad')?g('cs-ad').value:0)||0;
-  var dilution=parseFloat(g('cs-dilution')?g('cs-dilution').value:0)||0;
-  var commission=parseFloat(g('cs-commission')?g('cs-commission').value:0)||0;
-  var royalty=parseFloat(g('cs-royalty')?g('cs-royalty').value:0)||0;
-  var totalDed=returns+ad+dilution+commission+royalty;
-
-  var grossMargin=wholesale&&landedEst?((wholesale-landedEst)/wholesale*100):0;
-  var netMargin=grossMargin-totalDed;
-  var netActual=wholesale&&landedActual?((wholesale-landedActual)/wholesale*100)-totalDed:0;
-
-  if(g('cs-total-ded'))g('cs-total-ded').textContent=totalDed?totalDed.toFixed(1)+'%':'—';
-  if(g('cs-gross')){g('cs-gross').textContent=grossMargin?grossMargin.toFixed(1)+'%':'—';g('cs-gross').style.color=grossMargin>=35?'#1a7a1a':'#b00';}
-  if(g('cs-net')){g('cs-net').textContent=netMargin?netMargin.toFixed(1)+'%':'—';g('cs-net').style.color=netMargin>=25?'#1a7a1a':'#b00';}
-  if(g('cs-net-actual')){g('cs-net-actual').textContent=netActual?netActual.toFixed(1)+'%':'—';g('cs-net-actual').style.color=netActual>=25?'#1a7a1a':'#b00';}
+  var dil=parseFloat(g('cs-dilution')?g('cs-dilution').value:0)||0;
+  var com=parseFloat(g('cs-commission')?g('cs-commission').value:0)||0;
+  var roy=parseFloat(g('cs-royalty')?g('cs-royalty').value:0)||0;
+  var ded=ret+ad+dil+com+roy;
+  var gm=ws&&lEst?((ws-lEst)/ws*100):0;
+  var nm=gm-ded;
+  var nma=ws&&lAct?((ws-lAct)/ws*100)-ded:0;
+  if(g('cs-ded'))g('cs-ded').textContent=ded?ded.toFixed(1)+'%':'—';
+  var setMarg=function(id,v){if(!g(id))return;g(id).textContent=v?v.toFixed(1)+'%':'—';g(id).style.color=v>=(id==='cs-gross'?35:25)?'#1a7a1a':'#b00';};
+  setMarg('cs-gross',gm);setMarg('cs-net',nm);setMarg('cs-net-act',nma);
 }
 
-function updateFreightRates(){
+// ── Freight ──
+function updateFreightDests(){
   var origin=g('cs-freight-origin')?g('cs-freight-origin').value:'';
-  var destSel=g('cs-freight-dest');
-  if(!destSel||!origin)return;
-  var matching=allFreightRates.filter(function(r){return r.origin_country===origin;});
-  var dests=[...new Set(matching.map(function(r){return r.destination_name+'|'+r.destination_code;}))];
-  destSel.innerHTML='<option value="">— Destination —</option>'+dests.map(function(d){var parts=d.split('|');return '<option value="'+parts[1]+'">'+parts[0]+'</option>';}).join('');
-  // Auto-select first destination
-  if(destSel.options.length>1)destSel.selectedIndex=1;
-  autoFillFreightRate();
+  var destSel=g('cs-freight-dest');if(!destSel)return;
+  var matches=allFreightRates.filter(function(r){return r.origin_country===origin;});
+  var dests=[...new Set(matches.map(function(r){return r.destination_name+'||'+r.destination_code;}))];
+  destSel.innerHTML='<option value="">— Destination —</option>'+dests.map(function(d){var p=d.split('||');return '<option value="'+p[1]+'">'+p[0]+'</option>';}).join('');
+  if(destSel.options.length>1){destSel.selectedIndex=1;autoFillFreight();}
 }
 
-function autoFillFreightRate(){
+function autoFillFreight(){
   var origin=g('cs-freight-origin')?g('cs-freight-origin').value:'';
   var dest=g('cs-freight-dest')?g('cs-freight-dest').value:'';
   var mode=g('cs-freight-mode')?g('cs-freight-mode').value:'ocean_lcl';
-  var container=g('cs-freight-container')?g('cs-freight-container').value:'';
-  var matching=allFreightRates.filter(function(r){
-    return r.origin_country===origin&&r.destination_code===dest&&r.mode===mode&&(!container||r.container_type===container||!r.container_type);
+  var cont=g('cs-freight-cont')?g('cs-freight-cont').value:'';
+  var match=allFreightRates.find(function(r){
+    return r.origin_country===origin&&r.destination_code===dest&&r.mode===mode&&(!cont||!r.container_type||r.container_type===cont);
   });
-  if(matching.length){
-    var rate=matching[0];
-    var rateVal=mode==='ocean_lcl'?rate.rate_per_cbm:(mode==='air'?rate.rate_per_kg:rate.rate_per_container);
-    if(g('cs-freight-rate')&&rateVal)g('cs-freight-rate').value=rateVal;
-    recalcCosting();
+  if(match){
+    var rate=match.mode==='ocean_lcl'?match.rate_per_cbm:(match.mode==='air'?match.rate_per_kg:match.rate_per_container);
+    if(g('cs-freight-rate')&&rate)g('cs-freight-rate').value=rate;
+    recalcAll();
   }
 }
 
-async function suggestHTS(){
-  var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){alert('Please add your Anthropic API key in Settings to use AI HTS lookup.');return;}
-  var desc=g('sf-desc')?g('sf-desc').value:'';
-  var hts=g('cs-hts')?g('cs-hts').value:'';
-  if(!desc){alert('Please enter a description first.');return;}
-  var btn=event.target;btn.textContent='Looking up...';btn.disabled=true;
-  try{
-    var r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:'For this product: "'+desc+'"'+(hts?' with HTS code '+hts:'')+', what is the US import duty rate and Section 301 tariff rate from China? Return JSON only: {"duty_pct":number,"tariff_pct":number,"hts_suggestion":"string","notes":"brief"} No markdown.'}]})
-    });
-    var d=await r.json();
-    if(d.content&&d.content[0]){
-      var raw=d.content[0].text.replace(/```json\s*/g,'').replace(/```/g,'').trim();
-      var result=JSON.parse(raw);
-      if(result.duty_pct!==undefined&&g('cs-duty')){g('cs-duty').value=result.duty_pct;if(g('cs-duty-source'))g('cs-duty-source').textContent='(AI)';}
-      if(result.tariff_pct!==undefined&&g('cs-tariff')){g('cs-tariff').value=result.tariff_pct;if(g('cs-tariff-source'))g('cs-tariff-source').textContent='(AI)';}
-      if(result.hts_suggestion&&!hts&&g('cs-hts'))g('cs-hts').value=result.hts_suggestion;
-      recalcCosting();
-      if(result.notes)alert('AI suggestion: '+result.notes+'\n\nRates are editable — verify with your customs broker for current rates.');
-    }
-  }catch(e){alert('HTS lookup error: '+e.message);}
-  btn.textContent='✦ AI Suggest Duty & Tariff';btn.disabled=false;
-}
-
+// ── Model number ──
 function onBrandCatChange(){generateModelNumber();updateModelPreview();}
 
 function generateModelNumber(){
-  var brandSel=g('sf-brand');var catSel=g('sf-category');
-  if(!brandSel||!catSel)return;
-  var brandOpt=brandSel.options[brandSel.selectedIndex];
-  var catOpt=catSel.options[catSel.selectedIndex];
-  var bp=brandOpt?brandOpt.dataset.prefix:'';
-  var cp=catOpt?catOpt.dataset.prefix:'';
+  var bSel=g('sf-brand');var cSel=g('sf-category');if(!bSel||!cSel)return;
+  var bOpt=bSel.options[bSel.selectedIndex];var cOpt=cSel.options[cSel.selectedIndex];
+  var bp=bOpt?bOpt.dataset.prefix:'';var cp=cOpt?cOpt.dataset.prefix:'';
   if(!bp||!cp)return;
-  var existing=allSkus.filter(function(s){return s.brand_prefix===bp&&s.category_prefix===cp;});
-  var nextSeq=existing.length+1;
-  var modelEl=g('sf-model');
-  if(modelEl&&!currentSkuId)modelEl.value=bp+'-'+cp+'-'+String(nextSeq).padStart(4,'0');
+  var ex=allSkus.filter(function(s){return s.brand_prefix===bp&&s.category_prefix===cp;});
+  var seq=ex.length+1;
+  var mEl=g('sf-model');
+  if(mEl&&!currentSkuId)mEl.value=bp+'-'+cp+'-'+String(seq).padStart(4,'0');
   updateModelPreview();
 }
 
 function updateModelPreview(){
-  var modelEl=g('sf-model');var suffixEl=g('sf-cust-suffix');var previewEl=g('sf-model-preview');
-  if(!modelEl||!previewEl)return;
-  var base=modelEl.value||'';
-  var suffix=suffixEl?suffixEl.value.trim():'';
-  previewEl.textContent=suffix?base+'-'+suffix:base;
+  var m=g('sf-model');var s=g('sf-cust-suffix');var p=g('sf-model-preview');
+  if(!m||!p)return;
+  var sfx=s?s.value.trim():'';
+  p.textContent=sfx?m.value+'-'+sfx:m.value;
 }
 
 function onCustomerChange(){
-  var sel=g('sf-customer');if(!sel)return;
+  var sel=g('sf-customer');if(!sel||!sel.value)return;
   var opt=sel.options[sel.selectedIndex];
-  if(!opt||!opt.value)return;
-  var suffix=opt.dataset.suffix||'';
-  if(!suffix){var words=opt.text.split(' ');suffix=words.map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,3);}
-  if(g('sf-cust-suffix'))g('sf-cust-suffix').value=suffix;
-  // Pre-fill deductions from customer
-  if(g('cs-returns')&&opt.dataset.returns)g('cs-returns').value=opt.dataset.returns;
-  if(g('cs-dilution')&&opt.dataset.dilution)g('cs-dilution').value=opt.dataset.dilution;
+  var sfx=opt.dataset.suffix||opt.text.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,3);
+  if(g('sf-cust-suffix'))g('sf-cust-suffix').value=sfx;
+  if(g('cs-returns')&&opt.dataset.ret)g('cs-returns').value=opt.dataset.ret;
+  if(g('cs-dilution')&&opt.dataset.dil)g('cs-dilution').value=opt.dataset.dil;
   if(g('cs-ad')&&opt.dataset.ad)g('cs-ad').value=opt.dataset.ad;
-  if(g('cs-commission')&&opt.dataset.commission)g('cs-commission').value=opt.dataset.commission;
-  updateModelPreview();
-  recalcCosting();
+  if(g('cs-commission')&&opt.dataset.com)g('cs-commission').value=opt.dataset.com;
+  updateModelPreview();recalcAll();
 }
 
-function addVariationRow(){
-  var el=g('sf-variations');if(!el)return;
-  if(el.innerHTML.includes('No variations'))el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:4px;padding:0 4px;"><div style="font-size:10px;color:#aaa;">TYPE</div><div style="font-size:10px;color:#aaa;">VALUE</div><div style="font-size:10px;color:#aaa;">SUFFIX</div><div style="font-size:10px;color:#aaa;">FULL MODEL #</div><div></div></div>';
-  var modelBase=g('sf-model')?g('sf-model').value:'';
-  var row=document.createElement('div');
-  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:4px;';
-  row.innerHTML=
-    '<input type="text" class="var-type" placeholder="Color" style="padding:6px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
-    '<input type="text" class="var-value" placeholder="Black" style="padding:6px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
-    '<input type="text" class="var-suffix" placeholder="-BK" style="padding:6px;font-size:12px;font-family:monospace;border:1px solid #e0e0d8;border-radius:5px;" />'+
-    '<input type="text" class="var-model" value="'+modelBase+'" readonly style="padding:6px;font-size:12px;font-family:monospace;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:5px;" />'+
-    '<button style="padding:5px 8px;background:#fff0f0;border:1px solid #fdd;border-radius:5px;cursor:pointer;font-size:11px;">✕</button>';
-  var suffix=row.querySelector('.var-suffix');
-  var model=row.querySelector('.var-model');
-  suffix.addEventListener('input',function(){model.value=modelBase+this.value;});
-  row.querySelector('button').addEventListener('click',function(){row.remove();});
-  el.appendChild(row);
-}
-
-function updateVarModel(input){
-  var row=input.closest('div[style*="grid"]');if(!row)return;
-  var suffix=row.querySelector('.var-suffix').value;
-  var modelBase=g('sf-model')?g('sf-model').value:'';
-  var fullModel=row.querySelector('.var-model');
-  if(fullModel)fullModel.value=modelBase+suffix;
-}
-
-async function updateSourceStatus(sel){
-  var sid=sel.dataset.sid;var status=sel.value;
-  await fetch(SB+'/rest/v1/sku_factory_sources?id=eq.'+sid,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:status})});
-}
-
-async function showAddSourceModal(){
+// ── Dimension confirmation ──
+async function reqDimConf(level){
   if(!currentSkuId){alert('Please save the SKU first.');return;}
-  // Load factories with accepted quotes
-  var r=await fetch(SB+'/rest/v1/factories?select=id,factory_name_english&order=factory_name_english',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-  var factories=await r.json();
-  var opts=factories.map(function(f){return '<option value="'+f.id+'">'+f.factory_name_english+'</option>';}).join('');
-  var modal=document.createElement('div');
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
-  modal.innerHTML=
-    '<div style="background:#fff;border-radius:12px;padding:1.5rem;width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">'+
-      '<div style="font-size:15px;font-weight:600;margin-bottom:1rem;">Add Factory Source</div>'+
-      '<div class="f" style="margin-bottom:8px;"><label>Factory</label><select id="add-src-factory" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;"><option value="">— Select Factory —</option>'+opts+'</select></div>'+
-      '<div class="f" style="margin-bottom:8px;"><label>FOB Price (USD)</label><input type="number" id="add-src-fob" step="0.0001" placeholder="e.g. 2.85" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
-      '<div class="f" style="margin-bottom:8px;"><label>Status</label><select id="add-src-status" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;"><option value="active">Active</option><option value="backup">Backup</option></select></div>'+
-      '<div class="f" style="margin-bottom:12px;"><label>Allocation %</label><input type="number" id="add-src-alloc" placeholder="e.g. 50" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
-      '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
-        '<button id="add-src-cancel" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>'+
-        '<button id="add-src-save" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Add Source</button>'+
-      '</div>'+
-    '</div>';
-  document.body.appendChild(modal);
-  // Wire buttons after DOM insert
-  document.getElementById('add-src-cancel').addEventListener('click',function(){modal.remove();});
-  document.getElementById('add-src-save').addEventListener('click',function(){saveNewSource(this);});
+  var r=await fetch(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+currentSkuId+'&status=eq.active&select=*,factories(factory_name_english,sales_email,sales_contact_name)&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  var rows=await r.json();
+  if(!rows.length){alert('No active factory source found for this SKU. Add a factory source first.');return;}
+  var factory=rows[0].factories||{};
+  if(!factory.sales_email){alert('This factory has no email on file.');return;}
+  var lbl={unit:'Unit',inner:'Inner Carton',master:'Master Carton',pallet:'Pallet'}[level]||level;
+  var model=g('sf-model')?g('sf-model').value:'this SKU';
+  var firstName=(factory.sales_contact_name||'Team').split(' ')[0];
+  var body='Dear '+firstName+',\n\nWe need confirmed '+lbl+' dimensions for SKU: '+model+'.\n\nPlease log into our supplier portal and confirm the exact L × W × H (cm) and weight.\n\nPortal: https://project-7o416.vercel.app\n\nBest regards,\nAllan Amsel\nTBG Sourcing';
+  try{
+    await sendEmail(factory.sales_email,factory.sales_contact_name,'Dimension Confirmation Required — '+model,body,'sourcing@tbgsourcing.net');
+    alert('✓ Confirmation request sent to '+factory.sales_email);
+  }catch(e){alert('Send failed: '+e.message);}
 }
 
-async function saveNewSource(btn){
-  var factoryId=g('add-src-factory').value;
-  var fob=parseFloat(g('add-src-fob').value)||null;
-  var status=g('add-src-status').value;
-  var alloc=parseFloat(g('add-src-alloc').value)||null;
+// ── Factory sources ──
+async function updateSrcStatus(sel){
+  var sid=sel.dataset.sid;
+  await fetch(SB+'/rest/v1/sku_factory_sources?id=eq.'+sid,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:sel.value})});
+}
+
+function showAddSource(){
+  if(!currentSkuId){alert('Please save the SKU first.');return;}
+  // Build modal
+  var factOpts='<option value="">— Select Factory —</option>'+allBrands.map(function(){return '';}).join('');
+  // Load factories fresh
+  fetch(SB+'/rest/v1/factories?select=id,factory_name_english&order=factory_name_english',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+  .then(function(r){return r.json();})
+  .then(function(factories){
+    var opts='<option value="">— Select Factory —</option>'+factories.map(function(f){return '<option value="'+f.id+'">'+f.factory_name_english+'</option>';}).join('');
+    var modal=document.createElement('div');
+    modal.id='add-src-modal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML=
+      '<div style="background:#fff;border-radius:12px;padding:1.5rem;width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.2);">'+
+        '<div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:1rem;">Add Factory Source</div>'+
+        '<div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Factory *</label>'+
+          '<select id="add-src-fac" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;">'+opts+'</select></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+          '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">FOB Price (USD)</label><input type="number" id="add-src-fob" step="0.0001" placeholder="e.g. 2.8500" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+          '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Status</label><select id="add-src-st" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;"><option value="active">Active</option><option value="backup">Backup</option></select></div>'+
+        '</div>'+
+        '<div style="margin-bottom:12px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Allocation %</label><input type="number" id="add-src-alloc" placeholder="e.g. 50" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+          '<button id="add-src-cancel-btn" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>'+
+          '<button id="add-src-save-btn" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Add Source</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+    document.getElementById('add-src-cancel-btn').onclick=function(){modal.remove();};
+    document.getElementById('add-src-save-btn').onclick=function(){doAddSource(modal);};
+  });
+}
+
+async function doAddSource(modal){
+  var factoryId=document.getElementById('add-src-fac').value;
+  var fob=parseFloat(document.getElementById('add-src-fob').value)||null;
+  var status=document.getElementById('add-src-st').value;
+  var alloc=parseFloat(document.getElementById('add-src-alloc').value)||null;
   if(!factoryId){alert('Please select a factory.');return;}
+  var btn=document.getElementById('add-src-save-btn');
   btn.disabled=true;btn.textContent='Saving...';
   try{
-    await fetch(SB+'/rest/v1/sku_factory_sources',{
+    var r=await fetch(SB+'/rest/v1/sku_factory_sources',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({sku_id:currentSkuId,factory_id:factoryId,fob_price:fob,status:status,allocation_pct:alloc,effective_date:new Date().toISOString().split('T')[0]})
     });
-    // Close modal and reopen form
-    var modal=document.querySelector('div[style*="position:fixed"]');
-    if(modal)modal.remove();
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||r.status);}
+    modal.remove();
     openSkuForm(currentSkuId);
   }catch(e){
-    console.error('saveNewSource error:',e);
-    alert('Error saving factory source: '+e.message);
-    var saveBtn=document.getElementById('add-src-save');
-    if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Add Source';}
+    alert('Error: '+e.message);
+    btn.disabled=false;btn.textContent='Add Source';
   }
 }
 
-async function requestDimConfirmation(level){
-  if(!currentSkuId){alert('Please save the SKU first.');return;}
-  var r=await fetch(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+currentSkuId+'&status=eq.active&select=*,factories(factory_name_english,sales_email,sales_contact_name)&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-  var sources=await r.json();
-  if(!sources.length){alert('No active factory source found.');return;}
-  var factory=sources[0].factories||{};
-  if(!factory.sales_email){alert('Factory has no email on file.');return;}
-  var levelLabel={unit:'Unit',inner:'Inner Carton',master:'Master Carton',pallet:'Pallet'}[level]||level;
-  var skuModel=g('sf-model')?g('sf-model').value:'this SKU';
-  var firstName=(factory.sales_contact_name||'Team').split(' ')[0];
-  var body='Dear '+firstName+', We need you to confirm the '+levelLabel+' dimensions for SKU: '+skuModel+'. Please log into our supplier portal at https://project-7o416.vercel.app and confirm the exact dimensions (L x W x H in cm) and weight. Best regards, Allan Amsel, TBG Sourcing';
-  await sendEmail(factory.sales_email,factory.sales_contact_name||'Team','Dimension Confirmation Required — '+skuModel,body,'sourcing@tbgsourcing.net');
-  alert('Confirmation request sent to '+factory.sales_email);
+// ── Variations ──
+function addVarRow(){
+  var el=g('sf-variations');if(!el)return;
+  if(el.querySelector('.no-vars'))el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:4px;"><span style="font-size:10px;color:#aaa;">TYPE</span><span style="font-size:10px;color:#aaa;">VALUE</span><span style="font-size:10px;color:#aaa;">SUFFIX</span><span style="font-size:10px;color:#aaa;">MODEL #</span><span></span></div>';
+  var base=g('sf-model')?g('sf-model').value:'';
+  var row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:4px;';
+  row.innerHTML=
+    '<input type="text" class="var-type" placeholder="e.g. Color" style="padding:5px 7px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
+    '<input type="text" class="var-value" placeholder="e.g. Black" style="padding:5px 7px;font-size:12px;border:1px solid #e0e0d8;border-radius:5px;" />'+
+    '<input type="text" class="var-suffix" placeholder="e.g. -BK" style="padding:5px 7px;font-size:12px;font-family:monospace;border:1px solid #e0e0d8;border-radius:5px;" />'+
+    '<input type="text" class="var-model" value="'+base+'" readonly style="padding:5px 7px;font-size:12px;font-family:monospace;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:5px;" />'+
+    '<button style="padding:5px 8px;background:#fff0f0;border:1px solid #fdd;border-radius:5px;cursor:pointer;font-size:11px;color:#b00;">✕</button>';
+  row.querySelector('.var-suffix').addEventListener('input',function(){
+    row.querySelector('.var-model').value=base+this.value;
+  });
+  row.querySelector('button').addEventListener('click',function(){row.remove();});
+  el.appendChild(row);
 }
 
+// ── AI HTS suggest ──
+async function aiSuggestHTS(){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(!apiKey){alert('Add your Anthropic API key in Settings first.');return;}
+  var desc=g('sf-desc')?g('sf-desc').value:'';
+  var hts=g('cs-hts')?g('cs-hts').value:'';
+  if(!desc){alert('Please enter a description first.');return;}
+  var btn=event.target;btn.textContent='Searching...';btn.disabled=true;
+  try{
+    var r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:'Product: "'+desc+'"'+(hts?' HTS:'+hts:'')+'. US import duty % and Section 301 tariff % from China. JSON only: {"duty_pct":number,"tariff_pct":number,"hts":"string","notes":"string"} No markdown.'}]})
+    });
+    var d=await r.json();
+    if(d.content&&d.content[0]){
+      var raw=d.content[0].text.replace(/```json/g,'').replace(/```/g,'').trim();
+      var res=JSON.parse(raw);
+      if(g('cs-duty')&&res.duty_pct!==undefined){g('cs-duty').value=res.duty_pct;if(g('cs-duty-src'))g('cs-duty-src').textContent='(AI)';}
+      if(g('cs-tariff')&&res.tariff_pct!==undefined){g('cs-tariff').value=res.tariff_pct;if(g('cs-tariff-src'))g('cs-tariff-src').textContent='(AI)';}
+      if(g('cs-hts')&&res.hts&&!hts)g('cs-hts').value=res.hts;
+      recalcAll();
+      if(res.notes)alert('AI note: '+res.notes+'\n\nVerify with your customs broker.');
+    }
+  }catch(e){alert('Error: '+e.message);}
+  btn.textContent='✦ AI Suggest Duty & Tariff';btn.disabled=false;
+}
+
+// ── Save SKU ──
 async function saveSku(){
   var brand=g('sf-brand')?g('sf-brand').value:'';
-  var category=g('sf-category')?g('sf-category').value:'';
+  var cat=g('sf-category')?g('sf-category').value:'';
   var model=g('sf-model')?g('sf-model').value.trim():'';
   var desc=g('sf-desc')?g('sf-desc').value.trim():'';
-  if(!brand||!category||!model||!desc){alert('Brand, Category, Model Number and Description are required.');return;}
+  if(!brand||!cat||!model||!desc){alert('Brand, Category, Model Number and Description are required.');return;}
 
-  var brandOpt=g('sf-brand').options[g('sf-brand').selectedIndex];
-  var catOpt=g('sf-category').options[g('sf-category').selectedIndex];
-  var isCustSpecific=g('sf-cust-specific')&&g('sf-cust-specific').checked;
-  var custId=isCustSpecific&&g('sf-customer')?g('sf-customer').value||null:null;
-  var custSuffix=isCustSpecific&&g('sf-cust-suffix')?g('sf-cust-suffix').value.trim()||null:null;
-  var fullModel=isCustSpecific&&custSuffix?model+'-'+custSuffix:model;
-
-  var msgEl=g('sku-save-msg');
-  if(msgEl){msgEl.textContent='Saving...';msgEl.style.color='#888';}
+  var bOpt=g('sf-brand').options[g('sf-brand').selectedIndex];
+  var cOpt=g('sf-category').options[g('sf-category').selectedIndex];
+  var isCust=g('sf-cust-specific')&&g('sf-cust-specific').checked;
+  var custId=isCust&&g('sf-customer')?g('sf-customer').value||null:null;
+  var custSfx=isCust&&g('sf-cust-suffix')?g('sf-cust-suffix').value.trim()||null:null;
+  var fullModel=isCust&&custSfx?model+'-'+custSfx:model;
+  var msg=g('sku-save-msg');
+  if(msg){msg.textContent='Saving...';msg.style.color='#888';}
 
   var skuPayload={
     model_number:fullModel,
-    brand_prefix:brandOpt?brandOpt.dataset.prefix||'':'',
-    category_prefix:catOpt?catOpt.dataset.prefix||'':'',
-    sequence_number:parseInt((model.split('-').pop()))||1,
+    brand_prefix:bOpt?bOpt.dataset.prefix||'':'',
+    category_prefix:cOpt?cOpt.dataset.prefix||'':'',
+    sequence_number:parseInt(model.split('-').pop())||1,
     description:desc,
     detailed_description:g('sf-detail')?g('sf-detail').value.trim()||null:null,
-    brand_id:brand||null,
-    category_id:category||null,
-    is_customer_specific:isCustSpecific,
-    customer_id:custId,
-    customer_suffix:custSuffix,
+    brand_id:brand||null,category_id:cat||null,
+    is_customer_specific:isCust,customer_id:custId,customer_suffix:custSfx,
     shelf_life_days:g('sf-shelf')&&g('sf-shelf').value?parseInt(g('sf-shelf').value):1080,
     is_cosmetic:g('sf-cosmetic')&&g('sf-cosmetic').checked,
     has_inner_carton:g('sf-inner')&&g('sf-inner').checked,
@@ -1414,9 +1426,12 @@ async function saveSku(){
     if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||e.details||r.status);}
     var result=await r.json();
     var saved=Array.isArray(result)?result[0]:result;
-    if(saved&&saved.id&&!currentSkuId)currentSkuId=saved.id;
+    if(saved&&saved.id)currentSkuId=saved.id;
 
-    // Build packaging payload - only include fields that exist
+    // Build saves array
+    var saves=[];
+
+    // Packaging
     var packPayload={
       sku_id:currentSkuId,
       unit_length_cm:parseFloat(g('pk-ul')?g('pk-ul').value:0)||null,
@@ -1442,88 +1457,104 @@ async function saveSku(){
       pallet_height_cm:parseFloat(g('pk-ph')?g('pk-ph').value:0)||null,
       pallet_weight_kg:parseFloat(g('pk-pwt')?g('pk-pwt').value:0)||null
     };
-
-    // Build costing payload
-    var fob=parseFloat(g('cs-fob')?g('cs-fob').value:0)||null;
-    var costPayload=fob?{
-      sku_id:currentSkuId,
-      fob_price:fob,
-      packaging_price:parseFloat(g('cs-pkg')?g('cs-pkg').value:0)||null,
-      hts_code:g('cs-hts')?g('cs-hts').value.trim()||null:null,
-      country_of_origin:g('cs-origin')?g('cs-origin').value.trim()||null:null,
-      fob_port:g('cs-port')?g('cs-port').value.trim()||null:null,
-      freight_rate_per_cbm:parseFloat(g('cs-freight-rate')?g('cs-freight-rate').value:0)||null,
-      freight_per_unit:parseFloat((g('cs-freight-est')?g('cs-freight-est').value||'0':'0').replace('$',''))||null,
-      freight_actual_per_unit:parseFloat(g('cs-freight-actual')?g('cs-freight-actual').value:0)||null,
-      freight_origin:g('cs-freight-origin')?g('cs-freight-origin').value||null:null,
-      duty_pct:parseFloat(g('cs-duty')?g('cs-duty').value:0)||null,
-      tariff_pct:parseFloat(g('cs-tariff')?g('cs-tariff').value:0)||null,
-      wholesale_price:parseFloat(g('cs-wholesale')?g('cs-wholesale').value:0)||null,
-      retail_price:parseFloat(g('cs-retail')?g('cs-retail').value:0)||null,
-      returns_pct:parseFloat(g('cs-returns')?g('cs-returns').value:0)||null,
-      ad_allowance_pct:parseFloat(g('cs-ad')?g('cs-ad').value:0)||null,
-      dilution_pct:parseFloat(g('cs-dilution')?g('cs-dilution').value:0)||null,
-      commission_pct:parseFloat(g('cs-commission')?g('cs-commission').value:0)||null,
-      royalty_pct:parseFloat(g('cs-royalty')?g('cs-royalty').value:0)||null,
-      customer_id:g('sf-customer')&&g('sf-cust-specific')&&g('sf-cust-specific').checked?g('sf-customer').value||null:null,
-      effective_date:new Date().toISOString().split('T')[0]
-    }:null;
-
-    // Run pkg and costing saves in parallel
-    var saves=[
+    saves.push(
       fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+currentSkuId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
-        .then(function(r2){return r2.json();})
-        .then(function(rows){
-          var pkgMethod=rows.length?'PATCH':'POST';
-          var pkgUrl=rows.length?SB+'/rest/v1/sku_packaging?sku_id=eq.'+currentSkuId:SB+'/rest/v1/sku_packaging';
-          return fetch(pkgUrl,{method:pkgMethod,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(packPayload)});
-        })
-    ];
+      .then(function(r2){return r2.json();})
+      .then(function(rows){
+        var pm=rows.length?'PATCH':'POST';
+        var pu=rows.length?SB+'/rest/v1/sku_packaging?sku_id=eq.'+currentSkuId:SB+'/rest/v1/sku_packaging';
+        return fetch(pu,{method:pm,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(packPayload)});
+      })
+    );
 
-    if(costPayload){
+    // Save pending factory source from quote pre-fill
+    if(pendingSource&&pendingSource.factory_id){
+      saves.push(
+        fetch(SB+'/rest/v1/sku_factory_sources',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({
+            sku_id:currentSkuId,
+            factory_id:pendingSource.factory_id,
+            rfq_quote_id:pendingSource.rfq_quote_id||null,
+            fob_price:pendingSource.fob_price||null,
+            status:'active',
+            effective_date:new Date().toISOString().split('T')[0]
+          })
+        }).then(function(){pendingSource=null;})
+      );
+    }
+
+    // Costing
+    var fob=parseFloat(g('cs-fob')?g('cs-fob').value:0)||null;
+    if(fob){
+      var fEst=parseFloat((g('cs-freight-est')?g('cs-freight-est').value||'0':'0').replace('$',''))||null;
+      var costPayload={
+        sku_id:currentSkuId,
+        fob_price:fob,
+        packaging_price:parseFloat(g('cs-pkg')?g('cs-pkg').value:0)||null,
+        hts_code:g('cs-hts')?g('cs-hts').value.trim()||null:null,
+        country_of_origin:g('cs-origin')?g('cs-origin').value.trim()||null:null,
+        fob_port:g('cs-port')?g('cs-port').value.trim()||null:null,
+        freight_rate_per_cbm:parseFloat(g('cs-freight-rate')?g('cs-freight-rate').value:0)||null,
+        freight_per_unit:fEst,
+        freight_actual_per_unit:parseFloat(g('cs-freight-actual')?g('cs-freight-actual').value:0)||null,
+        freight_origin:g('cs-freight-origin')?g('cs-freight-origin').value||null:null,
+        duty_pct:parseFloat(g('cs-duty')?g('cs-duty').value:0)||null,
+        tariff_pct:parseFloat(g('cs-tariff')?g('cs-tariff').value:0)||null,
+        wholesale_price:parseFloat(g('cs-wholesale')?g('cs-wholesale').value:0)||null,
+        retail_price:parseFloat(g('cs-retail')?g('cs-retail').value:0)||null,
+        returns_pct:parseFloat(g('cs-returns')?g('cs-returns').value:0)||null,
+        ad_allowance_pct:parseFloat(g('cs-ad')?g('cs-ad').value:0)||null,
+        dilution_pct:parseFloat(g('cs-dilution')?g('cs-dilution').value:0)||null,
+        commission_pct:parseFloat(g('cs-commission')?g('cs-commission').value:0)||null,
+        royalty_pct:parseFloat(g('cs-royalty')?g('cs-royalty').value:0)||null,
+        customer_id:custId,
+        effective_date:new Date().toISOString().split('T')[0]
+      };
       saves.push(fetch(SB+'/rest/v1/sku_costing',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(costPayload)}));
     }
 
-    // Save new variations
+    // New variations
     var varRows=document.querySelectorAll('#sf-variations div[style*="grid-template-columns:1fr 1fr 1fr 1fr auto"]');
     for(var i=0;i<varRows.length;i++){
-      var vType=varRows[i].querySelector('.var-type');
-      var vValue=varRows[i].querySelector('.var-value');
-      var vSuffix=varRows[i].querySelector('.var-suffix');
-      var vModel=varRows[i].querySelector('.var-model');
-      if(vType&&vValue&&vSuffix&&vModel&&vType.value&&vValue.value&&vSuffix.value){
-        var upcR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&limit=1&select=upc_code',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-        var upcs=await upcR.json();
+      var vt=varRows[i].querySelector('.var-type');
+      var vv=varRows[i].querySelector('.var-value');
+      var vs=varRows[i].querySelector('.var-suffix');
+      var vm=varRows[i].querySelector('.var-model');
+      if(vt&&vv&&vs&&vm&&vt.value&&vv.value&&vs.value){
+        var uR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&limit=1&select=upc_code',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var upcs=await uR.json();
         var upc=upcs.length?upcs[0].upc_code:null;
-        saves.push(fetch(SB+'/rest/v1/sku_variations',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:currentSkuId,variation_type:vType.value,variation_value:vValue.value,model_suffix:vSuffix.value,model_number_full:vModel.value,upc_unit:upc})}));
+        var vPay={sku_id:currentSkuId,variation_type:vt.value,variation_value:vv.value,model_suffix:vs.value,model_number_full:vm.value,upc_unit:upc};
+        saves.push(fetch(SB+'/rest/v1/sku_variations',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(vPay)}));
         if(upc)saves.push(fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+upc,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_sku:currentSkuId,assigned_at:new Date().toISOString()})}));
       }
     }
 
     await Promise.all(saves);
     await loadSkuTab();
-    // Reopen the saved SKU so form stays populated
     openSkuForm(currentSkuId);
-    if(msgEl){msgEl.textContent='✓ SKU saved!';msgEl.style.color='#1a7a1a';}
-    setTimeout(function(){if(msgEl)msgEl.textContent='';},4000);
+    if(msg){msg.textContent='✓ SKU saved!';msg.style.color='#1a7a1a';}
+    setTimeout(function(){if(msg&&msg.textContent==='✓ SKU saved!')msg.textContent='';},4000);
   }catch(e){
-    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.style.color='#b00';}
-    console.error('saveSku error:',e);
+    console.error('saveSku:',e);
+    if(msg){msg.textContent='Error: '+e.message;msg.style.color='#b00';}
     alert('Save error: '+e.message);
   }
 }
 
+// ── Duplicate ──
 async function duplicateSku(skuId){
   if(!confirm('Duplicate this SKU? A new draft will be created.'))return;
   var r=await fetch(SB+'/rest/v1/skus?id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   var rows=await r.json();var sku=rows[0];if(!sku)return;
   var pr=await fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+skuId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   var pkgRows=await pr.json();
-  currentSkuId=null;
+  currentSkuId=null;pendingSource=null;
   sku.status='draft';
   delete sku.id;delete sku.model_number;delete sku.customer_suffix;delete sku.customer_id;delete sku.is_customer_specific;
   renderSkuForm(sku,pkgRows[0]||null,[],[],null,[]);
-  generateModelNumber();
   setTimeout(function(){
     if(g('sf-brand')&&sku.brand_id)g('sf-brand').value=sku.brand_id;
     if(g('sf-category')&&sku.category_id)g('sf-category').value=sku.category_id;
@@ -1531,27 +1562,31 @@ async function duplicateSku(skuId){
   },200);
 }
 
+// ── Load from accepted quote ──
 async function loadSkuFromQuote(quoteId,rfqId){
   try{
-    var [qr,rr,cr]=await Promise.all([
+    var results=await Promise.all([
       fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(id,factory_name_english,country,sales_email,sales_contact_name)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
       fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*,brands(id,brand_name,brand_code),categories(id,category,sub_category,model_prefix)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
       fetch(SB+'/rest/v1/rfq_quote_cert_assets?quote_id=eq.'+quoteId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];})
     ]);
-    var q=qr[0];var rfq=rr[0];
+    var q=results[0][0];var rfq=results[1][0];var certs=results[2]||[];
     if(!q||!rfq){alert('Could not load quote data.');return;}
     var f=q.factories||{};
-    var rfqBrand=rfq.brands||null;
-    var rfqCat=rfq.categories||null;
 
-    // Build partial sku from RFQ+quote data
+    // Add INCI if present
+    if(q.inci_document_url)certs.push({id:'inci',file_url:q.inci_document_url,file_name:'INCI List',cert_type:'INCI'});
+
+    // Store pending source - will be saved when user clicks Save
+    pendingSource={factory_id:q.factory_id,rfq_quote_id:quoteId,fob_price:q.unit_fob_price};
+
     var partialSku={
       description:rfq.item_description||'',
       detailed_description:rfq.detailed_specifications||'',
       brand_id:rfq.brand_id||null,
       category_id:rfq.category_id||null,
       is_cosmetic:rfq.is_cosmetic||false,
-      has_inner_carton:rfq.inner_case_pack>0||true,
+      has_inner_carton:!!(rfq.inner_case_pack),
       has_pallet:false,
       shelf_life_days:rfq.shelf_life_days||1080,
       status:'draft',
@@ -1559,29 +1594,20 @@ async function loadSkuFromQuote(quoteId,rfqId){
       is_customer_specific:!!rfq.customer_id
     };
 
-    // Build packaging from quote dims
     var partialPkg={
       unit_length_cm:q.unit_length_cm||rfq.est_unit_length_cm||null,
       unit_width_cm:q.unit_width_cm||rfq.est_unit_width_cm||null,
       unit_height_cm:q.unit_height_cm||rfq.est_unit_height_cm||null,
       unit_weight_kg:q.unit_weight_kg||null,
-      unit_cbm:q.unit_cbm||null,
       unit_dim_status:'estimated',
       inner_qty:rfq.inner_case_pack||null,
-      inner_length_cm:q.inner_length_cm||null,
-      inner_width_cm:q.inner_width_cm||null,
-      inner_height_cm:q.inner_height_cm||null,
-      inner_weight_kg:q.inner_weight_kg||null,
+      inner_length_cm:q.inner_length_cm||null,inner_width_cm:q.inner_width_cm||null,inner_height_cm:q.inner_height_cm||null,inner_weight_kg:q.inner_weight_kg||null,
       inner_dim_status:'estimated',
       master_qty:rfq.master_case_pack||null,
-      master_length_cm:q.master_length_cm||null,
-      master_width_cm:q.master_width_cm||null,
-      master_height_cm:q.master_height_cm||null,
-      master_weight_kg:q.master_weight_kg||null,
+      master_length_cm:q.master_length_cm||null,master_width_cm:q.master_width_cm||null,master_height_cm:q.master_height_cm||null,master_weight_kg:q.master_weight_kg||null,
       master_dim_status:'estimated'
     };
 
-    // Build costing from quote
     var fobPorts=q.fob_ports||[];
     var partialCosting={
       fob_price:parseFloat(q.unit_fob_price)||null,
@@ -1589,65 +1615,44 @@ async function loadSkuFromQuote(quoteId,rfqId){
       hts_code:q.hts_code_factory||null,
       country_of_origin:f.country||(q.country_of_manufacture&&q.country_of_manufacture[0])||'China',
       fob_port:fobPorts.length?fobPorts[0]:null,
-      duty_pct:rfq.est_duty_pct||null,
-      tariff_pct:rfq.est_tariff_pct||null,
+      freight_origin:f.country||'China',
+      duty_pct:rfq.est_duty_pct||null,tariff_pct:rfq.est_tariff_pct||null,
       freight_per_unit:rfq.est_freight_per_unit||null,
-      wholesale_price:rfq.target_wholesale_price||null,
-      retail_price:rfq.target_retail_price||null,
-      returns_pct:rfq.est_returns_pct||null,
-      ad_allowance_pct:rfq.est_ad_allowance_pct||null,
-      dilution_pct:rfq.est_dilution_pct||null,
-      commission_pct:rfq.est_commission_pct||null,
+      wholesale_price:rfq.target_wholesale_price||null,retail_price:rfq.target_retail_price||null,
+      returns_pct:rfq.est_returns_pct||null,ad_allowance_pct:rfq.est_ad_allowance_pct||null,
+      dilution_pct:rfq.est_dilution_pct||null,commission_pct:rfq.est_commission_pct||null,
       royalty_pct:rfq.est_royalty_pct||null
     };
 
-    // Build source from quote
-    var partialSources=[{
+    // Display source as pending (not yet saved to DB)
+    var displaySources=[{
       id:'__pending__',
-      factory_id:q.factory_id,
-      fob_price:q.unit_fob_price,
-      status:'active',
-      factories:{factory_name_english:f.factory_name_english,country:f.country}
+      factory_id:q.factory_id,fob_price:q.unit_fob_price,status:'active',
+      factories:{factory_name_english:f.factory_name_english+'  (pending save)',country:f.country}
     }];
 
-    renderSkuForm(partialSku,partialPkg,[],partialSources,partialCosting,cr||[]);
+    renderSkuForm(partialSku,partialPkg,[],displaySources,partialCosting,certs);
 
-    // Set dropdowns after render
+    // Set dropdowns
     setTimeout(function(){
-      if(g('sf-brand')&&rfq.brand_id){g('sf-brand').value=rfq.brand_id;}
-      else if(g('sf-brand')&&rfqBrand){for(var i=0;i<g('sf-brand').options.length;i++){if(g('sf-brand').options[i].dataset.prefix===rfqBrand.brand_code){g('sf-brand').selectedIndex=i;break;}}}
+      if(g('sf-brand')&&rfq.brand_id)g('sf-brand').value=rfq.brand_id;
       if(g('sf-category')&&rfq.category_id)g('sf-category').value=rfq.category_id;
-      if(g('sf-customer')&&rfq.customer_id)g('sf-customer').value=rfq.customer_id;
-      if(g('sf-cust-specific')&&rfq.customer_id){g('sf-cust-specific').checked=true;toggleSection('sf-cust-section',true);}
-      if(g('cs-origin')&&partialCosting.country_of_origin)g('cs-origin').value=partialCosting.country_of_origin;
-      if(g('cs-port')&&partialCosting.fob_port)g('cs-port').value=partialCosting.fob_port;
-      if(g('cs-freight-origin')&&f.country){g('cs-freight-origin').value=f.country;updateFreightRates();}
+      if(g('sf-customer')&&rfq.customer_id){g('sf-customer').value=rfq.customer_id;onCustomerChange();}
+      if(g('sf-cust-specific')&&rfq.customer_id){g('sf-cust-specific').checked=true;var s=g('sf-cust-section');if(s)s.style.display='block';}
+      if(g('cs-freight-origin')&&partialCosting.freight_origin){g('cs-freight-origin').value=partialCosting.freight_origin;updateFreightDests();}
       setTimeout(generateModelNumber,150);
-      recalcCosting();
+      recalcAll();
     },300);
 
-    // Show green banner
+    // Banner
     var banner=document.createElement('div');
     banner.style.cssText='background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#1a7a1a;';
-    banner.textContent='✓ Pre-filled from accepted quote — RFQ '+rfq.project_number+' · '+f.factory_name_english+' · $'+parseFloat(q.unit_fob_price||0).toFixed(2)+' FOB. Review all fields and save.';
+    banner.innerHTML='✓ Pre-filled from accepted quote — RFQ '+rfq.project_number+' · '+f.factory_name_english+' · $'+parseFloat(q.unit_fob_price||0).toFixed(2)+' FOB. <strong>Review all fields and click Save SKU to create.</strong>';
     var area=g('sku-form-area');
     if(area&&area.firstChild)area.insertBefore(banner,area.firstChild);
 
-  }catch(e){console.error('loadSkuFromQuote error:',e);alert('Error loading quote data: '+e.message);}
+  }catch(e){console.error('loadSkuFromQuote:',e);alert('Error loading quote data: '+e.message);}
 }
-
-async function sendEmail(toEmail,toName,subject,body,replyTo){
-  var r=await fetch('/api/send-email',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net'})
-  });
-  var d=await r.json().catch(function(){return{};});
-  if(!r.ok){throw new Error(d.error||r.status);}
-  return true;
-}
-
-// initPage already called above
 
 // ── FREIGHT RATES TAB ──
 var allFreightRatesFull=[];
@@ -1662,86 +1667,82 @@ async function loadFreightTab(){
 
 function renderFreightList(){
   var el=g('freight-list');if(!el)return;
-  if(!allFreightRatesFull.length){el.innerHTML='<div style="padding:1rem;text-align:center;font-size:12px;color:#bbb;">No rates yet.</div>';return;}
-  var modeIcons={ocean_lcl:'🚢',ocean_fcl:'📦',air:'✈️'};
+  if(!allFreightRatesFull.length){el.innerHTML='<div style="padding:1rem;text-align:center;font-size:12px;color:#bbb;">No rates yet. Add one.</div>';return;}
+  var icons={ocean_lcl:'🚢',ocean_fcl:'📦',air:'✈️'};
   el.innerHTML=allFreightRatesFull.map(function(r){
-    var isSelected=r.id===currentFreightId;
-    return '<div data-fid="'+r.id+'" onclick="openFreightForm(this.dataset.fid)" style="padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:3px;background:'+(isSelected?'#eef2ff':'transparent')+';border:1px solid '+(isSelected?'#c0d0f0':'transparent')+';">'+
-      '<div style="font-size:12px;font-weight:500;">'+(modeIcons[r.mode]||'')+'  '+r.origin_country+' → '+r.destination_name+'</div>'+
-      '<div style="font-size:11px;color:#888;">'+(r.mode.replace('_',' ').replace('ocean','Ocean').replace('lcl','LCL').replace('fcl','FCL').replace('air','Air'))+(r.container_type?' · '+r.container_type:'')+' · '+(r.is_active?'Active':'Inactive')+'</div>'+
+    var sel=r.id===currentFreightId;
+    return '<div data-fid="'+r.id+'" onclick="openFreightForm(this.dataset.fid)" style="padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:3px;background:'+(sel?'#eef2ff':'transparent')+';border:1px solid '+(sel?'#c0d0f0':'transparent')+';">'+
+      '<div style="font-size:12px;font-weight:500;">'+(icons[r.mode]||'')+' '+r.origin_country+' → '+r.destination_name+'</div>'+
+      '<div style="font-size:11px;color:#888;">'+(r.mode.replace(/_/g,' ')+(r.container_type?' · '+r.container_type:''))+' · '+(r.is_active?'Active':'Inactive')+'</div>'+
     '</div>';
   }).join('');
 }
 
 async function openFreightForm(id){
-  currentFreightId=id;
+  currentFreightId=id||null;
   renderFreightList();
-  var area=g('freight-form-area');
-  if(!area)return;
+  var area=g('freight-form-area');if(!area)return;
   var rate=id?allFreightRatesFull.find(function(r){return r.id===id;}):null;
-  var v=function(f,d){return rate&&rate[f]!=null?rate[f]:d||'';};
-
-  var modeOpts=['ocean_lcl','ocean_fcl','air'].map(function(m){
-    var lbl={ocean_lcl:'Ocean LCL (per CBM)',ocean_fcl:'Ocean FCL (per container)',air:'Air (per KG)'}[m];
-    return '<option value="'+m+'"'+(v('mode','ocean_lcl')===m?' selected':'')+'>'+lbl+'</option>';
-  }).join('');
+  var v=function(f,d){return rate&&rate[f]!=null?rate[f]:(d||'');};
 
   area.innerHTML='<div style="padding:1.5rem;max-width:600px;">'+
     '<div style="font-size:16px;font-weight:700;margin-bottom:1.25rem;">'+(rate?'Edit Rate':'New Freight Rate')+'</div>'+
-    '<div class="card">'+
+    '<div style="background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;">'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div class="f"><label>Origin Country *</label><input type="text" id="fr-origin" value="'+v('origin_country')+'" placeholder="e.g. China, Korea" /></div>'+
-        '<div class="f"><label>Destination Name *</label><input type="text" id="fr-dest-name" value="'+v('destination_name')+'" placeholder="e.g. Los Angeles" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Origin Country *</label><input type="text" id="fr-origin" value="'+v('origin_country')+'" placeholder="e.g. China" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Destination Name *</label><input type="text" id="fr-dest-name" value="'+v('destination_name')+'" placeholder="e.g. Los Angeles" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div class="f"><label>Destination Code</label><input type="text" id="fr-dest-code" value="'+v('destination_code')+'" placeholder="e.g. US-LAX" /></div>'+
-        '<div class="f"><label>Mode *</label><select id="fr-mode">'+modeOpts+'</select></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Destination Code</label><input type="text" id="fr-dest-code" value="'+v('destination_code')+'" placeholder="e.g. US-LAX" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Mode *</label><select id="fr-mode" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;">'+
+          '<option value="ocean_lcl"'+(v('mode','ocean_lcl')==='ocean_lcl'?' selected':'')+'>Ocean LCL (per CBM)</option>'+
+          '<option value="ocean_fcl"'+(v('mode')==='ocean_fcl'?' selected':'')+'>Ocean FCL (per container)</option>'+
+          '<option value="air"'+(v('mode')==='air'?' selected':'')+'>Air (per KG)</option>'+
+        '</select></div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div class="f"><label>Rate/CBM (LCL)</label><input type="number" id="fr-rate-cbm" step="0.01" value="'+v('rate_per_cbm')+'" placeholder="e.g. 180" /></div>'+
-        '<div class="f"><label>Rate/Container (FCL)</label><input type="number" id="fr-rate-cont" step="0.01" value="'+v('rate_per_container')+'" placeholder="e.g. 6000" /></div>'+
-        '<div class="f"><label>Container Type</label><select id="fr-container"><option value="">N/A</option><option value="20GP"'+(v('container_type')==='20GP'?' selected':'')+'>20GP</option><option value="40HC"'+(v('container_type')==='40HC'?' selected':'')+'>40HC</option></select></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Rate/CBM (LCL)</label><input type="number" id="fr-cbm" step="0.01" value="'+v('rate_per_cbm')+'" placeholder="e.g. 180" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Rate/Container (FCL)</label><input type="number" id="fr-cont" step="0.01" value="'+v('rate_per_container')+'" placeholder="e.g. 6000" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Container Type</label><select id="fr-conttype" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;"><option value="">N/A</option><option value="20GP"'+(v('container_type')==='20GP'?' selected':'')+'>20GP</option><option value="40HC"'+(v('container_type')==='40HC'?' selected':'')+'>40HC</option></select></div>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div class="f"><label>Rate/KG (Air)</label><input type="number" id="fr-rate-kg" step="0.01" value="'+v('rate_per_kg')+'" placeholder="e.g. 8.50" /></div>'+
-        '<div class="f"><label>Transit Days</label><input type="number" id="fr-transit" value="'+v('transit_days')+'" /></div>'+
-        '<div class="f"><label>Carrier</label><input type="text" id="fr-carrier" value="'+v('carrier')+'" placeholder="e.g. Maersk" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Rate/KG (Air)</label><input type="number" id="fr-kg" step="0.01" value="'+v('rate_per_kg')+'" placeholder="e.g. 8.50" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Transit Days</label><input type="number" id="fr-transit" value="'+v('transit_days')+'" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Carrier</label><input type="text" id="fr-carrier" value="'+v('carrier')+'" placeholder="e.g. Maersk" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
       '</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
-        '<div class="f"><label>Effective Date</label><input type="date" id="fr-date" value="'+(v('effective_date',new Date().toISOString().split('T')[0]))+'" /></div>'+
-        '<div class="f"><label>Status</label><select id="fr-active"><option value="true"'+(v('is_active',true)==='true'||v('is_active',true)===true?' selected':'')+'>Active</option><option value="false"'+(v('is_active',true)===false?' selected':'')+'>Inactive</option></select></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Effective Date</label><input type="date" id="fr-date" value="'+v('effective_date',new Date().toISOString().split('T')[0])+'" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Status</label><select id="fr-active" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;"><option value="true"'+(v('is_active',true)===true||v('is_active',true)==='true'?' selected':'')+'>Active</option><option value="false"'+(v('is_active',true)===false?' selected':'')+'>Inactive</option></select></div>'+
       '</div>'+
-      '<div class="f" style="margin-bottom:10px;"><label>Notes</label><input type="text" id="fr-notes" value="'+v('notes')+'" placeholder="e.g. Estimated rate, verify with forwarder" /></div>'+
+      '<div style="margin-bottom:12px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:3px;text-transform:uppercase;">Notes</label><input type="text" id="fr-notes" value="'+v('notes')+'" placeholder="e.g. Estimated — verify with forwarder" style="width:100%;padding:7px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>'+
       '<div style="display:flex;gap:8px;align-items:center;">'+
         '<button onclick="saveFreightRate()" style="padding:10px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Save Rate</button>'+
         (rate?'<button data-fid="'+rate.id+'" onclick="deleteFreightRate(this.dataset.fid)" style="padding:10px 14px;background:#fff0f0;border:1px solid #fdd;border-radius:7px;font-size:13px;color:#b00;cursor:pointer;">Delete</button>':'')+
-        '<span id="fr-save-msg" style="font-size:13px;"></span>'+
+        '<span id="fr-msg" style="font-size:12px;"></span>'+
       '</div>'+
     '</div>'+
   '</div>';
 }
 
 async function saveFreightRate(){
-  var origin=g('fr-origin').value.trim();
-  var destName=g('fr-dest-name').value.trim();
-  if(!origin||!destName){alert('Origin and destination are required.');return;}
+  var origin=g('fr-origin')?g('fr-origin').value.trim():'';
+  var destName=g('fr-dest-name')?g('fr-dest-name').value.trim():'';
+  if(!origin||!destName){alert('Origin and destination name are required.');return;}
   var payload={
-    origin_country:origin,
-    destination_name:destName,
-    destination_code:g('fr-dest-code').value.trim()||null,
-    mode:g('fr-mode').value,
-    rate_per_cbm:parseFloat(g('fr-rate-cbm').value)||null,
-    rate_per_container:parseFloat(g('fr-rate-cont').value)||null,
-    container_type:g('fr-container').value||null,
-    rate_per_kg:parseFloat(g('fr-rate-kg').value)||null,
-    transit_days:parseInt(g('fr-transit').value)||null,
-    carrier:g('fr-carrier').value.trim()||null,
-    effective_date:g('fr-date').value||new Date().toISOString().split('T')[0],
-    is_active:g('fr-active').value==='true',
-    notes:g('fr-notes').value.trim()||null
+    origin_country:origin,destination_name:destName,
+    destination_code:g('fr-dest-code')?g('fr-dest-code').value.trim()||null:null,
+    mode:g('fr-mode')?g('fr-mode').value:'ocean_lcl',
+    rate_per_cbm:parseFloat(g('fr-cbm')?g('fr-cbm').value:0)||null,
+    rate_per_container:parseFloat(g('fr-cont')?g('fr-cont').value:0)||null,
+    container_type:g('fr-conttype')?g('fr-conttype').value||null:null,
+    rate_per_kg:parseFloat(g('fr-kg')?g('fr-kg').value:0)||null,
+    transit_days:parseInt(g('fr-transit')?g('fr-transit').value:0)||null,
+    carrier:g('fr-carrier')?g('fr-carrier').value.trim()||null:null,
+    effective_date:g('fr-date')?g('fr-date').value:new Date().toISOString().split('T')[0],
+    is_active:g('fr-active')?g('fr-active').value==='true':true,
+    notes:g('fr-notes')?g('fr-notes').value.trim()||null:null
   };
-  var msg=g('fr-save-msg');
-  if(msg){msg.textContent='Saving...';msg.style.color='#888';}
+  var msg=g('fr-msg');if(msg){msg.textContent='Saving...';msg.style.color='#888';}
   try{
     var url=currentFreightId?SB+'/rest/v1/freight_rates?id=eq.'+currentFreightId:SB+'/rest/v1/freight_rates';
     var method=currentFreightId?'PATCH':'POST';
@@ -1751,6 +1752,7 @@ async function saveFreightRate(){
     var saved=Array.isArray(result)?result[0]:result;
     if(saved&&saved.id)currentFreightId=saved.id;
     await loadFreightTab();
+    // Refresh allFreightRates for SKU costing calculator
     allFreightRates=allFreightRatesFull.filter(function(r){return r.is_active;});
     if(msg){msg.textContent='✓ Saved!';msg.style.color='#1a7a1a';}
     setTimeout(function(){if(msg)msg.textContent='';},3000);
@@ -1758,12 +1760,12 @@ async function saveFreightRate(){
 }
 
 async function deleteFreightRate(id){
-  if(!confirm('Delete this freight rate?'))return;
+  if(!confirm('Delete this rate?'))return;
   await fetch(SB+'/rest/v1/freight_rates?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   currentFreightId=null;
   await loadFreightTab();
   var area=g('freight-form-area');
-  if(area)area.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;color:#bbb;"><div style="font-size:36px;">🚢</div><div style="font-size:13px;margin-top:10px;">Freight rate deleted</div></div>';
+  if(area)area.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;color:#bbb;"><div style="font-size:36px;">🚢</div><div style="margin-top:10px;font-size:13px;">Deleted.</div></div>';
 }
 
 </script>
