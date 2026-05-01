@@ -770,7 +770,7 @@ function renderSkuForm(sku,packaging,variations,sources,costing){
   var isNew=!sku;
 
   // Build brand options
-  var brandOpts=allBrands.map(function(b){return '<option value="'+b.id+'" data-prefix="'+b.brand_prefix+'"'+(sku&&sku.brand_id===b.id?' selected':'')+'>'+b.brand_name+'</option>';}).join('');
+  var brandOpts=allBrands.map(function(b){return '<option value="'+b.id+'" data-prefix="'+b.brand_code+'"'+(sku&&sku.brand_id===b.id?' selected':'')+'>'+b.brand_name+'</option>';}).join('');
   // Build category options
   var catOpts=allCats.map(function(c){var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');return '<option value="'+c.id+'" data-prefix="'+c.model_prefix+'"'+(sku&&sku.category_id===c.id?' selected':'')+'>'+path+'</option>';}).join('');
   // Build customer options
@@ -1170,10 +1170,12 @@ async function loadSkuFromQuote(quoteId, rfqId){
   try{
     var [qr,rr]=await Promise.all([
       fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(id,factory_name_english,sales_email,sales_contact_name)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();}),
-      fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();})
+      fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*,brands(id,brand_name,brand_code),categories(id,category,sub_category,model_prefix)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.json();})
     ]);
     var q=qr[0]; var rfq=rr[0];
-    if(!q||!rfq)return;
+    if(!q||!rfq){alert('Could not load quote or RFQ data.');return;}
+    var rfqBrand=rfq.brands||null;
+    var rfqCat=rfq.categories||null;
 
     // Switch to SKU tab
     switchTab('skus');
@@ -1236,12 +1238,33 @@ async function loadSkuFromQuote(quoteId, rfqId){
     g('sku-form-area').dataset.factoryId=q.factory_id;
 
     // Generate model number
-    setTimeout(generateModelNumber,200);
+    setTimeout(function(){
+      // Set brand dropdown
+      var brandSel=g('sf-brand');
+      if(brandSel&&rfq.brand_id){
+        brandSel.value=rfq.brand_id;
+        if(!brandSel.value&&rfqBrand){
+          // Try matching by brand_code
+          for(var i=0;i<brandSel.options.length;i++){
+            if(brandSel.options[i].dataset.prefix===rfqBrand.brand_code){
+              brandSel.selectedIndex=i;break;
+            }
+          }
+        }
+      }
+      // Set category dropdown
+      var catSel=g('sf-category');
+      if(catSel&&rfq.category_id)catSel.value=rfq.category_id;
+      // Generate model number
+      setTimeout(generateModelNumber,150);
+    },400);
 
     // Show banner
     var banner=document.createElement('div');
     banner.style.cssText='background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#1a7a1a;';
-    banner.textContent='✓ Pre-filled from accepted quote — '+rfq.project_number+' · '+(f.factory_name_english||'')+'  · $'+parseFloat(q.unit_fob_price||0).toFixed(2)+' FOB. Review and save.';
+    var brandName=rfqBrand?rfqBrand.brand_name:(rfq.brand_id?'Brand ID: '+rfq.brand_id:'No brand');
+    var catName=rfqCat?[rfqCat.category,rfqCat.sub_category].filter(Boolean).join(' › '):'No category';
+    banner.textContent='✓ Pre-filled from accepted quote — '+rfq.project_number+' · '+(f.factory_name_english||'')+' · $'+parseFloat(q.unit_fob_price||0).toFixed(2)+' FOB · '+brandName+' · '+catName+'. Review and save.';
     var formArea=g('sku-form-area');
     if(formArea&&formArea.firstChild)formArea.insertBefore(banner,formArea.firstChild.nextSibling);
 
