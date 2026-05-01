@@ -727,7 +727,7 @@
                   <option value="RW">Raw (RW)</option>
                 </select>
               </div>
-              <div class="mf"><label>Quantity to Quote</label><input type="number" id="rfq-quantity" placeholder="e.g. 5000" min="1" /></div>
+
             </div>
             <div class="mf-row">
               <div class="mf"><label>Inner Case Pack</label><input type="number" id="rfq-inner-pack" placeholder="e.g. 12" min="1" /></div>
@@ -847,11 +847,11 @@
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
             <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.001" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             <div class="mf"><label>Units/Carton</label><input type="number" id="rfq-units-per-carton" step="1" placeholder="= master pack" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Est. CBM/Unit</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Master Carton CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-            <div class="mf"><label>Container Cost ($)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-            <div class="mf"><label>Est. Freight/Unit ($)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Container Cost (full container $)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            <div class="mf"><label>Est. Freight/Unit</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
           </div>
 
           <!-- Duty & Tariff -->
@@ -2976,7 +2976,7 @@ function calcMargins(){
   var w=parseFloat(g('rfq-est-wid').value)||0;
   var h=parseFloat(g('rfq-est-hgt').value)||0;
   var cbm=l&&w&&h?(l*w*h/1000000):0;
-  if(cbm>0)g('rfq-est-cbm').value=cbm.toFixed(6);
+  if(cbm>0){g('rfq-est-cbm').value=cbm.toFixed(6);}
 
   // Freight calculation: container cost / (container CBM / unit CBM) = cost per unit
   var containerCost=parseFloat(g('rfq-container-cost').value)||6000;
@@ -3214,7 +3214,12 @@ async function saveRFQ(action){
 
         // Send emails
         if(action==='send'){
-          await sendRFQEmails(savedRFQ);
+          try{
+            await sendRFQEmails(savedRFQ);
+          }catch(emailErr){
+            console.log('sendRFQEmails error (non-fatal):', emailErr);
+            alert('RFQ saved successfully but some emails may not have sent. Check factory email addresses.');
+          }
         }
       }
       var msg=action==='send'?'RFQ sent to '+factoryIds.length+' factories!':'Draft saved as '+(savedRFQ?savedRFQ.project_number:'');
@@ -3882,6 +3887,7 @@ if(localStorage.getItem('admin_session')==='1'){
 // ── SendGrid Email ──
 
 async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
+  if(!toEmail||!toEmail.trim()){throw new Error('No recipient email address provided');}
   var r=await fetch('/api/send-email',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
