@@ -1597,7 +1597,7 @@ function populateRFQDetail(rfq){
     g('rfq-det-img-wrap').style.display='none';
   }
 
-  ['q-fob','q-pkg-price','q-uom','q-specs','q-hts','q-moq','q-len','q-wid','q-hgt','q-wgt','q-countries','q-ports','q-notes'].forEach(function(id){
+  ['q-fob','q-pkg-price','q-uom','q-specs','q-hts','q-moq','q-len','q-wid','q-hgt','q-wgt','q-inner-len','q-inner-wid','q-inner-hgt','q-inner-wgt','q-master-len','q-master-wid','q-master-hgt','q-master-wgt','q-countries','q-ports','q-notes'].forEach(function(id){
     var el=g(id);if(el)el.value='';
   });
   g('q-option').value='A';
@@ -1710,6 +1710,15 @@ async function submitQuote(){
     fob_ports:ports.length?ports:null,
     certifications_confirmed:certs.length?certs:null,
     formulation_notes:g('q-notes').value.trim()||null,
+    packaging_price:parseFloat(g('q-pkg-price').value)||null,
+    inner_length_cm:parseFloat(g('q-inner-len')?g('q-inner-len').value:0)||null,
+    inner_width_cm:parseFloat(g('q-inner-wid')?g('q-inner-wid').value:0)||null,
+    inner_height_cm:parseFloat(g('q-inner-hgt')?g('q-inner-hgt').value:0)||null,
+    inner_weight_kg:parseFloat(g('q-inner-wgt')?g('q-inner-wgt').value:0)||null,
+    master_length_cm:parseFloat(g('q-master-len')?g('q-master-len').value:0)||null,
+    master_width_cm:parseFloat(g('q-master-wid')?g('q-master-wid').value:0)||null,
+    master_height_cm:parseFloat(g('q-master-hgt')?g('q-master-hgt').value:0)||null,
+    master_weight_kg:parseFloat(g('q-master-wgt')?g('q-master-wgt').value:0)||null,
     status:'submitted'
   };
 
@@ -1818,55 +1827,78 @@ async function updateQuote(quoteId){
   };
 
   try{
-    // First load current quote to save as version snapshot
-    var cur=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
-    var curRows=await cur.json();
-    if(curRows&&curRows.length){
-      var currentQuote=curRows[0];
-      // Count existing versions
-      var vr=await fetch(SB+'/rest/v1/rfq_quote_versions?quote_id=eq.'+quoteId+'&select=version_number&order=version_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
-      var versions=await vr.json();
-      var nextVersion=(versions&&versions.length?versions[0].version_number:0)+1;
-      // Save snapshot of current state before updating
-      await fetch(SB+'/rest/v1/rfq_quote_versions',{
-        method:'POST',
-        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({quote_id:quoteId,version_number:nextVersion,snapshot:currentQuote,changed_by:'factory'})
+    // Run snapshot load and quote update in parallel
+    var snapshotPromise=fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}})
+      .then(function(r){return r.json();})
+      .then(function(curRows){
+        if(!curRows||!curRows.length)return;
+        return fetch(SB+'/rest/v1/rfq_quote_versions?quote_id=eq.'+quoteId+'&select=version_number&order=version_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}})
+          .then(function(vr){return vr.json();})
+          .then(function(versions){
+            var nextVersion=(versions&&versions.length?versions[0].version_number:0)+1;
+            return fetch(SB+'/rest/v1/rfq_quote_versions',{
+              method:'POST',
+              headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+              body:JSON.stringify({quote_id:quoteId,version_number:nextVersion,snapshot:curRows[0],changed_by:'factory'})
+            });
+          });
       });
-    }
 
-    var r=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{
+    var updatePromise=fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify(payload)
     });
-    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||r.status);}
 
-    // Upload INCI if selected
+    // Wait for both to complete
+    var results=await Promise.all([snapshotPromise,updatePromise]);
+    var updateResult=results[1];
+    if(!updateResult.ok){var e=await updateResult.json().catch(function(){return{};});throw new Error(e.message||updateResult.status);}
+
+    // Upload INCI and cert files in parallel
+    var uploads=[];
+
     var inciFile=g('eq-inci-'+quoteId).files[0];
     if(inciFile){
       var inciPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_inci_update.'+inciFile.name.split('.').pop();
-      var inciR=await fetch(SB+'/storage/v1/object/factory-files/'+inciPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:inciFile});
-      if(inciR.ok){
-        var inciUrl=SB+'/storage/v1/object/public/factory-files/'+inciPath;
-        await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({inci_document_url:inciUrl})});
-      }
+      uploads.push(
+        fetch(SB+'/storage/v1/object/factory-files/'+inciPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:inciFile})
+          .then(function(r){
+            if(r.ok){
+              var inciUrl=SB+'/storage/v1/object/public/factory-files/'+inciPath;
+              return fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({inci_document_url:inciUrl})});
+            }
+          })
+      );
     }
 
-    // Upload multiple cert docs
     var certInputs=document.querySelectorAll('[id^="eq-cert-file-'+quoteId+'"]');
     for(var ci=0;ci<certInputs.length;ci++){
       var certFile=certInputs[ci].files[0];
       if(certFile){
         var certPath=FACTORY_ID+'/rfq_quotes/'+quoteId+'_cert_'+Date.now()+'_'+ci+'.'+certFile.name.split('.').pop();
-        await fetch(SB+'/storage/v1/object/factory-files/'+certPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:certFile});
+        var certUrl=SB+'/storage/v1/object/public/factory-files/'+certPath;
+        var certName=certFile.name;
+        uploads.push(
+          fetch(SB+'/storage/v1/object/factory-files/'+certPath,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/octet-stream','x-upsert':'true'},body:certFile})
+          .then(function(r){
+            if(r.ok){
+              return fetch(SB+'/rest/v1/rfq_quote_cert_assets',{
+                method:'POST',
+                headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+                body:JSON.stringify({quote_id:quoteId,file_name:certName,file_url:certUrl})
+              });
+            }
+          })
+        );
       }
     }
+
+    if(uploads.length)await Promise.all(uploads);
 
     var okEl=g('eq-ok-'+quoteId);
     if(okEl)okEl.style.display='block';
     if(btn){btn.disabled=false;btn.textContent='Save Updates';}
-    // Reload quotes to show updated status
     if(currentRFQ)loadMyQuotes(currentRFQ.id);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='Save Updates';}
