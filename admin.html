@@ -2392,6 +2392,59 @@ function renderRFQDetailPane(rfq,assignments,quotes){
   '';
 
   el.innerHTML=html;
+  if(quotes.length)setTimeout(function(){loadHistoricalBenchmarks(rfq,g('rfq-detail-pane'));},500);
+}
+
+// ── Historical benchmark lookup ──
+async function loadHistoricalBenchmarks(rfq,containerEl){
+  var apiKey=localStorage.getItem('anthropic_key')||'';;
+  if(!apiKey)return;
+  try{
+    // Load recent accepted quotes from similar categories
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?status=eq.accepted&select=*,rfqs(item_description,category,unit_of_measure),factories(factory_name_english)&order=created_at.desc&limit=50',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var allQuotes=await r.json();
+    if(!allQuotes.length)return;
+
+    // Use AI to find top 3 most similar
+    var context=allQuotes.map(function(q,i){
+      var rfqData=q.rfqs||{};
+      return (i+1)+'. '+rfqData.item_description+' | Cat: '+rfqData.category+' | $'+q.unit_fob_price+' FOB | '+rfqData.unit_of_measure;
+    }).join(', ');
+
+    var prompt='Find top 3 most similar historical quotes to this item: '+rfq.item_description+' category: '+rfq.category+'. Historical quotes: '+context+'. Return JSON only: {"matches":[{"index":n,"reason":"why similar"}]} max 3 matches.';
+
+    var aiR=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})
+    });
+    var aiD=await aiR.json();
+    if(!aiD.content||!aiD.content[0])return;
+    var raw=aiD.content[0].text.trim().replace(/^```json\s*/,'').replace(/```$/,'').trim();
+    var result=JSON.parse(raw);
+    var matches=result.matches||[];
+    if(!matches.length)return;
+
+    var benchmarkHtml='<div style="margin-bottom:1rem;background:#fff8e0;border:1px solid #f0d060;border-radius:10px;padding:1rem;">'+
+      '<div style="font-size:11px;font-weight:600;color:#886600;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">📊 Top 3 Historical Benchmarks (AI-matched)</div>'+
+      matches.map(function(m){
+        var hq=allQuotes[m.index-1];
+        if(!hq)return '';
+        var hRfq=hq.rfqs||{};
+        var hFac=hq.factories||{};
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0d060;">'+
+          '<div>'+
+            '<div style="font-size:12px;font-weight:500;">'+hRfq.item_description+'</div>'+
+            '<div style="font-size:11px;color:#888;">'+hFac.factory_name_english+' · '+m.reason+'</div>'+
+          '</div>'+
+          '<div style="font-size:14px;font-weight:700;color:#886600;">$'+(parseFloat(hq.unit_fob_price)||0).toFixed(2)+' FOB</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+    containerEl.insertAdjacentHTML('afterbegin',benchmarkHtml);
+  }catch(e){console.log('benchmark error:',e);}
 }
 
 function renderQuoteCard(q,rfq,idx){
@@ -2439,7 +2492,7 @@ function renderQuoteCard(q,rfq,idx){
       (q.inci_document_url?'<div style="margin-bottom:12px;"><a href="'+q.inci_document_url+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">🧴 View INCI Document</a></div>':'')+
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
-        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
+        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMoreInfo(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">? Request More Info</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="saveQuoteToFactory(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f5f5f0;color:#555;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">💾 Save to Factory</button>'+
@@ -2453,40 +2506,146 @@ function toggleQuoteCard(id){
   if(body)body.classList.toggle('open');
 }
 
-async function acceptQuote(quoteId,rfqId){
-  var reason=confirm('Accept this quote and move RFQ to Approved?');
-  if(!reason)return;
+async function acceptQuote(quoteId,rfqId,factoryName){
+  if(!confirm('Accept this quote from '+(factoryName||'this factory')+'?'))return;
+
+  // Load quote and RFQ details for email
   try{
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var quotes=await qr.json();
+    var q=quotes[0];
+    var rfqr=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var rfqs=await rfqr.json();
+    var rfq=rfqs[0];
+    var f=q&&q.factories||{};
+
+    // Update quote and RFQ status
     await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'accepted'})});
     await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved'})});
+
+    // Update factory scorecard
+    updateFactoryScorecard(q.factory_id,'quote_accepted');
+
+    // Send acceptance email
+    if(f.sales_email){
+      var firstName=(f.sales_contact_name||'Team').split(' ')[0];
+      var fob=parseFloat(q.unit_fob_price)||0;
+      var emailBody='Dear '+firstName+',\n\n'+
+        'We are pleased to inform you that your quote for '+rfq.item_description+' has been accepted.\n\n'+
+        'ACCEPTED QUOTE DETAILS\n'+
+        'Project: '+rfq.project_number+'\n'+
+        'Item: '+rfq.item_description+'\n'+
+        'Accepted FOB Price: $'+fob.toFixed(2)+' per unit\n'+
+        'Quantity: '+(rfq.quote_quantity||'TBD').toLocaleString()+' '+(rfq.unit_type||'units')+'\n\n'+
+        'NEXT STEPS\n'+
+        'Upon receipt of your deposit, please log into our supplier portal and confirm the following production timeline:\n'+
+        '• Materials Arrival Date\n'+
+        '• Pre-Production Sample Ready Date\n'+
+        '• Mass Production Start Date\n'+
+        '• Inspection Date\n'+
+        '• Cargo Ready Date\n\n'+
+        'Please log into the portal to confirm these dates: https://project-7o416.vercel.app\n\n'+
+        'We look forward to working with you on this project.\n\n'+
+        'Best regards,\nAllan Amsel\nTBG Sourcing';
+
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Accepted — '+rfq.project_number+' — '+rfq.item_description,emailBody,'sourcing@tbgsourcing.net');
+    }
+
     await loadRFQs();
     openRFQDetail(rfqId);
-    alert('Quote accepted! RFQ moved to Approved.');
+    alert('Quote accepted! Email sent to factory with next steps.');
   }catch(e){alert('Error: '+e.message);}
 }
 
 async function rejectQuote(quoteId,rfqId){
-  var reasons=['Price too high','Specifications do not match','Certifications missing','No response','Going with another supplier','Other'];
-  var reason=prompt('Select rejection reason:\n1. Price too high\n2. Specs do not match\n3. Certifications missing\n4. No response\n5. Going with another supplier\n6. Other\n\nEnter number or type reason:');
+  var reasons=['Price too high','Specifications do not match','Certifications missing','Going with another supplier','Product discontinued','Other'];
+  var reason=prompt('Select rejection reason:\n1. Price too high\n2. Specifications do not match\n3. Certifications missing\n4. Going with another supplier\n5. Product discontinued\n6. Other\n\nEnter number or type reason:');
   if(!reason)return;
   var reasonText=reasons[parseInt(reason)-1]||reason;
+
   try{
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(item_description,project_number)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var quotes=await qr.json();
+    var q=quotes[0];
+    var f=q&&q.factories||{};
+    var rfqData=q&&q.rfqs||{};
+
     await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected',admin_notes:reasonText})});
+
+    // Update scorecard
+    updateFactoryScorecard(q.factory_id,'quote_rejected');
+
+    // Send rejection email
+    if(f.sales_email){
+      var firstName=(f.sales_contact_name||'Team').split(' ')[0];
+      var emailBody='Dear '+firstName+',\n\n'+
+        'Thank you for submitting your quote for '+rfqData.item_description+' ('+(rfqData.project_number||'')+').\n\n'+
+        'After careful review, we are unable to proceed with this quote at this time.\n'+
+        'Reason: '+reasonText+'\n\n'+
+        'We value our relationship with '+f.factory_name_english+' and look forward to working together on future opportunities.\n\n'+
+        'Best regards,\nAllan Amsel\nTBG Sourcing';
+
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Update — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+    }
+
     await loadRFQs();
     openRFQDetail(rfqId);
-    alert('Quote rejected: '+reasonText);
+    alert('Quote rejected. Email sent to factory.');
   }catch(e){alert('Error: '+e.message);}
 }
 
 async function requestMoreInfo(quoteId,rfqId){
-  var info=prompt('What additional information do you need? (e.g. Better photos, INCI list, Lead time, Sample price, HTS code)');
+  var info=prompt('What information do you need? (e.g. Better photos, INCI list, Lead time, Sample price, HTS code clarification)');
   if(!info)return;
+
   try{
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(item_description,project_number)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var quotes=await qr.json();
+    var q=quotes[0];
+    var f=q&&q.factories||{};
+    var rfqData=q&&q.rfqs||{};
+
     await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'more_info_requested',admin_notes:info})});
-    // TODO: send email to factory with the request
-    alert('Request sent. Factory will be notified to provide: '+info);
+
+    // Update scorecard
+    updateFactoryScorecard(q.factory_id,'info_requested');
+
+    // Send email
+    if(f.sales_email){
+      var firstName=(f.sales_contact_name||'Team').split(' ')[0];
+      var emailBody='Dear '+firstName+',\n\n'+
+        'Thank you for your quote on '+rfqData.item_description+' ('+(rfqData.project_number||'')+').\n\n'+
+        'To complete our evaluation, we need the following additional information:\n\n'+
+        info+'\n\n'+
+        'You may reply directly to this email or log into our supplier portal to submit your response: https://project-7o416.vercel.app\n\n'+
+        'Please respond at your earliest convenience.\n\n'+
+        'Best regards,\nAllan Amsel\nTBG Sourcing';
+
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Additional Information Required — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+    }
+
     openRFQDetail(rfqId);
+    alert('Request sent. Email sent to factory.');
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ── Factory Scorecard Updates ──
+async function updateFactoryScorecard(factoryId,action){
+  if(!factoryId)return;
+  try{
+    // Load current scorecard
+    var r=await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId+'&select=scorecard_data',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var rows=await r.json();
+    var factory=rows[0]||{};
+    var sc=factory.scorecard_data||{quotes_received:0,quotes_accepted:0,quotes_rejected:0,info_requests:0};
+    sc.quotes_received=(sc.quotes_received||0);
+    if(action==='quote_accepted')sc.quotes_accepted=(sc.quotes_accepted||0)+1;
+    if(action==='quote_rejected')sc.quotes_rejected=(sc.quotes_rejected||0)+1;
+    if(action==='info_requested')sc.info_requests=(sc.info_requests||0)+1;
+    sc.acceptance_rate=sc.quotes_received>0?Math.round(sc.quotes_accepted/sc.quotes_received*100):0;
+    sc.last_updated=new Date().toISOString();
+    await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({scorecard_data:sc})});
+  }catch(e){console.log('scorecard update error:',e);}
 }
 
 async function saveQuoteToFactory(quoteId,rfqId){

@@ -602,6 +602,26 @@
             </div>
 
             <button onclick="submitQuote()" style="width:100%;padding:12px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;" id="q-submit-btn">Submit Quote</button>
+
+            <!-- Production Timeline (shown after quote is accepted) -->
+            <div id="timeline-section" style="display:none;margin-top:1rem;background:#edfaed;border:1px solid #a0d8a0;border-radius:10px;padding:1rem;">
+              <div style="font-size:13px;font-weight:600;color:#1a7a1a;margin-bottom:12px;">✓ Quote Accepted — Please Confirm Production Timeline</div>
+              <div style="font-size:12px;color:#555;margin-bottom:12px;">Enter dates from the day you receive the deposit payment.</div>
+              <div style="display:flex;flex-direction:column;gap:10px;">
+                <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Materials Arrival Date</label>
+                  <input type="date" id="tl-materials" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" /></div>
+                <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Pre-Production Sample Ready Date</label>
+                  <input type="date" id="tl-sample" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" /></div>
+                <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Mass Production Start Date</label>
+                  <input type="date" id="tl-production" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" /></div>
+                <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Inspection Date</label>
+                  <input type="date" id="tl-inspection" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" /></div>
+                <div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Cargo Ready Date</label>
+                  <input type="date" id="tl-cargo" style="width:100%;padding:8px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" /></div>
+                <button onclick="submitTimeline()" style="width:100%;padding:12px;background:#1a7a1a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Confirm Production Timeline</button>
+                <div style="font-size:13px;color:#1a7a1a;display:none;" id="tl-ok">✓ Timeline confirmed! We will be in touch.</div>
+              </div>
+            </div>
             <div style="font-size:13px;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;padding:9px 12px;display:none;" id="q-ok">✓ Quote submitted successfully!</div>
             <div style="font-size:13px;color:#b00;background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:9px 12px;display:none;" id="q-err"></div>
           </div>
@@ -1713,6 +1733,44 @@ function resizeFactoryImage(file){
     };
     img.src=url;
   });
+}
+
+async function submitTimeline(){
+  if(!currentRFQ||!currentAssignmentId)return;
+  var materials=g('tl-materials').value;
+  var sample=g('tl-sample').value;
+  var production=g('tl-production').value;
+  var inspection=g('tl-inspection').value;
+  var cargo=g('tl-cargo').value;
+  if(!materials||!sample||!production||!inspection||!cargo){
+    alert('Please fill in all timeline dates.');return;
+  }
+  try{
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+currentAssignmentId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        status:'timeline_confirmed',
+        timeline_materials:materials,
+        timeline_sample:sample,
+        timeline_production:production,
+        timeline_inspection:inspection,
+        timeline_cargo:cargo,
+        timeline_confirmed_at:new Date().toISOString()
+      })
+    });
+    g('tl-ok').style.display='block';
+    document.querySelector('#timeline-section button').disabled=true;
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// Show timeline section if quote is accepted
+function checkTimelineRequired(quotes){
+  var accepted=quotes.find(function(q){return q.status==='accepted';});
+  if(accepted){
+    var ts=g('timeline-section');
+    if(ts)ts.style.display='block';
+  }
 }
 
 </script>
