@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SKU Library — TBG Sourcing</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a2e;font-size:14px;}
+.topbar{background:#1a1a2e;color:#fff;padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between;}
+.topbar-title{font-size:15px;font-weight:700;letter-spacing:0.02em;}
+.topbar a{color:#aaa;font-size:12px;text-decoration:none;}
+.topbar a:hover{color:#fff;}
+.filters{background:#fff;border-bottom:1px solid #e0e0d8;padding:10px 1.5rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.filters input,.filters select{padding:7px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;}
+.filters input{width:240px;}
+.main{display:flex;height:calc(100vh - 105px);overflow:hidden;}
+.sku-list{width:320px;flex-shrink:0;overflow-y:auto;border-right:1px solid #e0e0d8;background:#fff;}
+.sku-item{padding:12px 14px;border-bottom:1px solid #f0f0e8;cursor:pointer;transition:background 0.1s;}
+.sku-item:hover{background:#f8f8f4;}
+.sku-item.selected{background:#eef2ff;border-left:3px solid #2244cc;}
+.sku-detail{flex:1;overflow-y:auto;padding:1.5rem;}
+.card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
+.card-title{font-size:13px;font-weight:600;color:#1a1a2e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:1rem;padding-bottom:8px;border-bottom:1px solid #f0f0e8;}
+.badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500;}
+.badge-active{background:#e8f8e8;color:#1a7a1a;}
+.badge-draft{background:#f0f0e8;color:#888;}
+.badge-disc{background:#fff0f0;color:#b00;}
+.stat{background:#f8f8f4;border-radius:7px;padding:10px 12px;}
+.stat-label{font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;}
+.stat-val{font-size:16px;font-weight:700;}
+.dim-badge{font-size:10px;padding:2px 6px;border-radius:8px;}
+.dim-est{background:#fff8e0;color:#886600;}
+.dim-conf{background:#e8f8e8;color:#1a7a1a;}
+.dim-ver{background:#e8f0ff;color:#2244cc;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;padding:6px 10px;background:#f8f8f4;color:#888;font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;}
+td{padding:8px 10px;border-top:1px solid #f0f0e8;color:#1a1a2e;}
+.tab-row{display:flex;border-bottom:1px solid #e0e0d8;margin-bottom:1rem;}
+.stab{padding:8px 14px;font-size:12px;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.stab.on{color:#1a1a2e;border-bottom-color:#1a1a2e;font-weight:500;}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#bbb;gap:12px;}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-title">📦 SKU Library</div>
+  <div style="display:flex;gap:16px;align-items:center;">
+    <a href="setup.html">⚙ Setup</a>
+    <a href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="filters">
+  <input type="text" id="search" placeholder="Search model number or description..." oninput="filterSkus()" />
+  <select id="f-brand" onchange="filterSkus()"><option value="">All Brands</option></select>
+  <select id="f-category" onchange="filterSkus()"><option value="">All Categories</option></select>
+  <select id="f-status" onchange="filterSkus()">
+    <option value="">All Statuses</option>
+    <option value="active">Active</option>
+    <option value="draft">Draft</option>
+    <option value="discontinued">Discontinued</option>
+    <option value="archived">Archived</option>
+  </select>
+  <select id="f-customer" onchange="filterSkus()"><option value="">All Customers</option></select>
+  <span id="sku-count" style="font-size:12px;color:#888;margin-left:auto;"></span>
+</div>
+
+<div class="main">
+  <div class="sku-list" id="sku-list">
+    <div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">Loading...</div>
+  </div>
+  <div class="sku-detail" id="sku-detail">
+    <div class="empty">
+      <div style="font-size:40px;">📦</div>
+      <div>Select a SKU to view details</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+function g(id){return document.getElementById(id);}
+function h(url,opts){return fetch(url,Object.assign({headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}},opts||{}));}
+
+var allSkus=[], allBrands=[], allCats=[], allCusts=[];
+var currentSkuId=null;
+
+async function init(){
+  var urlParams=new URLSearchParams(window.location.search);
+  var preselect=urlParams.get('id');
+
+  var [sr,br,cr,cur]=await Promise.all([
+    h(SB+'/rest/v1/skus?select=*,brands(brand_name,brand_prefix),categories(category,sub_category,model_prefix)&order=model_number').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/brands?select=*&order=brand_name').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/categories?select=*&order=category').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/customers?select=*&order=customer_name').then(function(r){return r.json();})
+  ]);
+  allSkus=sr; allBrands=br; allCats=cr; allCusts=cur;
+
+  // Populate filter dropdowns
+  g('f-brand').innerHTML='<option value="">All Brands</option>'+br.map(function(b){return '<option value="'+b.id+'">'+b.brand_name+'</option>';}).join('');
+  g('f-category').innerHTML='<option value="">All Categories</option>'+cr.map(function(c){return '<option value="'+c.id+'">'+c.category+(c.sub_category?' › '+c.sub_category:'')+'</option>';}).join('');
+  g('f-customer').innerHTML='<option value="">All Customers</option>'+cur.map(function(c){return '<option value="'+c.id+'">'+c.customer_name+'</option>';}).join('');
+
+  filterSkus();
+  if(preselect)openSku(preselect);
+}
+
+function filterSkus(){
+  var search=(g('search').value||'').toLowerCase();
+  var brand=g('f-brand').value;
+  var cat=g('f-category').value;
+  var status=g('f-status').value;
+  var cust=g('f-customer').value;
+
+  var filtered=allSkus.filter(function(s){
+    if(search&&!(s.model_number||'').toLowerCase().includes(search)&&!(s.description||'').toLowerCase().includes(search))return false;
+    if(brand&&s.brand_id!==brand)return false;
+    if(cat&&s.category_id!==cat)return false;
+    if(status&&s.status!==status)return false;
+    if(cust&&s.customer_id!==cust)return false;
+    return true;
+  });
+
+  g('sku-count').textContent=filtered.length+' SKU'+(filtered.length===1?'':'s');
+
+  if(!filtered.length){
+    g('sku-list').innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No SKUs found.</div>';
+    return;
+  }
+
+  g('sku-list').innerHTML=filtered.map(function(s){
+    var b=s.brands||{};
+    var isSelected=s.id===currentSkuId;
+    var statusClass={active:'badge-active',draft:'badge-draft',discontinued:'badge-disc',archived:'badge-draft'}[s.status]||'badge-draft';
+    return '<div class="sku-item'+(isSelected?' selected':'')+'" data-sid="'+s.id+'" onclick="openSku(this.dataset.sid)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">'+
+        '<div style="font-size:12px;font-weight:600;font-family:monospace;color:#1a1a2e;">'+s.model_number+'</div>'+
+        '<span class="badge '+statusClass+'">'+s.status+'</span>'+
+      '</div>'+
+      '<div style="font-size:12px;color:#555;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.description+'</div>'+
+      '<div style="font-size:11px;color:#aaa;">'+(b.brand_name||'—')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function openSku(skuId){
+  currentSkuId=skuId;
+  filterSkus();
+  var detail=g('sku-detail');
+  detail.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
+
+  var [sr,pr,vr,fr,cr,ir,por,cor]=await Promise.all([
+    h(SB+'/rest/v1/skus?id=eq.'+skuId+'&select=*,brands(brand_name),categories(category,sub_category,sub_sub_category)').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/sku_packaging?sku_id=eq.'+skuId+'&select=*').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/sku_variations?sku_id=eq.'+skuId+'&select=*').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english)').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&select=*&order=created_at.desc&limit=5').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/inventory_positions?sku_id=eq.'+skuId+'&select=*,warehouses(name,type,city)').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/production_runs?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english)&order=created_at.desc&limit=10').then(function(r){return r.json();}),
+    h(SB+'/rest/v1/customer_order_lines?sku_id=eq.'+skuId+'&select=*,customer_orders(order_number,order_date,customers(customer_name))&order=created_at.desc&limit=10').then(function(r){return r.json();})
+  ]);
+
+  var sku=sr[0]; if(!sku)return;
+  var pkg=pr[0]||null;
+
+  var b=sku.brands||{};
+  var c=sku.categories||{};
+  var catStr=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+  var statusClass={active:'badge-active',draft:'badge-draft',discontinued:'badge-disc',archived:'badge-draft'}[sku.status]||'badge-draft';
+
+  // Total inventory
+  var totalOnHand=ir.reduce(function(sum,p){return sum+(p.qty_on_hand||0);},0);
+  var totalOnOrder=ir.reduce(function(sum,p){return sum+(p.qty_on_order||0);},0);
+  var totalInTransit=ir.reduce(function(sum,p){return sum+(p.qty_in_transit||0);},0);
+  var totalAvail=ir.reduce(function(sum,p){return sum+(p.qty_available||0);},0);
+
+  var latestCost=cr[0]||null;
+  var dimStatus=function(s){
+    var cls={estimated:'dim-est',factory_confirmed:'dim-conf',admin_verified:'dim-ver'}[s]||'dim-est';
+    var lbl={estimated:'Estimated',factory_confirmed:'Factory Confirmed',admin_verified:'Admin Verified'}[s]||s;
+    return '<span class="dim-badge '+cls+'">'+lbl+'</span>';
+  };
+
+  var html=
+    // Header
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;">'+
+      '<div>'+
+        '<div style="font-size:22px;font-weight:700;font-family:monospace;color:#1a1a2e;margin-bottom:4px;">'+sku.model_number+'</div>'+
+        '<div style="font-size:14px;color:#555;margin-bottom:8px;">'+sku.description+'</div>'+
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+          '<span class="badge '+statusClass+'">'+sku.status+'</span>'+
+          '<span style="font-size:11px;color:#888;">'+b.brand_name+'</span>'+
+          '<span style="font-size:11px;color:#bbb;">·</span>'+
+          '<span style="font-size:11px;color:#888;">'+catStr+'</span>'+
+          (sku.is_customer_specific?'<span class="badge" style="background:#e8f0ff;color:#2244cc;">'+sku.customer_suffix+'</span>':'')+
+          (sku.is_cosmetic?'<span class="badge" style="background:#fce8f0;color:#880044;">Cosmetic</span>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;">'+
+        '<a href="setup.html" style="padding:8px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;text-decoration:none;color:#555;">Edit SKU</a>'+
+      '</div>'+
+    '</div>'+
+
+    // Inventory snapshot
+    '<div class="card">'+
+      '<div class="card-title">Inventory Positions</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:'+(ir.length?'1rem':'0')+';">'+
+        '<div class="stat"><div class="stat-label">On Hand</div><div class="stat-val">'+totalOnHand.toLocaleString()+'</div></div>'+
+        '<div class="stat"><div class="stat-label">Available</div><div class="stat-val" style="color:'+(totalAvail>0?'#1a7a1a':'#b00')+'">'+totalAvail.toLocaleString()+'</div></div>'+
+        '<div class="stat"><div class="stat-label">On Order</div><div class="stat-val">'+totalOnOrder.toLocaleString()+'</div></div>'+
+        '<div class="stat"><div class="stat-label">In Transit</div><div class="stat-val">'+totalInTransit.toLocaleString()+'</div></div>'+
+      '</div>'+
+      (ir.length?
+        '<table><thead><tr><th>Warehouse</th><th>Type</th><th>On Hand</th><th>Reserved</th><th>Available</th><th>In Transit</th></tr></thead><tbody>'+
+        ir.map(function(p){
+          var w=p.warehouses||{};
+          return '<tr>'+
+            '<td>'+w.name+'</td>'+
+            '<td><span class="badge" style="background:#f5f5f0;color:#888;">'+w.type+'</span></td>'+
+            '<td>'+p.qty_on_hand+'</td>'+
+            '<td>'+p.qty_reserved+'</td>'+
+            '<td style="font-weight:500;color:'+(p.qty_available>0?'#1a7a1a':'#b00')+'">'+p.qty_available+'</td>'+
+            '<td>'+p.qty_in_transit+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'
+      :'<div style="font-size:13px;color:#bbb;">No inventory positions yet.</div>')+
+    '</div>'+
+
+    // Costing
+    '<div class="card">'+
+      '<div class="card-title">Current Costing</div>'+
+      (latestCost?
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1rem;">'+
+          '<div class="stat"><div class="stat-label">FOB Price</div><div class="stat-val">$'+parseFloat(latestCost.fob_price).toFixed(2)+'</div></div>'+
+          '<div class="stat"><div class="stat-label">Landed Cost</div><div class="stat-val">'+(latestCost.landed_cost?'$'+parseFloat(latestCost.landed_cost).toFixed(2):'—')+'</div></div>'+
+          '<div class="stat"><div class="stat-label">Wholesale</div><div class="stat-val">'+(latestCost.wholesale_price?'$'+parseFloat(latestCost.wholesale_price).toFixed(2):'—')+'</div></div>'+
+          '<div class="stat"><div class="stat-label">Retail</div><div class="stat-val">'+(latestCost.retail_price?'$'+parseFloat(latestCost.retail_price).toFixed(2):'—')+'</div></div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'+
+          '<div class="stat"><div class="stat-label">Gross Margin</div><div class="stat-val" style="color:'+(latestCost.gross_margin_pct>=35?'#1a7a1a':'#b00')+'">'+(latestCost.gross_margin_pct?latestCost.gross_margin_pct.toFixed(1)+'%':'—')+'</div></div>'+
+          '<div class="stat"><div class="stat-label">Net Margin</div><div class="stat-val" style="color:'+(latestCost.net_margin_pct>=25?'#1a7a1a':'#b00')+'">'+(latestCost.net_margin_pct?latestCost.net_margin_pct.toFixed(1)+'%':'—')+'</div></div>'+
+          '<div class="stat"><div class="stat-label">Total Deductions</div><div class="stat-val">'+(latestCost.total_deductions_pct?latestCost.total_deductions_pct.toFixed(1)+'%':'—')+'</div></div>'+
+        '</div>'
+      :'<div style="font-size:13px;color:#bbb;">No costing data yet.</div>')+
+    '</div>'+
+
+    // Packaging
+    '<div class="card">'+
+      '<div class="card-title">Packaging & Dimensions</div>'+
+      (pkg?
+        '<table><thead><tr><th>Level</th><th>Qty</th><th>L × W × H (cm)</th><th>Weight (kg)</th><th>CBM</th><th>Status</th></tr></thead><tbody>'+
+        '<tr><td>Unit</td><td>1</td><td>'+(pkg.unit_length_cm?pkg.unit_length_cm+' × '+pkg.unit_width_cm+' × '+pkg.unit_height_cm:'—')+'</td><td>'+(pkg.unit_weight_kg||'—')+'</td><td>'+(pkg.unit_cbm||'—')+'</td><td>'+dimStatus(pkg.unit_dim_status)+'</td></tr>'+
+        (sku.has_inner_carton?'<tr><td>Inner</td><td>'+(pkg.inner_qty||'—')+'</td><td>'+(pkg.inner_length_cm?pkg.inner_length_cm+' × '+pkg.inner_width_cm+' × '+pkg.inner_height_cm:'—')+'</td><td>'+(pkg.inner_weight_kg||'—')+'</td><td>'+(pkg.inner_cbm||'—')+'</td><td>'+dimStatus(pkg.inner_dim_status)+'</td></tr>':'')+
+        '<tr><td>Master</td><td>'+(pkg.master_qty||'—')+'</td><td>'+(pkg.master_length_cm?pkg.master_length_cm+' × '+pkg.master_width_cm+' × '+pkg.master_height_cm:'—')+'</td><td>'+(pkg.master_weight_kg||'—')+'</td><td>'+(pkg.master_cbm||'—')+'</td><td>'+dimStatus(pkg.master_dim_status)+'</td></tr>'+
+        (sku.has_pallet?'<tr><td>Pallet</td><td>'+(pkg.pallet_qty||'—')+'</td><td>'+(pkg.pallet_length_cm?pkg.pallet_length_cm+' × '+pkg.pallet_width_cm+' × '+pkg.pallet_height_cm:'—')+'</td><td>'+(pkg.pallet_weight_kg||'—')+'</td><td>'+(pkg.pallet_cbm||'—')+'</td><td>'+dimStatus(pkg.pallet_dim_status)+'</td></tr>':'')+
+        '</tbody></table>'
+      :'<div style="font-size:13px;color:#bbb;">No packaging data yet.</div>')+
+    '</div>'+
+
+    // Variations
+    (vr.length?
+      '<div class="card">'+
+        '<div class="card-title">Variations</div>'+
+        '<table><thead><tr><th>Type</th><th>Value</th><th>Model Number</th><th>Unit UPC</th></tr></thead><tbody>'+
+        vr.map(function(v){
+          return '<tr>'+
+            '<td>'+v.variation_type+'</td>'+
+            '<td>'+v.variation_value+'</td>'+
+            '<td style="font-family:monospace;font-size:11px;">'+v.model_number_full+'</td>'+
+            '<td style="font-family:monospace;font-size:11px;">'+(v.upc_unit||'Pending')+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'+
+      '</div>'
+    :'')+
+
+    // Factory Sources
+    '<div class="card">'+
+      '<div class="card-title">Factory Sources</div>'+
+      (fr.length?
+        '<table><thead><tr><th>Factory</th><th>FOB Price</th><th>Status</th><th>Effective</th></tr></thead><tbody>'+
+        fr.map(function(s){
+          var f=s.factories||{};
+          var statusColor={active:'#e8f8e8',backup:'#fff8e0',discontinued:'#fff0f0'}[s.status]||'#f5f5f0';
+          return '<tr>'+
+            '<td>'+f.factory_name_english+'</td>'+
+            '<td>'+(s.fob_price?'$'+parseFloat(s.fob_price).toFixed(2):'—')+'</td>'+
+            '<td><span style="font-size:11px;padding:2px 7px;border-radius:8px;background:'+statusColor+';">'+s.status+'</span></td>'+
+            '<td style="font-size:11px;color:#888;">'+(s.effective_date||'—')+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'
+      :'<div style="font-size:13px;color:#bbb;">No factory sources yet.</div>')+
+    '</div>'+
+
+    // Production Runs
+    '<div class="card">'+
+      '<div class="card-title">Production Runs</div>'+
+      (por.length?
+        '<table><thead><tr><th>Run Number</th><th>Factory</th><th>Qty</th><th>Production Date</th><th>Expiry</th><th>Status</th></tr></thead><tbody>'+
+        por.map(function(r){
+          var f=r.factories||{};
+          var statusColor={planned:'#f0f0e8',in_production:'#e8f0ff',qc:'#fff8e0',ready:'#e8f8e8',shipped:'#e0f0ff',received:'#e8f8e8',cancelled:'#fff0f0'}[r.status]||'#f5f5f0';
+          return '<tr>'+
+            '<td style="font-family:monospace;font-size:11px;">'+r.run_number+'</td>'+
+            '<td>'+f.factory_name_english+'</td>'+
+            '<td>'+r.qty_ordered.toLocaleString()+'</td>'+
+            '<td style="font-size:11px;">'+(r.production_date||'—')+'</td>'+
+            '<td style="font-size:11px;color:'+(r.expiry_date?'#b00':'#aaa')+'">'+(r.expiry_date||'—')+'</td>'+
+            '<td><span style="font-size:11px;padding:2px 7px;border-radius:8px;background:'+statusColor+';">'+r.status+'</span></td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'
+      :'<div style="font-size:13px;color:#bbb;">No production runs yet.</div>')+
+    '</div>'+
+
+    // Sales History
+    '<div class="card">'+
+      '<div class="card-title">Sales History</div>'+
+      (cor.length?
+        '<table><thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>'+
+        cor.map(function(l){
+          var o=l.customer_orders||{};
+          var c=o.customers||{};
+          return '<tr>'+
+            '<td style="font-family:monospace;font-size:11px;">'+(o.order_number||'—')+'</td>'+
+            '<td>'+(c.customer_name||'—')+'</td>'+
+            '<td style="font-size:11px;">'+(o.order_date||'—')+'</td>'+
+            '<td>'+l.qty_ordered.toLocaleString()+'</td>'+
+            '<td>$'+parseFloat(l.unit_price).toFixed(2)+'</td>'+
+            '<td style="font-weight:500;">$'+parseFloat(l.total_price||0).toFixed(2)+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>'
+      :'<div style="font-size:13px;color:#bbb;">No sales history yet.</div>')+
+    '</div>';
+
+  detail.innerHTML=html;
+}
+
+init();
+</script>
+</body>
+</html>

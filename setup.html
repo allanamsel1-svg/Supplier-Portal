@@ -91,6 +91,7 @@
   <div class="tab on" onclick="switchTab('categories')">📂 Categories</div>
   <div class="tab" onclick="switchTab('brands')">🏷 Brands</div>
   <div class="tab" onclick="switchTab('customers')">🛒 Customers</div>
+  <div class="tab" onclick="switchTab('skus');loadSkuTab();">📦 SKUs</div>
 </div>
 
 <!-- ══════════════════════════════════════ -->
@@ -671,6 +672,472 @@ async function deleteDept(id){
 
 // Load categories on page open
 loadCats();
+// ── SKU TAB ──
+var allSkus=[];
+var currentSkuId=null;
+
+async function loadSkuTab(){
+  try{
+    var r=await fetch(SB+'/rest/v1/skus?select=*,brands(brand_name,brand_prefix),categories(category,sub_category,sub_sub_category,model_prefix)&order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok)return;
+    allSkus=await r.json();
+    renderSkuList();
+  }catch(e){console.log('loadSkuTab error:',e);}
+}
+
+function renderSkuList(){
+  var el=g('sku-list');if(!el)return;
+  var search=(g('sku-search').value||'').toLowerCase();
+  var filtered=allSkus.filter(function(s){
+    return !search||(s.model_number||'').toLowerCase().includes(search)||(s.description||'').toLowerCase().includes(search);
+  });
+  if(!filtered.length){el.innerHTML='<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;">No SKUs found.</div>';return;}
+  el.innerHTML=filtered.map(function(s){
+    var isSelected=s.id===currentSkuId;
+    var statusColor={active:'#e8f8e8',draft:'#f0f0e8',discontinued:'#fff0f0',archived:'#f5f5f0'}[s.status]||'#f5f5f0';
+    return '<div data-sid="'+s.id+'" onclick="openSkuForm(this.dataset.sid)" style="padding:10px 12px;border-radius:8px;cursor:pointer;margin-bottom:4px;background:'+(isSelected?'#eef2ff':'#f8f8f4')+';border:1px solid '+(isSelected?'#c0d0f0':'#e8e8e0')+';">'+
+      '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+s.model_number+'</div>'+
+      '<div style="font-size:11px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.description+'</div>'+
+      '<div style="margin-top:4px;display:flex;gap:4px;">'+
+        '<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:'+statusColor+';color:#555;">'+s.status+'</span>'+
+        (s.is_customer_specific?'<span style="font-size:10px;padding:2px 6px;border-radius:8px;background:#e8f0ff;color:#2244cc;">'+s.customer_suffix+'</span>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function openSkuForm(skuId){
+  currentSkuId=skuId;
+  renderSkuList();
+  var area=g('sku-form-area');
+  area.innerHTML='<div style="padding:1.5rem;font-size:13px;color:#bbb;">Loading...</div>';
+
+  var sku=null;
+  var packaging=null;
+  var variations=[];
+  var sources=[];
+  var costing=null;
+
+  if(skuId){
+    try{
+      var r=await fetch(SB+'/rest/v1/skus?id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var rows=await r.json();sku=rows[0]||null;
+      var pr=await fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var prows=await pr.json();packaging=prows[0]||null;
+      var vr=await fetch(SB+'/rest/v1/sku_variations?sku_id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      variations=await vr.json();
+      var sr=await fetch(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english),rfq_quotes(unit_fob_price,quote_option)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      sources=await sr.json();
+      var cr=await fetch(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&select=*&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var crows=await cr.json();costing=crows[0]||null;
+    }catch(e){console.log('load sku error:',e);}
+  }
+
+  renderSkuForm(sku,packaging,variations,sources,costing);
+}
+
+function renderSkuForm(sku,packaging,variations,sources,costing){
+  var area=g('sku-form-area');
+  var isNew=!sku;
+
+  // Build brand options
+  var brandOpts=allBrands.map(function(b){return '<option value="'+b.id+'" data-prefix="'+b.brand_prefix+'"'+(sku&&sku.brand_id===b.id?' selected':'')+'>'+b.brand_name+'</option>';}).join('');
+  // Build category options
+  var catOpts=allCats.map(function(c){var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');return '<option value="'+c.id+'" data-prefix="'+c.model_prefix+'"'+(sku&&sku.category_id===c.id?' selected':'')+'>'+path+'</option>';}).join('');
+  // Build customer options
+  var custOpts=allCusts.map(function(c){return '<option value="'+c.id+'" data-suffix="'+(c.customer_suffix||'')+'"'+(sku&&sku.customer_id===c.id?' selected':'')+'>'+c.customer_name+'</option>';}).join('');
+  // Warehouse options
+  var whOpts='<option value="">— Select warehouse —</option>';
+
+  var html=
+    '<div style="padding:1.5rem;">'+
+    // Header
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">'+
+      '<div>'+
+        '<div style="font-size:18px;font-weight:700;color:#1a1a2e;">'+(isNew?'New SKU':sku.model_number)+'</div>'+
+        '<div style="font-size:13px;color:#888;">'+(isNew?'Fill in details below':sku.description)+'</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;">'+
+        (!isNew?'<button data-skuid="'+sku.id+'" onclick="duplicateSku(this.dataset.skuid)" style="padding:8px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">⧉ Duplicate</button>':'')+''+
+        (!isNew?'<a href="skus.html?id='+sku.id+'" target="_blank" style="padding:8px 14px;background:#f0f4ff;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;cursor:pointer;text-decoration:none;color:#2244cc;">View in Library →</a>':'')+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 1: Basic Info ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Basic Information</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">'+
+        '<div class="f"><label>Brand *</label><select id="sf-brand" onchange="generateModelNumber()">'+'<option value="">— Select Brand —</option>'+brandOpts+'</select></div>'+
+        '<div class="f"><label>Category *</label><select id="sf-category" onchange="generateModelNumber()">'+'<option value="">— Select Category —</option>'+catOpts+'</select></div>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">'+
+        '<div class="f"><label>Model Number</label><input type="text" id="sf-model" value="'+(sku?sku.model_number:'')+'" placeholder="Auto-generated" style="font-family:monospace;" /></div>'+
+        '<div class="f"><label>Status</label><select id="sf-status"><option value="draft"'+(sku&&sku.status==="draft"?" selected":"")+'>Draft</option><option value="active"'+((!sku||sku.status==="active")?" selected":"")+'>Active</option><option value="discontinued"'+(sku&&sku.status==="discontinued"?" selected":"")+'>Discontinued</option><option value="archived"'+(sku&&sku.status==="archived"?" selected":"")+'>Archived</option></select></div>'+
+        '<div class="f"><label>Shelf Life (days)</label><input type="number" id="sf-shelf" value="'+(sku&&sku.shelf_life_days?sku.shelf_life_days:'')+'" placeholder="e.g. 730" /></div>'+
+      '</div>'+
+      '<div class="f"><label>Description *</label><input type="text" id="sf-desc" value="'+(sku?sku.description:'')+'" placeholder="e.g. 100ml Facial Moisturizer with SPF 30" /></div>'+
+      '<div class="f"><label>Detailed Description</label><textarea id="sf-detail" rows="2">'+(sku&&sku.detailed_description?sku.detailed_description:'')+'</textarea></div>'+
+      '<div style="display:flex;gap:16px;margin-top:8px;">'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-cosmetic"'+(sku&&sku.is_cosmetic?' checked':'')+' /> Cosmetic product</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-inner"'+((!sku||sku.has_inner_carton)?' checked':'')+' onchange="toggleInner(this.checked)" /> Has inner carton</label>'+
+        '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="checkbox" id="sf-pallet"'+(sku&&sku.has_pallet?' checked':'')+' onchange="togglePallet(this.checked)" /> Has pallet</label>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 2: Customer Specific ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Customer Assignment</div>'+
+      '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:10px;">'+
+        '<input type="checkbox" id="sf-cust-specific"'+(sku&&sku.is_customer_specific?' checked':'')+' onchange="toggleCustSpecific(this.checked)" />'+
+        'This item is customer-specific (gets a customer suffix on the model number)'+
+      '</label>'+
+      '<div id="sf-cust-section" style="display:'+(sku&&sku.is_customer_specific?'block':'none')+';">'+
+        '<div class="f"><label>Customer *</label><select id="sf-customer" onchange="updateCustSuffix()">'+'<option value="">— Select Customer —</option>'+custOpts+'</select></div>'+
+        '<div class="f"><label>Customer Suffix (auto-filled)</label><input type="text" id="sf-cust-suffix" value="'+(sku&&sku.customer_suffix?sku.customer_suffix:'')+'" placeholder="e.g. WM" style="font-family:monospace;" /></div>'+
+        '<div style="font-size:12px;color:#888;">Full model number will be: <span id="sf-model-preview" style="font-family:monospace;font-weight:600;color:#1a1a2e;"></span></div>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 3: Packaging & Dimensions ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Packaging & Dimensions</div>'+
+      // Unit
+      '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Unit</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
+        '<div class="f"><label>L (cm)</label><input type="number" id="pk-ul" step="0.1" value="'+(packaging&&packaging.unit_length_cm?packaging.unit_length_cm:'')+'" /></div>'+
+        '<div class="f"><label>W (cm)</label><input type="number" id="pk-uw" step="0.1" value="'+(packaging&&packaging.unit_width_cm?packaging.unit_width_cm:'')+'" /></div>'+
+        '<div class="f"><label>H (cm)</label><input type="number" id="pk-uh" step="0.1" value="'+(packaging&&packaging.unit_height_cm?packaging.unit_height_cm:'')+'" /></div>'+
+        '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-uwt" step="0.001" value="'+(packaging&&packaging.unit_weight_kg?packaging.unit_weight_kg:'')+'" /></div>'+
+        '<div class="f"><label>Status</label>'+
+          '<select id="pk-ust">'+
+            '<option value="estimated"'+((!packaging||packaging.unit_dim_status==="estimated")?" selected":"")+'>Estimated</option>'+
+            '<option value="factory_confirmed"'+(packaging&&packaging.unit_dim_status==="factory_confirmed"?" selected":"")+'>Factory Confirmed</option>'+
+            '<option value="admin_verified"'+(packaging&&packaging.unit_dim_status==="admin_verified"?" selected":"")+'>Admin Verified</option>'+
+          '</select>'+
+        '</div>'+
+      '</div>'+
+      '<button data-level="unit" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 10px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;margin-bottom:12px;">✉ Request factory confirmation</button>'+
+
+      // Inner
+      '<div id="pk-inner-section">'+
+        '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Inner Carton</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
+          '<div class="f"><label>Qty/Inner</label><input type="number" id="pk-iq" value="'+(packaging&&packaging.inner_qty?packaging.inner_qty:'')+'" /></div>'+
+          '<div class="f"><label>L (cm)</label><input type="number" id="pk-il" step="0.1" value="'+(packaging&&packaging.inner_length_cm?packaging.inner_length_cm:'')+'" /></div>'+
+          '<div class="f"><label>W (cm)</label><input type="number" id="pk-iw" step="0.1" value="'+(packaging&&packaging.inner_width_cm?packaging.inner_width_cm:'')+'" /></div>'+
+          '<div class="f"><label>H (cm)</label><input type="number" id="pk-ih" step="0.1" value="'+(packaging&&packaging.inner_height_cm?packaging.inner_height_cm:'')+'" /></div>'+
+          '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-iwt" step="0.001" value="'+(packaging&&packaging.inner_weight_kg?packaging.inner_weight_kg:'')+'" /></div>'+
+          '<div class="f"><label>Status</label><select id="pk-ist"><option value="estimated"'+((!packaging||packaging.inner_dim_status==="estimated")?" selected":"")+'>Estimated</option><option value="factory_confirmed"'+(packaging&&packaging.inner_dim_status==="factory_confirmed"?" selected":"")+'>Factory Confirmed</option><option value="admin_verified"'+(packaging&&packaging.inner_dim_status==="admin_verified"?" selected":"")+'>Admin Verified</option></select></div>'+
+        '</div>'+
+        '<button data-level="inner" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 10px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;margin-bottom:12px;">✉ Request factory confirmation</button>'+
+      '</div>'+
+
+      // Master
+      '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Master Carton</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:4px;">'+
+        '<div class="f"><label>Qty/Master</label><input type="number" id="pk-mq" value="'+(packaging&&packaging.master_qty?packaging.master_qty:'')+'" /></div>'+
+        '<div class="f"><label>L (cm)</label><input type="number" id="pk-ml" step="0.1" value="'+(packaging&&packaging.master_length_cm?packaging.master_length_cm:'')+'" /></div>'+
+        '<div class="f"><label>W (cm)</label><input type="number" id="pk-mw" step="0.1" value="'+(packaging&&packaging.master_width_cm?packaging.master_width_cm:'')+'" /></div>'+
+        '<div class="f"><label>H (cm)</label><input type="number" id="pk-mh" step="0.1" value="'+(packaging&&packaging.master_height_cm?packaging.master_height_cm:'')+'" /></div>'+
+        '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-mwt" step="0.001" value="'+(packaging&&packaging.master_weight_kg?packaging.master_weight_kg:'')+'" /></div>'+
+        '<div class="f"><label>Status</label><select id="pk-mst"><option value="estimated"'+((!packaging||packaging.master_dim_status==="estimated")?" selected":"")+'>Estimated</option><option value="factory_confirmed"'+(packaging&&packaging.master_dim_status==="factory_confirmed"?" selected":"")+'>Factory Confirmed</option><option value="admin_verified"'+(packaging&&packaging.master_dim_status==="admin_verified"?" selected":"")+'>Admin Verified</option></select></div>'+
+      '</div>'+
+      '<button data-level="master" onclick="requestDimConfirmation(this.dataset.level)" style="font-size:11px;padding:4px 10px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;margin-bottom:12px;">✉ Request factory confirmation</button>'+
+
+      // Pallet
+      '<div id="pk-pallet-section" style="display:'+(sku&&sku.has_pallet?'block':'none')+';">'+
+        '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Pallet</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px;">'+
+          '<div class="f"><label>Qty/Pallet</label><input type="number" id="pk-pq" value="'+(packaging&&packaging.pallet_qty?packaging.pallet_qty:'')+'" /></div>'+
+          '<div class="f"><label>L (cm)</label><input type="number" id="pk-pl" step="0.1" value="'+(packaging&&packaging.pallet_length_cm?packaging.pallet_length_cm:'')+'" /></div>'+
+          '<div class="f"><label>W (cm)</label><input type="number" id="pk-pw" step="0.1" value="'+(packaging&&packaging.pallet_width_cm?packaging.pallet_width_cm:'')+'" /></div>'+
+          '<div class="f"><label>H (cm)</label><input type="number" id="pk-ph" step="0.1" value="'+(packaging&&packaging.pallet_height_cm?packaging.pallet_height_cm:'')+'" /></div>'+
+          '<div class="f"><label>Weight (kg)</label><input type="number" id="pk-pwt" step="0.001" value="'+(packaging&&packaging.pallet_weight_kg?packaging.pallet_weight_kg:'')+'" /></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 4: Factory Sources ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Factory Sources <span style="font-size:11px;color:#888;font-weight:400;">(only factories with accepted quotes)</span></div>'+
+      '<div id="sf-sources">'+
+        sources.map(function(s){
+          var f=s.factories||{};var q=s.rfq_quotes||{};
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:6px;">'+
+            '<div>'+
+              '<div style="font-size:13px;font-weight:500;">'+f.factory_name_english+'</div>'+
+              '<div style="font-size:11px;color:#888;">FOB $'+parseFloat(s.fob_price||0).toFixed(2)+' · '+s.status+'</div>'+
+            '</div>'+
+            '<select data-sid="'+s.id+'" onchange="updateSourceStatus(this)" style="font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;">'+
+              '<option value="active"'+(s.status==="active"?" selected":"")+'>Active</option>'+
+              '<option value="backup"'+(s.status==="backup"?" selected":"")+'>Backup</option>'+
+              '<option value="discontinued"'+(s.status==="discontinued"?" selected":"")+'>Discontinued</option>'+
+            '</select>'+
+          '</div>';
+        }).join('')+
+        '<div style="font-size:12px;color:#888;margin-top:6px;">Factory sources are added automatically when a quote is accepted for this SKU.</div>'+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 5: Variations ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Variations <button onclick="addVariationRow()" style="font-size:11px;padding:3px 8px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;cursor:pointer;">+ Add</button></div>'+
+      '<div id="sf-variations">'+
+        (variations.length?
+          variations.map(function(v){
+            return '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;">'+
+              '<div class="f"><label>Type</label><input type="text" value="'+v.variation_type+'" style="font-size:12px;" /></div>'+
+              '<div class="f"><label>Value</label><input type="text" value="'+v.variation_value+'" style="font-size:12px;" /></div>'+
+              '<div class="f"><label>Suffix</label><input type="text" value="'+v.model_suffix+'" style="font-family:monospace;font-size:12px;" /></div>'+
+              '<div class="f"><label>Full Model#</label><input type="text" value="'+v.model_number_full+'" readonly style="background:#f5f5f0;font-family:monospace;font-size:12px;" /></div>'+
+              '<div style="padding-bottom:2px;"><span style="font-size:11px;color:#1a7a1a;">UPC assigned</span></div>'+
+            '</div>';
+          }).join('')
+        :'<div style="font-size:13px;color:#bbb;">No variations. Click + Add to add colors/sizes.</div>')+
+      '</div>'+
+    '</div>'+
+
+    // ── Section 6: Costing ──
+    '<div class="card" style="margin-bottom:1rem;">'+
+      '<div class="card-title">Current Costing</div>'+
+      (costing?
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
+          '<div style="background:#f8f8f4;border-radius:7px;padding:10px;"><div style="font-size:10px;color:#aaa;">FOB Price</div><div style="font-size:15px;font-weight:600;">$'+parseFloat(costing.fob_price).toFixed(2)+'</div></div>'+
+          '<div style="background:#f8f8f4;border-radius:7px;padding:10px;"><div style="font-size:10px;color:#aaa;">Landed Cost</div><div style="font-size:15px;font-weight:600;">'+(costing.landed_cost?'$'+parseFloat(costing.landed_cost).toFixed(2):'—')+'</div></div>'+
+          '<div style="background:#f8f8f4;border-radius:7px;padding:10px;"><div style="font-size:10px;color:#aaa;">Gross Margin</div><div style="font-size:15px;font-weight:600;color:'+(costing.gross_margin_pct&&costing.gross_margin_pct>35?'#1a7a1a':'#b00')+'">'+(costing.gross_margin_pct?costing.gross_margin_pct.toFixed(1)+'%':'—')+'</div></div>'+
+          '<div style="background:#f8f8f4;border-radius:7px;padding:10px;"><div style="font-size:10px;color:#aaa;">Net Margin</div><div style="font-size:15px;font-weight:600;color:'+(costing.net_margin_pct&&costing.net_margin_pct>25?'#1a7a1a':'#b00')+'">'+(costing.net_margin_pct?costing.net_margin_pct.toFixed(1)+'%':'—')+'</div></div>'+
+        '</div>'
+      :'<div style="font-size:13px;color:#bbb;">No costing data yet. Will be populated from accepted quote.</div>')+
+    '</div>'+
+
+    // Save button
+    '<div style="display:flex;gap:10px;align-items:center;margin-bottom:2rem;">'+
+      '<button onclick="saveSku()" style="padding:11px 24px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Save SKU</button>'+
+      '<span id="sku-save-msg" style="font-size:13px;"></span>'+
+    '</div>'+
+  '</div>';
+
+  area.innerHTML=html;
+  updateModelPreview();
+}
+
+function generateModelNumber(){
+  var brandSel=g('sf-brand');
+  var catSel=g('sf-category');
+  if(!brandSel||!catSel)return;
+  var brandOpt=brandSel.options[brandSel.selectedIndex];
+  var catOpt=catSel.options[catSel.selectedIndex];
+  var brandPrefix=brandOpt?brandOpt.dataset.prefix:'';
+  var catPrefix=catOpt?catOpt.dataset.prefix:'';
+  if(!brandPrefix||!catPrefix)return;
+  // Check existing model numbers to get next sequence
+  var existing=allSkus.filter(function(s){return s.brand_prefix===brandPrefix&&s.category_prefix===catPrefix;});
+  var nextSeq=existing.length+1;
+  var modelNum=brandPrefix+'-'+catPrefix+'-'+String(nextSeq).padStart(4,'0');
+  var modelEl=g('sf-model');
+  if(modelEl&&!currentSkuId)modelEl.value=modelNum;
+  updateModelPreview();
+}
+
+function updateModelPreview(){
+  var modelEl=g('sf-model');
+  var suffixEl=g('sf-cust-suffix');
+  var previewEl=g('sf-model-preview');
+  if(!modelEl||!previewEl)return;
+  var base=modelEl.value||'BB-SKC-0001';
+  var suffix=suffixEl?suffixEl.value:'';
+  previewEl.textContent=suffix?base+'-'+suffix:base;
+}
+
+function toggleCustSpecific(checked){
+  var section=g('sf-cust-section');
+  if(section)section.style.display=checked?'block':'none';
+}
+
+function updateCustSuffix(){
+  var sel=g('sf-customer');
+  if(!sel)return;
+  var opt=sel.options[sel.selectedIndex];
+  var suffix=opt?opt.dataset.suffix:'';
+  // Auto-generate suffix from customer name if not set
+  if(!suffix&&opt&&opt.text){
+    var words=opt.text.split(' ');
+    suffix=words.map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,3);
+  }
+  var suffixEl=g('sf-cust-suffix');
+  if(suffixEl)suffixEl.value=suffix;
+  updateModelPreview();
+}
+
+function toggleInner(checked){
+  var section=g('pk-inner-section');
+  if(section)section.style.display=checked?'block':'none';
+}
+
+function togglePallet(checked){
+  var section=g('pk-pallet-section');
+  if(section)section.style.display=checked?'block':'none';
+}
+
+function addVariationRow(){
+  var el=g('sf-variations');
+  if(!el)return;
+  var modelBase=g('sf-model')?g('sf-model').value:'';
+  // Clear "no variations" message
+  if(el.innerHTML.includes('No variations'))el.innerHTML='';
+  var row=document.createElement('div');
+  row.style.cssText='display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px;';
+  row.innerHTML=
+    '<div class="f"><label>Type (e.g. Color)</label><input type="text" class="var-type" placeholder="Color" style="font-size:12px;" /></div>'+
+    '<div class="f"><label>Value (e.g. Black)</label><input type="text" class="var-value" placeholder="Black" style="font-size:12px;" onchange="updateVarModel(this)" /></div>'+
+    '<div class="f"><label>Suffix</label><input type="text" class="var-suffix" placeholder="-BK" style="font-family:monospace;font-size:12px;" oninput="updateVarModel(this)" /></div>'+
+    '<div class="f"><label>Full Model#</label><input type="text" class="var-model" readonly style="background:#f5f5f0;font-family:monospace;font-size:12px;" value="'+modelBase+'" /></div>'+
+    '<div style="padding-bottom:2px;"><button class="rm-var-row" style="padding:6px 8px;background:#fff0f0;border:1px solid #fdd;border-radius:5px;cursor:pointer;font-size:12px;">✕</button></div>';
+  el.appendChild(row);
+  row.querySelector('.rm-var-row').addEventListener('click',function(){row.remove();});
+}
+
+function updateVarModel(input){
+  var row=input.closest('div[style*="grid"]');
+  var suffix=row.querySelector('.var-suffix').value;
+  var modelBase=g('sf-model')?g('sf-model').value:'';
+  var fullModel=row.querySelector('.var-model');
+  if(fullModel)fullModel.value=suffix?modelBase+suffix:modelBase;
+}
+
+async function requestDimConfirmation(level){
+  if(!currentSkuId){alert('Please save the SKU first.');return;}
+  // Find factory source
+  var sr=await fetch(SB+'/rest/v1/sku_factory_sources?sku_id=eq.'+currentSkuId+'&status=eq.active&select=*,factories(factory_name_english,sales_email,sales_contact_name)&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  var sources=await sr.json();
+  if(!sources.length){alert('No active factory source found for this SKU.');return;}
+  var factory=sources[0].factories||{};
+  if(!factory.sales_email){alert('Factory has no email address.');return;}
+  var levelLabel={unit:'Unit',inner:'Inner Carton',master:'Master Carton',pallet:'Pallet'}[level]||level;
+  var skuModel=g('sf-model')?g('sf-model').value:'';
+  var firstName=(factory.sales_contact_name||'Team').split(' ')[0];
+  var body='Dear '+firstName+', We need you to confirm the '+levelLabel+' dimensions for SKU: '+skuModel+'. Please log into our supplier portal: https://project-7o416.vercel.app Best regards, Allan Amsel, TBG Sourcing';
+  await sendEmail(factory.sales_email,factory.sales_contact_name,'Dimension Confirmation Required — '+skuModel,body,'sourcing@tbgsourcing.net');
+  alert('✓ Confirmation request sent to '+factory.sales_email);
+}
+
+async function updateSourceStatus(sel){
+  var sid=sel.dataset.sid;
+  var status=sel.value;
+  await fetch(SB+'/rest/v1/sku_factory_sources?id=eq.'+sid,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:status})});
+}
+
+async function saveSku(){
+  var brand=g('sf-brand').value;
+  var category=g('sf-category').value;
+  var model=g('sf-model').value.trim();
+  var desc=g('sf-desc').value.trim();
+  if(!brand||!category||!model||!desc){alert('Please fill in Brand, Category, Model Number and Description.');return;}
+
+  var brandOpt=g('sf-brand').options[g('sf-brand').selectedIndex];
+  var catOpt=g('sf-category').options[g('sf-category').selectedIndex];
+  var isCustSpecific=g('sf-cust-specific').checked;
+  var custId=isCustSpecific&&g('sf-customer')?g('sf-customer').value:null;
+  var custSuffix=isCustSpecific&&g('sf-cust-suffix')?g('sf-cust-suffix').value.trim():null;
+  var fullModel=isCustSpecific&&custSuffix?model+'-'+custSuffix:model;
+
+  var skuPayload={
+    model_number:fullModel,
+    brand_prefix:brandOpt?brandOpt.dataset.prefix:'',
+    category_prefix:catOpt?catOpt.dataset.prefix:'',
+    sequence_number:parseInt(model.split('-').pop())||1,
+    description:desc,
+    detailed_description:g('sf-detail')?g('sf-detail').value.trim()||null:null,
+    brand_id:brand||null,
+    category_id:category||null,
+    is_customer_specific:isCustSpecific,
+    customer_id:custId||null,
+    customer_suffix:custSuffix||null,
+    shelf_life_days:g('sf-shelf')&&g('sf-shelf').value?parseInt(g('sf-shelf').value):null,
+    is_cosmetic:g('sf-cosmetic').checked,
+    has_inner_carton:g('sf-inner').checked,
+    has_pallet:g('sf-pallet').checked,
+    status:g('sf-status').value
+  };
+
+  var msgEl=g('sku-save-msg');
+  if(msgEl){msgEl.textContent='Saving...';msgEl.style.color='#888';}
+
+  try{
+    var url=currentSkuId?SB+'/rest/v1/skus?id=eq.'+currentSkuId:SB+'/rest/v1/skus';
+    var method=currentSkuId?'PATCH':'POST';
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||e.details||r.status);}
+    var result=await r.json();
+    var saved=Array.isArray(result)?result[0]:result;
+    if(saved&&!currentSkuId)currentSkuId=saved.id;
+
+    // Save packaging
+    var packPayload={
+      sku_id:currentSkuId,
+      unit_length_cm:parseFloat(g('pk-ul').value)||null,unit_width_cm:parseFloat(g('pk-uw').value)||null,unit_height_cm:parseFloat(g('pk-uh').value)||null,unit_weight_kg:parseFloat(g('pk-uwt').value)||null,unit_dim_status:g('pk-ust').value,
+      inner_qty:g('pk-inner-section').style.display!=='none'&&g('pk-iq').value?parseInt(g('pk-iq').value):null,
+      inner_length_cm:parseFloat(g('pk-il').value)||null,inner_width_cm:parseFloat(g('pk-iw').value)||null,inner_height_cm:parseFloat(g('pk-ih').value)||null,inner_weight_kg:parseFloat(g('pk-iwt').value)||null,inner_dim_status:g('pk-ist').value,
+      master_qty:g('pk-mq').value?parseInt(g('pk-mq').value):null,
+      master_length_cm:parseFloat(g('pk-ml').value)||null,master_width_cm:parseFloat(g('pk-mw').value)||null,master_height_cm:parseFloat(g('pk-mh').value)||null,master_weight_kg:parseFloat(g('pk-mwt').value)||null,master_dim_status:g('pk-mst').value,
+      pallet_qty:g('pk-pallet-section').style.display!=='none'&&g('pk-pq').value?parseInt(g('pk-pq').value):null,
+      pallet_length_cm:parseFloat(g('pk-pl')?g('pk-pl').value:0)||null,pallet_width_cm:parseFloat(g('pk-pw')?g('pk-pw').value:0)||null,pallet_height_cm:parseFloat(g('pk-ph')?g('pk-ph').value:0)||null,pallet_weight_kg:parseFloat(g('pk-pwt')?g('pk-pwt').value:0)||null
+    };
+    var existPack=await fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+currentSkuId,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var existPackRows=await existPack.json();
+    if(existPackRows.length){
+      await fetch(SB+'/rest/v1/sku_packaging?sku_id=eq.'+currentSkuId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(packPayload)});
+    }else{
+      await fetch(SB+'/rest/v1/sku_packaging',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(packPayload)});
+    }
+
+    // Save variations
+    var varRows=document.querySelectorAll('#sf-variations div[style*="grid"]');
+    for(var i=0;i<varRows.length;i++){
+      var vType=varRows[i].querySelector('.var-type').value.trim();
+      var vValue=varRows[i].querySelector('.var-value').value.trim();
+      var vSuffix=varRows[i].querySelector('.var-suffix').value.trim();
+      var vModel=varRows[i].querySelector('.var-model').value.trim();
+      if(vType&&vValue&&vSuffix&&vModel){
+        // Assign UPC
+        var upcR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&limit=1&select=upc_code',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var upcs=await upcR.json();
+        var upc=upcs.length?upcs[0].upc_code:null;
+        var vPayload={sku_id:currentSkuId,variation_type:vType,variation_value:vValue,model_suffix:vSuffix,model_number_full:vModel,upc_unit:upc};
+        await fetch(SB+'/rest/v1/sku_variations',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(vPayload)});
+        if(upc)await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+upc,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_sku:currentSkuId,assigned_to_variation:null,assigned_at:new Date().toISOString()})});
+      }
+    }
+
+    await loadSkuTab();
+    renderSkuList();
+    if(msgEl){msgEl.textContent='✓ SKU saved!';msgEl.style.color='#1a7a1a';}
+    setTimeout(function(){if(msgEl)msgEl.textContent='';},4000);
+  }catch(e){
+    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.style.color='#b00';}
+    alert('Save error: '+e.message);
+  }
+}
+
+async function duplicateSku(skuId){
+  if(!confirm('Duplicate this SKU? A new model number will be generated.'))return;
+  var r=await fetch(SB+'/rest/v1/skus?id=eq.'+skuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  var rows=await r.json();
+  var sku=rows[0];if(!sku)return;
+  // Clear unique identifiers
+  delete sku.id;delete sku.model_number;delete sku.customer_suffix;delete sku.customer_id;delete sku.is_customer_specific;
+  sku.status='draft';sku.created_at=new Date().toISOString();sku.updated_at=new Date().toISOString();
+  currentSkuId=null;
+  renderSkuForm(sku,null,[],[],null);
+  generateModelNumber();
+  g('sf-brand').value=sku.brand_id||'';
+  g('sf-category').value=sku.category_id||'';
+  setTimeout(generateModelNumber,100);
+  alert('SKU duplicated as draft. Update the model number and save.');
+}
+
 </script>
 </body>
 </html>
