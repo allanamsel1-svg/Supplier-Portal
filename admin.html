@@ -847,9 +847,10 @@
               <div class="mf"><label>Carton Weight (kg)</label><input type="number" id="rfq-est-wgt" step="0.1" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Master Carton CBM</label><input type="number" id="rfq-est-cbm" step="0.000001" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
               <div class="mf"><label>Container Cost (full container $)</label><input type="number" id="rfq-container-cost" value="6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Est. Freight/Unit ($)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Est. Freight/Unit (auto)</label><input type="number" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+              <div class="mf"><label style="color:#5522aa;font-weight:600;">Proposed FOB Price ($)</label><input type="number" id="rfq-proposed-fob" step="0.01" placeholder="Enter proposed FOB" oninput="calcMargins()" style="border-color:#5522aa;border-width:2px;" /></div>
             </div>
             <div id="rfq-container-qty" style="display:none;background:#f0eaff;border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;">
               <span style="font-weight:600;color:#5522aa;">Container quantities (40HC, 85% load): </span>
@@ -2981,28 +2982,27 @@ function calcMargins(){
   var custMargin=parseFloat(g('rfq-cust-margin').value)||0;
   var wholesale=custMargin>0&&targetRetail>0?targetRetail*(1-custMargin/100):0;
 
-  // CBM calculation from master carton dimensions
+  // CBM from master carton dimensions
   var l=parseFloat(g('rfq-est-len').value)||0;
   var w=parseFloat(g('rfq-est-wid').value)||0;
   var h=parseFloat(g('rfq-est-hgt').value)||0;
   var masterCbm=l&&w&&h?(l*w*h/1000000):0;
   if(masterCbm>0)g('rfq-est-cbm').value=masterCbm.toFixed(6);
 
-  // Master case pack from Product Information section
+  // Master case pack from Product Information
   var masterQty=parseFloat(g('rfq-master-pack')?g('rfq-master-pack').value:0)||0;
 
-  // CBM per unit = master carton CBM / units per master carton
+  // CBM per unit = master CBM / units per master carton
   var cbmPerUnit=masterCbm&&masterQty?masterCbm/masterQty:masterCbm;
 
-  // Freight per unit = CBM per unit * (container cost / usable CBM of container)
-  // Using 40HC = 67 CBM * 85% efficiency = 56.95 usable CBM
+  // Freight per unit
   var containerCost=parseFloat(g('rfq-container-cost').value)||6000;
   var usableCbm=56.95;
   var freightPerUnit=cbmPerUnit>0?parseFloat((cbmPerUnit*(containerCost/usableCbm)).toFixed(4)):0;
-  if(freightPerUnit>0)g('rfq-est-freight').value=freightPerUnit.toFixed(4);
+  if(g('rfq-est-freight'))g('rfq-est-freight').value=freightPerUnit?freightPerUnit.toFixed(4):'';
   if(g('res-freight-disp'))g('res-freight-disp').textContent=freightPerUnit?'$'+freightPerUnit.toFixed(4):'—';
 
-  // Show container quantities
+  // Container quantities
   var contQtyEl=g('rfq-container-qty');
   if(masterCbm>0&&masterQty>0&&contQtyEl){
     var mastersPerCont=Math.floor(usableCbm/masterCbm);
@@ -3012,11 +3012,12 @@ function calcMargins(){
     if(g('rfq-units-per-cont'))g('rfq-units-per-cont').textContent=unitsPerCont.toLocaleString();
   } else if(contQtyEl){contQtyEl.style.display='none';}
 
-  // Duty & tariff applied to FOB (we calculate on FOB not wholesale at RFQ stage)
+  // Duty & tariff
   var dutyPct=parseFloat(g('rfq-est-duty').value)||0;
   var tariffPct=parseFloat(g('rfq-est-tariff').value)||0;
+  var dutyTariffFactor=1+(dutyPct+tariffPct)/100;
 
-  // Deductions as % of wholesale
+  // Deductions
   var retPct=parseFloat(g('rfq-est-returns').value)||0;
   var dilPct=parseFloat(g('rfq-est-dilution').value)||0;
   var comPct=parseFloat(g('rfq-est-commission').value)||0;
@@ -3029,23 +3030,22 @@ function calcMargins(){
 
   if(!wholesale){g('rfq-margin-results').style.display='none';return;}
 
-  var dedPerUnit=wholesale*(totalDedPct/100);
-
-  // Max FOB working backwards from min gross margin:
-  // wholesale = landedCost / (1 - minGross/100)
-  // landedCost = FOB + freight + duty(FOB) + tariff(FOB)
-  // landedCost = FOB * (1 + duty%/100 + tariff%/100) + freight
-  // FOB * (1 + duty/100 + tariff/100) = wholesale*(1-minGross/100) - freight
-  var dutyTariffFactor=1+(dutyPct+tariffPct)/100;
+  // Max FOB: what FOB gives exactly min_gross margin
   var maxFOB=dutyTariffFactor>0?(wholesale*(1-minGross/100)-freightPerUnit)/dutyTariffFactor:0;
   if(maxFOB<0)maxFOB=0;
 
-  // Landed cost at max FOB
-  var dutyOnFOB=maxFOB*dutyPct/100;
-  var tariffOnFOB=maxFOB*tariffPct/100;
-  var landedCost=maxFOB+freightPerUnit+dutyOnFOB+tariffOnFOB;
+  // Proposed FOB entered by user — this is what margins are calculated against
+  var proposedFOB=parseFloat(g('rfq-proposed-fob')?g('rfq-proposed-fob').value:0)||0;
 
-  // Margins
+  // Use proposed FOB if entered, otherwise use max FOB for display
+  var calcFOB=proposedFOB>0?proposedFOB:maxFOB;
+
+  // Landed cost at calcFOB
+  var dutyOnFOB=calcFOB*dutyPct/100;
+  var tariffOnFOB=calcFOB*tariffPct/100;
+  var landedCost=calcFOB+freightPerUnit+dutyOnFOB+tariffOnFOB;
+
+  // Actual margins at calcFOB
   var grossMargin=wholesale>0?((wholesale-landedCost)/wholesale*100):0;
   var netMargin=grossMargin-totalDedPct;
 
@@ -3054,15 +3054,23 @@ function calcMargins(){
   g('res-max-fob').textContent=maxFOB>0?'$'+maxFOB.toFixed(2):'$0.00';
   g('res-landed').textContent=landedCost>0?'$'+landedCost.toFixed(2):'—';
 
+  // Color max FOB: green if proposed is under max, red if over
+  var maxFobEl=g('res-max-fob');
+  if(proposedFOB>0){
+    maxFobEl.style.color=proposedFOB<=maxFOB?'#60ff60':'#ff6060';
+  } else {
+    maxFobEl.style.color='#ffcc44';
+  }
+
   var grossEl=g('res-gross-margin');
   grossEl.textContent=grossMargin.toFixed(1)+'%';
   grossEl.style.color=minGross&&grossMargin<minGross?'#ff6060':'#60ff60';
-  g('res-gross-flag').textContent=minGross&&grossMargin<minGross?'⚠ Below '+minGross+'% threshold':'✓ Above threshold';
+  g('res-gross-flag').textContent=proposedFOB>0?(minGross&&grossMargin<minGross?'⚠ Below '+minGross+'% threshold':'✓ Above threshold'):'(at max FOB — enter proposed FOB for actual margin)';
 
   var netEl=g('res-net-margin');
   netEl.textContent=netMargin.toFixed(1)+'%';
   netEl.style.color=minNet&&netMargin<minNet?'#ff6060':'#60ff60';
-  g('res-net-flag').textContent=minNet&&netMargin<minNet?'⚠ Below '+minNet+'% threshold':'✓ Above threshold';
+  g('res-net-flag').textContent=proposedFOB>0?(minNet&&netMargin<minNet?'⚠ Below '+minNet+'% threshold':'✓ Above threshold'):'(at max FOB)';
 }
 
 
