@@ -3142,6 +3142,10 @@ async function saveRFQ(action){
   });
 
   var factoryIds=Object.keys(selectedFactoryIds);
+  if(action==='send'&&!factoryIds.length){
+    alert('Please select at least one factory before sending. Use the factory search to find and select factories.');
+    return;
+  }
   var brandId=g('rfq-brand-id')?g('rfq-brand-id').value:null;
   var payload={
     item_description:desc,
@@ -3252,32 +3256,42 @@ async function saveRFQ(action){
 
 async function sendRFQEmails(rfq){
   var myEmail=localStorage.getItem('from_email')||'';
-  var factories=allFactories.filter(function(f){return selectedFactoryIds[f.id];});
   var portalUrl='https://project-7o416.vercel.app';
-  var failed=[];
+  var factoryIds=Object.keys(selectedFactoryIds);
+  if(!factoryIds.length){alert('No factories selected.');return;}
 
+  // Fetch factory details fresh from DB to guarantee emails are included
+  var ids=factoryIds.map(function(id){return 'id=eq.'+id;}).join(',');
+  var r=await fetch(SB+'/rest/v1/factories?or=('+ids+')&select=id,factory_name_english,sales_email,sales_contact_name',{
+    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+  });
+  if(!r.ok){alert('Could not load factory details for emailing.');return;}
+  var factories=await r.json();
+
+  var failed=[];var sent=0;
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
-    if(!f.sales_email)continue;
+    if(!f.sales_email){
+      failed.push((f.factory_name_english||'Unknown')+' (no email)');
+      continue;
+    }
     var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
     var emailBody='Dear '+firstName+',\n\n'+
       'Our sourcing team has sent you a new Request for Quotation ('+rfq.project_number+').\n\n'+
+      'Product: '+rfq.item_description+'\n\n'+
       'Please log into our supplier portal to review the full specifications and submit your quote.\n\n'+
-      'Best regards,\nAllan Amsel\nSupplier Sourcing';
+      'Portal: '+portalUrl+'\n\n'+
+      'Best regards,\nAllan Amsel\nTBG Sourcing';
     try{
-      await sendEmail(
-      f.sales_email,
-      f.sales_contact_name||'Team',
-      'New RFQ — '+rfq.project_number+' — '+rfq.item_description,
-      emailBody+'\n\nPortal: '+portalUrl,
-      myEmail
-    );
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      sent++;
     }catch(ex){
       failed.push(f.factory_name_english);
       console.log('Email failed for '+f.factory_name_english+':',ex);
     }
   }
-  if(failed.length)alert('Note: emails failed for: '+failed.join(', '));
+  var msg='Emails sent: '+sent+(failed.length?'\nFailed/no email: '+failed.join(', '):'');
+  alert(msg);
 }
 
 // ── BRANDS ──
