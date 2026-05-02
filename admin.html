@@ -629,6 +629,8 @@
             <button class="rfq-tab" onclick="filterRFQs('in_review')" id="rtab-in_review">In Review</button>
             <button class="rfq-tab" onclick="filterRFQs('approved')" id="rtab-approved">Approved</button>
             <button class="rfq-tab" onclick="filterRFQs('rejected')" id="rtab-rejected">Rejected</button>
+            <button class="rfq-tab" onclick="filterRFQs('on_hold')" id="rtab-on_hold">On Hold</button>
+            <button class="rfq-tab" onclick="filterRFQs('archived')" id="rtab-archived">Archived</button>
           </div>
           <!-- New quote banner -->
           <div id="rfq-quotes-received" style="display:none;background:#edfaed;border-bottom:1px solid #a0d8a0;padding:8px 12px;font-size:12px;color:#1a7a1a;cursor:pointer;" onclick="filterRFQs('new_quotes')">
@@ -2277,9 +2279,9 @@ function filterRFQs(filter){
 
 function renderRFQList(){
   var el=g('rfq-list-items');if(!el)return;
-  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0'};
-  var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected','cancelled':'Cancelled'};
-  var badgeColors={'draft':'#888','sent':'#2244cc','in_review':'#cc7700','quotes_received':'#886600','approved':'#1a7a1a','rejected':'#b00','cancelled':'#b00'};
+  var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0','on_hold':'#fff8e0','archived':'#f0f0f0'};
+  var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected','cancelled':'Cancelled','on_hold':'On Hold','archived':'Archived'};
+  var badgeColors={'draft':'#888','sent':'#2244cc','in_review':'#cc7700','quotes_received':'#886600','approved':'#1a7a1a','rejected':'#b00','cancelled':'#b00','on_hold':'#886600','archived':'#999'};
 
   // Filter
   var filtered=allRFQs.filter(function(r){
@@ -2289,6 +2291,8 @@ function renderRFQList(){
     if(currentRFQFilter==='in_review')return r.status==='in_review';
     if(currentRFQFilter==='approved')return r.status==='approved';
     if(currentRFQFilter==='rejected')return r.status==='rejected'||r.status==='cancelled';
+    if(currentRFQFilter==='on_hold')return r.status==='on_hold';
+    if(currentRFQFilter==='archived')return r.status==='archived';
     return true;
   });
 
@@ -2373,7 +2377,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
       '</div>'+
       '<div style="display:flex;gap:8px;align-items:center;">'+
         '<span style="font-size:12px;padding:4px 10px;border-radius:20px;background:'+(statusColors[rfq.status]||'#f0f0e8')+';color:#555;border:1px solid #ddd;">'+(statusText[rfq.status]||rfq.status)+'</span>'+
-        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">✏ Edit</button>'+
+        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x270F; Edit</button>'+'<button data-rid="'+rfq.id+'" data-st="on_hold" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#fff8e0;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x23F8; On Hold</button>'+'<button data-rid="'+rfq.id+'" data-st="archived" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#f0f0f0;color:#888;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x1F4C1; Archive</button>'+'<button data-rid="'+rfq.id+'" onclick="deleteRFQ(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x1F5D1; Delete</button>'+
       '</div>'+
     '</div>'+
 
@@ -2637,7 +2641,7 @@ async function acceptQuote(quoteId,rfqId,factoryName){
         'We look forward to working with you on this project.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Quote Accepted — '+rfq.project_number+' — '+rfq.item_description,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Accepted — '+rfq.project_number+' — '+rfq.item_description,emailBody,'sourcing@tbgsourcing.net');
     }
 
     await loadRFQs();
@@ -2674,7 +2678,7 @@ async function rejectQuote(quoteId,rfqId){
         'We value our relationship with '+f.factory_name_english+' and look forward to working together on future opportunities.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Quote Update — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Update — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
     }
 
     await loadRFQs();
@@ -2710,7 +2714,7 @@ async function requestMoreInfo(quoteId,rfqId){
         'Please respond at your earliest convenience.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Additional Information Required — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Additional Information Required — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
     }
 
     openRFQDetail(rfqId);
@@ -2869,31 +2873,21 @@ async function openRFQForm(id){
 }
 
 function resetRFQForm(){
-  ['rfq-id','rfq-category-id','rfq-description','rfq-specs','rfq-color',
-   'rfq-quantity','rfq-pkg-notes','rfq-inner-pack','rfq-master-pack',
-   'rfq-target-retail','rfq-cust-margin','rfq-unit-w','rfq-unit-d','rfq-unit-h',
-   'rfq-calc-inner','rfq-calc-master','rfq-unit-cbm','rfq-inner-cbm',
-   'rfq-master-cbm','rfq-units-per-fcl','rfq-product-size'].forEach(function(id){if(g(id))g(id).value='';});
-  if(g('rfq-uom'))g('rfq-uom').value='N/A';
-  if(g('rfq-unit-type'))g('rfq-unit-type').value='each';
-  if(g('rfq-country-mfg'))g('rfq-country-mfg').value='China';
-  if(g('rfq-customer-id'))g('rfq-customer-id').value='';
-  if(g('rfq-brand-id'))g('rfq-brand-id').value='';
-  if(g('rfq-target-gross'))g('rfq-target-gross').value='80';
-  if(g('rfq-container-cost'))g('rfq-container-cost').value='';
-  if(g('rfq-est-freight'))g('rfq-est-freight').value='';
-  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty','rfq-est-duty','rfq-est-tariff'].forEach(function(id){if(g(id))g(id).value='0';});
+  g('rfq-id').value='';
+  g('rfq-category-id').value='';g('rfq-uom').value='N/A';
+  g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
+  g('rfq-description').value='';g('rfq-specs').value='';
+  g('rfq-color').value='';g('rfq-quantity').value='';
+  // Reset deductions to 0
+  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){if(g(id))g(id).value='0';});
+  g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
+  g('rfq-pkg-notes').value='';
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
-  if(g('rfq-margin-results'))g('rfq-margin-results').style.display='none';
-  if(g('rfq-duty-note'))g('rfq-duty-note').style.display='none';
-  if(g('rfq-inci-notice'))g('rfq-inci-notice').style.display='none';
-  if(g('factory-match-list'))g('factory-match-list').innerHTML='';
-  if(g('factory-match-status'))g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
-  if(g('rfq-img-name'))g('rfq-img-name').textContent='';
-  if(g('rfq-img-preview'))g('rfq-img-preview').style.display='none';
-  if(g('rfq-img-thumb'))g('rfq-img-thumb').src='';
-  if(g('rfq-save-ok'))g('rfq-save-ok').style.display='none';
-  if(g('rfq-save-err'))g('rfq-save-err').style.display='none';
+  g('rfq-inci-notice').style.display='none';
+  g('factory-match-list').innerHTML='';
+  g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
+  g('rfq-img-name').textContent='';g('rfq-img-preview').style.display='none';
+  g('rfq-save-ok').style.display='none';g('rfq-save-err').style.display='none';
   selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
 }
 
@@ -3372,7 +3366,7 @@ async function sendRFQEmails(rfq){
 
   // Fetch factory details fresh from DB to guarantee emails are included
   var idList=factoryIds.join(',');
-  var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=*',{
+  var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=id,factory_name_english,sales_email,sales_contact_name',{
     headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
   });
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
@@ -3381,13 +3375,11 @@ async function sendRFQEmails(rfq){
   var failed=[];var sent=0;
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
-    // Try every possible email field name
-    var factoryEmail=(f.sales_email||f.email||'').trim();
-    if(!factoryEmail){
+    if(!f.sales_email){
       failed.push((f.factory_name_english||'Unknown')+' (no email)');
       continue;
     }
-    var firstName=(f.sales_contact_name||f.contact_name||'').split(' ')[0]||'Team';
+    var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
     var emailBody='Dear '+firstName+',\n\n'+
       'Our sourcing team has sent you a new Request for Quotation ('+rfq.project_number+').\n\n'+
       'Product: '+rfq.item_description+'\n\n'+
@@ -3395,10 +3387,11 @@ async function sendRFQEmails(rfq){
       'Portal: '+portalUrl+'\n\n'+
       'Best regards,\nAllan Amsel\nTBG Sourcing';
     try{
-      await sendEmail(factoryEmail,f.sales_contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
       sent++;
     }catch(ex){
-      failed.push((f.factory_name_english||'Unknown')+' (send error: '+(ex.message||ex.text||JSON.stringify(ex))+')');
+      failed.push(f.factory_name_english);
+      console.log('Email failed for '+f.factory_name_english+':',ex);
     }
   }
   var msg='Emails sent: '+sent+(failed.length?'\nFailed/no email: '+failed.join(', '):'');
@@ -4338,6 +4331,45 @@ function rfqDescChanged(){
   // Description changed - no auto-action needed, AI suggest button handles duty lookup
 }
 
+
+// ── RFQ Status & Delete ──
+async function setRFQStatus(rfqId,status){
+  var labels={on_hold:'put this RFQ on hold',archived:'archive this RFQ'};
+  if(!confirm('Are you sure you want to '+(labels[status]||'update this RFQ')+'?'))return;
+  try{
+    var r=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:status})
+    });
+    if(r.ok){
+      await loadRFQs();
+      g('rfq-detail-pane').style.display='none';
+      g('rfq-detail-empty').style.display='flex';
+      selectedRFQId=null;
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      alert('Failed: '+(e.message||e.details||r.status));
+    }
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteRFQ(rfqId){
+  if(!confirm('Permanently delete this RFQ? This cannot be undone and will remove all quotes and factory assignments.'))return;
+  try{
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+rfqId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var r=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){
+      await loadRFQs();
+      g('rfq-detail-pane').style.display='none';
+      g('rfq-detail-empty').style.display='flex';
+      selectedRFQId=null;
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      alert('Delete failed: '+(e.message||e.details||r.status));
+    }
+  }catch(e){alert('Error: '+e.message);}
+}
 </script>
 </body>
 </html>
