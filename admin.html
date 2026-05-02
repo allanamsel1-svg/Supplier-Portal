@@ -3377,15 +3377,14 @@ async function sendRFQEmails(rfq){
   });
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
   var factories=await r.json();
-  alert('DEBUG - Factories returned: '+JSON.stringify(factories).substring(0,500));
 
   var failed=[];var sent=0;
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
-    var factoryEmail=f.sales_email||f.email||'';
+    // Try every possible email field name
+    var factoryEmail=(f.sales_email||f.email||'').trim();
     if(!factoryEmail){
-      console.log('Factory fields available:', JSON.stringify(f));
-      failed.push((f.factory_name_english||'Unknown')+' (no email - check console)');
+      failed.push((f.factory_name_english||'Unknown')+' (no email)');
       continue;
     }
     var firstName=(f.sales_contact_name||f.contact_name||'').split(' ')[0]||'Team';
@@ -3396,11 +3395,10 @@ async function sendRFQEmails(rfq){
       'Portal: '+portalUrl+'\n\n'+
       'Best regards,\nAllan Amsel\nTBG Sourcing';
     try{
-      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      await sendEmail(factoryEmail,f.sales_contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
       sent++;
     }catch(ex){
-      failed.push(f.factory_name_english);
-      console.log('Email failed for '+f.factory_name_english+':',ex);
+      failed.push((f.factory_name_english||'Unknown')+' (send error: '+(ex.message||ex.text||JSON.stringify(ex))+')');
     }
   }
   var msg='Emails sent: '+sent+(failed.length?'\nFailed/no email: '+failed.join(', '):'');
