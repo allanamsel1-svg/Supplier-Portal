@@ -2637,7 +2637,7 @@ async function acceptQuote(quoteId,rfqId,factoryName){
         'We look forward to working with you on this project.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Accepted — '+rfq.project_number+' — '+rfq.item_description,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Quote Accepted — '+rfq.project_number+' — '+rfq.item_description,emailBody,'sourcing@tbgsourcing.net');
     }
 
     await loadRFQs();
@@ -2674,7 +2674,7 @@ async function rejectQuote(quoteId,rfqId){
         'We value our relationship with '+f.factory_name_english+' and look forward to working together on future opportunities.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Quote Update — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Quote Update — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
     }
 
     await loadRFQs();
@@ -2710,7 +2710,7 @@ async function requestMoreInfo(quoteId,rfqId){
         'Please respond at your earliest convenience.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','Additional Information Required — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','Additional Information Required — '+rfqData.project_number,emailBody,'sourcing@tbgsourcing.net');
     }
 
     openRFQDetail(rfqId);
@@ -3372,20 +3372,24 @@ async function sendRFQEmails(rfq){
 
   // Fetch factory details fresh from DB to guarantee emails are included
   var idList=factoryIds.join(',');
-  var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=id,factory_name_english,sales_email,sales_contact_name',{
+  console.log('Fetching factories, idList:', idList);
+  var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=*',{
     headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
   });
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
   var factories=await r.json();
+  console.log('Factories returned:', JSON.stringify(factories));
 
   var failed=[];var sent=0;
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
-    if(!f.sales_email){
-      failed.push((f.factory_name_english||'Unknown')+' (no email)');
+    var factoryEmail=f.sales_email||f.email||'';
+    if(!factoryEmail){
+      console.log('Factory fields available:', JSON.stringify(f));
+      failed.push((f.factory_name_english||'Unknown')+' (no email - check console)');
       continue;
     }
-    var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
+    var firstName=(f.sales_contact_name||f.contact_name||'').split(' ')[0]||'Team';
     var emailBody='Dear '+firstName+',\n\n'+
       'Our sourcing team has sent you a new Request for Quotation ('+rfq.project_number+').\n\n'+
       'Product: '+rfq.item_description+'\n\n'+
@@ -3393,7 +3397,7 @@ async function sendRFQEmails(rfq){
       'Portal: '+portalUrl+'\n\n'+
       'Best regards,\nAllan Amsel\nTBG Sourcing';
     try{
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      await sendEmail(factoryEmail,f.sales_contact_name||f.contact_name||'Team','New RFQ — '+rfq.project_number+' — '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
       sent++;
     }catch(ex){
       failed.push(f.factory_name_english);
