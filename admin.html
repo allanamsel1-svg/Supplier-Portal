@@ -3334,8 +3334,8 @@ async function sendRFQEmails(rfq){
   if(!factoryIds.length){alert('No factories selected.');return;}
 
   // Fetch factory details fresh from DB to guarantee emails are included
-  var ids=factoryIds.map(function(id){return 'id.eq.'+id;}).join(',');
-  var r=await fetch(SB+'/rest/v1/factories?or=('+ids+')&select=id,factory_name_english,sales_email,sales_contact_name',{
+  var idList=factoryIds.join(',');
+  var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=id,factory_name_english,sales_email,sales_contact_name',{
     headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
   });
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
