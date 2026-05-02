@@ -737,7 +737,7 @@
         </div>
 
         <!-- Packaging -->
-        <div class="mgr-card" style="margin-bottom:1rem;">
+        <div class="mgr-card" id="pkg-type-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Packaging Type</div>
           <div class="checkbox-grid">
             <label class="cb-item"><input type="checkbox" value="Bulk"> Bulk</label>
@@ -759,7 +759,7 @@
         </div>
 
         <!-- Certifications -->
-        <div class="mgr-card" style="margin-bottom:1rem;">
+        <div class="mgr-card" id="cert-req-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Certifications Required</div>
           <div class="checkbox-grid">
             <label class="cb-item"><input type="checkbox" value="FDA"> FDA</label>
@@ -2762,9 +2762,9 @@ function populateRFQEditForm(rfq){
   if(g('rfq-master-pack'))g('rfq-master-pack').value=rfq.master_case_pack||'';
   if(g('rfq-pkg-notes'))g('rfq-pkg-notes').value=rfq.packaging_notes||'';
   var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
-  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(2) input[type=checkbox]').forEach(function(cb){cb.checked=pkgTypes.includes(cb.value);});
+  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){cb.checked=pkgTypes.includes(cb.value);});
   var certs=rfq.certifications_required||[];
-  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(3) input[type=checkbox]').forEach(function(cb){cb.checked=certs.includes(cb.value);});
+  document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){cb.checked=certs.includes(cb.value);});
   if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
   if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
   if(g('rfq-customer-id')&&rfq.customer_id)g('rfq-customer-id').value=rfq.customer_id;
@@ -2831,12 +2831,12 @@ async function openRFQForm(id){
   g('rfq-pkg-notes').value=rfq.packaging_notes||'';
   // Check packaging checkboxes
   var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
-  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(2) input[type=checkbox]').forEach(function(cb){
+  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){
     cb.checked=pkgTypes.includes(cb.value);
   });
   // Check cert checkboxes
   var certs=rfq.certifications_required||[];
-  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(3) input[type=checkbox]').forEach(function(cb){
+  document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){
     cb.checked=certs.includes(cb.value);
   });
   // Fill margin calculator fields
@@ -3204,14 +3204,14 @@ async function saveRFQ(action){
 
   // Collect packaging types
   var pkgTypes=[];
-  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox]').forEach(function(cb){
-    if(cb.checked&&['Bulk','Paper Box','Glass Jar','Plastic Bottle','Bag','Pillow Pack','Hang Tag','Tube','Pump Bottle','Spray Bottle','Blister Pack','Other'].includes(cb.value))pkgTypes.push(cb.value);
+  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){
+    if(cb.checked)pkgTypes.push(cb.value);
   });
 
   // Collect certs
   var certs=[];
-  document.querySelectorAll('#panel-rfq .mgr-card input[type=checkbox]').forEach(function(cb){
-    if(cb.checked&&!pkgTypes.includes(cb.value))certs.push(cb.value);
+  document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){
+    if(cb.checked)certs.push(cb.value);
   });
 
   var factoryIds=Object.keys(selectedFactoryIds);
