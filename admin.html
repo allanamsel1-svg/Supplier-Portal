@@ -2379,6 +2379,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
 
     // RFQ brief
     '<div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:10px;padding:1rem;margin-bottom:1rem;">'+
+      (rfq.product_image_url?'<img src="'+rfq.product_image_url+'" style="max-height:160px;border-radius:8px;border:1px solid #e0e0d8;margin-bottom:10px;display:block;" />':'')+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
         '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Category</div><div style="font-size:12px;font-weight:500;">'+[rfq.category,rfq.sub_category,rfq.sub_sub_category].filter(Boolean).join(' › ')+'</div></div>'+
         '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Quantity</div><div style="font-size:12px;font-weight:500;">'+qtyStr+'</div></div>'+
@@ -3286,6 +3287,27 @@ async function saveRFQ(action){
       if(savedRFQ){
         g('rfq-id').value=savedRFQ.id;
         g('rfq-project-number').textContent=savedRFQ.project_number;
+
+        // Upload reference image if selected
+        if(rfqImageFile&&savedRFQ.id){
+          try{
+            var imgPath='rfq-images/'+savedRFQ.id+'_ref.'+rfqImageFile.name.split('.').pop();
+            var upR=await fetch(SB+'/storage/v1/object/factory-files/'+imgPath,{
+              method:'POST',
+              headers:{'Authorization':'Bearer '+KEY,'Content-Type':rfqImageFile.type,'x-upsert':'true'},
+              body:rfqImageFile
+            });
+            if(upR.ok){
+              var imgUrl=SB+'/storage/v1/object/public/factory-files/'+imgPath;
+              await fetch(SB+'/rest/v1/rfqs?id=eq.'+savedRFQ.id,{
+                method:'PATCH',
+                headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+                body:JSON.stringify({product_image_url:imgUrl})
+              });
+              rfqImageUrl=imgUrl;
+            }
+          }catch(imgErr){console.log('Image upload error:',imgErr);}
+        }
 
         // Create factory assignments
         if(savedRFQ.id&&factoryIds.length){
