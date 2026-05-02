@@ -1352,7 +1352,7 @@ function showPanel(name){
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
   if(name==='upload')initAdminUpload();
-  if(name==='rfq'){loadRFQs();loadCategories();}
+  if(name==='rfq'){loadRFQs();loadCategories();loadCustAndBrandsForRFQ();}
   if(name==='rfq-followup')loadRFQFollowups();
   // Handle department inboxes
   var depts=['sourcing','sales','accounting','graphics','logistics'];
@@ -2765,7 +2765,7 @@ function hideRFQForm(){
   loadRFQs();
 }
 
-function openRFQForm(id){
+async function openRFQForm(id){
   var rfq=allRFQs.find(function(r){return r.id===id;});
   if(!rfq)return;
   g('rfq-list-view').style.display='none';
@@ -2773,7 +2773,7 @@ function openRFQForm(id){
   g('rfq-form-title').textContent='Edit RFQ';
   g('rfq-project-number').textContent=rfq.project_number;
   g('rfq-id').value=rfq.id;
-  populateRFQDropdowns();
+  await populateRFQDropdowns();
   // Fill form fields
   g('rfq-category-id').value=rfq.category_id||'';
   g('rfq-uom').value=rfq.unit_of_measure||'';
@@ -4214,6 +4214,15 @@ async function aiSearchInbox(dept){
       }).join('');
     }
   }catch(e){resultEl.textContent='Search error: '+e.message;}
+}
+
+async function loadCustAndBrandsForRFQ(){
+  if(!allCustomers.length){
+    try{var r=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(r.ok)allCustomers=await r.json();}catch(e){}
+  }
+  if(!allBrands.length){
+    try{var r=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(r.ok)allBrands=await r.json();}catch(e){}
+  }
 }
 
 // Missing utility functions
