@@ -1370,6 +1370,7 @@ function showPanel(name){
   } else {
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
+  if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
@@ -2794,7 +2795,27 @@ async function openRFQForm(id){
   document.querySelectorAll('#panel-rfq .mgr-card:nth-child(3) input[type=checkbox]').forEach(function(cb){
     cb.checked=certs.includes(cb.value);
   });
+  // Fill margin calculator fields
+  if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
+  if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
+  if(g('rfq-unit-w'))g('rfq-unit-w').value=rfq.est_unit_length_cm||'';
+  if(g('rfq-unit-d'))g('rfq-unit-d').value=rfq.est_unit_width_cm||'';
+  if(g('rfq-unit-h'))g('rfq-unit-h').value=rfq.est_unit_height_cm||'';
+  if(g('rfq-calc-inner'))g('rfq-calc-inner').value=rfq.inner_case_pack||'';
+  if(g('rfq-calc-master'))g('rfq-calc-master').value=rfq.master_case_pack||'';
+  if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
+  if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
+  if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
+  if(g('rfq-est-returns'))g('rfq-est-returns').value=rfq.est_returns_pct||0;
+  if(g('rfq-est-dilution'))g('rfq-est-dilution').value=rfq.est_dilution_pct||0;
+  if(g('rfq-est-commission'))g('rfq-est-commission').value=rfq.est_commission_pct||0;
+  if(g('rfq-est-ad'))g('rfq-est-ad').value=rfq.est_ad_allowance_pct||0;
+  if(g('rfq-est-royalty'))g('rfq-est-royalty').value=rfq.est_royalty_pct||0;
+  if(g('rfq-country-mfg')&&rfq.likely_country_of_manufacture)g('rfq-country-mfg').value=rfq.likely_country_of_manufacture;
+  if(g('rfq-customer-id')&&rfq.customer_id)g('rfq-customer-id').value=rfq.customer_id;
+  if(g('rfq-brand-id')&&rfq.brand_id)g('rfq-brand-id').value=rfq.brand_id;
   rfqCategoryChanged();
+  calcMargins();
 }
 
 function resetRFQForm(){
