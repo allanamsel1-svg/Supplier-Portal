@@ -2830,6 +2830,14 @@ async function populateRFQDropdowns(){
     }catch(e){alert('Categories error: '+e.message);}
   }
 
+  // Load customers and brands if not yet loaded
+  if(!allCustomers.length){
+    try{var cr=await fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(cr.ok)allCustomers=await cr.json();}catch(e){}
+  }
+  if(!allBrands.length){
+    try{var br=await fetch(SB+'/rest/v1/brands?select=*&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});if(br.ok)allBrands=await br.json();}catch(e){}
+  }
+
   // Populate customer dropdown
   var custSel=g('rfq-customer-id');
   if(custSel){
@@ -4206,6 +4214,16 @@ async function aiSearchInbox(dept){
       }).join('');
     }
   }catch(e){resultEl.textContent='Search error: '+e.message;}
+}
+
+// Missing utility functions
+function closeRFQ(){
+  var modal=g('rfq-modal');
+  if(modal)modal.style.display='none';
+}
+
+function rfqDescChanged(){
+  // Description changed - no auto-action needed, AI suggest button handles duty lookup
 }
 
 </script>
