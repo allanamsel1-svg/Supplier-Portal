@@ -2869,21 +2869,31 @@ async function openRFQForm(id){
 }
 
 function resetRFQForm(){
-  g('rfq-id').value='';
-  g('rfq-category-id').value='';g('rfq-uom').value='N/A';
-  g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
-  g('rfq-description').value='';g('rfq-specs').value='';
-  g('rfq-color').value='';g('rfq-quantity').value='';
-  // Reset deductions to 0
-  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){if(g(id))g(id).value='0';});
-  g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
-  g('rfq-pkg-notes').value='';
+  ['rfq-id','rfq-category-id','rfq-description','rfq-specs','rfq-color',
+   'rfq-quantity','rfq-pkg-notes','rfq-inner-pack','rfq-master-pack',
+   'rfq-target-retail','rfq-cust-margin','rfq-unit-w','rfq-unit-d','rfq-unit-h',
+   'rfq-calc-inner','rfq-calc-master','rfq-unit-cbm','rfq-inner-cbm',
+   'rfq-master-cbm','rfq-units-per-fcl','rfq-product-size'].forEach(function(id){if(g(id))g(id).value='';});
+  if(g('rfq-uom'))g('rfq-uom').value='N/A';
+  if(g('rfq-unit-type'))g('rfq-unit-type').value='each';
+  if(g('rfq-country-mfg'))g('rfq-country-mfg').value='China';
+  if(g('rfq-customer-id'))g('rfq-customer-id').value='';
+  if(g('rfq-brand-id'))g('rfq-brand-id').value='';
+  if(g('rfq-target-gross'))g('rfq-target-gross').value='80';
+  if(g('rfq-container-cost'))g('rfq-container-cost').value='';
+  if(g('rfq-est-freight'))g('rfq-est-freight').value='';
+  ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty','rfq-est-duty','rfq-est-tariff'].forEach(function(id){if(g(id))g(id).value='0';});
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
-  g('rfq-inci-notice').style.display='none';
-  g('factory-match-list').innerHTML='';
-  g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
-  g('rfq-img-name').textContent='';g('rfq-img-preview').style.display='none';
-  g('rfq-save-ok').style.display='none';g('rfq-save-err').style.display='none';
+  if(g('rfq-margin-results'))g('rfq-margin-results').style.display='none';
+  if(g('rfq-duty-note'))g('rfq-duty-note').style.display='none';
+  if(g('rfq-inci-notice'))g('rfq-inci-notice').style.display='none';
+  if(g('factory-match-list'))g('factory-match-list').innerHTML='';
+  if(g('factory-match-status'))g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
+  if(g('rfq-img-name'))g('rfq-img-name').textContent='';
+  if(g('rfq-img-preview'))g('rfq-img-preview').style.display='none';
+  if(g('rfq-img-thumb'))g('rfq-img-thumb').src='';
+  if(g('rfq-save-ok'))g('rfq-save-ok').style.display='none';
+  if(g('rfq-save-err'))g('rfq-save-err').style.display='none';
   selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
 }
 
