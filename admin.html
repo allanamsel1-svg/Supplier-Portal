@@ -3372,13 +3372,12 @@ async function sendRFQEmails(rfq){
 
   // Fetch factory details fresh from DB to guarantee emails are included
   var idList=factoryIds.join(',');
-  console.log('Fetching factories, idList:', idList);
   var r=await fetch(SB+'/rest/v1/factories?id=in.('+idList+')&select=*',{
     headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
   });
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
   var factories=await r.json();
-  console.log('Factories returned:', JSON.stringify(factories));
+  alert('DEBUG - Factories returned: '+JSON.stringify(factories).substring(0,500));
 
   var failed=[];var sent=0;
   for(var i=0;i<factories.length;i++){
