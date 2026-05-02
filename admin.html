@@ -2744,7 +2744,51 @@ async function saveQuoteToFactory(quoteId,rfqId){
   }catch(e){alert('Error: '+e.message);}
 }
 
-function loadRFQById(rfqId){
+
+function populateRFQEditForm(rfq){
+  if(!rfq)return;
+  g('rfq-form-title').textContent='Edit RFQ';
+  g('rfq-project-number').textContent=rfq.project_number||'';
+  g('rfq-id').value=rfq.id||'';
+  if(g('rfq-category-id'))g('rfq-category-id').value=rfq.category_id||'';
+  if(g('rfq-unit-type'))g('rfq-unit-type').value=rfq.unit_type||'each';
+  if(g('rfq-description'))g('rfq-description').value=rfq.item_description||'';
+  if(g('rfq-specs'))g('rfq-specs').value=rfq.detailed_specifications||'';
+  if(g('rfq-color'))g('rfq-color').value=rfq.color_code||'';
+  if(g('rfq-quantity'))g('rfq-quantity').value=rfq.quote_quantity||'';
+  if(g('rfq-product-size'))g('rfq-product-size').value=rfq.product_size||'';
+  if(g('rfq-uom'))g('rfq-uom').value=rfq.unit_of_measure||'';
+  if(g('rfq-inner-pack'))g('rfq-inner-pack').value=rfq.inner_case_pack||'';
+  if(g('rfq-master-pack'))g('rfq-master-pack').value=rfq.master_case_pack||'';
+  if(g('rfq-pkg-notes'))g('rfq-pkg-notes').value=rfq.packaging_notes||'';
+  var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
+  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(2) input[type=checkbox]').forEach(function(cb){cb.checked=pkgTypes.includes(cb.value);});
+  var certs=rfq.certifications_required||[];
+  document.querySelectorAll('#panel-rfq .mgr-card:nth-child(3) input[type=checkbox]').forEach(function(cb){cb.checked=certs.includes(cb.value);});
+  if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
+  if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
+  if(g('rfq-customer-id')&&rfq.customer_id)g('rfq-customer-id').value=rfq.customer_id;
+  if(g('rfq-brand-id')&&rfq.brand_id)g('rfq-brand-id').value=rfq.brand_id;
+  if(g('rfq-unit-w'))g('rfq-unit-w').value=rfq.est_unit_length_cm||'';
+  if(g('rfq-unit-d'))g('rfq-unit-d').value=rfq.est_unit_width_cm||'';
+  if(g('rfq-unit-h'))g('rfq-unit-h').value=rfq.est_unit_height_cm||'';
+  if(g('rfq-calc-inner'))g('rfq-calc-inner').value=rfq.inner_case_pack||'';
+  if(g('rfq-calc-master'))g('rfq-calc-master').value=rfq.master_case_pack||'';
+  if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
+  if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
+  if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
+  if(g('rfq-est-returns'))g('rfq-est-returns').value=rfq.est_returns_pct||0;
+  if(g('rfq-est-dilution'))g('rfq-est-dilution').value=rfq.est_dilution_pct||0;
+  if(g('rfq-est-commission'))g('rfq-est-commission').value=rfq.est_commission_pct||0;
+  if(g('rfq-est-ad'))g('rfq-est-ad').value=rfq.est_ad_allowance_pct||0;
+  if(g('rfq-est-royalty'))g('rfq-est-royalty').value=rfq.est_royalty_pct||0;
+  if(g('rfq-country-mfg')&&rfq.likely_country_of_manufacture)g('rfq-country-mfg').value=rfq.likely_country_of_manufacture;
+  rfqCategoryChanged();
+  calcMargins();
+}
+
+async function loadRFQById(rfqId){
+  await populateRFQDropdowns();
   var rfq=allRFQs.find(function(r){return r.id===rfqId;});
   if(rfq)populateRFQEditForm(rfq);
 }
