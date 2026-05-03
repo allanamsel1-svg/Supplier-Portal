@@ -1,15 +1,15 @@
-// api/send-email.js
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const SG_KEY = ['SG.ENlkbj--SB6u7Acx36sPuA', 'neLPh7z1BA-Wm-ubP1yeUp8at6MEO1BRc0zd3FGRYco'].join('.');
   try {
     const { to, toName, subject, body, replyTo, cc, bcc } = req.body;
     if (!to || !subject || !body) return res.status(400).json({ error: 'Missing required fields' });
-    const fromEmail = replyTo || 'sourcing@tbgsourcing.net';
+    const fromEmail = 'sourcing@tbgsourcing.net';
+    const replyToEmail = replyTo && replyTo.includes('@') ? replyTo : fromEmail;
     const payload = {
       personalizations: [{ to: [{ email: to, name: toName || '' }] }],
-      from: { email: fromEmail, name: 'Allan Amsel — TBG Sourcing' },
-      reply_to: { email: fromEmail, name: 'Allan Amsel — TBG Sourcing' },
+      from: { email: fromEmail, name: 'TBG Sourcing' },
+      reply_to: { email: replyToEmail, name: 'TBG Sourcing' },
       subject: subject,
       content: [{ type: 'text/plain', value: body }]
     };
