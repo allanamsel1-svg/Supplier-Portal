@@ -3313,15 +3313,19 @@ async function saveRFQ(action){
           }catch(imgErr){console.log('Image upload error:',imgErr);}
         }
 
-        // Create factory assignments
+        // Create factory assignments — delete existing first to avoid duplicate key errors
         if(savedRFQ.id&&factoryIds.length){
+          await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+savedRFQ.id,{
+            method:'DELETE',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+          });
           var assignments=factoryIds.map(function(fid){
             var f=allFactories.find(function(x){return x.id===fid;});
             return{rfq_id:savedRFQ.id,factory_id:fid,email_sent_to:f?f.sales_email:null,status:action==='send'?'sent':'pending'};
           });
           var ar=await fetch(SB+'/rest/v1/rfq_factory_assignments',{
             method:'POST',
-            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
+            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
             body:JSON.stringify(assignments)
           });
           if(!ar.ok){
