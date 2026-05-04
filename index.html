@@ -8,6 +8,47 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
 
+
+    /* ── Category Selector ── */
+    .cat-stage1 { margin-bottom: 1rem; }
+    .cat-top-item { background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+    .cat-top-row { display: flex; align-items: center; padding: 12px 14px; gap: 10px; }
+    .cat-top-row:hover { background: #fafaf8; }
+    .cat-top-check { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; }
+    .cat-top-name { flex: 1; font-size: 14px; font-weight: 600; color: #1a1a2e; cursor: pointer; }
+    .cat-pct-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .cat-pct-input { width: 60px; padding: 5px 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; text-align: center; }
+    .cat-pct-label { font-size: 12px; color: #888; }
+    .cat-specify-btn { font-size: 11px; padding: 5px 10px; background: #f0f4ff; color: #2244cc; border: 1px solid #c0d0f0; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; white-space: nowrap; }
+    .cat-specify-btn:hover { background: #e0ecff; }
+    .cat-detail-panel { display: none; border-top: 1px solid #f0f0e8; padding: 12px 14px; background: #fafaf8; }
+    .cat-detail-panel.open { display: block; }
+    .cat-sub-section { margin-bottom: 12px; }
+    .cat-sub-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .cat-sub-check { width: 14px; height: 14px; cursor: pointer; }
+    .cat-sub-name { font-size: 12px; font-weight: 600; color: #1a1a2e; }
+    .cat-sub-toggle { font-size: 11px; color: #2244cc; cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; }
+    .cat-subsub-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-left: 22px; margin-bottom: 4px; }
+    .cat-subsub-item { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #555; background: #f0f0e8; border: 1px solid #e0e0d8; border-radius: 5px; padding: 3px 8px; }
+    .cat-subsub-item input { width: 12px; height: 12px; cursor: pointer; }
+    .cat-add-custom { display: flex; align-items: center; gap: 6px; margin-top: 6px; margin-left: 22px; }
+    .cat-add-input { flex: 1; padding: 5px 8px; font-size: 12px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; }
+    .cat-add-btn { padding: 5px 10px; font-size: 11px; background: #1a1a2e; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    .cat-total-bar { background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 8px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+    .cat-total-label { font-size: 13px; color: #666; }
+    .cat-total-val { font-size: 15px; font-weight: 700; }
+    .cat-total-val.ok { color: #1a7a1a; }
+    .cat-total-val.warn { color: #cc7700; }
+    .cat-total-val.over { color: #b00; }
+
+    /* ── Global Markets ── */
+    .market-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #e0e0d8; border-radius: 8px; margin-bottom: 6px; }
+    .market-check { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+    .market-name { flex: 1; font-size: 13px; color: #1a1a2e; cursor: pointer; }
+    .market-pct-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .market-pct-input { width: 60px; padding: 5px 8px; font-size: 13px; border: 1px solid #ddd; border-radius: 6px; font-family: inherit; text-align: center; display: none; }
+    .market-pct-label { font-size: 12px; color: #888; display: none; }
+
     /* ── Auth ── */
     #auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
     .auth-box { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 100%; max-width: 380px; box-shadow: 0 2px 20px rgba(0,0,0,0.07); }
@@ -216,8 +257,25 @@
         <div class="field"><label>WeChat ID</label><input type="text" id="p-wechat" placeholder="WeChat ID" /></div>
         <div class="field"><label>WhatsApp</label><input type="tel" id="p-whatsapp" placeholder="+86 138 0000 0000" /></div>
       </div>
-      <div class="sec-label">Product Categories *</div>
-      <div class="field"><input type="text" id="p-categories" placeholder="e.g. LED Lighting, Solar Products, Electronic Accessories" /></div>
+      <div class="sec-label">Manufacturing Categories *</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">Select all categories that apply to your factory and enter the approximate percentage of your business each represents. All percentages should add up to 100%.</div>
+      <div id="cat-stage1" class="cat-stage1">
+        <div style="text-align:center;padding:1rem;color:#bbb;font-size:13px;" id="cat-loading">Loading categories...</div>
+      </div>
+      <div class="cat-total-bar">
+        <span class="cat-total-label">Category Total</span>
+        <span class="cat-total-val warn" id="cat-total">0%</span>
+      </div>
+
+      <div class="sec-label" style="margin-top:1.25rem;">Global Markets Served *</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">Select all markets your factory currently exports to and enter the approximate percentage of your business each represents.</div>
+      <div id="market-list">
+        <div style="text-align:center;padding:1rem;color:#bbb;font-size:13px;">Loading markets...</div>
+      </div>
+      <div class="cat-total-bar">
+        <span class="cat-total-label">Market Total</span>
+        <span class="cat-total-val warn" id="market-total">0%</span>
+      </div>
       <div class="sec-label">Certifications</div>
       <div class="certs">
         <label class="cb-item"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
@@ -390,6 +448,9 @@ async function enterPortal(){
   g('portal').style.display='flex';
   g('portal').style.flexDirection='column';
   g('u-email').textContent=USER.email;
+  // Load category and market data first
+  await loadCategoryData();
+  await loadMarketData();
   await loadDetails();
   await loadAllFileLists();
   // Load RFQ badge count silently
@@ -439,12 +500,15 @@ async function loadDetails(){
         banner.className='banner pending';
       }
       g('save-btn').textContent='Update Factory Details';
+      // Load structured categories and markets
+      await loadFactoryCategories();
+      await loadFactoryMarkets();
     }
   }catch(e){console.log('loadDetails error:',e);}
 }
 
 async function saveDetails(){
-  var reqFields=[['p-name_en','Factory name'],['p-telephone','Telephone'],['p-address','Address'],['p-city','City'],['p-country','Country'],['p-contact_name','Contact name'],['p-contact_mobile','Mobile'],['p-contact_email','Email'],['p-categories','Product categories']];
+  var reqFields=[['p-name_en','Factory name'],['p-telephone','Telephone'],['p-address','Address'],['p-city','City'],['p-country','Country'],['p-contact_name','Contact name'],['p-contact_mobile','Mobile'],['p-contact_email','Email'],];
   for(var i=0;i<reqFields.length;i++){
     if(!g(reqFields[i][0]).value.trim()){alert('Please fill in: '+reqFields[i][1]);g(reqFields[i][0]).focus();return;}
   }
@@ -472,7 +536,7 @@ async function saveDetails(){
     sales_wechat:g('p-wechat').value.trim()||null,
     sales_whatsapp:g('p-whatsapp').value.trim()||null,
     certifications:certs,
-    product_categories:g('p-categories').value.trim().split(',').map(function(s){return s.trim();}).filter(Boolean),
+    product_categories:getSelectedTopCategories(),
     status:'pending'
   };
   try{
@@ -487,6 +551,9 @@ async function saveDetails(){
     if(r.ok){
       var result=await r.json();
       if(!exists&&Array.isArray(result)&&result[0])FACTORY_ID=result[0].id;
+      // Save factory categories and markets
+      await saveFactoryCategories();
+      await saveFactoryMarkets();
       g('save-ok').style.display='block';
       g('save-btn').textContent='Update Factory Details';
       g('status-banner').style.display='block';
@@ -809,6 +876,348 @@ async function loadAllFileLists(){
       }else{listEl.innerHTML='';}
     }catch(e){console.log('file list error:',e);}
   }
+}
+
+// ── CATEGORY & MARKET DATA ──
+var allCategoryData = {}; // {topLevel: {subCat: [subSubCats]}}
+var globalMarketsData = [];
+var factoryCategorySelections = {}; // {topLevel: {pct, subs: {subCat: [subSubCats]}}}
+var factoryMarketSelections = {}; // {marketId: pct}
+
+async function loadCategoryData(){
+  try{
+    var r = await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var rows = await r.json();
+    allCategoryData = {};
+    rows.forEach(function(row){
+      var cat = row.category;
+      var sub = row.sub_category;
+      var subsub = row.sub_sub_category;
+      if(!allCategoryData[cat]) allCategoryData[cat] = {};
+      if(!allCategoryData[cat][sub]) allCategoryData[cat][sub] = [];
+      if(subsub) allCategoryData[cat][sub].push({name:subsub, id:row.id});
+    });
+    renderCategoryStage1();
+  }catch(e){
+    g('cat-loading').textContent = 'Error loading categories. Please refresh.';
+  }
+}
+
+async function loadMarketData(){
+  try{
+    var r = await fetch(SB+'/rest/v1/global_markets?select=*&order=display_order',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    globalMarketsData = await r.json();
+    renderMarketList();
+  }catch(e){
+    console.log('loadMarketData error:',e);
+  }
+}
+
+function renderCategoryStage1(){
+  var el = g('cat-stage1');
+  var topCats = Object.keys(allCategoryData);
+  el.innerHTML = topCats.map(function(cat){
+    var sel = factoryCategorySelections[cat];
+    var isChecked = sel ? 'checked' : '';
+    var pct = sel ? sel.pct || '' : '';
+    var encCat = encodeURIComponent(cat);
+    var pctHidden = sel ? '' : 'style="display:none;"';
+    var btnHidden = sel ? '' : 'style="display:none;"';
+    return '<div class="cat-top-item" id="catitem-'+encCat+'" data-cat="'+encCat+'">' +
+      '<div class="cat-top-row">' +
+        '<input type="checkbox" class="cat-top-check" '+isChecked+' onchange="handleTopCatChange(this)" />' +
+        '<span class="cat-top-name" onclick="this.previousElementSibling.click()">'+cat+'</span>' +
+        '<div class="cat-pct-wrap">' +
+          '<input type="number" class="cat-pct-input" id="catpct-'+encCat+'" value="'+pct+'" min="0" max="100" placeholder="0" '+pctHidden+' oninput="updateCatTotal()" />' +
+          '<span class="cat-pct-label" '+pctHidden+'>%</span>' +
+          '<button class="cat-specify-btn" id="catbtn-'+encCat+'" onclick="handleSpecifyClick(this)" '+btnHidden+'>Specify Products &#9660;</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="cat-detail-panel" id="catdetail-'+encCat+'">' +
+        '<div style="font-size:12px;color:#888;margin-bottom:10px;padding:6px 0;">All products in this category have been pre-selected. Simply uncheck any products your factory does not manufacture.</div>' +
+        renderSubCategories(cat) +
+      '</div>' +
+    '</div>';
+  }).join('');
+  updateCatTotal();
+}
+
+function handleTopCatChange(cb){
+  var item = cb.closest('.cat-top-item');
+  var encCat = item.dataset.cat;
+  var cat = decodeURIComponent(encCat);
+  var isChecked = cb.checked;
+  var pctInput = g('catpct-'+encCat);
+  var pctLabel = pctInput ? pctInput.nextElementSibling : null;
+  var specBtn = g('catbtn-'+encCat);
+  if(pctInput) pctInput.style.display = isChecked ? 'block' : 'none';
+  if(pctLabel) pctLabel.style.display = isChecked ? 'inline' : 'none';
+  if(specBtn) specBtn.style.display = isChecked ? 'inline-block' : 'none';
+  if(!isChecked){
+    var detail = g('catdetail-'+encCat);
+    if(detail) detail.classList.remove('open');
+    delete factoryCategorySelections[cat];
+  } else {
+    if(!factoryCategorySelections[cat]) factoryCategorySelections[cat] = {pct:'',subs:{}};
+  }
+  updateCatTotal();
+}
+
+function handleSpecifyClick(btn){
+  var item = btn.closest('.cat-top-item');
+  var encCat = item.dataset.cat;
+  var panel = g('catdetail-'+encCat);
+  if(!panel) return;
+  var isOpen = panel.classList.toggle('open');
+  btn.innerHTML = isOpen ? 'Specify Products &#9650;' : 'Specify Products &#9660;';
+}
+
+function renderSubCategories(cat){
+  var subs = allCategoryData[cat];
+  return Object.keys(subs).map(function(sub){
+    var subSubs = subs[sub];
+    var subId = encodeURIComponent(cat+'|'+sub);
+    var sel = factoryCategorySelections[cat];
+    var selectedSubs = sel && sel.subs ? sel.subs : {};
+    var isSubChecked = selectedSubs[sub] ? true : !sel;
+    return '<div class="cat-sub-section">' +
+      '<div class="cat-sub-header">' +
+        '<input type="checkbox" class="cat-sub-check" id="subscheck-'+subId+'" '+(isSubChecked?'checked':'')+' onchange="updateCatTotal()" />' +
+        '<span class="cat-sub-name">'+sub+'</span>' +
+        '<button class="cat-sub-toggle" data-subid="'+subId+'" data-all="true" onclick="selectAllSubSub(this.dataset.subid,true)">All</button>' +
+        '<span style="color:#ccc;font-size:11px;">|</span>' +
+        '<button class="cat-sub-toggle" data-subid="'+subId+'" onclick="selectAllSubSub(this.dataset.subid,false)">None</button>' +
+      '</div>' +
+      '<div class="cat-subsub-grid" id="subsubgrid-'+subId+'">' +
+        subSubs.map(function(item){
+          var isChecked = !sel || (selectedSubs[sub] && selectedSubs[sub].includes(item.name));
+          if(!sel) isChecked = true;
+          return '<label class="cat-subsub-item">' +
+            '<input type="checkbox" '+(isChecked?'checked':'')+' value="'+item.name+'" data-cat="'+cat+'" data-sub="'+sub+'" /> '+
+            item.name +
+          '</label>';
+        }).join('') +
+      '</div>' +
+      '<div class="cat-add-custom">' +
+        '<input type="text" class="cat-add-input" placeholder="Not listed? Add it here..." id="custominput-'+subId+'" data-cat="'+cat+'" data-sub="'+sub+'" data-subid="'+subId+'" />' +
+        '<button class="cat-add-btn" data-subid="'+subId+'" onclick="handleAddCustom(this)">+ Add</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+
+
+function selectAllSubSub(subId, selectAll){
+  var grid = g('subsubgrid-'+subId);
+  if(!grid) return;
+  grid.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked = selectAll; });
+}
+
+function updateCatTotal(){
+  var total = 0;
+  document.querySelectorAll('.cat-pct-input').forEach(function(inp){
+    if(inp.offsetParent !== null){ // visible
+      var v = parseFloat(inp.value) || 0;
+      total += v;
+    }
+  });
+  var el = g('cat-total');
+  el.textContent = total + '%';
+  el.className = 'cat-total-val ' + (total === 100 ? 'ok' : total > 100 ? 'over' : 'warn');
+}
+
+function updateMarketTotal(){
+  var total = 0;
+  document.querySelectorAll('.market-pct-input').forEach(function(inp){
+    if(inp.style.display !== 'none'){
+      var v = parseFloat(inp.value) || 0;
+      total += v;
+    }
+  });
+  var el = g('market-total');
+  el.textContent = total + '%';
+  el.className = 'cat-total-val ' + (total === 100 ? 'ok' : total > 100 ? 'over' : 'warn');
+}
+
+function renderMarketList(){
+  var el = g('market-list');
+  el.innerHTML = globalMarketsData.map(function(m){
+    var sel = factoryMarketSelections[m.id];
+    var isChecked = sel !== undefined;
+    var pct = sel || '';
+    var hidden = isChecked ? '' : 'style="display:none;"';
+    return '<div class="market-item">' +
+      '<input type="checkbox" class="market-check" id="mktcheck-'+m.id+'" data-marketid="'+m.id+'" '+(isChecked?'checked':'')+' onchange="handleMarketChange(this)" />' +
+      '<span class="market-name" onclick="this.previousElementSibling.click()">'+m.market_name+'</span>' +
+      '<div class="market-pct-wrap">' +
+        '<input type="number" class="market-pct-input" id="mktpct-'+m.id+'" value="'+pct+'" min="0" max="100" placeholder="0" '+hidden+' oninput="updateMarketTotal()" />' +
+        '<span class="market-pct-label" '+hidden+'>%</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  updateMarketTotal();
+}
+
+function handleMarketChange(cb){
+  var marketId = cb.dataset.marketid;
+  var pctInput = g('mktpct-'+marketId);
+  var pctLabel = pctInput ? pctInput.nextElementSibling : null;
+  var isChecked = cb.checked;
+  if(pctInput) pctInput.style.display = isChecked ? 'block' : 'none';
+  if(pctLabel) pctLabel.style.display = isChecked ? 'inline' : 'none';
+  if(!isChecked) delete factoryMarketSelections[marketId];
+  updateMarketTotal();
+}
+
+
+
+function getSelectedTopCategories(){
+  // Returns array of top-level category names for the factories.product_categories field
+  var cats = [];
+  document.querySelectorAll('.cat-top-check:checked').forEach(function(cb){
+    var row = cb.closest('.cat-top-item');
+    if(row){
+      var nameEl = row.querySelector('.cat-top-name');
+      if(nameEl) cats.push(nameEl.textContent.trim());
+    }
+  });
+  return cats;
+}
+
+function handleAddCustom(btn){
+  var subId = btn.dataset.subid;
+  var input = g('custominput-'+subId);
+  if(!input || !input.value.trim()) return;
+  var cat = input.dataset.cat;
+  var sub = input.dataset.sub;
+  addCustomProduct(cat, sub, subId, input.value.trim());
+  input.value = '';
+}
+
+async function addCustomProduct(cat, sub, subId, name){
+  var grid = g('subsubgrid-'+subId);
+  if(grid){
+    var label = document.createElement('label');
+    label.className = 'cat-subsub-item';
+    label.style.background = '#fff8e0';
+    label.style.borderColor = '#f0d060';
+    label.innerHTML = '<input type="checkbox" checked value="'+name+'" data-cat="'+cat+'" data-sub="'+sub+'" data-custom="true" /> '+name+' <span style="font-size:10px;color:#886600;margin-left:4px;">pending</span>';
+    grid.appendChild(label);
+  }
+  if(FACTORY_ID){
+    try{
+      await fetch(SB+'/rest/v1/pending_subcategories',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({factory_id:FACTORY_ID,parent_category:cat,parent_sub_category:sub,proposed_name:name,status:'pending'})
+      });
+    }catch(e){console.log('pending subcategory save error:',e);}
+  }
+}
+
+async function saveFactoryCategories(){
+  if(!FACTORY_ID) return;
+  // Build selections from UI
+  var rows = [];
+  document.querySelectorAll('.cat-top-check:checked').forEach(function(cb){
+    var item = cb.closest('.cat-top-item');
+    if(!item) return;
+    var nameEl = item.querySelector('.cat-top-name');
+    if(!nameEl) return;
+    var cat = nameEl.textContent.trim();
+    var encCat = encodeURIComponent(cat);
+    var pct = parseFloat((g('catpct-'+encCat)||{}).value) || null;
+    // Get selected sub-sub-categories
+    item.querySelectorAll('.cat-subsub-item input:checked').forEach(function(scb){
+      rows.push({
+        factory_id: FACTORY_ID,
+        category: cat,
+        sub_category: scb.dataset.sub,
+        sub_sub_category: scb.value,
+        business_percentage: pct,
+        is_primary: false
+      });
+    });
+    // If no sub-sub selected, still save the top-level
+    if(!item.querySelector('.cat-subsub-item input:checked')){
+      rows.push({factory_id:FACTORY_ID, category:cat, sub_category:null, sub_sub_category:null, business_percentage:pct, is_primary:false});
+    }
+  });
+  // Delete existing and reinsert
+  await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID,{
+    method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+  });
+  if(rows.length){
+    await fetch(SB+'/rest/v1/factory_categories',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(rows)
+    });
+  }
+}
+
+async function saveFactoryMarkets(){
+  if(!FACTORY_ID) return;
+  var rows = [];
+  globalMarketsData.forEach(function(m){
+    var cb = g('mktcheck-'+m.id);
+    if(cb && cb.checked){
+      var pct = parseFloat((g('mktpct-'+m.id)||{}).value) || null;
+      rows.push({factory_id:FACTORY_ID, market_id:m.id, market_percentage:pct});
+    }
+  });
+  // Delete existing and reinsert
+  await fetch(SB+'/rest/v1/factory_markets?factory_id=eq.'+FACTORY_ID,{
+    method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+  });
+  if(rows.length){
+    await fetch(SB+'/rest/v1/factory_markets',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(rows)
+    });
+  }
+}
+
+async function loadFactoryCategories(){
+  if(!FACTORY_ID) return;
+  try{
+    var r = await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var rows = await r.json();
+    factoryCategorySelections = {};
+    rows.forEach(function(row){
+      var cat = row.category;
+      if(!factoryCategorySelections[cat]) factoryCategorySelections[cat] = {pct: row.business_percentage, subs:{}};
+      if(row.sub_category){
+        if(!factoryCategorySelections[cat].subs[row.sub_category]) factoryCategorySelections[cat].subs[row.sub_category] = [];
+        if(row.sub_sub_category) factoryCategorySelections[cat].subs[row.sub_category].push(row.sub_sub_category);
+      }
+    });
+    // Re-render with saved selections
+    if(Object.keys(allCategoryData).length) renderCategoryStage1();
+  }catch(e){console.log('loadFactoryCategories error:',e);}
+}
+
+async function loadFactoryMarkets(){
+  if(!FACTORY_ID) return;
+  try{
+    var r = await fetch(SB+'/rest/v1/factory_markets?factory_id=eq.'+FACTORY_ID+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var rows = await r.json();
+    factoryMarketSelections = {};
+    rows.forEach(function(row){
+      factoryMarketSelections[row.market_id] = row.market_percentage;
+    });
+    if(globalMarketsData.length) renderMarketList();
+  }catch(e){console.log('loadFactoryMarkets error:',e);}
 }
 </script>
 </body>
