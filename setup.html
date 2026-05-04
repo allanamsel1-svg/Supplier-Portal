@@ -1038,6 +1038,11 @@ async function loadVendorGuides(custId){
         tagsHtml+='<div style="margin-top:2px;">'+vg.ai_freeform_tags.map(function(t){return '<span class="vguide-tag" style="background:#fff8e0;color:#886600;border-color:#f0d860;">'+t.replace(/_/g,' ')+'</span>';}).join('')+'</div>';
       }
       var summaryHtml=vg.ai_summary?'<div style="font-size:11px;color:#666;margin-top:4px;line-height:1.4;">'+esc(vg.ai_summary)+'</div>':'';
+      // Show "Analyze" button only for pending or failed docs
+      var analyzeBtn='';
+      if(vg.processing_status==='pending'||vg.processing_status==='failed'){
+        analyzeBtn='<button class="btn-sm-edit" onclick="reanalyzeVendorGuide(\''+vg.id+'\')" style="background:#f0f4ff;color:#2244cc;border-color:#c0d0f0;">✦ Analyze</button>';
+      }
       var safePath=vg.file_path.replace(/'/g,"\\'");
       return '<div class="vguide-item">'+
         '<div class="vguide-item-row">'+
@@ -1046,6 +1051,7 @@ async function loadVendorGuides(custId){
             '<div class="vguide-item-meta">'+esc(vg.file_name)+(sizeStr?' · '+sizeStr:'')+(dateStr?' · '+dateStr:'')+'</div>'+
           '</div>'+
           '<div class="vguide-item-actions">'+
+            analyzeBtn+
             '<button class="btn-sm-edit" onclick="downloadVendorGuide(\''+vg.id+'\',\''+safePath+'\')">View</button>'+
             '<button class="btn-sm-del" onclick="deleteVendorGuide(\''+vg.id+'\',\''+safePath+'\')">Del</button>'+
           '</div>'+
@@ -1054,10 +1060,20 @@ async function loadVendorGuides(custId){
         tagsHtml+
       '</div>';
     }).join('');
-    // Auto-refresh while any document is still being analyzed
-    var stillProcessing=guides.some(function(vg){return vg.processing_status==='pending'||vg.processing_status==='processing';});
+    // Auto-refresh while any document is actively analyzing.
+    // Only poll for: status='processing', OR status='pending' if uploaded in the last 30 seconds.
+    // This stops infinite polling on stuck old pending docs.
+    var nowMs=Date.now();
+    var stillProcessing=guides.some(function(vg){
+      if(vg.processing_status==='processing')return true;
+      if(vg.processing_status==='pending'){
+        var ageMs=nowMs-new Date(vg.uploaded_at).getTime();
+        return ageMs<30000;
+      }
+      return false;
+    });
     if(stillProcessing){
-      // Stop polling after ~3 minutes total (30 attempts × ~6s) to avoid forever-loops
+      // Stop polling after ~3 minutes total to avoid forever-loops
       vguidePollCount=(vguidePollCount||0)+1;
       if(vguidePollCount<30){
         setTimeout(function(){
@@ -1074,6 +1090,28 @@ async function loadVendorGuides(custId){
   }
 }
 var vguidePollCount=0;
+
+async function reanalyzeVendorGuide(guideId){
+  // Reset status to pending so the AI runs again, then kick off the analyzer
+  try{
+    var pr=await fetch(SB+'/rest/v1/customer_vendor_guides?id=eq.'+guideId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({processing_status:'pending',ai_summary:null})
+    });
+    if(!pr.ok){var perr=await pr.json().catch(function(){return{};});alert('Reset failed: '+(perr.message||pr.status));return;}
+    // Kick off analyzer (fire-and-forget)
+    fetch('/api/analyze-vendor-guide',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({guideId:guideId})
+    }).catch(function(e){console.log('analyze kickoff error:',e);});
+    // Reset poll counter so polling can run for this manual trigger
+    vguidePollCount=0;
+    // Reload list to show updated state
+    if(currentCustId)await loadVendorGuides(currentCustId);
+  }catch(e){alert('Error: '+e.message);}
+}
 
 async function uploadVendorGuide(){
   if(!currentCustId){showMsg('vg','err','Save the customer first before uploading documents.');return;}
