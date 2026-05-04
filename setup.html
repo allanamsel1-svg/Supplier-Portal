@@ -113,6 +113,11 @@
     .contact-name { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-top: 4px; }
     .contact-meta { font-size: 11px; color: #888; margin-top: 2px; }
     .contact-form { background: #f0f8ff; border: 1px solid #c8e0f8; border-radius: 8px; padding: 12px; margin-top: 8px; }
+
+    /* Compact checkbox grid (Trading Terms) */
+    .cb-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 10px; }
+    .cb-it { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #444; }
+    .cb-it input { width: 13px; height: 13px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -266,6 +271,95 @@
             <div class="f"><label>Min Gross Margin %</label><div class="pct-row"><input type="number" id="xf-mingross" placeholder="45" min="0" max="100" step="0.1" /><span>%</span></div></div>
             <div class="f"><label>Min Net Margin %</label><div class="pct-row"><input type="number" id="xf-minnet" placeholder="30" min="0" max="100" step="0.1" /><span>%</span></div></div>
           </div>
+
+          <div class="section-divider">Trading Terms</div>
+          <div class="fg2">
+            <div class="f">
+              <label>Payment Terms</label>
+              <select id="xf-payment-terms">
+                <option value="">— Select —</option>
+                <option>Net 15</option>
+                <option>Net 30</option>
+                <option>Net 45</option>
+                <option>Net 60</option>
+                <option>Net 75</option>
+                <option>Net 90</option>
+                <option>2/10 Net 30</option>
+                <option>1/10 Net 30</option>
+                <option>COD</option>
+                <option>Prepaid</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="f">
+              <label>Currency</label>
+              <select id="xf-currency">
+                <option value="">— Select —</option>
+                <option>USD</option>
+                <option>CAD</option>
+                <option>GBP</option>
+                <option>EUR</option>
+                <option>AUD</option>
+                <option>MXN</option>
+                <option>JPY</option>
+                <option>CNY</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg2">
+            <div class="f"><label>Vendor / GS1 Number</label><input type="text" id="xf-vendor-number" placeholder="e.g. 12345678" /></div>
+            <div class="f">
+              <label>Incoterms</label>
+              <select id="xf-incoterms">
+                <option value="">— Select —</option>
+                <option>FOB (Free On Board)</option>
+                <option>DDP (Delivered Duty Paid)</option>
+                <option>CIF (Cost, Insurance, Freight)</option>
+                <option>EXW (Ex Works)</option>
+                <option>FCA (Free Carrier)</option>
+                <option>CPT (Carriage Paid To)</option>
+                <option>CIP (Carriage and Insurance Paid To)</option>
+                <option>DAP (Delivered At Place)</option>
+                <option>DPU (Delivered at Place Unloaded)</option>
+              </select>
+            </div>
+          </div>
+          <div class="f"><label>Ship-To / Primary DC</label><input type="text" id="xf-ship-to-dc" placeholder="e.g. Walmart DC #6094, Bentonville AR" /></div>
+
+          <div style="font-size:11px;color:#888;margin-top:8px;margin-bottom:4px;">EDI Documents Required</div>
+          <div class="cb-grid">
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="810"> 810 Invoice</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="850"> 850 PO</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="855"> 855 PO Ack</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="856"> 856 ASN</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="860"> 860 PO Change</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="940"> 940 Warehouse Order</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="945"> 945 Ship Advice</label>
+            <label class="cb-it"><input type="checkbox" class="edi-cb" value="997"> 997 Func Ack</label>
+          </div>
+
+          <div class="fg2" style="margin-top:8px;">
+            <div class="f"><label>Routing Portal URL</label><input type="url" id="xf-routing-url" placeholder="https://..." /></div>
+            <div class="f"><label>Vendor Portal URL</label><input type="url" id="xf-vendor-url" placeholder="https://..." /></div>
+          </div>
+          <div class="f"><label>Insurance Min Liability</label><input type="text" id="xf-insurance" placeholder="e.g. $2M general liability" /></div>
+
+          <div style="font-size:11px;color:#888;margin-top:8px;margin-bottom:4px;">Required Certifications (customer demands these from us)</div>
+          <div class="cb-grid">
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="Prop 65"> Prop 65</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="CPSIA"> CPSIA</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="FDA"> FDA</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="FCC"> FCC</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="UL"> UL</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="CE"> CE</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="RoHS"> RoHS</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="REACH"> REACH</label>
+            <label class="cb-it"><input type="checkbox" class="cert-cb" value="Health Canada"> Health Canada</label>
+          </div>
+
+          <div class="f" style="margin-top:8px;"><label>Chargeback Policy / Fines</label><textarea id="xf-chargeback" rows="2" placeholder="e.g. 3% per ASN error, 5% late shipment fee..."></textarea></div>
+          <div class="f"><label>Vendor Setup Notes</label><textarea id="xf-vendor-terms-notes" rows="2" placeholder="Anything else specific to this customer's setup..."></textarea></div>
+
           <div class="f"><label>Notes</label><textarea id="xf-notes" rows="2"></textarea></div>
           <button class="btn-save-form" onclick="saveCust()">Save Customer</button>
           <button class="btn-cancel-form" onclick="newCustForm()" style="margin-top:6px;">Clear Form</button>
@@ -722,6 +816,10 @@ function newCustForm(){
   g('xf-contact').value='';g('xf-email').value='';
   ['xf-margin','xf-returns','xf-dilution','xf-commission','xf-ad','xf-mingross','xf-minnet'].forEach(function(id){g(id).value='';});
   g('xf-notes').value='';
+  // Trading Terms — clear
+  ['xf-payment-terms','xf-currency','xf-vendor-number','xf-incoterms','xf-ship-to-dc','xf-routing-url','xf-vendor-url','xf-insurance','xf-chargeback','xf-vendor-terms-notes'].forEach(function(id){var el=g(id);if(el)el.value='';});
+  document.querySelectorAll('.edi-cb').forEach(function(cb){cb.checked=false;});
+  document.querySelectorAll('.cert-cb').forEach(function(cb){cb.checked=false;});
   g('cust-form-title').textContent='New Customer';
   g('cust-ok').style.display='none';g('cust-err').style.display='none';
   g('dept-section').style.display='none';
@@ -738,6 +836,21 @@ function editCust(id){
   g('xf-ad').value=c.default_ad_allowance_pct||'';
   g('xf-mingross').value=c.min_gross_margin_pct||'';g('xf-minnet').value=c.min_net_margin_pct||'';
   g('xf-notes').value=c.notes||'';
+  // Trading Terms — populate
+  g('xf-payment-terms').value=c.payment_terms||'';
+  g('xf-currency').value=c.currency||'';
+  g('xf-vendor-number').value=c.vendor_number||'';
+  g('xf-incoterms').value=c.incoterms||'';
+  g('xf-ship-to-dc').value=c.ship_to_dc||'';
+  g('xf-routing-url').value=c.routing_portal_url||'';
+  g('xf-vendor-url').value=c.vendor_portal_url||'';
+  g('xf-insurance').value=c.insurance_min_liability||'';
+  g('xf-chargeback').value=c.chargeback_policy||'';
+  g('xf-vendor-terms-notes').value=c.vendor_terms_notes||'';
+  var ediArr=Array.isArray(c.edi_documents)?c.edi_documents:[];
+  document.querySelectorAll('.edi-cb').forEach(function(cb){cb.checked=ediArr.indexOf(cb.value)!==-1;});
+  var certArr=Array.isArray(c.required_certifications)?c.required_certifications:[];
+  document.querySelectorAll('.cert-cb').forEach(function(cb){cb.checked=certArr.indexOf(cb.value)!==-1;});
   g('cust-form-title').textContent='Edit Customer';
   g('cust-ok').style.display='none';g('cust-err').style.display='none';
   currentCustId=id;
@@ -753,7 +866,31 @@ function editCust(id){
 async function saveCust(){
   var name=gv('xf-name'),code=gv('xf-code').toUpperCase();
   if(!name||!code){alert('Customer name and code are required.');return;}
-  var payload={customer_name:name,customer_code:code,contact_name:gv('xf-contact')||null,contact_email:gv('xf-email')||null,default_margin_pct:pf('xf-margin'),default_returns_pct:pf('xf-returns'),default_dilution_pct:pf('xf-dilution'),default_commission_pct:pf('xf-commission'),default_ad_allowance_pct:pf('xf-ad'),min_gross_margin_pct:pf('xf-mingross'),min_net_margin_pct:pf('xf-minnet'),notes:gv('xf-notes')||null,is_active:true};
+  // Collect EDI and cert checkboxes
+  var ediDocs=[];document.querySelectorAll('.edi-cb:checked').forEach(function(cb){ediDocs.push(cb.value);});
+  var certs=[];document.querySelectorAll('.cert-cb:checked').forEach(function(cb){certs.push(cb.value);});
+  var payload={
+    customer_name:name,customer_code:code,
+    contact_name:gv('xf-contact')||null,contact_email:gv('xf-email')||null,
+    default_margin_pct:pf('xf-margin'),default_returns_pct:pf('xf-returns'),
+    default_dilution_pct:pf('xf-dilution'),default_commission_pct:pf('xf-commission'),
+    default_ad_allowance_pct:pf('xf-ad'),
+    min_gross_margin_pct:pf('xf-mingross'),min_net_margin_pct:pf('xf-minnet'),
+    notes:gv('xf-notes')||null,is_active:true,
+    // Trading Terms
+    payment_terms:gv('xf-payment-terms')||null,
+    currency:gv('xf-currency')||null,
+    vendor_number:gv('xf-vendor-number')||null,
+    incoterms:gv('xf-incoterms')||null,
+    ship_to_dc:gv('xf-ship-to-dc')||null,
+    edi_documents:ediDocs,
+    chargeback_policy:gv('xf-chargeback')||null,
+    routing_portal_url:gv('xf-routing-url')||null,
+    vendor_portal_url:gv('xf-vendor-url')||null,
+    insurance_min_liability:gv('xf-insurance')||null,
+    required_certifications:certs,
+    vendor_terms_notes:gv('xf-vendor-terms-notes')||null
+  };
   var id=gv('xf-id');
   var url=id?SB+'/rest/v1/customers?id=eq.'+id:SB+'/rest/v1/customers';
   var method=id?'PATCH':'POST';
