@@ -448,12 +448,18 @@ async function enterPortal(){
   g('portal').style.display='flex';
   g('portal').style.flexDirection='column';
   g('u-email').textContent=USER.email;
-  // Load category and market data first
+  // Get factory ID first so category/market selections load correctly
+  try{
+    var fidR = await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id+'&select=id&limit=1',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var fidRows = await fidR.json();
+    if(Array.isArray(fidRows) && fidRows.length > 0) FACTORY_ID = fidRows[0].id;
+  }catch(e){}
+  // Load category structure and saved selections, then factory details
   await loadCategoryData();
-  await loadMarketData();
   await loadDetails();
   await loadAllFileLists();
-  // Load RFQ badge count silently
   loadRFQBadge();
 }
 
@@ -500,9 +506,6 @@ async function loadDetails(){
         banner.className='banner pending';
       }
       g('save-btn').textContent='Update Factory Details';
-      // Load structured categories and markets
-      await loadFactoryCategories();
-      await loadFactoryMarkets();
     }
   }catch(e){console.log('loadDetails error:',e);}
 }
@@ -886,6 +889,7 @@ var factoryMarketSelections = {}; // {marketId: pct}
 
 async function loadCategoryData(){
   try{
+    // Load category structure
     var r = await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
@@ -899,9 +903,13 @@ async function loadCategoryData(){
       if(!allCategoryData[cat][sub]) allCategoryData[cat][sub] = [];
       if(subsub) allCategoryData[cat][sub].push({name:subsub, id:row.id});
     });
-    renderCategoryStage1();
+    // Load saved factory selections BEFORE rendering so they populate correctly
+    await loadFactoryCategories();
+    await loadMarketData();
+    await loadFactoryMarkets();
   }catch(e){
     g('cat-loading').textContent = 'Error loading categories. Please refresh.';
+    console.log('loadCategoryData error:',e);
   }
 }
 
@@ -911,9 +919,10 @@ async function loadMarketData(){
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     globalMarketsData = await r.json();
-    renderMarketList();
+    // renderMarketList is called by loadFactoryMarkets after selections are loaded
   }catch(e){
     console.log('loadMarketData error:',e);
+    globalMarketsData = [];
   }
 }
 
@@ -1185,39 +1194,53 @@ async function saveFactoryMarkets(){
 }
 
 async function loadFactoryCategories(){
-  if(!FACTORY_ID) return;
+  if(!FACTORY_ID){
+    // No factory yet - just render with empty selections (all pre-checked)
+    renderCategoryStage1();
+    return;
+  }
   try{
     var r = await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+FACTORY_ID+'&select=*',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     var rows = await r.json();
     factoryCategorySelections = {};
-    rows.forEach(function(row){
-      var cat = row.category;
-      if(!factoryCategorySelections[cat]) factoryCategorySelections[cat] = {pct: row.business_percentage, subs:{}};
-      if(row.sub_category){
-        if(!factoryCategorySelections[cat].subs[row.sub_category]) factoryCategorySelections[cat].subs[row.sub_category] = [];
-        if(row.sub_sub_category) factoryCategorySelections[cat].subs[row.sub_category].push(row.sub_sub_category);
-      }
-    });
-    // Re-render with saved selections
-    if(Object.keys(allCategoryData).length) renderCategoryStage1();
-  }catch(e){console.log('loadFactoryCategories error:',e);}
+    if(Array.isArray(rows) && rows.length > 0){
+      rows.forEach(function(row){
+        var cat = row.category;
+        if(!factoryCategorySelections[cat]) factoryCategorySelections[cat] = {pct: row.business_percentage, subs:{}};
+        if(row.sub_category){
+          if(!factoryCategorySelections[cat].subs[row.sub_category]) factoryCategorySelections[cat].subs[row.sub_category] = [];
+          if(row.sub_sub_category) factoryCategorySelections[cat].subs[row.sub_category].push(row.sub_sub_category);
+        }
+      });
+    }
+    // Always render after loading selections
+    renderCategoryStage1();
+  }catch(e){
+    console.log('loadFactoryCategories error:',e);
+    renderCategoryStage1();
+  }
 }
 
 async function loadFactoryMarkets(){
-  if(!FACTORY_ID) return;
+  factoryMarketSelections = {};
+  if(!FACTORY_ID){
+    renderMarketList();
+    return;
+  }
   try{
     var r = await fetch(SB+'/rest/v1/factory_markets?factory_id=eq.'+FACTORY_ID+'&select=*',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     var rows = await r.json();
-    factoryMarketSelections = {};
-    rows.forEach(function(row){
-      factoryMarketSelections[row.market_id] = row.market_percentage;
-    });
-    if(globalMarketsData.length) renderMarketList();
+    if(Array.isArray(rows)){
+      rows.forEach(function(row){
+        factoryMarketSelections[row.market_id] = row.market_percentage;
+      });
+    }
   }catch(e){console.log('loadFactoryMarkets error:',e);}
+  renderMarketList();
 }
 </script>
 </body>
