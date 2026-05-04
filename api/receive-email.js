@@ -1,9 +1,9 @@
 // api/receive-email.js
-// SendGrid Inbound Parse webhook — receives incoming emails and saves to Supabase
+import { IncomingForm } from 'formidable';
 
 export const config = {
   api: {
-    bodyParser: false, // Must be disabled for multipart/form-data
+    bodyParser: false,
   },
 };
 
@@ -22,45 +22,59 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Parse multipart form data manually
-    const body = await parseMultipart(req);
+    // Parse multipart form data using formidable
+    const fields = await new Promise((resolve, reject) => {
+      const form = new IncomingForm({ multiples: false });
+      form.parse(req, (err, fields) => {
+        if (err) reject(err);
+        else resolve(fields);
+      });
+    });
 
-    const fromRaw = body.from || '';
-    const toRaw = body.to || '';
+    // formidable v3 returns arrays for field values
+    const get = (key) => {
+      const val = fields[key];
+      if (Array.isArray(val)) return val[0] || '';
+      return val || '';
+    };
+
+    const fromRaw = get('from');
+    const toRaw = get('to');
     const fromEmail = extractEmail(fromRaw);
     const fromName = extractName(fromRaw);
     const toEmail = extractEmail(toRaw).toLowerCase();
-    const subject = body.subject || '(No Subject)';
-    const textBody = body.text || body.html || '';
-    const headersRaw = body.headers || '';
+    const subject = get('subject') || '(No Subject)';
+    const textBody = get('text') || get('html') || '';
+    const headersRaw = get('headers');
     const messageId = extractHeader(headersRaw, 'Message-ID');
     const inReplyTo = extractHeader(headersRaw, 'In-Reply-To');
     const now = new Date().toISOString();
 
-    const headers = {
+    const sbHeaders = {
       'apikey': KEY,
       'Authorization': 'Bearer ' + KEY,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
 
-    // Try to find existing thread
+    // Try to find existing thread by In-Reply-To
     let threadId = null;
 
     if (inReplyTo) {
       const r = await fetch(
         SB + '/rest/v1/email_threads?message_id=eq.' + encodeURIComponent(inReplyTo.trim()),
-        { headers }
+        { headers: sbHeaders }
       );
       const rows = await r.json();
       if (rows && rows.length > 0) threadId = rows[0].id;
     }
 
+    // Try to match by subject
     if (!threadId) {
       const cleanSubject = subject.replace(/^(Re:|Fwd:|RE:|FW:)\s*/gi, '').trim();
       const r = await fetch(
         SB + '/rest/v1/email_threads?subject=ilike.*' + encodeURIComponent(cleanSubject) + '*&to_email=eq.' + encodeURIComponent(toEmail) + '&order=created_at.desc&limit=1',
-        { headers }
+        { headers: sbHeaders }
       );
       const rows = await r.json();
       if (rows && rows.length > 0) threadId = rows[0].id;
@@ -70,7 +84,7 @@ export default async function handler(req, res) {
       // Create new thread
       const r = await fetch(SB + '/rest/v1/email_threads', {
         method: 'POST',
-        headers,
+        headers: sbHeaders,
         body: JSON.stringify({
           subject,
           from_email: fromEmail,
@@ -88,7 +102,7 @@ export default async function handler(req, res) {
       // Update existing thread
       await fetch(SB + '/rest/v1/email_threads?id=eq.' + threadId, {
         method: 'PATCH',
-        headers: { ...headers, 'Prefer': 'return=minimal' },
+        headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
         body: JSON.stringify({
           status: 'unread',
           last_message_at: now,
@@ -100,13 +114,13 @@ export default async function handler(req, res) {
     }
 
     if (!threadId) {
-      return res.status(500).json({ error: 'Could not create thread' });
+      return res.status(200).json({ error: 'Could not create thread' });
     }
 
     // Save message
     await fetch(SB + '/rest/v1/email_messages', {
       method: 'POST',
-      headers: { ...headers, 'Prefer': 'return=minimal' },
+      headers: { ...sbHeaders, 'Prefer': 'return=minimal' },
       body: JSON.stringify({
         thread_id: threadId,
         from_email: fromEmail,
@@ -124,44 +138,9 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('receive-email error:', err);
-    // Always return 200 to SendGrid so it doesn't retry endlessly
+    // Return 200 so SendGrid does not retry
     return res.status(200).json({ error: err.message });
   }
-}
-
-// Parse multipart/form-data from raw request
-async function parseMultipart(req) {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => { data += chunk.toString(); });
-    req.on('end', () => {
-      try {
-        const contentType = req.headers['content-type'] || '';
-        const boundary = contentType.split('boundary=')[1];
-        if (!boundary) {
-          // Try to parse as URL encoded
-          const params = {};
-          data.split('&').forEach(pair => {
-            const [k, v] = pair.split('=');
-            if (k) params[decodeURIComponent(k)] = decodeURIComponent((v || '').replace(/\+/g, ' '));
-          });
-          return resolve(params);
-        }
-        const parts = data.split('--' + boundary);
-        const result = {};
-        parts.forEach(part => {
-          const match = part.match(/Content-Disposition: form-data; name="([^"]+)"[\r\n]+([\s\S]*)/i);
-          if (match) {
-            result[match[1]] = match[2].trim();
-          }
-        });
-        resolve(result);
-      } catch(e) {
-        reject(e);
-      }
-    });
-    req.on('error', reject);
-  });
 }
 
 function extractEmail(str) {
