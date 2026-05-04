@@ -9,6 +9,12 @@
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
 
 
+    /* ── Certifications ── */
+    .cert-category-group { margin-bottom:14px; }
+    .cert-category-label { font-size:10px; font-weight:600; color:#bbb; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #f0f0e8; }
+    .cert-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+    .cert-pending-tag { font-size:11px; background:#fff8e0; color:#886600; border:1px solid #f0d060; padding:3px 10px; border-radius:20px; display:flex; align-items:center; gap:5px; }
+    .cert-pending-remove { cursor:pointer; color:#886600; font-weight:700; }
     /* ── Category Selector ── */
     .cat-stage1 { margin-bottom: 1rem; }
     .cat-top-item { background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
@@ -277,38 +283,17 @@
         <span class="cat-total-val warn" id="market-total">0%</span>
       </div>
       <div class="sec-label">Certifications</div>
-      <div class="certs">
-        <label class="cb-item"><input type="checkbox" value="ISO 9001"> ISO 9001</label>
-        <label class="cb-item"><input type="checkbox" value="ISO 14001"> ISO 14001</label>
-        <label class="cb-item"><input type="checkbox" value="ISO 45001"> ISO 45001</label>
-        <label class="cb-item"><input type="checkbox" value="CE"> CE</label>
-        <label class="cb-item"><input type="checkbox" value="FCC"> FCC</label>
-        <label class="cb-item"><input type="checkbox" value="ETL"> ETL</label>
-        <label class="cb-item"><input type="checkbox" value="UL"> UL</label>
-        <label class="cb-item"><input type="checkbox" value="RoHS"> RoHS</label>
-        <label class="cb-item"><input type="checkbox" value="REACH"> REACH</label>
-        <label class="cb-item"><input type="checkbox" value="FDA"> FDA</label>
-        <label class="cb-item"><input type="checkbox" value="GMP"> GMP</label>
-        <label class="cb-item"><input type="checkbox" value="BSCI"> BSCI</label>
-        <label class="cb-item"><input type="checkbox" value="Sedex"> Sedex</label>
-        <label class="cb-item"><input type="checkbox" value="SA8000"> SA8000</label>
-        <label class="cb-item"><input type="checkbox" value="GRS"> GRS</label>
-        <label class="cb-item"><input type="checkbox" value="OEKO-TEX"> OEKO-TEX</label>
-        <label class="cb-item"><input type="checkbox" value="FSC"> FSC</label>
-        <label class="cb-item"><input type="checkbox" value="HACCP"> HACCP</label>
-        <label class="cb-item"><input type="checkbox" value="BRC"> BRC</label>
-        <label class="cb-item"><input type="checkbox" value="NSF"> NSF</label>
-        <label class="cb-item"><input type="checkbox" value="Leaping Bunny"> Leaping Bunny</label>
-        <label class="cb-item"><input type="checkbox" value="Cruelty Free"> Cruelty Free</label>
-        <label class="cb-item"><input type="checkbox" value="Vegan"> Vegan</label>
-        <label class="cb-item"><input type="checkbox" value="Organic"> Organic</label>
-        <label class="cb-item"><input type="checkbox" value="COSMOS"> COSMOS</label>
-        <label class="cb-item"><input type="checkbox" value="Health Canada"> Health Canada</label>
-        <label class="cb-item"><input type="checkbox" value="Prop 65 Compliant"> Prop 65</label>
-        <label class="cb-item"><input type="checkbox" value="CCC"> CCC</label>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">Select all certifications your factory currently holds.</div>
+      <div id="certs-loading" style="font-size:13px;color:#bbb;padding:8px 0;">Loading certifications...</div>
+      <div id="certs-by-category"></div>
+      <div style="margin-top:12px;">
+        <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Not listed? Add it here</div>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="p-cert-custom" placeholder="e.g. REACH, Bluesign..." style="flex:1;padding:8px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;" />
+          <button onclick="submitCustomCert()" style="padding:8px 14px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">+ Add</button>
+        </div>
+        <div id="custom-certs-pending" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
-      <div class="sec-label">Other Certifications</div>
-      <div class="field"><input type="text" id="p-cert_other" placeholder="List any other certifications..." /></div>
       <button class="save-btn" id="save-btn" onclick="saveDetails()">Save Factory Details</button>
       <div class="prog" id="save-prog">Saving...</div>
       <div class="pmsg ok" id="save-ok">✓ Factory details saved successfully!</div>
@@ -448,6 +433,8 @@ async function enterPortal(){
   g('portal').style.display='flex';
   g('portal').style.flexDirection='column';
   g('u-email').textContent=USER.email;
+  // Load certifications from DB
+  await loadCertifications();
   // Get factory ID first so category/market selections load correctly
   try{
     var fidR = await fetch(SB+'/rest/v1/factories?user_id=eq.'+USER.id+'&select=id&limit=1',{
@@ -492,10 +479,7 @@ async function loadDetails(){
       g('p-contact_email').value=f.sales_email||'';
       g('p-wechat').value=f.sales_wechat||'';
       g('p-whatsapp').value=f.sales_whatsapp||'';
-      document.querySelectorAll('.certs input[type=checkbox]').forEach(function(cb){
-        cb.checked=(f.certifications||[]).includes(cb.value);
-      });
-      if(g('p-cert_other'))g('p-cert_other').value='';
+      renderCertifications(f.certifications||[]);
       var banner=g('status-banner');
       banner.style.display='block';
       if(f.status==='approved'){
@@ -519,9 +503,7 @@ async function saveDetails(){
   g('save-prog').style.display='block';
   g('save-ok').style.display='none';
   g('save-err').style.display='none';
-  var certs=[];
-  document.querySelectorAll('.certs input:checked').forEach(function(c){certs.push(c.value);});
-  var other=g('p-cert_other').value.trim();if(other)certs.push(other);
+  var certs = getSelectedCertifications();
   FACTORY_NAME=g('p-name_en').value.trim();
   var payload={
     user_id:USER.id,
@@ -1241,6 +1223,84 @@ async function loadFactoryMarkets(){
     }
   }catch(e){console.log('loadFactoryMarkets error:',e);}
   renderMarketList();
+}
+
+// ── CERTIFICATIONS ──
+var allCertifications = [];
+
+async function loadCertifications(){
+  try{
+    var r = await fetch(SB+'/rest/v1/certifications?select=*&is_active=eq.true&order=category,name',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    allCertifications = await r.json();
+    renderCertifications([]);
+    g('certs-loading').style.display='none';
+  }catch(e){
+    console.log('loadCertifications error:',e);
+    g('certs-loading').textContent='Error loading certifications.';
+  }
+}
+
+function renderCertifications(savedCerts){
+  var el = g('certs-by-category');
+  if(!el) return;
+  // Group by category
+  var groups = {};
+  allCertifications.forEach(function(c){
+    var cat = c.category||'Other';
+    if(!groups[cat]) groups[cat] = [];
+    groups[cat].push(c);
+  });
+  el.innerHTML = Object.keys(groups).map(function(cat){
+    return '<div class="cert-category-group">' +
+      '<div class="cert-category-label">'+cat+'</div>' +
+      '<div class="cert-grid">' +
+        groups[cat].map(function(c){
+          var isChecked = savedCerts.includes(c.name);
+          return '<label class="cb-item">' +
+            '<input type="checkbox" class="cert-cb" value="'+c.name+'" '+(isChecked?'checked':'')+' /> '+c.name+
+          '</label>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function submitCustomCert(){
+  var input = g('p-cert-custom');
+  var name = input ? input.value.trim() : '';
+  if(!name){alert('Please enter a certification name.');return;}
+  // Show as pending tag in UI
+  var pendingEl = g('custom-certs-pending');
+  var tagId = 'certtag-'+Date.now();
+  var tag = document.createElement('div');
+  tag.className = 'cert-pending-tag';
+  tag.id = tagId;
+  tag.innerHTML = name+' <span style="font-size:9px;background:#fff0c0;padding:1px 4px;border-radius:3px;margin-left:2px;">pending</span> <span class="cert-pending-remove" onclick="this.parentElement.remove()">✕</span>';
+  tag.dataset.certname = name;
+  if(pendingEl) pendingEl.appendChild(tag);
+  input.value = '';
+  // Save to pending_certifications if factory exists
+  if(FACTORY_ID){
+    try{
+      await fetch(SB+'/rest/v1/pending_certifications',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({factory_id:FACTORY_ID, proposed_name:name, status:'pending'})
+      });
+    }catch(e){console.log('pending cert save error:',e);}
+  }
+}
+
+function getSelectedCertifications(){
+  var certs = [];
+  document.querySelectorAll('.cert-cb:checked').forEach(function(cb){ certs.push(cb.value); });
+  // Also include pending custom certs
+  document.querySelectorAll('#custom-certs-pending .cert-pending-tag').forEach(function(tag){
+    if(tag.dataset.certname) certs.push(tag.dataset.certname);
+  });
+  return certs;
 }
 </script>
 </body>

@@ -347,7 +347,7 @@
       <button class="sitem" id="nav-all" onclick="showPanel('all')"><span class="sicon">🏭</span> All Factories <span class="scount" id="cnt-all">0</span></button>
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
       <div class="slabel">Outreach</div>
-      <button class="sitem" id="nav-pending-cats" onclick="showPanel('pending-cats');loadPendingCats();"><span class="sicon">⚠</span> Pending Categories <span class="scount" id="cnt-pending-cats" style="background:#fff8e0;color:#886600;border:1px solid #f0d060;">0</span></button>
+      <button class="sitem" id="nav-pending-cats" onclick="showPanel('pending-cats');loadPendingCats();loadPendingCerts();"><span class="sicon">⚠</span> Pending Reviews <span class="scount" id="cnt-pending-cats" style="background:#fff8e0;color:#886600;border:1px solid #f0d060;">0</span></button>
       <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
       <div class="slabel">Communications</div>
@@ -947,16 +947,32 @@
     <!-- ── PENDING CATEGORIES PANEL ── -->
     <div class="panel" id="panel-pending-cats">
       <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
-        <div><div class="ph-title">⚠ Pending Categories</div><div class="ph-sub">New sub-categories added by factories — review, correct spelling, and approve</div></div>
-        <button onclick="loadPendingCats()" style="padding:7px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">↻ Refresh</button>
+        <div><div class="ph-title">⚠ Pending Reviews</div><div class="ph-sub">New categories and certifications added by factories — review, correct and approve</div></div>
+        <button onclick="loadPendingCats();loadPendingCerts();" style="padding:7px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">↻ Refresh</button>
       </div>
-      <div style="padding:1.25rem 1.5rem;max-width:800px;">
+      <!-- Tabs -->
+      <div style="display:flex;border-bottom:1px solid #e0e0d8;background:#fafaf8;padding:0 1.5rem;">
+        <button class="rfq-tab on" id="ptab-cats" onclick="switchPendingTab('cats')">Categories <span id="cnt-pending-cats-tab" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d060;padding:1px 6px;border-radius:10px;margin-left:4px;">0</span></button>
+        <button class="rfq-tab" id="ptab-certs" onclick="switchPendingTab('certs')">Certifications <span id="cnt-pending-certs-tab" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d060;padding:1px 6px;border-radius:10px;margin-left:4px;">0</span></button>
+      </div>
+      <!-- Categories tab -->
+      <div id="ptabpane-cats" style="padding:1.25rem 1.5rem;max-width:800px;">
         <div id="pending-cats-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading...</div>
         <div id="pending-cats-list"></div>
         <div id="pending-cats-empty" style="display:none;text-align:center;padding:3rem;color:#bbb;">
           <div style="font-size:32px;margin-bottom:12px;">✓</div>
           <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">All caught up</div>
           <div style="font-size:13px;">No pending category additions to review.</div>
+        </div>
+      </div>
+      <!-- Certifications tab -->
+      <div id="ptabpane-certs" style="display:none;padding:1.25rem 1.5rem;max-width:800px;">
+        <div id="pending-certs-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading...</div>
+        <div id="pending-certs-list"></div>
+        <div id="pending-certs-empty" style="display:none;text-align:center;padding:3rem;color:#bbb;">
+          <div style="font-size:32px;margin-bottom:12px;">✓</div>
+          <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">All caught up</div>
+          <div style="font-size:13px;">No pending certification additions to review.</div>
         </div>
       </div>
     </div>
@@ -1410,7 +1426,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
-  if(name==='pending-cats')loadPendingCats();
+  if(name==='pending-cats'){loadPendingCats();loadPendingCerts();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
@@ -4556,6 +4572,159 @@ async function rejectPendingCat(btn){
     }
     if(msgEl){msgEl.textContent='✕ Rejected and removed from factory record';msgEl.className='pcat-msg ok';msgEl.style.display='block';}
     setTimeout(function(){loadPendingCats();},1500);
+  }catch(e){
+    btn.disabled=false;btn.textContent='✕ Reject';
+    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
+  }
+}
+
+// ── PENDING CERTIFICATIONS ──
+function switchPendingTab(tab){
+  document.querySelectorAll('[id^="ptab-"]').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('[id^="ptabpane-"]').forEach(function(p){p.style.display='none';});
+  g('ptab-'+tab).classList.add('on');
+  g('ptabpane-'+tab).style.display='block';
+}
+
+async function loadPendingCerts(){
+  var loading=g('pending-certs-loading');
+  var list=g('pending-certs-list');
+  var empty=g('pending-certs-empty');
+  if(loading)loading.style.display='block';
+  if(list)list.innerHTML='';
+  if(empty)empty.style.display='none';
+  try{
+    var r=await fetch(SB+'/rest/v1/pending_certifications?status=eq.pending&select=*,factories(factory_name_english,sales_email,sales_contact_name)&order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    if(loading)loading.style.display='none';
+    // Update badges
+    var badge=g('cnt-pending-certs-tab');
+    if(badge)badge.textContent=rows.length;
+    // Update combined sidebar badge
+    var catBadge=g('cnt-pending-cats-tab');
+    var catCount=catBadge?parseInt(catBadge.textContent)||0:0;
+    var sidebarBadge=g('cnt-pending-cats');
+    if(sidebarBadge)sidebarBadge.textContent=(catCount+rows.length)||'';
+    if(!rows.length){
+      if(empty)empty.style.display='block';
+      return;
+    }
+    if(list)list.innerHTML=rows.map(function(row){
+      var f=row.factories||{};
+      var date=new Date(row.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      return '<div class="pcat-card" id="pcert-'+row.id+'">' +
+        '<div class="pcat-header">' +
+          '<div>' +
+            '<div class="pcat-title">'+(f.factory_name_english||'Unknown Factory')+'</div>' +
+            '<div class="pcat-meta">'+(f.sales_email||'')+(f.sales_contact_name?' · '+f.sales_contact_name:'')+' · '+date+'</div>' +
+          '</div>' +
+          '<span class="pcat-badge">Pending Review</span>' +
+        '</div>' +
+        '<div class="pcat-proposed">' +
+          '<div class="pcat-proposed-label">Proposed Certification</div>' +
+          '<div class="pcat-proposed-name">'+esc(row.proposed_name)+'</div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#888;margin-bottom:6px;">Edit name if needed, then approve or reject:</div>' +
+        '<div class="pcat-edit-row">' +
+          '<input type="text" class="pcat-edit-input" id="pcertedit-'+row.id+'" value="'+esc(row.proposed_name)+'" placeholder="Corrected name..." />' +
+        '</div>' +
+        '<div class="pcat-actions">' +
+          '<button class="btn-approve-cat" data-id="'+row.id+'" data-fid="'+(row.factory_id||'')+'" onclick="approvePendingCert(this)">✓ Approve & Add to List</button>' +
+          '<button class="btn-reject-cat" data-id="'+row.id+'" data-fid="'+(row.factory_id||'')+'" onclick="rejectPendingCert(this)">✕ Reject</button>' +
+        '</div>' +
+        '<div class="pcat-msg" id="pcertmsg-'+row.id+'"></div>' +
+      '</div>';
+    }).join('');
+  }catch(e){
+    if(loading)loading.style.display='none';
+    if(list)list.innerHTML='<div style="color:#b00;font-size:13px;padding:1rem;">Error loading: '+e.message+'</div>';
+  }
+}
+
+async function approvePendingCert(btn){
+  var id=btn.dataset.id;
+  var factoryId=btn.dataset.fid;
+  var nameInput=g('pcertedit-'+id);
+  var approvedName=nameInput?nameInput.value.trim():'';
+  if(!approvedName){alert('Please enter a name before approving.');return;}
+  btn.disabled=true;btn.textContent='Approving...';
+  var msgEl=g('pcertmsg-'+id);
+  try{
+    // 1. Add to certifications table
+    var insR=await fetch(SB+'/rest/v1/certifications',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify({name:approvedName,category:'Other',is_active:true,requires_expiry_date:true,requires_certificate_number:true})
+    });
+    // 2. If name was corrected, update factory certifications array
+    var originalNameEl=document.querySelector('#pcert-'+id+' .pcat-proposed-name');
+    var originalName=originalNameEl?originalNameEl.textContent.trim():'';
+    var wasEdited=originalName&&originalName!==approvedName;
+    if(factoryId){
+      // Get current certifications for this factory
+      var fR=await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId+'&select=certifications',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      var fRows=await fR.json();
+      if(fRows&&fRows[0]){
+        var certs=fRows[0].certifications||[];
+        // Remove old name if corrected, add approved name
+        if(wasEdited) certs=certs.filter(function(c){return c!==originalName;});
+        if(!certs.includes(approvedName)) certs.push(approvedName);
+        await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId,{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({certifications:certs})
+        });
+      }
+    }
+    // 3. Mark as approved
+    await fetch(SB+'/rest/v1/pending_certifications?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'approved',corrected_name:approvedName,reviewed_at:new Date().toISOString(),reviewed_by:'admin',applied_to_factory_record:true})
+    });
+    if(msgEl){msgEl.textContent='✓ Added to certifications list'+(wasEdited?' with corrected spelling':'');msgEl.className='pcat-msg ok';msgEl.style.display='block';}
+    setTimeout(function(){loadPendingCerts();},1500);
+  }catch(e){
+    btn.disabled=false;btn.textContent='✓ Approve & Add to List';
+    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
+  }
+}
+
+async function rejectPendingCert(btn){
+  var id=btn.dataset.id;
+  var factoryId=btn.dataset.fid;
+  if(!confirm('Reject this certification? It will be removed from the factory record.'))return;
+  btn.disabled=true;btn.textContent='Rejecting...';
+  var msgEl=g('pcertmsg-'+id);
+  try{
+    var originalNameEl=document.querySelector('#pcert-'+id+' .pcat-proposed-name');
+    var originalName=originalNameEl?originalNameEl.textContent.trim():'';
+    // Remove from factory certifications
+    if(factoryId&&originalName){
+      var fR=await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId+'&select=certifications',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      var fRows=await fR.json();
+      if(fRows&&fRows[0]){
+        var certs=(fRows[0].certifications||[]).filter(function(c){return c!==originalName;});
+        await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId,{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({certifications:certs})
+        });
+      }
+    }
+    await fetch(SB+'/rest/v1/pending_certifications?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'rejected',reviewed_at:new Date().toISOString(),reviewed_by:'admin'})
+    });
+    if(msgEl){msgEl.textContent='✕ Rejected and removed from factory record';msgEl.className='pcat-msg ok';msgEl.style.display='block';}
+    setTimeout(function(){loadPendingCerts();},1500);
   }catch(e){
     btn.disabled=false;btn.textContent='✕ Reject';
     if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
