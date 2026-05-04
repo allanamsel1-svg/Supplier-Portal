@@ -1,13 +1,18 @@
 // api/receive-email.js
 // SendGrid Inbound Parse webhook — receives incoming emails and saves to Supabase
 
+export const config = {
+  api: {
+    bodyParser: false, // Must be disabled for multipart/form-data
+  },
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
   const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 
-  // Department email map
   const DEPT_EMAILS = {
     'sourcing@tbgsourcing.net': 'sourcing',
     'sales@tbgsourcing.net': 'sales',
@@ -17,56 +22,53 @@ export default async function handler(req, res) {
   };
 
   try {
-    // SendGrid sends form data
-    const body = req.body;
+    // Parse multipart form data manually
+    const body = await parseMultipart(req);
 
-    // Extract fields from SendGrid inbound parse
-    const fromEmail = extractEmail(body.from || '');
-    const fromName = extractName(body.from || '');
-    const toEmail = extractEmail(body.to || '').toLowerCase();
+    const fromRaw = body.from || '';
+    const toRaw = body.to || '';
+    const fromEmail = extractEmail(fromRaw);
+    const fromName = extractName(fromRaw);
+    const toEmail = extractEmail(toRaw).toLowerCase();
     const subject = body.subject || '(No Subject)';
     const textBody = body.text || body.html || '';
-    const messageId = body.headers ? extractHeader(body.headers, 'Message-ID') : null;
-    const inReplyTo = body.headers ? extractHeader(body.headers, 'In-Reply-To') : null;
-
-    // Determine which department this email is for
-    const dept = DEPT_EMAILS[toEmail];
+    const headersRaw = body.headers || '';
+    const messageId = extractHeader(headersRaw, 'Message-ID');
+    const inReplyTo = extractHeader(headersRaw, 'In-Reply-To');
     const now = new Date().toISOString();
 
-    const headers = { 
-      'apikey': KEY, 
-      'Authorization': 'Bearer ' + KEY, 
+    const headers = {
+      'apikey': KEY,
+      'Authorization': 'Bearer ' + KEY,
       'Content-Type': 'application/json',
       'Prefer': 'return=representation'
     };
 
-    // Try to find existing thread by In-Reply-To header or subject
+    // Try to find existing thread
     let threadId = null;
 
     if (inReplyTo) {
-      // Look for thread with matching message ID
-      const threadR = await fetch(
+      const r = await fetch(
         SB + '/rest/v1/email_threads?message_id=eq.' + encodeURIComponent(inReplyTo.trim()),
         { headers }
       );
-      const threads = await threadR.json();
-      if (threads && threads.length > 0) threadId = threads[0].id;
+      const rows = await r.json();
+      if (rows && rows.length > 0) threadId = rows[0].id;
     }
 
     if (!threadId) {
-      // Try to match by subject (strip Re:, Fwd: etc)
       const cleanSubject = subject.replace(/^(Re:|Fwd:|RE:|FW:)\s*/gi, '').trim();
-      const threadR = await fetch(
-        SB + '/rest/v1/email_threads?subject=ilike.*' + encodeURIComponent(cleanSubject) + '*&to_email=eq.' + encodeURIComponent(toEmail) + '&limit=1',
+      const r = await fetch(
+        SB + '/rest/v1/email_threads?subject=ilike.*' + encodeURIComponent(cleanSubject) + '*&to_email=eq.' + encodeURIComponent(toEmail) + '&order=created_at.desc&limit=1',
         { headers }
       );
-      const threads = await threadR.json();
-      if (threads && threads.length > 0) threadId = threads[0].id;
+      const rows = await r.json();
+      if (rows && rows.length > 0) threadId = rows[0].id;
     }
 
     if (!threadId) {
       // Create new thread
-      const threadR = await fetch(SB + '/rest/v1/email_threads', {
+      const r = await fetch(SB + '/rest/v1/email_threads', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -80,27 +82,28 @@ export default async function handler(req, res) {
           message_id: messageId || null
         })
       });
-      const threads = await threadR.json();
-      if (threads && threads[0]) threadId = threads[0].id;
+      const rows = await r.json();
+      if (rows && rows[0]) threadId = rows[0].id;
     } else {
-      // Update existing thread — mark as unread with latest timestamp
+      // Update existing thread
       await fetch(SB + '/rest/v1/email_threads?id=eq.' + threadId, {
         method: 'PATCH',
         headers: { ...headers, 'Prefer': 'return=minimal' },
         body: JSON.stringify({
           status: 'unread',
           last_message_at: now,
+          from_email: fromEmail,
+          from_name: fromName,
           direction: 'inbound'
         })
       });
     }
 
     if (!threadId) {
-      console.error('Could not create or find thread');
       return res.status(500).json({ error: 'Could not create thread' });
     }
 
-    // Save the message
+    // Save message
     await fetch(SB + '/rest/v1/email_messages', {
       method: 'POST',
       headers: { ...headers, 'Prefer': 'return=minimal' },
@@ -121,21 +124,60 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error('receive-email error:', err);
-    return res.status(500).json({ error: err.message });
+    // Always return 200 to SendGrid so it doesn't retry endlessly
+    return res.status(200).json({ error: err.message });
   }
 }
 
+// Parse multipart/form-data from raw request
+async function parseMultipart(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        const contentType = req.headers['content-type'] || '';
+        const boundary = contentType.split('boundary=')[1];
+        if (!boundary) {
+          // Try to parse as URL encoded
+          const params = {};
+          data.split('&').forEach(pair => {
+            const [k, v] = pair.split('=');
+            if (k) params[decodeURIComponent(k)] = decodeURIComponent((v || '').replace(/\+/g, ' '));
+          });
+          return resolve(params);
+        }
+        const parts = data.split('--' + boundary);
+        const result = {};
+        parts.forEach(part => {
+          const match = part.match(/Content-Disposition: form-data; name="([^"]+)"[\r\n]+([\s\S]*)/i);
+          if (match) {
+            result[match[1]] = match[2].trim();
+          }
+        });
+        resolve(result);
+      } catch(e) {
+        reject(e);
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 function extractEmail(str) {
+  if (!str) return '';
   const match = str.match(/<([^>]+)>/);
-  return match ? match[1].toLowerCase() : str.toLowerCase().trim();
+  return match ? match[1].toLowerCase().trim() : str.toLowerCase().trim();
 }
 
 function extractName(str) {
+  if (!str) return '';
   const match = str.match(/^([^<]+)</);
   return match ? match[1].trim().replace(/"/g, '') : '';
 }
 
 function extractHeader(headersStr, headerName) {
+  if (!headersStr) return null;
   const regex = new RegExp(headerName + ':\\s*(.+)', 'i');
   const match = headersStr.match(regex);
   return match ? match[1].trim() : null;
@@ -143,16 +185,15 @@ function extractHeader(headersStr, headerName) {
 
 function cleanEmailBody(text) {
   if (!text) return '';
-  // Remove excessive quoted reply chains (keep only the new part)
   const lines = text.split('\n');
   const cleaned = [];
-  let quoteDepth = 0;
+  let quoteCount = 0;
   for (const line of lines) {
     if (line.startsWith('>')) {
-      quoteDepth++;
-      if (quoteDepth <= 2) cleaned.push(line); // keep 1-2 levels of quote for context
+      quoteCount++;
+      if (quoteCount <= 3) cleaned.push(line);
     } else {
-      quoteDepth = 0;
+      quoteCount = 0;
       cleaned.push(line);
     }
   }
