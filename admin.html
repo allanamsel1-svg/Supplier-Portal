@@ -773,6 +773,7 @@
             <label class="cb-item"><input type="checkbox" value="Tube"> Tube</label>
             <label class="cb-item"><input type="checkbox" value="Pump Bottle"> Pump Bottle</label>
             <label class="cb-item"><input type="checkbox" value="Spray Bottle"> Spray Bottle</label>
+            <label class="cb-item"><input type="checkbox" value="Aerosol Can"> Aerosol Can</label>
             <label class="cb-item"><input type="checkbox" value="Blister Pack"> Blister Pack</label>
             <label class="cb-item"><input type="checkbox" value="Other"> Other</label>
           </div>
@@ -1102,6 +1103,28 @@
                 <div class="form-msg ok" id="dept-ok">Department saved!</div>
                 <div class="form-msg err" id="dept-err"></div>
               </div>
+            </div>
+
+            <!-- Vendor Guides section — shows after customer is saved -->
+            <div id="vguide-section" style="display:none;margin-top:1rem;border-top:1px solid #f0f0e8;padding-top:1rem;">
+              <div class="mgr-card-title">Vendor Guides <span style="font-size:11px;color:#aaa;font-weight:400;margin-left:6px;">PDF only</span></div>
+              <p style="font-size:12px;color:#888;margin-bottom:10px;">Upload vendor guides one at a time. Each file gets a title (e.g. "Packaging Requirements" or "Master Vendor Guide"). Click Upload to save the file. AI tagging arrives in a later step.</p>
+              <div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;padding:12px;margin-bottom:12px;">
+                <div class="mf" style="margin-bottom:8px;">
+                  <label>Guide Title *</label>
+                  <input type="text" id="vguide-title" placeholder="e.g. Packaging Requirements, Routing Guide, Master Vendor Guide" />
+                </div>
+                <div class="mf" style="margin-bottom:8px;">
+                  <label>PDF File *</label>
+                  <input type="file" id="vguide-file" accept="application/pdf,.pdf" style="font-size:13px;font-family:inherit;" />
+                  <div id="vguide-file-info" style="font-size:11px;color:#888;margin-top:4px;display:none;"></div>
+                </div>
+                <button class="btn-save-form" id="vguide-upload-btn" onclick="uploadVendorGuide()">Upload Guide</button>
+                <div class="form-msg ok" id="vguide-ok"></div>
+                <div class="form-msg err" id="vguide-err"></div>
+              </div>
+              <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Uploaded Guides</div>
+              <div id="vguide-list"><div style="font-size:13px;color:#bbb;padding:6px 0;">No guides uploaded yet.</div></div>
             </div>
           </div>
         </div>
@@ -3453,7 +3476,7 @@ async function sendRFQEmails(rfq){
     }
   }
   var msg='Emails sent: '+sent+(failed.length?'\nFailed/no email: '+failed.join(', '):'');
-  alert(msg);
+  console.log('[sendRFQEmails]',msg);
 }
 
 // ── BRANDS ──
@@ -3561,6 +3584,9 @@ function newCustomerForm(){
   g('cust-min-gross').value='';g('cust-min-net').value='';g('customer-notes').value='';
   g('customer-form-title').textContent='New Customer';
   g('customer-ok').style.display='none';g('customer-err').style.display='none';
+  var ds=g('dept-section');if(ds)ds.style.display='none';
+  var vs=g('vguide-section');if(vs)vs.style.display='none';
+  currentCustomerId=null;
 }
 function editCustomer(id){
   var c=allCustomers.find(function(x){return x.id===id;});if(!c)return;
@@ -3786,7 +3812,9 @@ editCustomer=async function(id){
   currentCustomerId=id;
   g('dept-section').style.display='block';
   g('dept-form').style.display='none';
+  g('vguide-section').style.display='block';
   await loadDepts(id);
+  await loadVendorGuides(id);
 };
 
 // ── Override save to capture customer id ──
@@ -3803,9 +3831,149 @@ saveCustomer=async function(){
       currentCustomerId=found.id;
       g('customer-id').value=found.id;
       g('dept-section').style.display='block';
+      g('vguide-section').style.display='block';
+      await loadVendorGuides(found.id);
     }
   }
 };
+
+// ── VENDOR GUIDES ──
+async function loadVendorGuides(customerId){
+  var listEl=g('vguide-list');
+  if(!listEl)return;
+  listEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:6px 0;">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/customer_vendor_guides?customer_id=eq.'+customerId+'&is_current=eq.true&select=*&order=uploaded_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){
+      var err=await r.json().catch(function(){return{};});
+      listEl.innerHTML='<div style="font-size:13px;color:#b00;padding:6px 0;">Error loading guides: '+(err.message||r.status)+'</div>';
+      return;
+    }
+    var guides=await r.json();
+    if(!guides.length){
+      listEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:6px 0;">No guides uploaded yet.</div>';
+      return;
+    }
+    listEl.innerHTML=guides.map(function(g0){
+      var sizeStr=g0.file_size?(g0.file_size/1024/1024).toFixed(2)+' MB':'';
+      var dateStr=g0.uploaded_at?new Date(g0.uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      var verBadge=g0.version>1?'<span style="font-size:10px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 6px;border-radius:10px;margin-left:6px;">v'+g0.version+'</span>':'';
+      return '<div class="mgr-item" style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;margin-bottom:6px;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div class="mgr-item-name">'+esc(g0.title)+verBadge+'</div>'+
+          '<div class="mgr-item-meta">'+esc(g0.file_name)+(sizeStr?' · '+sizeStr:'')+(dateStr?' · '+dateStr:'')+'</div>'+
+        '</div>'+
+        '<div class="mgr-item-actions">'+
+          '<button class="btn-edit" onclick="downloadVendorGuide(\''+g0.id+'\',\''+g0.file_path.replace(/'/g,"\\'")+'\')">View</button>'+
+          '<button class="btn-del" onclick="deleteVendorGuide(\''+g0.id+'\',\''+g0.file_path.replace(/'/g,"\\'")+'\')">Delete</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    listEl.innerHTML='<div style="font-size:13px;color:#b00;padding:6px 0;">Error: '+e.message+'</div>';
+  }
+}
+
+async function uploadVendorGuide(){
+  var customerId=currentCustomerId||g('customer-id').value;
+  if(!customerId){showFormMsg('vguide-err','Save the customer first before uploading guides.');return;}
+  var title=g('vguide-title').value.trim();
+  if(!title){showFormMsg('vguide-err','Please enter a title for this guide.');return;}
+  var fileInput=g('vguide-file');
+  var file=fileInput.files&&fileInput.files[0];
+  if(!file){showFormMsg('vguide-err','Please choose a PDF file.');return;}
+  // PDF check — allow by MIME or extension
+  var isPdf=(file.type==='application/pdf')||/\.pdf$/i.test(file.name);
+  if(!isPdf){showFormMsg('vguide-err','Only PDF files are accepted right now.');return;}
+  if(file.size>50*1024*1024){showFormMsg('vguide-err','File is over 50 MB. Please contact support if you need to upload a larger file.');return;}
+
+  var btn=g('vguide-upload-btn');
+  btn.disabled=true;btn.textContent='Uploading...';
+
+  // Build storage path: vendor-guides/{customerId}/{timestamp}_{safeName}.pdf
+  var ts=Date.now();
+  var safeName=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+  var storagePath=customerId+'/'+ts+'_'+safeName;
+
+  try{
+    // Upload file to storage
+    var sr=await fetch(SB+'/storage/v1/object/vendor-guides/'+storagePath,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+KEY,'Content-Type':'application/pdf','x-upsert':'true'},
+      body:file
+    });
+    if(!sr.ok){
+      var serr=await sr.json().catch(function(){return{};});
+      btn.disabled=false;btn.textContent='Upload Guide';
+      showFormMsg('vguide-err','Storage upload failed: '+(serr.message||serr.error||sr.status));
+      return;
+    }
+    // Insert DB row
+    var payload={
+      customer_id:customerId,
+      title:title,
+      file_name:file.name,
+      file_path:storagePath,
+      file_size:file.size,
+      version:1,
+      is_current:true,
+      processing_status:'pending'
+    };
+    var dr=await fetch(SB+'/rest/v1/customer_vendor_guides',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    btn.disabled=false;btn.textContent='Upload Guide';
+    if(!dr.ok){
+      var derr=await dr.json().catch(function(){return{};});
+      showFormMsg('vguide-err','Database save failed: '+(derr.message||derr.details||dr.status));
+      return;
+    }
+    showFormMsg('vguide-ok','✓ Guide uploaded.');
+    g('vguide-title').value='';
+    fileInput.value='';
+    await loadVendorGuides(customerId);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Upload Guide';
+    showFormMsg('vguide-err','Error: '+e.message);
+  }
+}
+
+async function downloadVendorGuide(id,filePath){
+  // Storage bucket is private — use signed URL
+  try{
+    var r=await fetch(SB+'/storage/v1/object/sign/vendor-guides/'+filePath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:300})
+    });
+    if(!r.ok){alert('Could not generate download link: '+r.status);return;}
+    var d=await r.json();
+    var url=SB+'/storage/v1'+d.signedURL;
+    window.open(url,'_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteVendorGuide(id,filePath){
+  if(!confirm('Delete this vendor guide? This cannot be undone.'))return;
+  try{
+    // Delete storage object first
+    await fetch(SB+'/storage/v1/object/vendor-guides/'+filePath,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+KEY}
+    });
+    // Delete DB row
+    var r=await fetch(SB+'/rest/v1/customer_vendor_guides?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Delete failed: '+(err.message||r.status));return;}
+    if(currentCustomerId)await loadVendorGuides(currentCustomerId);
+  }catch(e){alert('Error: '+e.message);}
+}
 
 // ── Shared form message helper ──
 function showFormMsg(id,msg){
