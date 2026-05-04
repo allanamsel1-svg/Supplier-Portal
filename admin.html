@@ -250,6 +250,26 @@
     .d-btn-delete:hover { background: #ffe0e0; }
     .no-data { font-size: 13px; color: #ccc; font-style: italic; }
   
+    .pcat-card { background:#fff; border:1px solid #e0e0d8; border-radius:12px; padding:1.25rem; margin-bottom:10px; }
+    .pcat-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:12px; }
+    .pcat-title { font-size:14px; font-weight:600; color:#1a1a2e; }
+    .pcat-meta { font-size:12px; color:#888; margin-top:3px; }
+    .pcat-badge { font-size:11px; background:#fff8e0; color:#886600; border:1px solid #f0d060; padding:3px 9px; border-radius:20px; font-weight:500; flex-shrink:0; }
+    .pcat-proposed { background:#fff8e0; border:1px solid #f0d060; border-radius:8px; padding:10px 14px; margin-bottom:12px; }
+    .pcat-proposed-label { font-size:10px; color:#886600; text-transform:uppercase; letter-spacing:0.06em; font-weight:600; margin-bottom:4px; }
+    .pcat-proposed-name { font-size:15px; font-weight:700; color:#1a1a2e; }
+    .pcat-path { font-size:12px; color:#666; margin-top:3px; }
+    .pcat-edit-row { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+    .pcat-edit-input { flex:1; padding:8px 10px; font-size:13px; border:1px solid #ddd; border-radius:7px; font-family:inherit; color:#1a1a2e; }
+    .pcat-edit-input:focus { outline:none; border-color:#1a1a2e; }
+    .pcat-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-approve-cat { padding:8px 16px; background:#e8f8e8; color:#1a7a1a; border:1px solid #a0d8a0; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-approve-cat:hover { background:#d0f0d0; }
+    .btn-reject-cat { padding:8px 16px; background:#fff0f0; color:#b00; border:1px solid #fdd; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; font-family:inherit; }
+    .btn-reject-cat:hover { background:#ffe0e0; }
+    .pcat-msg { font-size:12px; padding:6px 10px; border-radius:6px; margin-top:8px; display:none; }
+    .pcat-msg.ok { color:#1a7a1a; background:#edfaed; border:1px solid #a0d8a0; }
+    .pcat-msg.err { color:#b00; background:#fff0f0; border:1px solid #fdd; }
     .rfq-tab { padding:8px 12px;font-size:11px;font-weight:500;color:#888;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit; }
     .rfq-tab.on { color:#1a1a2e;border-bottom-color:#1a1a2e; }
     .rfq-tab:hover { color:#1a1a2e; }
@@ -327,6 +347,7 @@
       <button class="sitem" id="nav-all" onclick="showPanel('all')"><span class="sicon">🏭</span> All Factories <span class="scount" id="cnt-all">0</span></button>
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
       <div class="slabel">Outreach</div>
+      <button class="sitem" id="nav-pending-cats" onclick="showPanel('pending-cats');loadPendingCats();"><span class="sicon">⚠</span> Pending Categories <span class="scount" id="cnt-pending-cats" style="background:#fff8e0;color:#886600;border:1px solid #f0d060;">0</span></button>
       <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
       <div class="slabel">Communications</div>
@@ -923,6 +944,22 @@
       </div>
     </div>
 
+    <!-- ── PENDING CATEGORIES PANEL ── -->
+    <div class="panel" id="panel-pending-cats">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">⚠ Pending Categories</div><div class="ph-sub">New sub-categories added by factories — review, correct spelling, and approve</div></div>
+        <button onclick="loadPendingCats()" style="padding:7px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">↻ Refresh</button>
+      </div>
+      <div style="padding:1.25rem 1.5rem;max-width:800px;">
+        <div id="pending-cats-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading...</div>
+        <div id="pending-cats-list"></div>
+        <div id="pending-cats-empty" style="display:none;text-align:center;padding:3rem;color:#bbb;">
+          <div style="font-size:32px;margin-bottom:12px;">✓</div>
+          <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">All caught up</div>
+          <div style="font-size:13px;">No pending category additions to review.</div>
+        </div>
+      </div>
+    </div>
     <!-- ── BRANDS PANEL ── -->
     <div class="panel" id="panel-brands">
       <div class="ph"><div class="ph-title">Brands</div><div class="ph-sub">Manage house brands and licensed brands with royalty rates</div></div>
@@ -1373,6 +1410,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
+  if(name==='pending-cats')loadPendingCats();
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
   if(name==='categories'){loadCategories();setTimeout(function(){var p=g('cat-prefix');if(p)p.dataset.userEdited='false';},100);}
@@ -4373,6 +4411,155 @@ async function deleteRFQ(rfqId){
       alert('Delete failed: '+(e.message||e.details||r.status));
     }
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ── PENDING CATEGORIES ──
+async function loadPendingCats(){
+  var loading=g('pending-cats-loading');
+  var list=g('pending-cats-list');
+  var empty=g('pending-cats-empty');
+  if(loading)loading.style.display='block';
+  if(list)list.innerHTML='';
+  if(empty)empty.style.display='none';
+  try{
+    var r=await fetch(SB+'/rest/v1/pending_subcategories?status=eq.pending&select=*,factories(factory_name_english,sales_email,sales_contact_name)&order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    if(loading)loading.style.display='none';
+    // Update badge
+    var badge=g('cnt-pending-cats');
+    if(badge)badge.textContent=rows.length||'';
+    if(!rows.length){
+      if(empty)empty.style.display='block';
+      return;
+    }
+    if(list)list.innerHTML=rows.map(function(row){
+      var f=row.factories||{};
+      var date=new Date(row.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      return '<div class="pcat-card" id="pcat-'+row.id+'">' +
+        '<div class="pcat-header">' +
+          '<div>' +
+            '<div class="pcat-title">'+(f.factory_name_english||'Unknown Factory')+'</div>' +
+            '<div class="pcat-meta">'+(f.sales_email||'')+(f.sales_contact_name?' · '+f.sales_contact_name:'')+' · '+date+'</div>' +
+          '</div>' +
+          '<span class="pcat-badge">Pending Review</span>' +
+        '</div>' +
+        '<div class="pcat-proposed">' +
+          '<div class="pcat-proposed-label">Proposed Product Name</div>' +
+          '<div class="pcat-proposed-name">'+esc(row.proposed_name)+'</div>' +
+          '<div class="pcat-path">'+esc(row.parent_category||'')+(row.parent_sub_category?' › '+esc(row.parent_sub_category):'')+'</div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#888;margin-bottom:6px;">Edit name if needed, then approve or reject:</div>' +
+        '<div class="pcat-edit-row">' +
+          '<input type="text" class="pcat-edit-input" id="pcatedit-'+row.id+'" value="'+esc(row.proposed_name)+'" placeholder="Corrected name..." />' +
+        '</div>' +
+        '<div class="pcat-actions">' +
+          '<button class="btn-approve-cat" data-id="'+row.id+'" data-cat="'+esc(row.parent_category||'')+'" data-sub="'+esc(row.parent_sub_category||'')+'" data-fid="'+(row.factory_id||'')+'" onclick="approvePendingCat(this)">✓ Approve</button>' +
+          '<button class="btn-reject-cat" data-id="'+row.id+'" data-fid="'+(row.factory_id||'')+'" data-fname="'+esc(f.factory_name_english||'')+'" onclick="rejectPendingCat(this)">✕ Reject</button>' +
+        '</div>' +
+        '<div class="pcat-msg" id="pcatmsg-'+row.id+'"></div>' +
+      '</div>';
+    }).join('');
+  }catch(e){
+    if(loading)loading.style.display='none';
+    if(list)list.innerHTML='<div style="color:#b00;font-size:13px;padding:1rem;">Error loading: '+e.message+'</div>';
+  }
+}
+
+async function approvePendingCat(btn){
+  var id=btn.dataset.id;
+  var cat=btn.dataset.cat;
+  var sub=btn.dataset.sub;
+  var factoryId=btn.dataset.fid;
+  var nameInput=g('pcatedit-'+id);
+  var approvedName=nameInput?nameInput.value.trim():'';
+  if(!approvedName){alert('Please enter a name before approving.');return;}
+  btn.disabled=true;btn.textContent='Approving...';
+  var msgEl=g('pcatmsg-'+id);
+  try{
+    // 1. Add to categories table as new sub-sub-category
+    // First get a model prefix from parent category
+    var catR=await fetch(SB+'/rest/v1/categories?category=eq.'+encodeURIComponent(cat)+(sub?'&sub_category=eq.'+encodeURIComponent(sub):'')+' &select=model_prefix,is_cosmetic,is_formulated,manufacturing_type&limit=1',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var catRows=await catR.json();
+    var catData=catRows&&catRows[0]?catRows[0]:{model_prefix:'GEN',is_cosmetic:false,is_formulated:false,manufacturing_type:null};
+    // Insert new category
+    var insR=await fetch(SB+'/rest/v1/categories',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        category:cat,
+        sub_category:sub||null,
+        sub_sub_category:approvedName,
+        model_prefix:catData.model_prefix,
+        is_cosmetic:catData.is_cosmetic,
+        is_formulated:catData.is_formulated,
+        manufacturing_type:catData.manufacturing_type
+      })
+    });
+    // 2. Update factory_categories if name was corrected
+    var originalName=document.querySelector('#pcat-'+id+' .pcat-proposed-name');
+    var wasEdited=originalName&&originalName.textContent.trim()!==approvedName;
+    if(wasEdited&&factoryId){
+      // Update any factory_categories rows with the old name to the corrected name
+      var fcR=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+factoryId+'&sub_sub_category=eq.'+encodeURIComponent(originalName.textContent.trim()),{
+        method:'PATCH',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({sub_sub_category:approvedName})
+      });
+    }
+    // 3. Mark as approved
+    await fetch(SB+'/rest/v1/pending_subcategories?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'approved',corrected_name:approvedName,reviewed_at:new Date().toISOString(),reviewed_by:'admin',applied_to_factory_record:wasEdited})
+    });
+    // 4. Show success and remove card
+    if(msgEl){msgEl.textContent='✓ Approved'+(wasEdited?' and corrected':'')+' — added to category database';msgEl.className='pcat-msg ok';msgEl.style.display='block';}
+    setTimeout(function(){
+      var card=g('pcat-'+id);
+      if(card)card.style.opacity='0.4';
+      loadPendingCats();
+    },1500);
+  }catch(e){
+    btn.disabled=false;btn.textContent='✓ Approve';
+    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
+  }
+}
+
+async function rejectPendingCat(btn){
+  var id=btn.dataset.id;
+  var factoryId=btn.dataset.fid;
+  var fname=btn.dataset.fname||'the factory';
+  var reason=prompt('Optional: Enter a reason for rejection (will not be sent to factory automatically):')||'';
+  if(reason===null)return; // cancelled
+  btn.disabled=true;btn.textContent='Rejecting...';
+  var msgEl=g('pcatmsg-'+id);
+  try{
+    // Mark as rejected
+    await fetch(SB+'/rest/v1/pending_subcategories?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'rejected',reviewed_at:new Date().toISOString(),reviewed_by:'admin'})
+    });
+    // Remove from factory_categories if it was saved there
+    if(factoryId){
+      var nameEl=document.querySelector('#pcat-'+id+' .pcat-proposed-name');
+      if(nameEl){
+        await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+factoryId+'&sub_sub_category=eq.'+encodeURIComponent(nameEl.textContent.trim()),{
+          method:'DELETE',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+        });
+      }
+    }
+    if(msgEl){msgEl.textContent='✕ Rejected and removed from factory record';msgEl.className='pcat-msg ok';msgEl.style.display='block';}
+    setTimeout(function(){loadPendingCats();},1500);
+  }catch(e){
+    btn.disabled=false;btn.textContent='✕ Reject';
+    if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
+  }
 }
 </script>
 </body>
