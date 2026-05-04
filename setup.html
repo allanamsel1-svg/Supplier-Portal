@@ -1027,10 +1027,15 @@ async function loadVendorGuides(custId){
       var sizeStr=vg.file_size?(vg.file_size/1024/1024).toFixed(2)+' MB':'';
       var dateStr=vg.uploaded_at?new Date(vg.uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
       var verBadge=vg.version>1?'<span class="vguide-version-badge">v'+vg.version+'</span>':'';
-      var statusBadge='<span class="vguide-status '+vg.processing_status+'">'+vg.processing_status+'</span>';
+      var statusLabel=vg.processing_status;
+      if(statusLabel==='processing')statusLabel='analyzing...';
+      var statusBadge='<span class="vguide-status '+vg.processing_status+'">'+statusLabel+'</span>';
       var tagsHtml='';
       if(vg.ai_tags&&vg.ai_tags.length){
-        tagsHtml='<div style="margin-top:4px;">'+vg.ai_tags.map(function(t){return '<span class="vguide-tag">'+t+'</span>';}).join('')+'</div>';
+        tagsHtml='<div style="margin-top:4px;">'+vg.ai_tags.map(function(t){return '<span class="vguide-tag">'+t.replace(/_/g,' ')+'</span>';}).join('')+'</div>';
+      }
+      if(vg.ai_freeform_tags&&vg.ai_freeform_tags.length){
+        tagsHtml+='<div style="margin-top:2px;">'+vg.ai_freeform_tags.map(function(t){return '<span class="vguide-tag" style="background:#fff8e0;color:#886600;border-color:#f0d860;">'+t.replace(/_/g,' ')+'</span>';}).join('')+'</div>';
       }
       var summaryHtml=vg.ai_summary?'<div style="font-size:11px;color:#666;margin-top:4px;line-height:1.4;">'+esc(vg.ai_summary)+'</div>':'';
       var safePath=vg.file_path.replace(/'/g,"\\'");
@@ -1049,10 +1054,26 @@ async function loadVendorGuides(custId){
         tagsHtml+
       '</div>';
     }).join('');
+    // Auto-refresh while any document is still being analyzed
+    var stillProcessing=guides.some(function(vg){return vg.processing_status==='pending'||vg.processing_status==='processing';});
+    if(stillProcessing){
+      // Stop polling after ~3 minutes total (30 attempts × ~6s) to avoid forever-loops
+      vguidePollCount=(vguidePollCount||0)+1;
+      if(vguidePollCount<30){
+        setTimeout(function(){
+          if(currentCustId===custId)loadVendorGuides(custId);
+        },6000);
+      }else{
+        vguidePollCount=0;
+      }
+    }else{
+      vguidePollCount=0;
+    }
   }catch(e){
     listEl.innerHTML='<div class="empty-list" style="color:#b00;">Error: '+e.message+'</div>';
   }
 }
+var vguidePollCount=0;
 
 async function uploadVendorGuide(){
   if(!currentCustId){showMsg('vg','err','Save the customer first before uploading documents.');return;}
@@ -1096,7 +1117,7 @@ async function uploadVendorGuide(){
     };
     var dr=await fetch(SB+'/rest/v1/customer_vendor_guides',{
       method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
     btn.disabled=false;btn.textContent='Upload Document';
@@ -1105,7 +1126,17 @@ async function uploadVendorGuide(){
       showMsg('vg','err','Database save failed: '+(derr.message||derr.details||dr.status));
       return;
     }
-    showMsg('vg','ok','Document uploaded.');
+    // Get the new guide's ID and kick off AI analysis (fire-and-forget)
+    var inserted=await dr.json().catch(function(){return null;});
+    var newGuideId=Array.isArray(inserted)?(inserted[0]&&inserted[0].id):(inserted&&inserted.id);
+    if(newGuideId){
+      fetch('/api/analyze-vendor-guide',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({guideId:newGuideId})
+      }).catch(function(e){console.log('analyze kickoff error:',e);});
+    }
+    showMsg('vg','ok','Document uploaded. AI is analyzing...');
     g('vg-title').value='';
     fileInput.value='';
     await loadVendorGuides(currentCustId);
