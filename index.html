@@ -136,7 +136,7 @@
     .file-list { margin-top: 10px; }
     .file-list-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
 
-    /* Compliance Documents (Stage 2) */
+    /* Compliance Documents — checklist UI */
     .compliance-banner { display: none; background: #fff0f0; border: 1px solid #f5b8b8; color: #9a1a1a; padding: 12px 16px; border-radius: 10px; margin-bottom: 1rem; font-size: 13px; line-height: 1.5; }
     .compliance-banner strong { color: #7a0000; }
     .cf-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
@@ -144,19 +144,29 @@
     .cf-form-grid input, .cf-form-grid select, .cf-form-grid textarea { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid #d8d8d0; border-radius: 6px; background: #fff; font-family: inherit; box-sizing: border-box; }
     .cf-form-grid label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-weight: 500; }
     .cf-form-full { grid-column: 1 / -1; }
-    .cf-other-wrap { display: none; }
-    .cf-doc-item { padding: 12px 14px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; margin-bottom: 8px; }
-    .cf-doc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
-    .cf-doc-type { font-size: 13px; font-weight: 600; color: #1a1a2e; }
-    .cf-doc-status { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
-    .cf-doc-status.active { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
-    .cf-doc-status.expiring { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
-    .cf-doc-status.warning { background: #fff0f0; color: #b00; border: 1px solid #fdd; font-weight: 600; }
-    .cf-doc-status.expired { background: #1a1a2e; color: #fff; border: 1px solid #1a1a2e; }
-    .cf-doc-meta { font-size: 11px; color: #888; line-height: 1.5; }
-    .cf-doc-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-    .cf-doc-btn { font-size: 11px; padding: 4px 10px; background: #fff; border: 1px solid #d8d8d0; border-radius: 5px; cursor: pointer; color: #555; font-family: inherit; }
+
+    /* Per-cert row */
+    .cf-cert-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; margin-bottom: 6px; }
+    .cf-cert-row.uploaded { background: #f0fff0; border-color: #c0e0c0; }
+    .cf-cert-row.warning30 { background: #fff0f0; border-color: #f5b8b8; }
+    .cf-cert-row.expiring60 { background: #fff8e0; border-color: #f0d860; }
+    .cf-cert-row.declaration { border-style: dashed; }
+    .cf-cert-name { flex: 1; min-width: 0; }
+    .cf-cert-name-text { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .cf-cert-name-tag { font-size: 10px; background: #f0f4ff; color: #2244cc; border: 1px solid #c0d0f0; padding: 1px 6px; border-radius: 10px; margin-left: 6px; vertical-align: middle; font-weight: 500; }
+    .cf-cert-name-tag.declaration { background: #fff8e0; color: #886600; border-color: #f0d860; }
+    .cf-cert-meta { font-size: 11px; color: #888; margin-top: 2px; }
+    .cf-cert-status { font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
+    .cf-cert-status.empty { background: #fff; color: #888; border: 1px solid #ddd; }
+    .cf-cert-status.active { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
+    .cf-cert-status.expiring { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
+    .cf-cert-status.warning { background: #fff0f0; color: #b00; border: 1px solid #fdd; font-weight: 600; }
+    .cf-cert-status.expired { background: #1a1a2e; color: #fff; border: 1px solid #1a1a2e; }
+    .cf-cert-actions { display: flex; gap: 5px; flex-shrink: 0; }
+    .cf-doc-btn { font-size: 11px; padding: 5px 11px; background: #fff; border: 1px solid #d8d8d0; border-radius: 5px; cursor: pointer; color: #555; font-family: inherit; white-space: nowrap; }
     .cf-doc-btn:hover { background: #f0f0e8; }
+    .cf-doc-btn.primary { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+    .cf-doc-btn.primary:hover { background: #2a2a4e; }
     .cf-doc-btn.danger { color: #b00; border-color: #f5c8c8; }
     .cf-doc-btn.danger:hover { background: #fff0f0; }
     .cf-version-badge { font-size: 10px; background: #e8f0ff; color: #2244cc; border: 1px solid #b8ccf0; padding: 1px 6px; border-radius: 10px; margin-left: 6px; }
@@ -401,72 +411,97 @@
   <!-- Compliance Documents pane -->
   <div class="ppane" id="ppane-compliance">
     <div class="compliance-banner" id="compl-banner"></div>
+
     <div class="card">
       <div class="card-title">Compliance Documents</div>
-      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your factory's compliance certifications (audits, ISO certs, business licenses, etc). Each document needs an expiry date so we can remind you before it lapses.</p>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload the actual certificate PDF for each certification listed below. Items below are based on what you selected on the <strong>Factory Details</strong> tab — to add or remove a certification, update your selections there.</p>
 
-      <div class="cf-form-grid">
-        <div class="field">
-          <label>Document Type *</label>
-          <select id="cf-type" onchange="onComplianceTypeChange()">
-            <option value="">— Select —</option>
-            <option>BSCI Audit</option>
-            <option>Sedex / SMETA Audit</option>
-            <option>ISO 9001 (Quality)</option>
-            <option>ISO 14001 (Environment)</option>
-            <option>ISO 45001 (Health &amp; Safety)</option>
-            <option>GMP (Good Manufacturing Practice)</option>
-            <option>GRS (Global Recycled Standard)</option>
-            <option>FSC (Forest Stewardship)</option>
-            <option>OEKO-TEX</option>
-            <option>WRAP</option>
-            <option>Business License</option>
-            <option>Factory Profile / Capability Statement</option>
-            <option>Insurance Certificate</option>
-            <option>Other</option>
-          </select>
+      <!-- Certification rows (auto-generated from factory.certifications) -->
+      <div id="compl-cert-rows"><div style="font-size:13px;color:#bbb;padding:8px 0;">Loading...</div></div>
+
+      <!-- Other Documents section -->
+      <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #f0f0e8;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-weight:600;font-size:14px;color:#1a1a2e;">Other Documents</div>
+          <button class="cf-doc-btn" onclick="showAddOtherDocForm()">+ Add document</button>
         </div>
-        <div class="field cf-other-wrap" id="cf-other-wrap">
-          <label>Specify type *</label>
-          <input type="text" id="cf-type-other" placeholder="e.g. C-TPAT, Higg FEM, etc." />
-        </div>
-        <div class="field">
-          <label>Certificate Number</label>
-          <input type="text" id="cf-cert-no" placeholder="optional" />
-        </div>
-        <div class="field">
-          <label>Issued By</label>
-          <input type="text" id="cf-issued-by" placeholder="e.g. TÜV SÜD, BSCI Foundation" />
-        </div>
-        <div class="field">
-          <label>Issue Date</label>
-          <input type="date" id="cf-issue-date" />
-        </div>
-        <div class="field">
-          <label>Expiry Date *</label>
-          <input type="date" id="cf-expiry-date" />
-        </div>
-        <div class="field cf-form-full">
-          <label>Notes</label>
-          <textarea id="cf-notes" rows="2" placeholder="Optional notes — scope, exclusions, etc."></textarea>
+        <p style="font-size:12px;color:#999;margin-bottom:10px;">Business licenses, insurance certificates, factory profiles, and any other compliance documents not covered above.</p>
+        <div id="compl-other-rows"></div>
+
+        <!-- Add Other Document form (hidden until + Add document is clicked) -->
+        <div id="compl-add-other-form" style="display:none;background:#f0f8ff;border:1px solid #c8e0f8;border-radius:8px;padding:12px;margin-top:8px;">
+          <div class="cf-form-grid">
+            <div class="field cf-form-full">
+              <label>Document Type *</label>
+              <select id="compl-other-type" onchange="onOtherTypeChange()">
+                <option value="">— Select —</option>
+                <option>Business License</option>
+                <option>Insurance Certificate</option>
+                <option>Factory Profile / Capability Statement</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="field cf-form-full" id="compl-other-custom-wrap" style="display:none;">
+              <label>Specify type *</label>
+              <input type="text" id="compl-other-custom" placeholder="e.g. C-TPAT, Quality Manual" />
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="cf-doc-btn" onclick="g('compl-add-other-form').style.display='none'">Cancel</button>
+            <button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="proceedAddOther()">Continue to upload</button>
+          </div>
         </div>
       </div>
-
-      <div class="upload-zone" onclick="document.getElementById('cf-input').click()">
-        <div class="icon">📄</div>
-        <strong>Choose PDF</strong>
-        <small>PDF only, up to 25 MB</small>
-        <div class="file-chosen" id="cf-chosen"></div>
-      </div>
-      <input type="file" id="cf-input" accept="application/pdf,.pdf" style="display:none" onchange="chooseFile(this,'cf-chosen','cf')" />
-      <button class="up-btn" onclick="uploadComplianceDoc()">Upload Document</button>
-      <div class="prog" id="cf-prog">Uploading...</div>
-      <div class="pmsg ok" id="cf-ok">Document uploaded successfully!</div>
-      <div class="pmsg err" id="cf-err"></div>
     </div>
 
-    <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin:1.5rem 0 8px;">Your Compliance Documents</div>
-    <div id="cf-list"><div style="font-size:13px;color:#bbb;padding:8px 0;">No documents uploaded yet.</div></div>
+    <!-- Upload Modal (one shared form for all rows) -->
+    <div id="compl-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:16px;font-weight:600;color:#1a1a2e;" id="compl-modal-title">Upload Document</div>
+          <button onclick="closeComplianceModal()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div id="compl-modal-guidance" style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5;"></div>
+
+        <div class="cf-form-grid">
+          <div class="field">
+            <label id="compl-cert-no-label">Certificate Number</label>
+            <input type="text" id="compl-cert-no" placeholder="optional" />
+          </div>
+          <div class="field">
+            <label id="compl-issued-by-label">Issued By</label>
+            <input type="text" id="compl-issued-by" placeholder="e.g. TÜV SÜD, BSCI Foundation" />
+          </div>
+          <div class="field">
+            <label>Issue Date</label>
+            <input type="date" id="compl-issue-date" />
+          </div>
+          <div class="field">
+            <label>Expiry Date *</label>
+            <input type="date" id="compl-expiry-date" />
+          </div>
+          <div class="field cf-form-full">
+            <label>Notes</label>
+            <textarea id="compl-notes" rows="2" placeholder="Optional notes — scope, exclusions, etc."></textarea>
+          </div>
+        </div>
+
+        <div class="upload-zone" onclick="document.getElementById('compl-file-input').click()">
+          <div class="icon">📄</div>
+          <strong>Choose PDF</strong>
+          <small>PDF only, up to 25 MB</small>
+          <div class="file-chosen" id="compl-chosen"></div>
+        </div>
+        <input type="file" id="compl-file-input" accept="application/pdf,.pdf" style="display:none" onchange="chooseFile(this,'compl-chosen','cf')" />
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button class="cf-doc-btn" onclick="closeComplianceModal()">Cancel</button>
+          <button class="cf-doc-btn" id="compl-modal-save" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="saveComplianceUpload()">Upload Document</button>
+        </div>
+        <div class="prog" id="compl-modal-prog">Uploading...</div>
+        <div class="pmsg err" id="compl-modal-err"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -555,12 +590,16 @@ function ptab(t){
 }
 
 // ════════════════════════════════════════
-// COMPLIANCE DOCUMENTS (Stage 2)
+// COMPLIANCE DOCUMENTS (checklist-driven)
 // ════════════════════════════════════════
-function onComplianceTypeChange(){
-  var t=g('cf-type').value;
-  g('cf-other-wrap').style.display=(t==='Other'?'block':'none');
-}
+// Self-declaration types — factory uploads a signed self-attestation rather than a third-party cert
+var DECLARATION_CERTS = ['Cruelty Free','Vegan','Organic'];
+// Special "Other Documents" types that aren't certifications (always shown in Other Documents section)
+var ALWAYS_OTHER_DOCS = ['Business License','Insurance Certificate','Factory Profile / Capability Statement'];
+
+var FACTORY_CHECKED_CERTS = []; // populated from loadDetails
+var COMPLIANCE_DOCS = []; // populated from loadComplianceDocs
+var pendingUploadType = null; // the cert type the modal is opened for
 
 function ymd(d){
   if(!d)return null;
@@ -579,54 +618,245 @@ function daysUntil(dateStr){
 function complianceStatus(expiryDateStr){
   var days=daysUntil(expiryDateStr);
   if(days===null)return{cls:'active',label:'Active',days:null};
-  if(days<0)return{cls:'expired',label:'Expired',days:days};
-  if(days<30)return{cls:'warning',label:'⚠ '+days+'d — Non-compliant zone',days:days};
-  if(days<=90)return{cls:'expiring',label:'Expiring in '+days+'d',days:days};
+  if(days<0)return{cls:'expired',label:'Expired '+Math.abs(days)+'d ago',days:days};
+  if(days<30)return{cls:'warning',label:'⚠ '+days+'d left',days:days};
+  if(days<=90)return{cls:'expiring',label:days+'d left',days:days};
   return{cls:'active',label:'Active',days:days};
 }
 
-async function uploadComplianceDoc(){
-  if(!FACTORY_ID){alert('Please save your Factory Details first before uploading compliance documents.');return;}
-  var type=g('cf-type').value;
-  if(!type){showCfErr('Please select a document type.');return;}
-  var typeOther=g('cf-type-other').value.trim();
-  if(type==='Other'&&!typeOther){showCfErr('Please specify the document type.');return;}
-  var expiryDate=g('cf-expiry-date').value;
-  if(!expiryDate){showCfErr('Expiry date is required.');return;}
-  var issueDate=g('cf-issue-date').value;
-  if(issueDate&&issueDate>=expiryDate){showCfErr('Expiry date must be after issue date.');return;}
-  var file=selFiles.cf;
-  if(!file){showCfErr('Please choose a PDF file.');return;}
-  var isPdf=(file.type==='application/pdf')||/\.pdf$/i.test(file.name);
-  if(!isPdf){showCfErr('Only PDF files are accepted.');return;}
-  if(file.size>25*1024*1024){showCfErr('File is over 25 MB. Please reduce file size.');return;}
+function isDeclarationCert(certName){
+  return DECLARATION_CERTS.indexOf(certName)!==-1;
+}
 
-  // Version detection — if a current doc with the same type exists, treat as new version
-  var existingId=null;
-  var existingVersion=0;
-  var typeLabel=(type==='Other'?typeOther:type);
+async function loadComplianceDocs(){
+  if(!FACTORY_ID){
+    g('compl-cert-rows').innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">Save your factory details first.</div>';
+    g('compl-other-rows').innerHTML='';
+    return;
+  }
   try{
-    var checkR=await fetch(SB+'/rest/v1/factory_documents?factory_id=eq.'+FACTORY_ID+'&is_current=eq.true&select=id,document_type,document_type_other,version&order=version.desc',{
+    var r=await fetch(SB+'/rest/v1/factory_documents?factory_id=eq.'+FACTORY_ID+'&is_current=eq.true&select=*&order=uploaded_at.desc',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
-    if(checkR.ok){
-      var existingDocs=await checkR.json();
-      var match=existingDocs.find(function(d){
-        var lbl=(d.document_type==='Other'?(d.document_type_other||''):d.document_type);
-        return(lbl||'').toLowerCase().trim()===typeLabel.toLowerCase().trim();
-      });
-      if(match){
-        var prevVer=match.version||1;
-        var ok=confirm('A "'+typeLabel+'" document already exists (v'+prevVer+'). Replace as new version v'+(prevVer+1)+'? The old version will be archived but viewable in your history.');
-        if(!ok){showCfErr('Upload cancelled.');return;}
-        existingId=match.id;
-        existingVersion=prevVer;
-      }
+    if(!r.ok){
+      g('compl-cert-rows').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error loading documents.</div>';
+      return;
     }
-  }catch(e){console.log('version check failed:',e);}
+    COMPLIANCE_DOCS=await r.json();
+    renderComplianceUI();
+    updateComplianceBanner(COMPLIANCE_DOCS);
+  }catch(e){
+    g('compl-cert-rows').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error: '+esc(e.message)+'</div>';
+  }
+}
 
-  g('cf-prog').style.display='block';
-  g('cf-ok').style.display='none';g('cf-err').style.display='none';
+function findDocForType(certName){
+  // Match the most recent current doc whose document_type or document_type_other matches
+  for(var i=0;i<COMPLIANCE_DOCS.length;i++){
+    var d=COMPLIANCE_DOCS[i];
+    var label=(d.document_type==='Other'?(d.document_type_other||''):d.document_type);
+    if((label||'').toLowerCase().trim()===(certName||'').toLowerCase().trim())return d;
+  }
+  return null;
+}
+
+function renderComplianceUI(){
+  var certRowsEl=g('compl-cert-rows');
+  var otherRowsEl=g('compl-other-rows');
+
+  // ── Cert rows: one per checked cert on Factory Details ──
+  var certs=Array.isArray(FACTORY_CHECKED_CERTS)?FACTORY_CHECKED_CERTS.slice():[];
+  if(!certs.length){
+    certRowsEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:12px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;">No certifications selected yet. Go to <strong>Factory Details</strong> and check off the certifications your factory holds.</div>';
+  }else{
+    // Sort: uploaded first by expiry asc, then not-uploaded alphabetical
+    certs.sort(function(a,b){
+      var da=findDocForType(a),db=findDocForType(b);
+      if(da&&!db)return -1;
+      if(!da&&db)return 1;
+      if(da&&db)return(da.expiry_date||'').localeCompare(db.expiry_date||'');
+      return a.localeCompare(b);
+    });
+    certRowsEl.innerHTML=certs.map(function(certName){
+      return renderCertRow(certName,false);
+    }).join('');
+  }
+
+  // ── Other Documents section ──
+  // Show always-other (Business License, Insurance, Factory Profile) regardless of upload state,
+  // PLUS any uploaded "Other" types (custom names) that the factory has uploaded
+  var otherSlots=ALWAYS_OTHER_DOCS.slice();
+  // Find any uploaded docs whose label isn't in the cert list AND isn't already in the always-other list
+  COMPLIANCE_DOCS.forEach(function(d){
+    var label=(d.document_type==='Other'?(d.document_type_other||''):d.document_type);
+    if(!label)return;
+    if(certs.indexOf(label)!==-1)return; // skip — it's a cert row
+    if(otherSlots.indexOf(label)!==-1)return; // already in always-other
+    otherSlots.push(label);
+  });
+  if(!otherSlots.length){
+    otherRowsEl.innerHTML='';
+  }else{
+    otherSlots.sort(function(a,b){
+      var da=findDocForType(a),db=findDocForType(b);
+      if(da&&!db)return -1;
+      if(!da&&db)return 1;
+      return a.localeCompare(b);
+    });
+    otherRowsEl.innerHTML=otherSlots.map(function(name){
+      return renderCertRow(name,true);
+    }).join('');
+  }
+}
+
+function renderCertRow(typeName,isOther){
+  var doc=findDocForType(typeName);
+  var declaration=isDeclarationCert(typeName);
+  var rowCls='cf-cert-row';
+  var status,statusLabel,verBadge='',meta='';
+  if(doc){
+    status=complianceStatus(doc.expiry_date);
+    if(status.cls==='warning')rowCls+=' warning30';
+    else if(status.cls==='expiring')rowCls+=' expiring60';
+    else if(status.cls==='expired')rowCls+=' warning30';
+    else rowCls+=' uploaded';
+    statusLabel=status.label;
+    if(doc.version>1)verBadge='<span class="cf-version-badge">v'+doc.version+'</span>';
+    var expiryStr=doc.expiry_date?new Date(doc.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    var parts=[];
+    if(doc.certificate_number)parts.push('Cert #'+esc(doc.certificate_number));
+    if(doc.issued_by)parts.push('Issued by '+esc(doc.issued_by));
+    if(expiryStr)parts.push('Expires '+expiryStr);
+    meta=parts.join(' · ');
+  }else{
+    if(declaration)rowCls+=' declaration';
+    statusLabel='Not uploaded';
+    meta=declaration
+      ? 'Self-declaration on company letterhead with chop/seal'
+      : 'No certificate on file';
+  }
+  var statusClass=doc?status.cls:'empty';
+  var nameTag=declaration
+    ? '<span class="cf-cert-name-tag declaration">Self-declaration</span>'
+    : (isOther?'':'<span class="cf-cert-name-tag">Certification</span>');
+  // Actions
+  var actions;
+  if(doc){
+    var safePath=(doc.file_path||'').replace(/'/g,"\\'");
+    actions='<button class="cf-doc-btn" onclick="viewComplianceDoc(\''+doc.id+'\',\''+safePath+'\')">View</button>'+
+            '<button class="cf-doc-btn" onclick="openComplianceModal(\''+escAttr(typeName)+'\','+(isOther?'true':'false')+',true)">Replace</button>'+
+            '<button class="cf-doc-btn danger" onclick="deleteComplianceDoc(\''+doc.id+'\',\''+safePath+'\')">Delete</button>';
+  }else{
+    actions='<button class="cf-doc-btn primary" onclick="openComplianceModal(\''+escAttr(typeName)+'\','+(isOther?'true':'false')+',false)">+ Upload</button>';
+  }
+  return '<div class="'+rowCls+'">'+
+    '<div class="cf-cert-name">'+
+      '<div><span class="cf-cert-name-text">'+esc(typeName)+'</span>'+nameTag+verBadge+'</div>'+
+      '<div class="cf-cert-meta">'+meta+'</div>'+
+    '</div>'+
+    '<span class="cf-cert-status '+statusClass+'">'+esc(statusLabel)+'</span>'+
+    '<div class="cf-cert-actions">'+actions+'</div>'+
+  '</div>';
+}
+
+function escAttr(s){return(s||'').toString().replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+
+// ── Modal upload form ──
+function openComplianceModal(typeName,isOther,isReplace){
+  pendingUploadType=typeName;
+  var declaration=isDeclarationCert(typeName);
+  g('compl-modal-title').textContent=(isReplace?'Replace':'Upload')+': '+typeName;
+  // Guidance text
+  if(declaration){
+    g('compl-modal-guidance').innerHTML='<strong>Self-declaration required.</strong> Please upload a signed self-attestation document on company letterhead, signed and stamped with your company chop/seal, stating compliance with <strong>'+esc(typeName)+'</strong>. Include the effective date and any review date you commit to.';
+    g('compl-cert-no-label').textContent='Document Reference (optional)';
+    g('compl-issued-by-label').textContent='Signed By (optional)';
+    g('compl-issued-by').placeholder='e.g. CEO, QA Director';
+  }else{
+    g('compl-modal-guidance').innerHTML='Upload the actual certificate PDF. Include the certificate number, issuing body, issue/expiry dates as printed on the certificate.';
+    g('compl-cert-no-label').textContent='Certificate Number';
+    g('compl-issued-by-label').textContent='Issued By';
+    g('compl-issued-by').placeholder='e.g. TÜV SÜD, BSCI Foundation';
+  }
+  // Reset fields
+  g('compl-cert-no').value='';g('compl-issued-by').value='';
+  g('compl-issue-date').value='';g('compl-expiry-date').value='';
+  g('compl-notes').value='';
+  g('compl-chosen').textContent='';
+  selFiles.cf=null;
+  g('compl-modal-prog').style.display='none';
+  g('compl-modal-err').style.display='none';
+  g('compl-modal-save').disabled=false;
+  g('compl-modal-save').textContent=isReplace?'Upload New Version':'Upload Document';
+  g('compl-modal').style.display='flex';
+}
+
+function closeComplianceModal(){
+  g('compl-modal').style.display='none';
+  pendingUploadType=null;
+}
+
+function showAddOtherDocForm(){
+  g('compl-add-other-form').style.display='block';
+  g('compl-other-type').value='';
+  g('compl-other-custom').value='';
+  g('compl-other-custom-wrap').style.display='none';
+}
+
+function onOtherTypeChange(){
+  var t=g('compl-other-type').value;
+  g('compl-other-custom-wrap').style.display=(t==='Other'?'block':'none');
+}
+
+function proceedAddOther(){
+  var t=g('compl-other-type').value;
+  if(!t){alert('Please select a document type.');return;}
+  var typeName=t;
+  if(t==='Other'){
+    var custom=g('compl-other-custom').value.trim();
+    if(!custom){alert('Please specify the document type.');return;}
+    typeName=custom;
+  }
+  g('compl-add-other-form').style.display='none';
+  openComplianceModal(typeName,true,false);
+}
+
+async function saveComplianceUpload(){
+  if(!FACTORY_ID){alert('Save your factory details first.');return;}
+  if(!pendingUploadType){return;}
+  var expiryDate=g('compl-expiry-date').value;
+  if(!expiryDate){showComplErr('Expiry date is required.');return;}
+  var issueDate=g('compl-issue-date').value;
+  if(issueDate&&issueDate>=expiryDate){showComplErr('Expiry date must be after issue date.');return;}
+  var file=selFiles.cf;
+  if(!file){showComplErr('Please choose a PDF file.');return;}
+  var isPdf=(file.type==='application/pdf')||/\.pdf$/i.test(file.name);
+  if(!isPdf){showComplErr('Only PDF files are accepted.');return;}
+  if(file.size>25*1024*1024){showComplErr('File is over 25 MB. Please reduce file size.');return;}
+
+  // Determine document_type / document_type_other based on whether the typeName matches a standard option
+  // Standard types we know about (use as-is); anything else gets stored as Other + custom name
+  var STANDARD_TYPES=['BSCI Audit','Sedex / SMETA Audit','ISO 9001 (Quality)','ISO 14001 (Environment)','ISO 45001 (Health & Safety)','GMP (Good Manufacturing Practice)','GRS (Global Recycled Standard)','FSC (Forest Stewardship)','OEKO-TEX','WRAP','Business License','Factory Profile / Capability Statement','Insurance Certificate'];
+  // For now, store every type literally with document_type=typeName when it matches the FACTORY_CHECKED_CERTS list,
+  // or document_type='Other' + document_type_other=typeName otherwise
+  var docType, docTypeOther=null;
+  if(STANDARD_TYPES.indexOf(pendingUploadType)!==-1){
+    docType=pendingUploadType;
+  }else{
+    // Cert from Factory Details checklist OR custom Other — store full name in document_type_other
+    docType='Other';
+    docTypeOther=pendingUploadType;
+  }
+
+  // Version detection — match by typeName (case-insensitive) on existing current docs
+  var existing=findDocForType(pendingUploadType);
+  var existingId=existing?existing.id:null;
+  var existingVersion=existing?(existing.version||1):0;
+
+  var btn=g('compl-modal-save');
+  btn.disabled=true;btn.textContent='Uploading...';
+  g('compl-modal-prog').style.display='block';
+  g('compl-modal-err').style.display='none';
 
   var ts=Date.now();
   var safeName=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
@@ -639,12 +869,12 @@ async function uploadComplianceDoc(){
       body:file
     });
     if(!sr.ok){
-      g('cf-prog').style.display='none';
       var serr=await sr.json().catch(function(){return{};});
-      showCfErr('Storage upload failed: '+(serr.message||serr.error||sr.status));
+      btn.disabled=false;btn.textContent='Upload Document';
+      g('compl-modal-prog').style.display='none';
+      showComplErr('Storage upload failed: '+(serr.message||serr.error||sr.status));
       return;
     }
-    // Archive previous version if applicable
     if(existingId){
       try{
         await fetch(SB+'/rest/v1/factory_documents?id=eq.'+existingId,{
@@ -656,16 +886,16 @@ async function uploadComplianceDoc(){
     }
     var payload={
       factory_id:FACTORY_ID,
-      document_type:type,
-      document_type_other:type==='Other'?typeOther:null,
-      certificate_number:g('cf-cert-no').value.trim()||null,
-      issued_by:g('cf-issued-by').value.trim()||null,
+      document_type:docType,
+      document_type_other:docTypeOther,
+      certificate_number:g('compl-cert-no').value.trim()||null,
+      issued_by:g('compl-issued-by').value.trim()||null,
       file_name:file.name,
       file_path:storagePath,
       file_size:file.size,
       issue_date:issueDate||null,
       expiry_date:expiryDate,
-      notes:g('cf-notes').value.trim()||null,
+      notes:g('compl-notes').value.trim()||null,
       version:existingId?(existingVersion+1):1,
       is_current:true,
       previous_version_id:existingId,
@@ -676,97 +906,32 @@ async function uploadComplianceDoc(){
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify(payload)
     });
-    g('cf-prog').style.display='none';
+    btn.disabled=false;btn.textContent='Upload Document';
+    g('compl-modal-prog').style.display='none';
     if(!dr.ok){
       var derr=await dr.json().catch(function(){return{};});
-      showCfErr('Database save failed: '+(derr.message||derr.details||dr.status));
+      showComplErr('Database save failed: '+(derr.message||derr.details||dr.status));
       return;
     }
-    g('cf-ok').textContent=existingId?('Document uploaded as v'+(existingVersion+1)+'!'):'Document uploaded successfully!';
-    g('cf-ok').style.display='block';
-    selFiles.cf=null;
-    g('cf-chosen').textContent='';
-    // Clear form
-    g('cf-type').value='';g('cf-type-other').value='';g('cf-other-wrap').style.display='none';
-    g('cf-cert-no').value='';g('cf-issued-by').value='';
-    g('cf-issue-date').value='';g('cf-expiry-date').value='';g('cf-notes').value='';
-    setTimeout(function(){g('cf-ok').style.display='none';},4000);
+    closeComplianceModal();
     await loadComplianceDocs();
   }catch(e){
-    g('cf-prog').style.display='none';
-    showCfErr('Error: '+e.message);
+    btn.disabled=false;btn.textContent='Upload Document';
+    g('compl-modal-prog').style.display='none';
+    showComplErr('Error: '+e.message);
   }
 }
 
-function showCfErr(msg){
-  g('cf-err').textContent=msg;
-  g('cf-err').style.display='block';
-}
-
-async function loadComplianceDocs(){
-  if(!FACTORY_ID){
-    g('cf-list').innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">Save your factory details first.</div>';
-    return;
-  }
-  try{
-    var r=await fetch(SB+'/rest/v1/factory_documents?factory_id=eq.'+FACTORY_ID+'&is_current=eq.true&select=*&order=expiry_date.asc',{
-      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
-    });
-    if(!r.ok){
-      g('cf-list').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error loading documents.</div>';
-      return;
-    }
-    var docs=await r.json();
-    renderComplianceList(docs);
-    updateComplianceBanner(docs);
-  }catch(e){
-    g('cf-list').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error: '+esc(e.message)+'</div>';
-  }
-}
-
-function renderComplianceList(docs){
-  var listEl=g('cf-list');
-  if(!docs||!docs.length){
-    listEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">No documents uploaded yet.</div>';
-    return;
-  }
-  listEl.innerHTML=docs.map(function(d){
-    var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
-    var status=complianceStatus(d.expiry_date);
-    var expiryStr=d.expiry_date?new Date(d.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
-    var issueStr=d.issue_date?new Date(d.issue_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
-    var sizeStr=d.file_size?(d.file_size/1024/1024).toFixed(2)+' MB':'';
-    var verBadge=d.version>1?'<span class="cf-version-badge">v'+d.version+'</span>':'';
-    var metaParts=[];
-    if(d.certificate_number)metaParts.push('Cert #'+esc(d.certificate_number));
-    if(d.issued_by)metaParts.push('Issued by '+esc(d.issued_by));
-    if(issueStr)metaParts.push('Issued '+issueStr);
-    metaParts.push('<strong style="color:#444;">Expires '+expiryStr+'</strong>');
-    var metaLine=metaParts.join(' · ');
-    var fileLine=esc(d.file_name||'')+(sizeStr?' · '+sizeStr:'');
-    var notesLine=d.notes?'<div style="font-size:11px;color:#888;margin-top:4px;font-style:italic;">'+esc(d.notes)+'</div>':'';
-    var safePath=(d.file_path||'').replace(/'/g,"\\'");
-    return '<div class="cf-doc-item">'+
-      '<div class="cf-doc-top">'+
-        '<div class="cf-doc-type">'+esc(typeLabel)+verBadge+'</div>'+
-        '<span class="cf-doc-status '+status.cls+'">'+esc(status.label)+'</span>'+
-      '</div>'+
-      '<div class="cf-doc-meta">'+metaLine+'</div>'+
-      '<div class="cf-doc-meta" style="margin-top:2px;color:#aaa;">'+fileLine+'</div>'+
-      notesLine+
-      '<div class="cf-doc-actions">'+
-        '<button class="cf-doc-btn" onclick="viewComplianceDoc(\''+d.id+'\',\''+safePath+'\')">View PDF</button>'+
-        '<button class="cf-doc-btn danger" onclick="deleteComplianceDoc(\''+d.id+'\',\''+safePath+'\')">Delete</button>'+
-      '</div>'+
-    '</div>';
-  }).join('');
+function showComplErr(msg){
+  g('compl-modal-err').textContent=msg;
+  g('compl-modal-err').style.display='block';
 }
 
 function updateComplianceBanner(docs){
   var banner=g('compl-banner');
   var badge=g('compl-badge');
   if(!banner||!badge)return;
-  var critical=docs.filter(function(d){
+  var critical=(docs||[]).filter(function(d){
     var days=daysUntil(d.expiry_date);
     return days!==null&&days<30;
   });
@@ -843,6 +1008,7 @@ async function loadDetails(){
       g('p-wechat').value=f.sales_wechat||'';
       g('p-whatsapp').value=f.sales_whatsapp||'';
       renderCertifications(f.certifications||[]);
+      FACTORY_CHECKED_CERTS=Array.isArray(f.certifications)?f.certifications.slice():[];
       var banner=g('status-banner');
       banner.style.display='block';
       if(f.status==='approved'){
@@ -867,6 +1033,7 @@ async function saveDetails(){
   g('save-ok').style.display='none';
   g('save-err').style.display='none';
   var certs = getSelectedCertifications();
+  FACTORY_CHECKED_CERTS=certs.slice();
   FACTORY_NAME=g('p-name_en').value.trim();
   var payload={
     user_id:USER.id,
