@@ -1038,6 +1038,16 @@ async function loadVendorGuides(custId){
         tagsHtml+='<div style="margin-top:2px;">'+vg.ai_freeform_tags.map(function(t){return '<span class="vguide-tag" style="background:#fff8e0;color:#886600;border-color:#f0d860;">'+t.replace(/_/g,' ')+'</span>';}).join('')+'</div>';
       }
       var summaryHtml=vg.ai_summary?'<div style="font-size:11px;color:#666;margin-top:4px;line-height:1.4;">'+esc(vg.ai_summary)+'</div>':'';
+      // Show "what changed" summary when this is v2+
+      var changeHtml='';
+      if(vg.version>1&&vg.ai_change_summary){
+        changeHtml='<div style="font-size:11px;color:#1a7a1a;background:#f0fff0;border:1px solid #c0e0c0;border-radius:6px;padding:6px 8px;margin-top:6px;line-height:1.4;"><strong>Changes from v'+(vg.version-1)+':</strong> '+esc(vg.ai_change_summary)+'</div>';
+      }
+      // Version history toggle
+      var historyToggle='';
+      if(vg.version>1){
+        historyToggle='<div style="margin-top:4px;"><a href="javascript:void(0)" onclick="toggleVersionHistory(\''+vg.id+'\')" style="font-size:11px;color:#2266cc;text-decoration:none;">▸ View version history</a><div id="vh-'+vg.id+'" style="display:none;margin-top:6px;"></div></div>';
+      }
       // Show "Analyze" button only for pending or failed docs
       var analyzeBtn='';
       if(vg.processing_status==='pending'||vg.processing_status==='failed'){
@@ -1057,7 +1067,9 @@ async function loadVendorGuides(custId){
           '</div>'+
         '</div>'+
         summaryHtml+
+        changeHtml+
         tagsHtml+
+        historyToggle+
       '</div>';
     }).join('');
     // Auto-refresh while any document is actively analyzing.
@@ -1091,8 +1103,53 @@ async function loadVendorGuides(custId){
 }
 var vguidePollCount=0;
 
-async function reanalyzeVendorGuide(guideId){
-  // Reset status to pending so the AI runs again, then kick off the analyzer
+async function toggleVersionHistory(currentGuideId){
+  var box=g('vh-'+currentGuideId);
+  if(!box)return;
+  if(box.style.display==='block'){
+    box.style.display='none';
+    return;
+  }
+  box.style.display='block';
+  box.innerHTML='<div style="font-size:11px;color:#888;padding:4px;">Loading version history...</div>';
+  // Walk the previous_version_id chain backwards
+  try{
+    var versions=[];
+    var nextId=currentGuideId;
+    var safety=0;
+    while(nextId&&safety<20){
+      var r=await fetch(SB+'/rest/v1/customer_vendor_guides?id=eq.'+nextId+'&select=id,version,file_name,file_path,uploaded_at,previous_version_id,ai_change_summary',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      if(!r.ok)break;
+      var rows=await r.json();
+      if(!rows.length)break;
+      versions.push(rows[0]);
+      nextId=rows[0].previous_version_id;
+      safety++;
+    }
+    // Skip the first one (it's the current version itself), show the rest
+    var prior=versions.slice(1);
+    if(!prior.length){
+      box.innerHTML='<div style="font-size:11px;color:#888;padding:4px;">No prior versions found.</div>';
+      return;
+    }
+    box.innerHTML=prior.map(function(v){
+      var dateStr=v.uploaded_at?new Date(v.uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+      var safePath=(v.file_path||'').replace(/'/g,"\\'");
+      return '<div style="font-size:11px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">'+
+          '<div><span class="vguide-version-badge" style="margin-left:0;">v'+v.version+'</span> <span style="color:#888;">'+esc(v.file_name||'')+' · '+dateStr+'</span></div>'+
+          '<button class="btn-sm-edit" onclick="downloadVendorGuide(\''+v.id+'\',\''+safePath+'\')">View</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    box.innerHTML='<div style="font-size:11px;color:#b00;padding:4px;">Error loading history: '+e.message+'</div>';
+  }
+}
+
+async function reanalyzeVendorGuide(guideId){  // Reset status to pending so the AI runs again, then kick off the analyzer
   try{
     var pr=await fetch(SB+'/rest/v1/customer_vendor_guides?id=eq.'+guideId,{
       method:'PATCH',
@@ -1124,6 +1181,29 @@ async function uploadVendorGuide(){
   if(!isPdf){showMsg('vg','err','Only PDF files are accepted.');return;}
   if(file.size>50*1024*1024){showMsg('vg','err','File is over 50 MB. Contact support if you need to upload larger files.');return;}
 
+  // ── Version detection: look for an existing current doc with the same title (case-insensitive) ──
+  var existingId=null;
+  var existingVersion=0;
+  try{
+    var checkR=await fetch(SB+'/rest/v1/customer_vendor_guides?customer_id=eq.'+currentCustId+'&is_current=eq.true&select=id,title,version&order=version.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(checkR.ok){
+      var existingDocs=await checkR.json();
+      var titleLc=title.toLowerCase().trim();
+      var match=existingDocs.find(function(d){return(d.title||'').toLowerCase().trim()===titleLc;});
+      if(match){
+        var prevVer=match.version||1;
+        var ok=confirm('A document titled "'+match.title+'" already exists (v'+prevVer+'). Replace as new version v'+(prevVer+1)+'?\n\nThe old version will be archived but viewable in version history. AI will compare both versions and summarize what changed.');
+        if(!ok){showMsg('vg','err','Upload cancelled. Rename the title if this is a different document.');return;}
+        existingId=match.id;
+        existingVersion=prevVer;
+      }
+    }
+  }catch(e){
+    console.log('version check failed, proceeding as new:',e);
+  }
+
   var btn=g('vg-upload-btn');
   btn.disabled=true;btn.textContent='Uploading...';
 
@@ -1143,14 +1223,25 @@ async function uploadVendorGuide(){
       showMsg('vg','err','Storage upload failed: '+(serr.message||serr.error||sr.status));
       return;
     }
+    // ── If this is a new version, archive the previous one ──
+    if(existingId){
+      try{
+        await fetch(SB+'/rest/v1/customer_vendor_guides?id=eq.'+existingId,{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({is_current:false})
+        });
+      }catch(e){console.log('archive previous failed:',e);}
+    }
     var payload={
       customer_id:currentCustId,
       title:title,
       file_name:file.name,
       file_path:storagePath,
       file_size:file.size,
-      version:1,
+      version:existingId?(existingVersion+1):1,
       is_current:true,
+      previous_version_id:existingId,
       processing_status:'pending'
     };
     var dr=await fetch(SB+'/rest/v1/customer_vendor_guides',{
@@ -1164,7 +1255,6 @@ async function uploadVendorGuide(){
       showMsg('vg','err','Database save failed: '+(derr.message||derr.details||dr.status));
       return;
     }
-    // Get the new guide's ID and kick off AI analysis (fire-and-forget)
     var inserted=await dr.json().catch(function(){return null;});
     var newGuideId=Array.isArray(inserted)?(inserted[0]&&inserted[0].id):(inserted&&inserted.id);
     if(newGuideId){
@@ -1174,7 +1264,8 @@ async function uploadVendorGuide(){
         body:JSON.stringify({guideId:newGuideId})
       }).catch(function(e){console.log('analyze kickoff error:',e);});
     }
-    showMsg('vg','ok','Document uploaded. AI is analyzing...');
+    var okMsg=existingId?'Document uploaded as v'+(existingVersion+1)+'. AI is comparing versions...':'Document uploaded. AI is analyzing...';
+    showMsg('vg','ok',okMsg);
     g('vg-title').value='';
     fileInput.value='';
     await loadVendorGuides(currentCustId);
