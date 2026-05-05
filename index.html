@@ -135,6 +135,31 @@
     .up-btn:hover { opacity: 0.87; }
     .file-list { margin-top: 10px; }
     .file-list-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+
+    /* Compliance Documents (Stage 2) */
+    .compliance-banner { display: none; background: #fff0f0; border: 1px solid #f5b8b8; color: #9a1a1a; padding: 12px 16px; border-radius: 10px; margin-bottom: 1rem; font-size: 13px; line-height: 1.5; }
+    .compliance-banner strong { color: #7a0000; }
+    .cf-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .cf-form-grid .field { margin-bottom: 0; }
+    .cf-form-grid input, .cf-form-grid select, .cf-form-grid textarea { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid #d8d8d0; border-radius: 6px; background: #fff; font-family: inherit; box-sizing: border-box; }
+    .cf-form-grid label { display: block; font-size: 11px; color: #888; margin-bottom: 3px; font-weight: 500; }
+    .cf-form-full { grid-column: 1 / -1; }
+    .cf-other-wrap { display: none; }
+    .cf-doc-item { padding: 12px 14px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 8px; margin-bottom: 8px; }
+    .cf-doc-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .cf-doc-type { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .cf-doc-status { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
+    .cf-doc-status.active { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
+    .cf-doc-status.expiring { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
+    .cf-doc-status.warning { background: #fff0f0; color: #b00; border: 1px solid #fdd; font-weight: 600; }
+    .cf-doc-status.expired { background: #1a1a2e; color: #fff; border: 1px solid #1a1a2e; }
+    .cf-doc-meta { font-size: 11px; color: #888; line-height: 1.5; }
+    .cf-doc-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .cf-doc-btn { font-size: 11px; padding: 4px 10px; background: #fff; border: 1px solid #d8d8d0; border-radius: 5px; cursor: pointer; color: #555; font-family: inherit; }
+    .cf-doc-btn:hover { background: #f0f0e8; }
+    .cf-doc-btn.danger { color: #b00; border-color: #f5c8c8; }
+    .cf-doc-btn.danger:hover { background: #fff0f0; }
+    .cf-version-badge { font-size: 10px; background: #e8f0ff; color: #2244cc; border: 1px solid #b8ccf0; padding: 1px 6px; border-radius: 10px; margin-left: 6px; }
     .file-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: #f8f8f4; border: 1px solid #e8e8e0; border-radius: 7px; margin-bottom: 6px; }
     .file-row-name { font-size: 12px; color: #555; }
     .file-row-link { font-size: 12px; color: #2266cc; text-decoration: none; }
@@ -238,6 +263,7 @@
     <button class="ptab" onclick="ptab('catalogs')">Catalog</button>
     <button class="ptab" onclick="ptab('overview')">Company Deck</button>
     <button class="ptab" onclick="ptab('quotes')">Quote Sheets</button>
+    <button class="ptab" onclick="ptab('compliance');loadComplianceDocs();">Compliance <span id="compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
   </div>
 
   <!-- Details pane -->
@@ -371,13 +397,84 @@
     </div>
     <div class="file-list" id="qt-list"></div>
   </div>
+
+  <!-- Compliance Documents pane -->
+  <div class="ppane" id="ppane-compliance">
+    <div class="compliance-banner" id="compl-banner"></div>
+    <div class="card">
+      <div class="card-title">Compliance Documents</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your factory's compliance certifications (audits, ISO certs, business licenses, etc). Each document needs an expiry date so we can remind you before it lapses.</p>
+
+      <div class="cf-form-grid">
+        <div class="field">
+          <label>Document Type *</label>
+          <select id="cf-type" onchange="onComplianceTypeChange()">
+            <option value="">— Select —</option>
+            <option>BSCI Audit</option>
+            <option>Sedex / SMETA Audit</option>
+            <option>ISO 9001 (Quality)</option>
+            <option>ISO 14001 (Environment)</option>
+            <option>ISO 45001 (Health &amp; Safety)</option>
+            <option>GMP (Good Manufacturing Practice)</option>
+            <option>GRS (Global Recycled Standard)</option>
+            <option>FSC (Forest Stewardship)</option>
+            <option>OEKO-TEX</option>
+            <option>WRAP</option>
+            <option>Business License</option>
+            <option>Factory Profile / Capability Statement</option>
+            <option>Insurance Certificate</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field cf-other-wrap" id="cf-other-wrap">
+          <label>Specify type *</label>
+          <input type="text" id="cf-type-other" placeholder="e.g. C-TPAT, Higg FEM, etc." />
+        </div>
+        <div class="field">
+          <label>Certificate Number</label>
+          <input type="text" id="cf-cert-no" placeholder="optional" />
+        </div>
+        <div class="field">
+          <label>Issued By</label>
+          <input type="text" id="cf-issued-by" placeholder="e.g. TÜV SÜD, BSCI Foundation" />
+        </div>
+        <div class="field">
+          <label>Issue Date</label>
+          <input type="date" id="cf-issue-date" />
+        </div>
+        <div class="field">
+          <label>Expiry Date *</label>
+          <input type="date" id="cf-expiry-date" />
+        </div>
+        <div class="field cf-form-full">
+          <label>Notes</label>
+          <textarea id="cf-notes" rows="2" placeholder="Optional notes — scope, exclusions, etc."></textarea>
+        </div>
+      </div>
+
+      <div class="upload-zone" onclick="document.getElementById('cf-input').click()">
+        <div class="icon">📄</div>
+        <strong>Choose PDF</strong>
+        <small>PDF only, up to 25 MB</small>
+        <div class="file-chosen" id="cf-chosen"></div>
+      </div>
+      <input type="file" id="cf-input" accept="application/pdf,.pdf" style="display:none" onchange="chooseFile(this,'cf-chosen','cf')" />
+      <button class="up-btn" onclick="uploadComplianceDoc()">Upload Document</button>
+      <div class="prog" id="cf-prog">Uploading...</div>
+      <div class="pmsg ok" id="cf-ok">Document uploaded successfully!</div>
+      <div class="pmsg err" id="cf-err"></div>
+    </div>
+
+    <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin:1.5rem 0 8px;">Your Compliance Documents</div>
+    <div id="cf-list"><div style="font-size:13px;color:#bbb;padding:8px 0;">No documents uploaded yet.</div></div>
+  </div>
 </div>
 
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var USER=null,TOKEN=null,FACTORY_NAME='',FACTORY_ID=null;
-var selFiles={cat:null,ov:null,qt:null};
+var selFiles={cat:null,ov:null,qt:null,cf:null};
 var allRFQs=[];
 
 function g(id){return document.getElementById(id);}
@@ -448,13 +545,279 @@ async function enterPortal(){
   await loadDetails();
   await loadAllFileLists();
   loadRFQBadge();
+  loadComplianceDocs();
 }
 
 function ptab(t){
-  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',['details','rfqs','catalogs','overview','quotes'][i]===t);});
+  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',['details','rfqs','catalogs','overview','quotes','compliance'][i]===t);});
   document.querySelectorAll('.ppane').forEach(function(el){el.classList.remove('on');});
   g('ppane-'+t).classList.add('on');
 }
+
+// ════════════════════════════════════════
+// COMPLIANCE DOCUMENTS (Stage 2)
+// ════════════════════════════════════════
+function onComplianceTypeChange(){
+  var t=g('cf-type').value;
+  g('cf-other-wrap').style.display=(t==='Other'?'block':'none');
+}
+
+function ymd(d){
+  if(!d)return null;
+  var dt=(typeof d==='string')?new Date(d+'T00:00:00'):d;
+  if(isNaN(dt.getTime()))return null;
+  return dt.toISOString().slice(0,10);
+}
+
+function daysUntil(dateStr){
+  if(!dateStr)return null;
+  var d=new Date(dateStr+'T00:00:00');
+  var today=new Date();today.setHours(0,0,0,0);
+  return Math.ceil((d.getTime()-today.getTime())/(1000*60*60*24));
+}
+
+function complianceStatus(expiryDateStr){
+  var days=daysUntil(expiryDateStr);
+  if(days===null)return{cls:'active',label:'Active',days:null};
+  if(days<0)return{cls:'expired',label:'Expired',days:days};
+  if(days<30)return{cls:'warning',label:'⚠ '+days+'d — Non-compliant zone',days:days};
+  if(days<=90)return{cls:'expiring',label:'Expiring in '+days+'d',days:days};
+  return{cls:'active',label:'Active',days:days};
+}
+
+async function uploadComplianceDoc(){
+  if(!FACTORY_ID){alert('Please save your Factory Details first before uploading compliance documents.');return;}
+  var type=g('cf-type').value;
+  if(!type){showCfErr('Please select a document type.');return;}
+  var typeOther=g('cf-type-other').value.trim();
+  if(type==='Other'&&!typeOther){showCfErr('Please specify the document type.');return;}
+  var expiryDate=g('cf-expiry-date').value;
+  if(!expiryDate){showCfErr('Expiry date is required.');return;}
+  var issueDate=g('cf-issue-date').value;
+  if(issueDate&&issueDate>=expiryDate){showCfErr('Expiry date must be after issue date.');return;}
+  var file=selFiles.cf;
+  if(!file){showCfErr('Please choose a PDF file.');return;}
+  var isPdf=(file.type==='application/pdf')||/\.pdf$/i.test(file.name);
+  if(!isPdf){showCfErr('Only PDF files are accepted.');return;}
+  if(file.size>25*1024*1024){showCfErr('File is over 25 MB. Please reduce file size.');return;}
+
+  // Version detection — if a current doc with the same type exists, treat as new version
+  var existingId=null;
+  var existingVersion=0;
+  var typeLabel=(type==='Other'?typeOther:type);
+  try{
+    var checkR=await fetch(SB+'/rest/v1/factory_documents?factory_id=eq.'+FACTORY_ID+'&is_current=eq.true&select=id,document_type,document_type_other,version&order=version.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(checkR.ok){
+      var existingDocs=await checkR.json();
+      var match=existingDocs.find(function(d){
+        var lbl=(d.document_type==='Other'?(d.document_type_other||''):d.document_type);
+        return(lbl||'').toLowerCase().trim()===typeLabel.toLowerCase().trim();
+      });
+      if(match){
+        var prevVer=match.version||1;
+        var ok=confirm('A "'+typeLabel+'" document already exists (v'+prevVer+'). Replace as new version v'+(prevVer+1)+'? The old version will be archived but viewable in your history.');
+        if(!ok){showCfErr('Upload cancelled.');return;}
+        existingId=match.id;
+        existingVersion=prevVer;
+      }
+    }
+  }catch(e){console.log('version check failed:',e);}
+
+  g('cf-prog').style.display='block';
+  g('cf-ok').style.display='none';g('cf-err').style.display='none';
+
+  var ts=Date.now();
+  var safeName=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+  var storagePath=FACTORY_ID+'/'+ts+'_'+safeName;
+
+  try{
+    var sr=await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath,{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/pdf','x-upsert':'true'},
+      body:file
+    });
+    if(!sr.ok){
+      g('cf-prog').style.display='none';
+      var serr=await sr.json().catch(function(){return{};});
+      showCfErr('Storage upload failed: '+(serr.message||serr.error||sr.status));
+      return;
+    }
+    // Archive previous version if applicable
+    if(existingId){
+      try{
+        await fetch(SB+'/rest/v1/factory_documents?id=eq.'+existingId,{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({is_current:false})
+        });
+      }catch(e){console.log('archive previous failed:',e);}
+    }
+    var payload={
+      factory_id:FACTORY_ID,
+      document_type:type,
+      document_type_other:type==='Other'?typeOther:null,
+      certificate_number:g('cf-cert-no').value.trim()||null,
+      issued_by:g('cf-issued-by').value.trim()||null,
+      file_name:file.name,
+      file_path:storagePath,
+      file_size:file.size,
+      issue_date:issueDate||null,
+      expiry_date:expiryDate,
+      notes:g('cf-notes').value.trim()||null,
+      version:existingId?(existingVersion+1):1,
+      is_current:true,
+      previous_version_id:existingId,
+      uploaded_by:'factory'
+    };
+    var dr=await fetch(SB+'/rest/v1/factory_documents',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    });
+    g('cf-prog').style.display='none';
+    if(!dr.ok){
+      var derr=await dr.json().catch(function(){return{};});
+      showCfErr('Database save failed: '+(derr.message||derr.details||dr.status));
+      return;
+    }
+    g('cf-ok').textContent=existingId?('Document uploaded as v'+(existingVersion+1)+'!'):'Document uploaded successfully!';
+    g('cf-ok').style.display='block';
+    selFiles.cf=null;
+    g('cf-chosen').textContent='';
+    // Clear form
+    g('cf-type').value='';g('cf-type-other').value='';g('cf-other-wrap').style.display='none';
+    g('cf-cert-no').value='';g('cf-issued-by').value='';
+    g('cf-issue-date').value='';g('cf-expiry-date').value='';g('cf-notes').value='';
+    setTimeout(function(){g('cf-ok').style.display='none';},4000);
+    await loadComplianceDocs();
+  }catch(e){
+    g('cf-prog').style.display='none';
+    showCfErr('Error: '+e.message);
+  }
+}
+
+function showCfErr(msg){
+  g('cf-err').textContent=msg;
+  g('cf-err').style.display='block';
+}
+
+async function loadComplianceDocs(){
+  if(!FACTORY_ID){
+    g('cf-list').innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">Save your factory details first.</div>';
+    return;
+  }
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_documents?factory_id=eq.'+FACTORY_ID+'&is_current=eq.true&select=*&order=expiry_date.asc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){
+      g('cf-list').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error loading documents.</div>';
+      return;
+    }
+    var docs=await r.json();
+    renderComplianceList(docs);
+    updateComplianceBanner(docs);
+  }catch(e){
+    g('cf-list').innerHTML='<div style="font-size:13px;color:#b00;padding:8px 0;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+function renderComplianceList(docs){
+  var listEl=g('cf-list');
+  if(!docs||!docs.length){
+    listEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">No documents uploaded yet.</div>';
+    return;
+  }
+  listEl.innerHTML=docs.map(function(d){
+    var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
+    var status=complianceStatus(d.expiry_date);
+    var expiryStr=d.expiry_date?new Date(d.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    var issueStr=d.issue_date?new Date(d.issue_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+    var sizeStr=d.file_size?(d.file_size/1024/1024).toFixed(2)+' MB':'';
+    var verBadge=d.version>1?'<span class="cf-version-badge">v'+d.version+'</span>':'';
+    var metaParts=[];
+    if(d.certificate_number)metaParts.push('Cert #'+esc(d.certificate_number));
+    if(d.issued_by)metaParts.push('Issued by '+esc(d.issued_by));
+    if(issueStr)metaParts.push('Issued '+issueStr);
+    metaParts.push('<strong style="color:#444;">Expires '+expiryStr+'</strong>');
+    var metaLine=metaParts.join(' · ');
+    var fileLine=esc(d.file_name||'')+(sizeStr?' · '+sizeStr:'');
+    var notesLine=d.notes?'<div style="font-size:11px;color:#888;margin-top:4px;font-style:italic;">'+esc(d.notes)+'</div>':'';
+    var safePath=(d.file_path||'').replace(/'/g,"\\'");
+    return '<div class="cf-doc-item">'+
+      '<div class="cf-doc-top">'+
+        '<div class="cf-doc-type">'+esc(typeLabel)+verBadge+'</div>'+
+        '<span class="cf-doc-status '+status.cls+'">'+esc(status.label)+'</span>'+
+      '</div>'+
+      '<div class="cf-doc-meta">'+metaLine+'</div>'+
+      '<div class="cf-doc-meta" style="margin-top:2px;color:#aaa;">'+fileLine+'</div>'+
+      notesLine+
+      '<div class="cf-doc-actions">'+
+        '<button class="cf-doc-btn" onclick="viewComplianceDoc(\''+d.id+'\',\''+safePath+'\')">View PDF</button>'+
+        '<button class="cf-doc-btn danger" onclick="deleteComplianceDoc(\''+d.id+'\',\''+safePath+'\')">Delete</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function updateComplianceBanner(docs){
+  var banner=g('compl-banner');
+  var badge=g('compl-badge');
+  if(!banner||!badge)return;
+  var critical=docs.filter(function(d){
+    var days=daysUntil(d.expiry_date);
+    return days!==null&&days<30;
+  });
+  if(critical.length){
+    var lines=critical.map(function(d){
+      var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
+      var days=daysUntil(d.expiry_date);
+      var phrase=(days<0)?('expired '+Math.abs(days)+' days ago'):('expires in '+days+' days');
+      return '<div style="margin-top:4px;">• <strong>'+esc(typeLabel)+'</strong> — '+phrase+'</div>';
+    }).join('');
+    banner.innerHTML='<strong>⚠ Non-compliance warning:</strong> You have '+critical.length+' document'+(critical.length>1?'s':'')+' at or near expiry. Upload renewed certificate'+(critical.length>1?'s':'')+' as soon as possible to remain compliant.'+lines;
+    banner.style.display='block';
+    badge.textContent=critical.length;
+    badge.style.display='inline-block';
+  }else{
+    banner.style.display='none';
+    badge.style.display='none';
+  }
+}
+
+async function viewComplianceDoc(id,filePath){
+  try{
+    var r=await fetch(SB+'/storage/v1/object/sign/factory-documents/'+filePath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:300})
+    });
+    if(!r.ok){alert('Could not generate download link: '+r.status);return;}
+    var d=await r.json();
+    window.open(SB+'/storage/v1'+d.signedURL,'_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteComplianceDoc(id,filePath){
+  if(!confirm('Delete this compliance document? This cannot be undone.'))return;
+  try{
+    await fetch(SB+'/storage/v1/object/factory-documents/'+filePath,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+TOKEN}
+    });
+    var r=await fetch(SB+'/rest/v1/factory_documents?id=eq.'+id,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Delete failed: '+(err.message||r.status));return;}
+    await loadComplianceDocs();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// HTML-escape helper if not already defined elsewhere
+if(typeof esc!=='function'){window.esc=function(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};}
 
 async function loadDetails(){
   try{
