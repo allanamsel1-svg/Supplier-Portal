@@ -118,6 +118,26 @@
     .btn-edit:hover { background: #e8e8e0; }
     .btn-del { font-size: 11px; padding: 4px 10px; background: #fff0f0; color: #b00; border: 1px solid #fdd; border-radius: 5px; cursor: pointer; font-family: inherit; }
     .btn-del:hover { background: #ffe0e0; }
+
+    /* Compliance Alerts */
+    .cmp-chip { padding: 6px 12px; background: #fff; border: 1px solid #e0e0d8; border-radius: 16px; font-size: 12px; font-family: inherit; cursor: pointer; color: #555; transition: all 0.15s; }
+    .cmp-chip:hover { background: #f0f0e8; }
+    .cmp-chip.on { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+    .cmp-chip span { background: rgba(0,0,0,0.08); padding: 1px 6px; border-radius: 8px; margin-left: 4px; font-size: 10px; }
+    .cmp-chip.on span { background: rgba(255,255,255,0.18); }
+    .cmp-row { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr 0.7fr auto; gap: 12px; align-items: center; padding: 12px 14px; background: #fff; border: 1px solid #e8e8e0; border-radius: 8px; margin-bottom: 6px; }
+    .cmp-row.expired { background: #fff0f0; border-color: #f5b8b8; }
+    .cmp-row.warn30 { background: #fff8f0; border-color: #f0d0b8; }
+    .cmp-factory { font-size: 13px; font-weight: 600; color: #1a1a2e; }
+    .cmp-factory-sub { font-size: 11px; color: #888; margin-top: 2px; }
+    .cmp-doctype { font-size: 12px; color: #555; }
+    .cmp-expiry { font-size: 12px; color: #444; font-weight: 500; }
+    .cmp-days { font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: 600; white-space: nowrap; text-align: center; }
+    .cmp-days.expired { background: #1a1a2e; color: #fff; }
+    .cmp-days.urgent { background: #fff0f0; color: #b00; border: 1px solid #fdd; }
+    .cmp-days.warning { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
+    .cmp-days.notice { background: #f0f8ff; color: #2244cc; border: 1px solid #c8e0f8; }
+    .cmp-actions { display: flex; gap: 6px; flex-wrap: wrap; }
     .btn-add-new { font-size: 12px; padding: 6px 12px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: 500; }
     .btn-add-new:hover { opacity: 0.87; }
     .mgr-form { display: flex; flex-direction: column; gap: 10px; }
@@ -350,6 +370,7 @@
       <button class="sitem" id="nav-pending-cats" onclick="showPanel('pending-cats');loadPendingCats();loadPendingCerts();"><span class="sicon">⚠</span> Pending Reviews <span class="scount" id="cnt-pending-cats" style="background:#fff8e0;color:#886600;border:1px solid #f0d060;">0</span></button>
       <button class="sitem" id="nav-followup" onclick="showPanel('followup')"><span class="sicon">✉</span> Invitations <span class="scount" id="cnt-followup">0</span></button>
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
+      <button class="sitem" id="nav-compliance" onclick="showPanel('compliance');loadComplianceAlerts();"><span class="sicon">🛡</span> Compliance Alerts <span class="scount" id="cnt-compliance" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
       <div class="slabel">Communications</div>
       <button class="sitem" id="nav-inbox-sourcing" onclick="showPanel('inbox-sourcing');loadInbox('sourcing');"><span class="sicon">📬</span> Sourcing <span class="scount" id="cnt-inbox-sourcing">0</span></button>
       <button class="sitem" id="nav-inbox-sales" onclick="showPanel('inbox-sales');loadInbox('sales');"><span class="sicon">📬</span> Sales <span class="scount" id="cnt-inbox-sales">0</span></button>
@@ -376,6 +397,31 @@
         <div class="stat"><div class="stat-label">Pending Review</div><div class="stat-val" id="s-pending">—</div></div>
         <div class="stat"><div class="stat-label">Approved</div><div class="stat-val" id="s-approved">—</div></div>
         <div class="stat"><div class="stat-label">With Files</div><div class="stat-val" id="s-files">—</div></div>
+      </div>
+      <!-- Compliance Alerts widget -->
+      <div id="compl-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">🛡 Factory Compliance</div>
+          <a href="javascript:void(0)" onclick="showPanel('compliance');loadComplianceAlerts();" style="font-size:11px;color:#2266cc;text-decoration:none;">View all →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div onclick="showPanel('compliance');loadComplianceAlerts('expired');" style="cursor:pointer;padding:10px 12px;background:#1a1a2e;color:#fff;border-radius:8px;">
+            <div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Expired</div>
+            <div style="font-size:22px;font-weight:600;" id="cwidget-expired">—</div>
+          </div>
+          <div onclick="showPanel('compliance');loadComplianceAlerts('30');" style="cursor:pointer;padding:10px 12px;background:#fff0f0;border:1px solid #f5b8b8;border-radius:8px;">
+            <div style="font-size:10px;color:#b00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">≤ 30 days</div>
+            <div style="font-size:22px;font-weight:600;color:#7a0000;" id="cwidget-30">—</div>
+          </div>
+          <div onclick="showPanel('compliance');loadComplianceAlerts('60');" style="cursor:pointer;padding:10px 12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">
+            <div style="font-size:10px;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">31–60 days</div>
+            <div style="font-size:22px;font-weight:600;color:#664400;" id="cwidget-60">—</div>
+          </div>
+          <div onclick="showPanel('compliance');loadComplianceAlerts('90');" style="cursor:pointer;padding:10px 12px;background:#f0f8ff;border:1px solid #c8e0f8;border-radius:8px;">
+            <div style="font-size:10px;color:#2244cc;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">61–90 days</div>
+            <div style="font-size:22px;font-weight:600;color:#1a3399;" id="cwidget-90">—</div>
+          </div>
+        </div>
       </div>
       <div style="padding:0 1.5rem;font-size:13px;color:#888;margin-bottom:12px;font-weight:500;">Recent Registrations</div>
       <div class="factory-list" id="recent-list"></div>
@@ -428,7 +474,28 @@
       </div>
     </div>
 
-    <!-- SOURCING INBOX -->
+    <!-- COMPLIANCE ALERTS -->
+    <div class="panel" id="panel-compliance">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">🛡 Compliance Alerts</div><div class="ph-sub">Factory documents at or near expiry — follow up to keep compliance current</div></div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn-edit" id="cmp-trigger-cron-btn" onclick="manualSendComplianceReminders()" title="Manually trigger today's reminder check">⚡ Send today's reminders</button>
+        </div>
+      </div>
+
+      <!-- Bucket filter chips -->
+      <div style="padding:1rem 1.5rem 0.5rem;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="cmp-chip" data-filter="all" onclick="filterComplianceAlerts('all')">All <span id="cmp-c-all">0</span></button>
+        <button class="cmp-chip" data-filter="expired" onclick="filterComplianceAlerts('expired')">⛔ Expired <span id="cmp-c-expired">0</span></button>
+        <button class="cmp-chip" data-filter="30" onclick="filterComplianceAlerts('30')">≤ 30 days <span id="cmp-c-30">0</span></button>
+        <button class="cmp-chip" data-filter="60" onclick="filterComplianceAlerts('60')">31–60 days <span id="cmp-c-60">0</span></button>
+        <button class="cmp-chip" data-filter="90" onclick="filterComplianceAlerts('90')">61–90 days <span id="cmp-c-90">0</span></button>
+      </div>
+
+      <div style="padding:0 1.5rem 1.5rem;">
+        <div id="cmp-list"><div class="empty">Loading...</div></div>
+      </div>
+    </div>
     <div class="panel" id="panel-inbox-sourcing">
       <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
         <div><div class="ph-title">📬 Sourcing</div><div class="ph-sub">Factory sourcing communications · sourcing@tbgsourcing.net</div></div>
@@ -1456,6 +1523,11 @@ async function loadData(){
   await loadCategories();
   loadBrands();
   loadCustomers();
+  // Compliance counts (sidebar badge + dashboard widget)
+  loadComplianceCounts();
+  // Auto-refresh compliance counts every 60 seconds
+  if(window._complianceTimer)clearInterval(window._complianceTimer);
+  window._complianceTimer=setInterval(loadComplianceCounts,60000);
 }
 
 async function loadAllFiles(){
@@ -3813,6 +3885,198 @@ function showFormMsg(id,msg){
   var el=g(id);if(!el)return;
   el.textContent=msg;el.style.display='block';
   setTimeout(function(){el.style.display='none';},4000);
+}
+
+// ════════════════════════════════════════
+// COMPLIANCE ALERTS (Stage 3 of Feature 2)
+// ════════════════════════════════════════
+var allComplianceDocs=[];
+var currentComplianceFilter='all';
+var _complianceTimer=null;
+
+function complDaysUntil(dateStr){
+  if(!dateStr)return null;
+  var d=new Date(dateStr+'T00:00:00');
+  var today=new Date();today.setHours(0,0,0,0);
+  return Math.ceil((d.getTime()-today.getTime())/(1000*60*60*24));
+}
+
+function complBucket(days){
+  if(days===null)return null;
+  if(days<0)return 'expired';
+  if(days<=30)return '30';
+  if(days<=60)return '60';
+  if(days<=90)return '90';
+  return null;
+}
+
+async function loadComplianceCounts(){
+  // Lightweight query just for the sidebar+widget counts
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_documents?is_current=eq.true&select=expiry_date',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok)return;
+    var docs=await r.json();
+    var counts={expired:0,'30':0,'60':0,'90':0};
+    docs.forEach(function(d){
+      var b=complBucket(complDaysUntil(d.expiry_date));
+      if(b)counts[b]++;
+    });
+    var totalAlert=counts.expired+counts['30']+counts['60']+counts['90'];
+    var totalCritical=counts.expired+counts['30'];
+    // Sidebar badge — only critical (expired or ≤30) shows red
+    var sidebarBadge=g('cnt-compliance');
+    if(sidebarBadge)sidebarBadge.textContent=totalCritical;
+    // Dashboard widget counts
+    var w={cwidget_expired:counts.expired,cwidget_30:counts['30'],cwidget_60:counts['60'],cwidget_90:counts['90']};
+    if(g('cwidget-expired'))g('cwidget-expired').textContent=counts.expired;
+    if(g('cwidget-30'))g('cwidget-30').textContent=counts['30'];
+    if(g('cwidget-60'))g('cwidget-60').textContent=counts['60'];
+    if(g('cwidget-90'))g('cwidget-90').textContent=counts['90'];
+    // Page-level chip counts (if compliance panel is open)
+    if(g('cmp-c-all'))g('cmp-c-all').textContent=totalAlert;
+    if(g('cmp-c-expired'))g('cmp-c-expired').textContent=counts.expired;
+    if(g('cmp-c-30'))g('cmp-c-30').textContent=counts['30'];
+    if(g('cmp-c-60'))g('cmp-c-60').textContent=counts['60'];
+    if(g('cmp-c-90'))g('cmp-c-90').textContent=counts['90'];
+  }catch(e){console.log('compliance counts error:',e);}
+}
+
+async function loadComplianceAlerts(initialFilter){
+  var listEl=g('cmp-list');
+  if(!listEl)return;
+  listEl.innerHTML='<div class="empty">Loading...</div>';
+  if(initialFilter)currentComplianceFilter=initialFilter;
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_documents?is_current=eq.true&select=*,factories(id,factory_name_english,sales_contact_name,sales_email,country)&order=expiry_date.asc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){
+      var err=await r.json().catch(function(){return{};});
+      listEl.innerHTML='<div class="empty" style="color:#b00;">Error loading: '+(err.message||r.status)+'</div>';
+      return;
+    }
+    var docs=await r.json();
+    // Annotate each doc with days/bucket for filter
+    allComplianceDocs=docs.map(function(d){
+      var days=complDaysUntil(d.expiry_date);
+      d._days=days;
+      d._bucket=complBucket(days);
+      return d;
+    });
+    renderComplianceList();
+    loadComplianceCounts();
+  }catch(e){
+    listEl.innerHTML='<div class="empty" style="color:#b00;">Error: '+e.message+'</div>';
+  }
+}
+
+function filterComplianceAlerts(filter){
+  currentComplianceFilter=filter;
+  renderComplianceList();
+}
+
+function renderComplianceList(){
+  // Update active chip
+  document.querySelectorAll('.cmp-chip').forEach(function(c){
+    c.classList.toggle('on',c.getAttribute('data-filter')===currentComplianceFilter);
+  });
+  var listEl=g('cmp-list');
+  // Filter docs by current bucket
+  var filtered=allComplianceDocs.filter(function(d){
+    if(currentComplianceFilter==='all')return d._bucket!==null;
+    return d._bucket===currentComplianceFilter;
+  });
+  if(!filtered.length){
+    listEl.innerHTML='<div class="empty">No documents in this bucket. Nice.</div>';
+    return;
+  }
+  listEl.innerHTML=filtered.map(function(d){
+    var fac=d.factories||{};
+    var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
+    var expiryStr=d.expiry_date?new Date(d.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'—';
+    var daysCls,daysLabel;
+    if(d._days===null){daysCls='notice';daysLabel='—';}
+    else if(d._days<0){daysCls='expired';daysLabel='Expired '+Math.abs(d._days)+'d ago';}
+    else if(d._days<=30){daysCls='urgent';daysLabel=d._days+' days';}
+    else if(d._days<=60){daysCls='warning';daysLabel=d._days+' days';}
+    else{daysCls='notice';daysLabel=d._days+' days';}
+    var rowCls='cmp-row';
+    if(d._bucket==='expired')rowCls+=' expired';
+    else if(d._bucket==='30')rowCls+=' warn30';
+    var safePath=(d.file_path||'').replace(/'/g,"\\'");
+    var contactLine=(fac.sales_contact_name||'')+(fac.sales_email?' · '+fac.sales_email:'');
+    var canEmail=!!fac.sales_email;
+    return '<div class="'+rowCls+'">'+
+      '<div>'+
+        '<div class="cmp-factory">'+esc(fac.factory_name_english||'(unknown factory)')+'</div>'+
+        '<div class="cmp-factory-sub">'+esc(contactLine||'No contact info')+(fac.country?' · '+esc(fac.country):'')+'</div>'+
+      '</div>'+
+      '<div class="cmp-doctype">'+esc(typeLabel)+(d.certificate_number?' <span style="color:#aaa;">#'+esc(d.certificate_number)+'</span>':'')+'</div>'+
+      '<div class="cmp-expiry">'+expiryStr+'</div>'+
+      '<div class="cmp-days '+daysCls+'">'+esc(daysLabel)+'</div>'+
+      '<div class="cmp-actions">'+
+        '<button class="btn-edit" onclick="viewComplianceDocAdmin(\''+safePath+'\')">View PDF</button>'+
+        (canEmail?'<button class="btn-edit" onclick="sendManualReminder(\''+d.id+'\')">✉ Remind</button>':'<button class="btn-edit" disabled style="opacity:0.5;cursor:not-allowed;" title="No email on file">✉ Remind</button>')+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+async function viewComplianceDocAdmin(filePath){
+  if(!filePath){alert('No file path on this document.');return;}
+  try{
+    var r=await fetch(SB+'/storage/v1/object/sign/factory-documents/'+filePath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:300})
+    });
+    if(!r.ok){alert('Could not generate download link: '+r.status);return;}
+    var d=await r.json();
+    window.open(SB+'/storage/v1'+d.signedURL,'_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function sendManualReminder(docId){
+  if(!confirm('Send a reminder email to this factory now?'))return;
+  var btn=event&&event.target;
+  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  try{
+    var r=await fetch('/api/check-compliance-expiry',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mode:'manual',document_id:docId})
+    });
+    var data=await r.json().catch(function(){return{};});
+    if(r.ok){
+      alert('Reminder sent.'+(data.email_to?' To: '+data.email_to:''));
+    }else{
+      alert('Send failed: '+(data.error||r.status));
+    }
+  }catch(e){alert('Error: '+e.message);}
+  if(btn){btn.disabled=false;btn.textContent='✉ Remind';}
+}
+
+async function manualSendComplianceReminders(){
+  if(!confirm('Run today\'s reminder check now? This will check all factories\' documents and email any that hit a 90/60/45/30-day mark.'))return;
+  var btn=g('cmp-trigger-cron-btn');
+  if(btn){btn.disabled=true;btn.textContent='Running...';}
+  try{
+    var r=await fetch('/api/check-compliance-expiry',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({mode:'all'})
+    });
+    var data=await r.json().catch(function(){return{};});
+    if(r.ok){
+      alert('Reminder check complete.\n\nDocuments checked: '+(data.checked||0)+'\nEmails sent: '+(data.sent||0)+'\nSkipped (already sent): '+(data.skipped||0)+(data.failed?'\nFailed: '+data.failed:''));
+      loadComplianceAlerts();
+    }else{
+      alert('Run failed: '+(data.error||r.status));
+    }
+  }catch(e){alert('Error: '+e.message);}
+  if(btn){btn.disabled=false;btn.textContent='⚡ Send today\'s reminders';}
 }
 
 // ── RFQ Follow-ups ──
