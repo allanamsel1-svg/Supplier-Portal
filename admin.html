@@ -1224,12 +1224,12 @@
 
     <div class="panel" id="panel-upload">
       <div class="ph"><div class="ph-title">Upload Files</div><div class="ph-sub">Upload catalogs, presentations, and quote sheets on behalf of a factory</div></div>
-      <div style="padding:1.25rem 1.5rem;max-width:600px;">
-        <div style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;padding:1.25rem;">
+      <div style="padding:1.25rem 1.5rem;max-width:780px;">
+        <div style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;padding:1.25rem;margin-bottom:1rem;">
 
           <div style="margin-bottom:14px;">
             <label style="display:block;font-size:12px;color:#888;margin-bottom:5px;">Select Factory</label>
-            <select id="upload-factory-select" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ddd;border-radius:8px;font-family:inherit;color:#1a1a2e;background:#fff;">
+            <select id="upload-factory-select" onchange="onUploadFactoryChange()" style="width:100%;padding:9px 11px;font-size:14px;border:1px solid #ddd;border-radius:8px;font-family:inherit;color:#1a1a2e;background:#fff;">
               <option value="">— Choose a factory —</option>
             </select>
           </div>
@@ -1258,6 +1258,13 @@
           <div id="admin-upload-prog" style="font-size:13px;color:#999;text-align:center;margin-top:8px;display:none;">Uploading...</div>
           <div id="admin-upload-ok" style="font-size:13px;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;padding:9px 12px;margin-top:10px;display:none;"></div>
           <div id="admin-upload-err" style="font-size:13px;color:#b00;background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:9px 12px;margin-top:10px;display:none;"></div>
+        </div>
+
+        <!-- Existing files for selected factory -->
+        <div id="upload-existing-files-card" style="background:#fff;border:1px solid #e0e0d8;border-radius:12px;padding:1.25rem;display:none;">
+          <div style="font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">Existing Files</div>
+          <div id="upload-existing-files-sub" style="font-size:12px;color:#888;margin-bottom:12px;">—</div>
+          <div id="upload-existing-files-list"></div>
         </div>
       </div>
     </div>
@@ -1781,14 +1788,8 @@ async function openDrawer(id,e){
     locsEl.innerHTML='<span class="no-data">No additional locations</span>';
   }
 
-  // Files
-  var filesEl=g('d-files');
-  var ff=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
-  var fileLinks=[];
-  ff.catalogs.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'catalogs',x.name)+'" target="_blank">📄 '+x.name+'</a>');});
-  ff.overview.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'overview',x.name)+'" target="_blank">📊 '+x.name+'</a>');});
-  ff.quotes.forEach(function(x){fileLinks.push('<a class="d-file" href="'+fileURL(f.user_id,'quotes',x.name)+'" target="_blank">📋 '+x.name+'</a>');});
-  filesEl.innerHTML=fileLinks.length?fileLinks.join(''):'<span class="no-data">No files uploaded</span>';
+  // Files — rich list with replace + delete
+  renderDrawerFiles(f);
 
   // Registration date
   var created=f.created_at?new Date(f.created_at).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}):'—';
@@ -1834,6 +1835,132 @@ function closeDrawer(){
   g('drawer-overlay').classList.remove('on');
   g('supplier-drawer').classList.remove('open');
   currentDrawerFactory=null;
+}
+
+// ── Drawer file rendering with replace/delete ──
+function renderDrawerFiles(f){
+  var filesEl=g('d-files');
+  if(!filesEl)return;
+  var ff=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
+  var sections=[
+    {label:'Catalogs',folder:'catalogs',icon:'📄',files:ff.catalogs||[]},
+    {label:'Company Decks',folder:'overview',icon:'📊',files:ff.overview||[]},
+    {label:'Quote Sheets',folder:'quotes',icon:'📋',files:ff.quotes||[]}
+  ];
+  var totalFiles=sections.reduce(function(a,s){return a+s.files.length;},0);
+  if(!totalFiles){
+    filesEl.innerHTML='<span class="no-data">No files uploaded</span>';
+    return;
+  }
+  filesEl.innerHTML=sections.map(function(s){
+    if(!s.files.length)return '';
+    return '<div style="margin-bottom:10px;">'+
+      '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">'+s.label+' ('+s.files.length+')</div>'+
+      s.files.map(function(x){
+        var safeName=(x.name||'').replace(/'/g,"\\'");
+        var sizeStr=(x.metadata&&x.metadata.size)?' · '+(x.metadata.size/1024/1024).toFixed(2)+' MB':'';
+        var dateStr=x.created_at?' · '+new Date(x.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:4px;">'+
+          '<div style="flex:1;min-width:0;overflow:hidden;">'+
+            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.icon+' '+esc(x.name)+'</div>'+
+            '<div style="font-size:10px;color:#aaa;margin-top:2px;">'+sizeStr.replace(/^ · /,'')+dateStr+'</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:4px;flex-shrink:0;">'+
+            '<a class="btn-edit" style="text-decoration:none;display:inline-block;" href="'+fileURL(f.user_id,s.folder,x.name)+'" target="_blank">View</a>'+
+            '<button class="btn-edit" onclick="adminReplaceFactoryFile(\''+f.user_id+'\',\''+s.folder+'\',\''+safeName+'\')">Replace</button>'+
+            '<button class="btn-del" onclick="adminDeleteFactoryFile(\''+f.user_id+'\',\''+s.folder+'\',\''+safeName+'\')">Delete</button>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
+async function refreshFactoryFiles(userId){
+  if(!userId)return;
+  var folders=['catalogs','overview','quotes'];
+  var files={catalogs:[],overview:[],quotes:[]};
+  for(var i=0;i<folders.length;i++){
+    var folder=folders[i];
+    try{
+      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},
+        body:JSON.stringify({prefix:userId+'/'+folder+'/',limit:50})
+      });
+      var items=await r.json();
+      if(Array.isArray(items))files[folder]=items.filter(function(x){return x.name;});
+    }catch(e){console.log('refreshFactoryFiles error:',e);}
+  }
+  factoryFiles[userId]=files;
+}
+
+async function adminDeleteFactoryFile(userId,folder,fileName){
+  if(!confirm('Delete "'+fileName+'"? This cannot be undone.'))return;
+  try{
+    var path=userId+'/'+folder+'/'+fileName;
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+path,{
+      method:'DELETE',
+      headers:{'Authorization':'Bearer '+KEY,'apikey':KEY}
+    });
+    if(!r.ok){
+      var err=await r.json().catch(function(){return{};});
+      alert('Delete failed: '+(err.message||r.status));
+      return;
+    }
+    await refreshFactoryFiles(userId);
+    if(currentDrawerFactory&&currentDrawerFactory.user_id===userId)renderDrawerFiles(currentDrawerFactory);
+    refreshUploadPanelFileList();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function adminReplaceFactoryFile(userId,folder,oldFileName){
+  // Trigger a hidden file picker, then upload to same folder; the new upload will use a new timestamp-based name.
+  // Old file is preserved unless user explicitly deletes it.
+  if(!confirm('Replace "'+oldFileName+'"?\n\nThis will upload a new file alongside the old one. After uploading, you can delete the old version.'))return;
+  var input=document.createElement('input');
+  input.type='file';
+  input.accept='.pdf,.pptx,.ppt,.xlsx,.xls';
+  input.onchange=async function(){
+    var file=input.files&&input.files[0];
+    if(!file)return;
+    var ext=file.name.split('.').pop();
+    var ct='application/octet-stream';
+    var n=file.name.toLowerCase();
+    if(n.endsWith('.pdf'))ct='application/pdf';
+    else if(n.endsWith('.pptx'))ct='application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    else if(n.endsWith('.ppt'))ct='application/vnd.ms-powerpoint';
+    else if(n.endsWith('.xlsx'))ct='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    else if(n.endsWith('.xls'))ct='application/vnd.ms-excel';
+    var ts=Date.now();
+    var safeName=file.name.replace(/[^a-zA-Z0-9._\-\s]/g,'').trim();
+    var fileTypeLabel=(folder==='catalogs')?'Catalog':(folder==='overview')?'Company Presentation':'Quote Sheet';
+    var formattedName=fileTypeLabel.replace(/\s/g,'_')+'_'+ts+'.'+ext;
+    var storagePath=userId+'/'+folder+'/'+formattedName;
+    try{
+      var r=await fetch(SB+'/storage/v1/object/factory-files/'+storagePath,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+KEY,'apikey':KEY,'Content-Type':ct,'x-upsert':'true'},
+        body:file
+      });
+      if(!r.ok){
+        var err=await r.json().catch(function(){return{};});
+        alert('Upload failed: '+(err.message||err.error||r.status));
+        return;
+      }
+      // Optionally delete the old file in one click
+      if(confirm('New file uploaded. Delete the old file "'+oldFileName+'"?')){
+        await fetch(SB+'/storage/v1/object/factory-files/'+userId+'/'+folder+'/'+oldFileName,{
+          method:'DELETE',
+          headers:{'Authorization':'Bearer '+KEY,'apikey':KEY}
+        });
+      }
+      await refreshFactoryFiles(userId);
+      if(currentDrawerFactory&&currentDrawerFactory.user_id===userId)renderDrawerFiles(currentDrawerFactory);
+      refreshUploadPanelFileList();
+    }catch(e){alert('Upload error: '+e.message);}
+  };
+  input.click();
 }
 
 // ── Drawer inline edit ──
@@ -2086,6 +2213,73 @@ function populateUploadDropdown(){
   });
 }
 
+async function onUploadFactoryChange(){
+  var sel=g('upload-factory-select');
+  var card=g('upload-existing-files-card');
+  var sub=g('upload-existing-files-sub');
+  var list=g('upload-existing-files-list');
+  if(!sel||!sel.value){if(card)card.style.display='none';return;}
+  var opt=sel.options[sel.selectedIndex];
+  var userId=opt.dataset.userId;
+  var factoryName=opt.dataset.name||'this factory';
+  if(!userId){
+    if(card){
+      card.style.display='block';
+      sub.textContent='—';
+      list.innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">This factory has not registered yet, so no folder exists for them.</div>';
+    }
+    return;
+  }
+  card.style.display='block';
+  sub.textContent='Files already uploaded by '+factoryName+' (or by admin on their behalf)';
+  list.innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">Loading...</div>';
+  await refreshFactoryFiles(userId);
+  refreshUploadPanelFileList();
+}
+
+function refreshUploadPanelFileList(){
+  var sel=g('upload-factory-select');
+  var list=g('upload-existing-files-list');
+  if(!sel||!sel.value||!list)return;
+  var opt=sel.options[sel.selectedIndex];
+  var userId=opt.dataset.userId;
+  if(!userId)return;
+  var ff=factoryFiles[userId]||{catalogs:[],overview:[],quotes:[]};
+  var sections=[
+    {label:'Catalogs',folder:'catalogs',icon:'📄',files:ff.catalogs||[]},
+    {label:'Company Decks',folder:'overview',icon:'📊',files:ff.overview||[]},
+    {label:'Quote Sheets',folder:'quotes',icon:'📋',files:ff.quotes||[]}
+  ];
+  var totalFiles=sections.reduce(function(a,s){return a+s.files.length;},0);
+  if(!totalFiles){
+    list.innerHTML='<div style="font-size:13px;color:#bbb;padding:8px 0;">No files yet.</div>';
+    return;
+  }
+  list.innerHTML=sections.map(function(s){
+    if(!s.files.length)return '';
+    return '<div style="margin-bottom:14px;">'+
+      '<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">'+s.label+' ('+s.files.length+')</div>'+
+      s.files.map(function(x){
+        var safeName=(x.name||'').replace(/'/g,"\\'");
+        var sizeStr=(x.metadata&&x.metadata.size)?(x.metadata.size/1024/1024).toFixed(2)+' MB':'';
+        var dateStr=x.created_at?new Date(x.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        var meta=[sizeStr,dateStr].filter(Boolean).join(' · ');
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;margin-bottom:5px;">'+
+          '<div style="flex:1;min-width:0;overflow:hidden;">'+
+            '<div style="font-size:13px;font-weight:600;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+s.icon+' '+esc(x.name)+'</div>'+
+            (meta?'<div style="font-size:11px;color:#aaa;margin-top:2px;">'+meta+'</div>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:5px;flex-shrink:0;">'+
+            '<a class="btn-edit" style="text-decoration:none;display:inline-block;" href="'+fileURL(userId,s.folder,x.name)+'" target="_blank">View</a>'+
+            '<button class="btn-edit" onclick="adminReplaceFactoryFile(\''+userId+'\',\''+s.folder+'\',\''+safeName+'\')">Replace</button>'+
+            '<button class="btn-del" onclick="adminDeleteFactoryFile(\''+userId+'\',\''+s.folder+'\',\''+safeName+'\')">Delete</button>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+}
+
 function initAdminUpload(){
   var dz=g('admin-drop-zone');
   var fi=g('admin-file-input');
@@ -2161,6 +2355,12 @@ async function adminUpload(){
       g('admin-file-chosen').textContent='';
       g('admin-file-input')._selectedFile=null;
       setTimeout(function(){g('admin-upload-ok').style.display='none';},6000);
+      // Refresh the in-memory cache and the existing-files list under the form
+      try{
+        await refreshFactoryFiles(userId);
+        refreshUploadPanelFileList();
+        if(currentDrawerFactory&&currentDrawerFactory.user_id===userId)renderDrawerFiles(currentDrawerFactory);
+      }catch(e){console.log('refresh after upload error:',e);}
     }else{
       var err=await r.json().catch(function(){return{};});
       g('admin-upload-err').textContent='Upload failed: '+(err.message||err.error||r.status);
