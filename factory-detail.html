@@ -541,13 +541,14 @@ async function uploadPhotos(input){
 }
 
 async function deleteFile(btn){
-  var factoryId=btn.dataset.fid;
+  // Read prefix from data-prefix (new), fall back to data-fid (legacy compat)
+  var prefix=btn.dataset.prefix||btn.dataset.fid;
   var folder=btn.dataset.folder;
   var filename=btn.dataset.name;
-  var displayName=filename.replace(/^\d{8}_\d{4}_/,'');
+  var displayName=filename.replace(/^\d{8}_\d{4}_/,'').replace(/^\d{13}_/,'');
   if(!confirm('Delete '+displayName+'?'))return;
   try{
-    var r=await fetch(SB+'/storage/v1/object/factory-files/'+factoryId+'/'+folder+'/'+filename,{
+    var r=await fetch(SB+'/storage/v1/object/factory-files/'+prefix+'/'+folder+'/'+filename,{
       method:'DELETE',
       headers:{'Authorization':'Bearer '+KEY,'apikey':KEY}
     });
@@ -583,34 +584,58 @@ async function deletePhoto(photoId){
 async function loadFiles(){
   var folders=['catalogs','overview','quotes','certifications','audits'];
   var listIds=['catalog-list','overview-list','quotes-list','certs-file-list','audits-list'];
+  // Storage path used by factory portal (index.html) is {user_id}/{folder}/.
+  // Legacy admin uploads on this page used {factory_id}/{folder}/. Check both.
+  var prefixes=[];
+  if(factory&&factory.user_id)prefixes.push(factory.user_id);
+  if(FACTORY_ID&&prefixes.indexOf(FACTORY_ID)===-1)prefixes.push(FACTORY_ID);
   for(var i=0;i<folders.length;i++){
     var folder=folders[i];
     var listId=listIds[i];
-    try{
-      console.log('Listing path:',FACTORY_ID+'/'+folder+'/');
-      var r=await fetch(SB+'/storage/v1/object/list/factory-files',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},body:JSON.stringify({prefix:FACTORY_ID+'/'+folder+'/',limit:20})});
-      var items=await r.json();
-      var el=g(listId);
-      if(!el)continue;
-      var validItems=Array.isArray(items)?items.filter(function(f){return f.name&&f.name!=='.emptyFolderPlaceholder'}):[]; 
-      if(validItems.length){
-        el.innerHTML=validItems.map(function(f){
-          var url=SB+'/storage/v1/object/public/factory-files/'+FACTORY_ID+'/'+folder+'/'+f.name;
-          // Strip date prefix for display (format: YYYYMMDD_HHMM_originalname)
-          var displayName=f.name.replace(/^\d{8}_\d{4}_/,'');
-          var sizeKB=f.metadata&&f.metadata.size?Math.round(f.metadata.size/1024)+'KB':'';
-          return '<div class="file-row">'+
-            '<div><span class="file-name">'+displayName+'</span>'+
-            (sizeKB?'<span style="font-size:11px;color:#bbb;margin-left:6px;">'+sizeKB+'</span>':'')+
-            '</div>'+
-            '<div style="display:flex;gap:8px;align-items:center;">'+
-              '<a class="file-link" href="'+url+'" target="_blank">View</a>'+
-              '<button onclick="deleteFile(this)" data-fid="'+FACTORY_ID+'" data-folder="'+folder+'" data-name="'+f.name+'" style="font-size:11px;color:#b00;background:none;border:none;cursor:pointer;padding:0;">Delete</button>'+
-            '</div>'+
-          '</div>';
-        }).join('');
-      }else{el.innerHTML='<div style="font-size:12px;color:#bbb;padding:4px 0;">No files uploaded yet.</div>';}
-    }catch(e){console.log('file list error:',e);}
+    var el=g(listId);
+    if(!el)continue;
+    var allItems=[];
+    var seenNames={};
+    for(var p=0;p<prefixes.length;p++){
+      var prefix=prefixes[p];
+      try{
+        var r=await fetch(SB+'/storage/v1/object/list/factory-files',{
+          method:'POST',
+          headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY},
+          body:JSON.stringify({prefix:prefix+'/'+folder+'/',limit:50})
+        });
+        var items=await r.json();
+        if(Array.isArray(items)){
+          items.forEach(function(item){
+            if(!item.name||item.name==='.emptyFolderPlaceholder')return;
+            var key=prefix+'/'+folder+'/'+item.name;
+            if(seenNames[key])return;
+            seenNames[key]=true;
+            item._prefix=prefix;
+            item._folder=folder;
+            allItems.push(item);
+          });
+        }
+      }catch(e){console.log('file list error:',e);}
+    }
+    if(allItems.length){
+      el.innerHTML=allItems.map(function(f){
+        var url=SB+'/storage/v1/object/public/factory-files/'+f._prefix+'/'+f._folder+'/'+f.name;
+        var displayName=f.name.replace(/^\d{8}_\d{4}_/,'').replace(/^\d{13}_/,'');
+        var sizeKB=f.metadata&&f.metadata.size?Math.round(f.metadata.size/1024)+'KB':'';
+        var dateStr=f.created_at?new Date(f.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        var meta=[sizeKB,dateStr].filter(Boolean).join(' · ');
+        return '<div class="file-row">'+
+          '<div><span class="file-name">'+displayName+'</span>'+
+          (meta?'<span style="font-size:11px;color:#bbb;margin-left:6px;">'+meta+'</span>':'')+
+          '</div>'+
+          '<div style="display:flex;gap:8px;align-items:center;">'+
+            '<a class="file-link" href="'+url+'" target="_blank">View</a>'+
+            '<button onclick="deleteFile(this)" data-prefix="'+f._prefix+'" data-folder="'+f._folder+'" data-name="'+f.name+'" style="font-size:11px;color:#b00;background:none;border:none;cursor:pointer;padding:0;">Delete</button>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }else{el.innerHTML='<div style="font-size:12px;color:#bbb;padding:4px 0;">No files uploaded yet.</div>';}
   }
 }
 
@@ -632,7 +657,9 @@ async function uploadFile(input,folder,fileType){
   var d=new Date();
   var datePrefix=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'_';
   var safeOriginal=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  var path=FACTORY_ID+'/'+folder+'/'+datePrefix+safeOriginal;
+  // Use factory.user_id if registered (matches factory portal location), else fall back to FACTORY_ID
+  var prefix=(factory&&factory.user_id)?factory.user_id:FACTORY_ID;
+  var path=prefix+'/'+folder+'/'+datePrefix+safeOriginal;
   console.log('Uploading to path:',path);
   showMsg('file-msg','ok','Uploading '+file.name+'...');
   try{
