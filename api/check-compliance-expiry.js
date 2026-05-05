@@ -15,7 +15,9 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 
 const FROM_EMAIL = 'sourcing@tbgsourcing.net';
 const FROM_NAME = 'TBG Sourcing';
-const ADMIN_CC = 'sourcing@tbgsourcing.net'; // CC every reminder to the admin inbox
+// Note: no CC — sourcing@tbgsourcing.net has no real mailbox.
+// Instead, every outbound reminder is logged to the email_threads/email_messages tables
+// so it shows up in the admin portal's Sourcing inbox alongside incoming factory emails.
 
 const REMINDER_BUCKETS = [90, 60, 45, 30]; // days before expiry that trigger emails
 
@@ -88,6 +90,7 @@ async function runDailyCheck() {
     if (sendResult.ok) {
       sent++;
       await recordReminder(doc.id, bucket, sendResult.email_to, 'sent', null);
+      await logToInbox(sendResult, doc.factory_id);
     } else {
       failed++;
       errors.push({ doc_id: doc.id, error: sendResult.error });
@@ -120,6 +123,7 @@ async function sendManualReminderForDoc(docId) {
   const result = await sendReminderEmail(doc, bucket, days, /* manualOverride */ true);
   if (result.ok) {
     await recordReminder(doc.id, bucket, result.email_to, 'sent', null, true);
+    await logToInbox(result, doc.factory_id);
     return { ok: true, email_to: result.email_to, bucket, days };
   }
   return { ok: false, error: result.error || 'Send failed' };
@@ -186,8 +190,7 @@ TBG Sourcing
   // Build SendGrid payload (matches send-email.js pattern)
   const payload = {
     personalizations: [{
-      to: [{ email: toEmail, name: contactName }],
-      cc: [{ email: ADMIN_CC, name: 'TBG Sourcing' }]
+      to: [{ email: toEmail, name: contactName }]
     }],
     from: { email: FROM_EMAIL, name: FROM_NAME },
     reply_to: { email: FROM_EMAIL, name: FROM_NAME },
@@ -205,7 +208,7 @@ TBG Sourcing
       body: JSON.stringify(payload)
     });
     if (r.ok) {
-      return { ok: true, email_to: toEmail };
+      return { ok: true, email_to: toEmail, subject, body, factory_id: doc.factory_id };
     }
     const e = await r.json().catch(() => ({}));
     return { ok: false, email_to: toEmail, error: (e.errors && e.errors[0] && e.errors[0].message) || 'HTTP ' + r.status };
@@ -214,8 +217,90 @@ TBG Sourcing
   }
 }
 
-async function recordReminder(documentId, bucket, emailTo, status, errorMessage, isManual) {
-  const payload = {
+// ── Log outbound reminder to email_threads/email_messages (Sourcing inbox) ──
+async function logToInbox(sendResult, factoryId) {
+  if (!sendResult || !sendResult.ok) return;
+  const now = new Date().toISOString();
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': `Bearer ${SB_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+  };
+  try {
+    // Try to find an existing thread for this factory + this subject (for grouping reminders by doc type)
+    let threadId = null;
+    if (factoryId) {
+      const cleanSubject = sendResult.subject.replace(/^(Re:|Fwd:|RE:|FW:)\s*/gi, '').trim();
+      const lookupR = await fetch(
+        `${SB}/rest/v1/email_threads?factory_id=eq.${factoryId}&subject=eq.${encodeURIComponent(cleanSubject)}&order=created_at.desc&limit=1`,
+        { headers }
+      );
+      if (lookupR.ok) {
+        const rows = await lookupR.json();
+        if (rows && rows.length > 0) threadId = rows[0].id;
+      }
+    }
+
+    if (threadId) {
+      // Update existing thread
+      await fetch(`${SB}/rest/v1/email_threads?id=eq.${threadId}`, {
+        method: 'PATCH',
+        headers: { ...headers, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          last_message_at: now,
+          // Outbound — we sent it, so leave status as 'read' (not unread)
+          status: 'read'
+        })
+      });
+    } else {
+      // Create new thread
+      const r = await fetch(`${SB}/rest/v1/email_threads`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          subject: sendResult.subject,
+          from_email: FROM_EMAIL,
+          from_name: FROM_NAME,
+          to_email: sendResult.email_to,
+          direction: 'outbound',
+          status: 'read', // outbound — already "read" since we sent it
+          department: 'sourcing',
+          last_message_at: now,
+          factory_id: factoryId || null
+        })
+      });
+      if (r.ok) {
+        const rows = await r.json();
+        if (rows && rows[0]) threadId = rows[0].id;
+      }
+    }
+
+    if (threadId) {
+      // Insert message
+      await fetch(`${SB}/rest/v1/email_messages`, {
+        method: 'POST',
+        headers: { ...headers, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          thread_id: threadId,
+          from_email: FROM_EMAIL,
+          from_name: FROM_NAME,
+          to_email: sendResult.email_to,
+          subject: sendResult.subject,
+          body_text: sendResult.body,
+          direction: 'outbound',
+          is_read: true,
+          sent_at: now
+        })
+      });
+    }
+  } catch (err) {
+    // Non-fatal — the email already went out; logging failure shouldn't block the run
+    console.log('logToInbox error:', err.message);
+  }
+}
+
+async function recordReminder(documentId, bucket, emailTo, status, errorMessage, isManual) {  const payload = {
     document_id: documentId,
     reminder_bucket: bucket,
     email_to: emailTo,
