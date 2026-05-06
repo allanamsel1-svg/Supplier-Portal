@@ -186,6 +186,9 @@
     .rfq-card-badge { font-size: 11px; padding: 3px 9px; border-radius: 20px; font-weight: 500; flex-shrink: 0; margin-left: 10px; }
     .badge-new { background: #e8f0ff; color: #2244cc; border: 1px solid #b8ccf0; }
     .badge-quoted { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
+    .badge-info-needed { background: #fff8e0; color: #886600; border: 1px solid #f0d860; font-weight: 600; }
+    .badge-rejected { background: #fff0f0; color: #b00; border: 1px solid #fdd; }
+    .badge-draft { background: #f5f5e8; color: #886600; border: 1px solid #d8c860; }
     .badge-accepted { background: #fff8e0; color: #886600; border: 1px solid #f0d060; }
     .rfq-card-body { display: none; border-top: 1px solid #f0f0e8; padding: 1.25rem; }
     .rfq-card-body.open { display: block; }
@@ -1773,8 +1776,14 @@ function renderRFQList(assignments,existingQuotes){
   el.innerHTML=assignments.map(function(a){
     var rfq=a.rfqs||{};
     var quote=existingQuotes.find(function(q){return q.rfq_id===rfq.id;});
-    var badgeClass=quote?'badge-quoted':'badge-new';
-    var badgeText=quote?'Quote Submitted':'New RFQ';
+    var badgeClass='badge-new',badgeText='New RFQ';
+    if(quote){
+      if(quote.status==='more_info_requested'){badgeClass='badge-info-needed';badgeText='⚠ More Info Requested';}
+      else if(quote.status==='rejected'){badgeClass='badge-rejected';badgeText='Not Approved';}
+      else if(quote.status==='accepted'){badgeClass='badge-quoted';badgeText='✓ Approved';}
+      else if(quote.status==='draft'){badgeClass='badge-draft';badgeText='Draft Saved';}
+      else{badgeClass='badge-quoted';badgeText='Quote Submitted';}
+    }
     var date=rfq.created_at?new Date(rfq.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
     var qty=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'units'):'—';
     var uom=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'';
@@ -1790,6 +1799,15 @@ function renderRFQList(assignments,existingQuotes){
       '</div>' +
       '<div class="rfq-card-body" id="rfqbody-'+rfq.id+'">' +
         (rfq.product_image_url?'<img src="'+rfq.product_image_url+'" style="max-height:150px;border-radius:8px;border:1px solid #e0e0d8;margin-bottom:12px;display:block;" />':'')+
+        (quote&&quote.status==='more_info_requested'&&quote.admin_notes?'<div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:14px;margin-bottom:12px;">'+
+          '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">⚠ Buyer requested additional information</div>'+
+          '<div style="font-size:12px;color:#664400;line-height:1.6;white-space:pre-wrap;">'+esc(quote.admin_notes)+'</div>'+
+          '<div style="font-size:11px;color:#886600;margin-top:8px;font-style:italic;">Please update your quote below to address this request.</div>'+
+        '</div>':'')+
+        (quote&&quote.status==='rejected'&&quote.admin_notes?'<div style="background:#fff0f0;border:1px solid #fdd;border-radius:8px;padding:14px;margin-bottom:12px;">'+
+          '<div style="font-size:13px;font-weight:600;color:#b00;margin-bottom:6px;">Not Approved at this time</div>'+
+          '<div style="font-size:12px;color:#b00;line-height:1.6;white-space:pre-wrap;">'+esc(quote.admin_notes)+'</div>'+
+        '</div>':'')+
         '<div class="rfq-detail-grid">' +
           '<div class="rfq-detail-item"><div class="rfq-detail-label">Quantity</div><div class="rfq-detail-val">'+qty+(uom?' ('+uom+')':'')+'</div></div>' +
           '<div class="rfq-detail-item"><div class="rfq-detail-label">Packaging</div><div class="rfq-detail-val">'+pkgTypes+'</div></div>' +
@@ -1851,21 +1869,21 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
     '<div class="quote-grid" style="margin-top:8px;">' +
       '<div class="qf"><label>Unit Weight (kg)</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="kg" value="'+wgt+'" /></div>' +
     '</div>' +
-    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">'+
+    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;box-sizing:border-box;">'+
       '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents (required for cosmetics)</div>'+
       '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">Both INCI list AND full formulation breakdown are required. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially.</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
-        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">'+
+        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
           '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">INCI List PDF *</label>'+
           '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Standardized ingredient list (regulatory order, no percentages)</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;">Current: '+(existing&&existing.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
-          '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;" />'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;">Current: '+(existing&&existing.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
-        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
+        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
           '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">Formulation PDF * <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">CONFIDENTIAL</span></label>'+
           '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Quantitative breakdown — ingredient %, role, active concentrations</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;">Current: '+(existing&&existing.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
-          '<input type="file" id="qformula-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;" />'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;">Current: '+(existing&&existing.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<input type="file" id="qformula-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
       '</div>'+
     '</div>':'')+
