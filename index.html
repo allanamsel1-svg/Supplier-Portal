@@ -1871,7 +1871,10 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
     '</div>':'')+
     '<input type="hidden" id="qquoteid-'+rfq.id+'" value="'+quoteId+'" />' +
     '<input type="hidden" id="qassignid-'+rfq.id+'" value="'+assignment.id+'" />' +
-    '<button class="submit-quote-btn" id="qbtn-'+rfq.id+'" onclick="submitQuote(\''+rfq.id+'\')">'+(hidden?'Update Quote':'Submit Quote')+'</button>' +
+    '<div style="display:flex;gap:8px;margin-top:8px;">'+
+      '<button class="submit-quote-btn" id="qdraft-'+rfq.id+'" style="flex:1;background:#fff;color:#1a1a2e;border:1px solid #d8d8d0;" onclick="saveQuoteDraft(\''+rfq.id+'\')">💾 Save Draft</button>' +
+      '<button class="submit-quote-btn" id="qbtn-'+rfq.id+'" style="flex:2;" onclick="submitQuote(\''+rfq.id+'\')">'+(hidden?'Update Quote':'Submit Quote')+'</button>' +
+    '</div>' +
     '<div class="pmsg ok" id="qok-'+rfq.id+'"></div>' +
     '<div class="pmsg err" id="qerr-'+rfq.id+'"></div>' +
   '</div>';
@@ -1885,6 +1888,71 @@ function toggleRFQ(rfqId){
 function showEditQuote(rfqId,quoteId){
   var form=g('qform-'+rfqId);
   if(form)form.style.display=form.style.display==='none'?'block':'none';
+}
+
+async function saveQuoteDraft(rfqId){
+  if(!FACTORY_ID){alert('Factory not loaded.');return;}
+  var btn=g('qdraft-'+rfqId);btn.disabled=true;btn.textContent='Saving...';
+  var existingId=g('qquoteid-'+rfqId).value;
+  var assignId=g('qassignid-'+rfqId).value;
+
+  // Upload files if present (same as submit)
+  var inciUrl=null,formulaUrl=null;
+  var inciInput=g('qinci-'+rfqId);
+  var inciFile=inciInput&&inciInput.files&&inciInput.files[0];
+  if(inciFile){
+    var ts=Date.now();var safe=inciFile.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var path=USER.id+'/inci/'+ts+'_'+safe;
+    var ur=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'apikey':KEY,'Content-Type':'application/pdf','x-upsert':'true'},body:inciFile});
+    if(ur.ok)inciUrl=path;
+  }
+  var formulaInput=g('qformula-'+rfqId);
+  var formulaFile=formulaInput&&formulaInput.files&&formulaInput.files[0];
+  if(formulaFile){
+    var ts2=Date.now();var safe2=formulaFile.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var path2=USER.id+'/formulation/'+ts2+'_'+safe2;
+    var ur2=await fetch(SB+'/storage/v1/object/factory-files/'+path2,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'apikey':KEY,'Content-Type':'application/pdf','x-upsert':'true'},body:formulaFile});
+    if(ur2.ok)formulaUrl=path2;
+  }
+
+  var len=parseFloat(g('qlen-'+rfqId).value)||null;
+  var wid=parseFloat(g('qwid-'+rfqId).value)||null;
+  var hei=parseFloat(g('qhei-'+rfqId).value)||null;
+  var payload={
+    rfq_id:rfqId,factory_id:FACTORY_ID,quote_option:1,
+    unit_fob_price:parseFloat(g('qfob-'+rfqId).value)||null,
+    moq:parseInt(g('qmoq-'+rfqId).value)||null,
+    hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
+    country_of_manufacture:g('qcountry-'+rfqId).value?[g('qcountry-'+rfqId).value]:null,
+    factory_existing_model_number:g('qmodel-'+rfqId)?g('qmodel-'+rfqId).value.trim()||null:null,
+    factory_specifications:g('qspecs-'+rfqId).value.trim()||null,
+    unit_length_cm:len,unit_width_cm:wid,unit_height_cm:hei,
+    unit_cbm:(len&&wid&&hei)?(len*wid*hei/1000000):null,
+    unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
+    status:'draft'
+  };
+  if(inciUrl)payload.inci_document_url=inciUrl;
+  if(formulaUrl)payload.formulation_document_url=formulaUrl;
+
+  try{
+    var url=existingId?SB+'/rest/v1/rfq_quotes?id=eq.'+existingId:SB+'/rest/v1/rfq_quotes';
+    var method=existingId?'PATCH':'POST';
+    var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(r.ok){
+      var d=await r.json();
+      var newId=existingId||(Array.isArray(d)?d[0].id:d.id);
+      if(newId)g('qquoteid-'+rfqId).value=newId;
+      btn.disabled=false;btn.textContent='💾 Save Draft';
+      var ok=g('qok-'+rfqId);if(ok){ok.textContent='✓ Draft saved — you can return to finish later.';ok.style.display='block';setTimeout(function(){ok.style.display='none';},4000);}
+    }else{
+      var e=await r.json().catch(function(){return{};});
+      btn.disabled=false;btn.textContent='💾 Save Draft';
+      var er=g('qerr-'+rfqId);if(er){er.textContent='Save failed: '+(e.message||r.status);er.style.display='block';}
+    }
+  }catch(e){
+    btn.disabled=false;btn.textContent='💾 Save Draft';
+    alert('Error: '+e.message);
+  }
 }
 
 async function submitQuote(rfqId){
