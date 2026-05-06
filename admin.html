@@ -4482,6 +4482,25 @@ async function manualSendComplianceReminders(){
 var PD_RECORDS = [];
 var pdCurrentFilter = 'all';
 var pdCurrentDetail = null;
+var pdDirty = false;        // tracks unsaved edits
+var pdAutoSaveTimer = null; // debounce handle
+var pdSaving = false;       // re-entrancy guard
+function markPDDirty(){
+  if(!pdCurrentDetail)return;
+  pdDirty=true;
+  updatePDSaveIndicator('dirty');
+  if(pdAutoSaveTimer)clearTimeout(pdAutoSaveTimer);
+  pdAutoSaveTimer=setTimeout(function(){
+    if(pdDirty&&!pdSaving)savePDAll(true);
+  },2000);
+}
+function updatePDSaveIndicator(state){
+  var el=g('pd-save-indicator');if(!el)return;
+  if(state==='dirty'){el.innerHTML='● <span style="font-weight:500;">Unsaved changes</span>';el.style.color='#aa6600';}
+  else if(state==='saving'){el.innerHTML='⟳ Saving...';el.style.color='#888';}
+  else if(state==='saved'){el.innerHTML='✓ Saved';el.style.color='#1a7a1a';}
+  else if(state==='error'){el.innerHTML='⚠ Save failed';el.style.color='#b00';}
+}
 
 async function loadPDList(filterOverride){
   if(filterOverride) pdCurrentFilter = filterOverride;
@@ -4614,8 +4633,8 @@ async function openPDDetail(pdId){
   }catch(e){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">Error: '+e.message+'</div>';}
 }
 
-function closePDDetail(e){if(e&&e.target&&e.target.id!=='pd-detail-overlay')return;g('pd-detail-overlay').style.display='none';pdCurrentDetail=null;}
-function closePDDetailForce(){g('pd-detail-overlay').style.display='none';pdCurrentDetail=null;}
+function closePDDetail(e){if(e&&e.target&&e.target.id!=='pd-detail-overlay')return;closePDDetailWithSave();}
+function closePDDetailForce(){if(pdAutoSaveTimer){clearTimeout(pdAutoSaveTimer);pdAutoSaveTimer=null;}g('pd-detail-overlay').style.display='none';pdCurrentDetail=null;pdDirty=false;}
 
 function renderPDDetail(){
   var p=pdCurrentDetail;if(!p)return;
@@ -4706,9 +4725,10 @@ function renderPDDetail(){
           (defModel?'<span style="font-family:monospace;font-size:12px;color:#1a1a2e;font-weight:600;">'+escAttr(defModel)+'</span>':'')+
         '</div>'+
       '</div>'+
-      '<div style="display:flex;gap:8px;flex-shrink:0;">'+
+      '<div style="display:flex;gap:8px;flex-shrink:0;align-items:center;">'+
+        '<span id="pd-save-indicator" style="font-size:11px;color:#1a7a1a;margin-right:6px;">✓ Saved</span>'+
         '<button onclick="savePDAll()" style="padding:9px 18px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">💾 Save All</button>'+
-        '<button onclick="closePDDetail()" style="padding:9px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">×</button>'+
+        '<button onclick="closePDDetailWithSave()" style="padding:9px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">×</button>'+
       '</div>'+
     '</div>'+
 
@@ -5019,6 +5039,23 @@ function renderPDDetail(){
   setTimeout(recalcPD,30);
   setTimeout(pdAutoFillFreight,40);
   setTimeout(loadPDFormDropdowns,40);
+  // Wire up auto-save dirty tracking
+  pdDirty=false;
+  if(pdAutoSaveTimer){clearTimeout(pdAutoSaveTimer);pdAutoSaveTimer=null;}
+  setTimeout(function(){
+    var container=g('pd-detail-content');
+    if(!container)return;
+    container.addEventListener('input',function(ev){
+      // Skip the readonly calculated displays
+      var t=ev.target;if(!t||t.readOnly||t.disabled)return;
+      markPDDirty();
+    });
+    container.addEventListener('change',function(ev){
+      var t=ev.target;if(!t||t.readOnly||t.disabled)return;
+      markPDDirty();
+    });
+    updatePDSaveIndicator('saved');
+  },100);
 }
 
 async function loadPDAssets(pdId){
@@ -5609,6 +5646,10 @@ function recalcPD(){
 
 async function savePDAll(silent){
   if(!pdCurrentDetail)return;
+  if(pdSaving)return; // already saving
+  pdSaving=true;
+  if(!silent)updatePDSaveIndicator('saving');
+  else updatePDSaveIndicator('saving');
   var p=pdCurrentDetail;
   function v(id){var el=g(id);return el?(el.value===''?null:el.value):null;}
   function n(id){var x=v(id);return x===null?null:(parseFloat(x)||null);}
@@ -5662,18 +5703,48 @@ async function savePDAll(silent){
   if(!payload.item_number)delete payload.item_number;
   try{
     var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    pdSaving=false;
     if(r.ok){
       Object.assign(pdCurrentDetail,payload);
+      pdDirty=false;
+      updatePDSaveIndicator('saved');
       if(!silent){
         var btn=document.querySelector('button[onclick="savePDAll()"]');
         if(btn){var orig=btn.textContent;btn.textContent='✓ Saved';setTimeout(function(){btn.textContent=orig;},1200);}
       }
-    }else if(!silent){
-      var err=await r.json().catch(function(){return{};});
-      alert('Save failed: '+(err.message||err.details||r.status));
+    }else{
+      updatePDSaveIndicator('error');
+      if(!silent){
+        var err=await r.json().catch(function(){return{};});
+        alert('Save failed: '+(err.message||err.details||r.status));
+      }
     }
-  }catch(e){if(!silent)alert('Save error: '+e.message);}
+  }catch(e){pdSaving=false;updatePDSaveIndicator('error');if(!silent)alert('Save error: '+e.message);}
 }
+
+// Close PD drawer, flushing any pending save first
+async function closePDDetailWithSave(){
+  if(pdAutoSaveTimer){clearTimeout(pdAutoSaveTimer);pdAutoSaveTimer=null;}
+  if(pdDirty&&pdCurrentDetail){
+    await savePDAll(true);
+  }
+  g('pd-detail-overlay').style.display='none';
+  pdCurrentDetail=null;pdDirty=false;
+}
+
+// Warn user before leaving page if unsaved
+window.addEventListener('beforeunload',function(e){
+  if(pdDirty&&pdCurrentDetail){
+    // Try a synchronous save attempt via sendBeacon
+    try{
+      var p=pdCurrentDetail;
+      // Best-effort: just show the warning so user can save first
+      e.preventDefault();
+      e.returnValue='You have unsaved changes in Product Development. Leave anyway?';
+      return e.returnValue;
+    }catch(ex){}
+  }
+});
 
 // ════════════════════════════════════════
 // PD VARIATIONS
