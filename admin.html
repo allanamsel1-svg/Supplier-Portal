@@ -2956,7 +2956,8 @@ async function loadHistoricalBenchmarks(rfq,containerEl){
 
 function buildDiffSection(oldSnapshot,newQuote){
   var fields=[
-    {key:'unit_fob_price',label:'FOB Price',format:function(v){return v?'$'+parseFloat(v).toFixed(2):'—';}},
+    {key:'unit_fob_price',label:'Unit FOB Price',format:function(v){return v?'$'+parseFloat(v).toFixed(4):'—';}},
+    {key:'packaging_price_per_unit',label:'Packaging Cost',format:function(v){return v?'$'+parseFloat(v).toFixed(4):'—';}},
     {key:'hts_code_factory',label:'HTS Code',format:function(v){return v||'—';}},
     {key:'factory_specifications',label:'Specifications',format:function(v){return v?v.substring(0,40)+(v.length>40?'...':''):'—';}},
     {key:'unit_length_cm',label:'Length (cm)',format:function(v){return v||'—';}},
@@ -4687,7 +4688,7 @@ function renderPDDetail(){
   // Costing defaults
   var defHts=pick(fv(p,'hts_code'),fv(quoteRow,'hts_code_factory'),fv(rfqRow,'est_hts_code'));
   var defCountry=pick(fv(p,'country_of_origin'),(quoteRow.country_of_manufacture&&quoteRow.country_of_manufacture[0])||'',fv(rfqRow,'likely_country_of_manufacture'),'China');
-  var defPort=pick(fv(p,'fob_port'),fv(quoteRow,'fob_port'));
+  var defPort=pick(fv(p,'fob_port'),fv(rfqRow,'fob_port'),fv(quoteRow,'fob_port'));
   var defFob=pick(fv(p,'fob_price'),fv(quoteRow,'unit_fob_price'));
   var defPkg=pick(fv(p,'packaging_price'),fv(quoteRow,'packaging_price_per_unit'));
   var defDuty=pick(fv(p,'duty_pct'),fv(rfqRow,'est_duty_pct'));
@@ -4737,7 +4738,7 @@ function renderPDDetail(){
       grid('1fr 1fr 1fr 1fr','10px',
         fld('Approved Factory','<div style="font-size:13px;font-weight:600;">'+escAttr(fac.factory_name_english||'—')+'</div>')+
         fld('From RFQ','<div style="font-size:13px;font-family:monospace;">'+escAttr(rfqRow.project_number||'—')+'</div>')+
-        fld('FOB Price','<div style="font-size:13px;font-weight:600;color:#1a7a1a;">'+(quoteRow.unit_fob_price?'$'+parseFloat(quoteRow.unit_fob_price).toFixed(2):'—')+'</div>')+
+        fld('Total FOB','<div style="font-size:13px;font-weight:600;color:#1a7a1a;">'+((quoteRow.unit_fob_price||quoteRow.packaging_price_per_unit)?'$'+(parseFloat(quoteRow.unit_fob_price||0)+parseFloat(quoteRow.packaging_price_per_unit||0)).toFixed(4):'—')+'</div>'+(quoteRow.packaging_price_per_unit?'<div style="font-size:10px;color:#888;margin-top:2px;">($'+parseFloat(quoteRow.unit_fob_price||0).toFixed(4)+' unit + $'+parseFloat(quoteRow.packaging_price_per_unit||0).toFixed(4)+' pkg)</div>':''))+
         fld('Factory Model #','<div style="font-size:13px;font-family:monospace;">'+escAttr(quoteRow.factory_existing_model_number||'—')+'</div>')
       )
     )+
@@ -4776,15 +4777,29 @@ function renderPDDetail(){
 
     // ── 3. UPCs (PD-specific) ──
     card('🏷 UPCs',
+      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;">'+
+        '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:2px;">Unit UPC-A</div>'+
+          '<div style="font-family:monospace;font-size:14px;font-weight:600;color:'+(p.unit_upc?'#1a1a2e':'#bbb')+';">'+(p.unit_upc?escAttr(p.unit_upc):'— not assigned —')+'</div>'+
+        '</div>'+
+        '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:2px;">Inner ITF-14</div>'+
+          '<div style="font-family:monospace;font-size:14px;font-weight:600;color:'+(p.inner_upc?'#1a1a2e':'#bbb')+';">'+(p.inner_upc?escAttr(p.inner_upc):'— auto-derived from Unit UPC —')+'</div>'+
+        '</div>'+
+        '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:2px;">Master ITF-14</div>'+
+          '<div style="font-family:monospace;font-size:14px;font-weight:600;color:'+(p.master_upc?'#1a1a2e':'#bbb')+';">'+(p.master_upc?escAttr(p.master_upc):'— auto-derived from Unit UPC —')+'</div>'+
+        '</div>'+
+        '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;margin-bottom:2px;">Pallet ITF-14</div>'+
+          '<div style="font-family:monospace;font-size:14px;font-weight:600;color:'+(p.pallet_upc?'#1a1a2e':'#bbb')+';">'+(p.pallet_upc?escAttr(p.pallet_upc):'— auto-derived from Unit UPC —')+'</div>'+
+        '</div>'+
+      '</div>'+
       (p.unit_upc
-        ? '<div style="font-family:monospace;font-size:12px;line-height:1.7;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:6px;padding:10px;">'+
-            '<div><strong>Unit UPC-A:</strong> '+escAttr(p.unit_upc)+' <span style="font-size:9px;background:#e8f8e8;color:#1a7a1a;border:1px solid #a0d8a0;padding:1px 5px;border-radius:8px;margin-left:6px;">ASSIGNED</span></div>'+
-            (p.inner_upc?'<div><strong>Inner ITF-14:</strong> '+escAttr(p.inner_upc)+'</div>':'')+
-            (p.master_upc?'<div><strong>Master ITF-14:</strong> '+escAttr(p.master_upc)+'</div>':'')+
-            (p.pallet_upc?'<div><strong>Pallet ITF-14:</strong> '+escAttr(p.pallet_upc)+'</div>':'')+
+        ? '<div style="font-size:11px;color:'+(defStatus==='approved'?'#1a7a1a':'#aa6600')+';">'+
+            (defStatus==='approved'?'✓ ASSIGNED — UPCs are locked in and used for this SKU.':'⏳ RESERVED — UPCs reserved from pool. Will be locked in when PD is fully approved.')+
           '</div>'
-        : '<button '+(defModel?'':'disabled ')+'class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;width:100%;padding:10px;'+(defModel?'':'opacity:0.5;cursor:not-allowed;')+'" onclick="generatePDUpcs()">⚡ Generate UPCs from Pool'+(defModel?'':' (assign model number first)')+'</button>'),
-      'Unit UPC-A drawn from the pool. ITF-14 codes for inner / master / pallet are auto-derived.'
+        : '<button '+(defModel?'':'disabled ')+'class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;width:100%;padding:10px;'+(defModel?'':'opacity:0.5;cursor:not-allowed;')+'" onclick="generatePDUpcs()">⚡ Generate UPCs from Pool'+(defModel?'':' (assign model number first)')+'</button>')
     )+
 
     // ── 4. PACKAGING & DIMENSIONS (with single confirmation button + container quantities) ──
@@ -4803,7 +4818,7 @@ function renderPDDetail(){
 
       // Inner
       '<div id="sf-inner-dims" style="display:'+(defHasInner?'block':'none')+';">'+
-        '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">INNER CARTON &nbsp;'+dimSt(fv(p,'inner_dim_status','estimated'))+'</div>'+
+        '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">INNER CARTON — Estimated &nbsp;'+dimSt(fv(p,'inner_dim_status','estimated'))+'</div>'+
         grid('1fr 1fr 1fr 1fr 1fr 1fr','8px',
           fld('Qty/Inner',numIn('pk-iq',defIQ,'1'))+
           fld('L (cm)',numIn('pk-il',fv(p,'inner_length_cm'),'0.01'))+
@@ -4812,11 +4827,23 @@ function renderPDDetail(){
           fld('Weight (kg)',numIn('pk-iwt',fv(p,'inner_weight_kg'),'0.001'))+
           fld('Status',sel('pk-ist',['estimated','factory_confirmed','admin_verified'].map(function(s){return '<option value="'+s+'"'+(fv(p,'inner_dim_status','estimated')===s?' selected':'')+'>'+s.replace(/_/g,' ').replace(/\b\w/g,function(l){return l.toUpperCase();})+'</option>';}).join('')))
         )+
-        '<div style="font-size:12px;color:#888;margin-bottom:14px;">CBM (estimated): <strong id="cbm-inner">—</strong></div>'+
+        '<div style="font-size:12px;color:#888;margin-bottom:8px;">CBM (estimated): <strong id="cbm-inner">—</strong></div>'+
+        // Factory-confirmed
+        '<div style="background:#e8f0ff;border:1px solid #c0d0f0;border-radius:7px;padding:9px 12px;margin-bottom:14px;">'+
+          '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed inner dimensions '+(p.inner_dim_confirmed_at?'<span style="font-weight:400;">— confirmed '+new Date(p.inner_dim_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
+          grid('1fr 1fr 1fr 1fr 1fr','8px',
+            fld('Qty/Inner','<input type="number" id="fpk-iq" value="'+escAttr(fv(p,'factory_inner_qty'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('L (cm)','<input type="number" id="fpk-il" value="'+escAttr(fv(p,'factory_inner_length_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('W (cm)','<input type="number" id="fpk-iw" value="'+escAttr(fv(p,'factory_inner_width_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('H (cm)','<input type="number" id="fpk-ih" value="'+escAttr(fv(p,'factory_inner_height_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('Weight (kg)','<input type="number" id="fpk-iwt" value="'+escAttr(fv(p,'factory_inner_weight_kg'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
+          )+
+          '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-inner">'+(function(){var fc=calcCBM(fv(p,'factory_inner_length_cm'),fv(p,'factory_inner_width_cm'),fv(p,'factory_inner_height_cm'));return fc||'—';})()+'</strong></div>'+
+        '</div>'+
       '</div>'+
 
       // Master
-      '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">MASTER CARTON &nbsp;'+dimSt(fv(p,'master_dim_status','estimated'))+'</div>'+
+      '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">MASTER CARTON — Estimated &nbsp;'+dimSt(fv(p,'master_dim_status','estimated'))+'</div>'+
       grid('1fr 1fr 1fr 1fr 1fr 1fr','8px',
         fld('Qty/Master',numIn('pk-mq',defMQ,'1'))+
         fld('L (cm)',numIn('pk-ml',fv(p,'master_length_cm'),'0.01'))+
@@ -4826,6 +4853,18 @@ function renderPDDetail(){
         fld('Status',sel('pk-mst',['estimated','factory_confirmed','admin_verified'].map(function(s){return '<option value="'+s+'"'+(fv(p,'master_dim_status','estimated')===s?' selected':'')+'>'+s.replace(/_/g,' ').replace(/\b\w/g,function(l){return l.toUpperCase();})+'</option>';}).join('')))
       )+
       '<div style="font-size:12px;color:#888;margin-bottom:8px;">CBM (estimated): <strong id="cbm-master">—</strong></div>'+
+      // Factory-confirmed
+      '<div style="background:#e8f0ff;border:1px solid #c0d0f0;border-radius:7px;padding:9px 12px;margin-bottom:14px;">'+
+        '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed master dimensions '+(p.master_dim_confirmed_at?'<span style="font-weight:400;">— confirmed '+new Date(p.master_dim_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
+        grid('1fr 1fr 1fr 1fr 1fr','8px',
+          fld('Qty/Master','<input type="number" id="fpk-mq" value="'+escAttr(fv(p,'factory_master_qty'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('L (cm)','<input type="number" id="fpk-ml" value="'+escAttr(fv(p,'factory_master_length_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('W (cm)','<input type="number" id="fpk-mw" value="'+escAttr(fv(p,'factory_master_width_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('H (cm)','<input type="number" id="fpk-mh" value="'+escAttr(fv(p,'factory_master_height_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('Weight (kg)','<input type="number" id="fpk-mwt" value="'+escAttr(fv(p,'factory_master_weight_kg'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
+        )+
+        '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-master">'+(function(){var fc=calcCBM(fv(p,'factory_master_length_cm'),fv(p,'factory_master_width_cm'),fv(p,'factory_master_height_cm'));return fc||'—';})()+'</strong></div>'+
+      '</div>'+
 
       // Pallet
       '<div id="sf-pallet-dims" style="display:'+(defHasPallet?'block':'none')+';">'+
@@ -5537,21 +5576,76 @@ async function approvePDToSKU(){
 // ════════════════════════════════════════
 function calcCBM(L,W,H){var l=parseFloat(L)||0,w=parseFloat(W)||0,h=parseFloat(H)||0;if(!l||!w||!h)return 0;return parseFloat((l*w*h/1000000).toFixed(6));}
 
+function bestPackSplit(qty){
+  // Returns [a,b,c] integer factors with a*b*c=qty, sorted ascending. Best = closest to cube root.
+  if(!qty||qty<1)return[1,1,1];
+  var bestSplit=[qty,1,1],bestSpread=Infinity;
+  for(var a=1;a<=qty;a++){
+    if(qty%a!==0)continue;
+    var rem=qty/a;
+    for(var b=1;b<=rem;b++){
+      if(rem%b!==0)continue;
+      var c=rem/b;
+      var sorted=[a,b,c].sort(function(x,y){return x-y;});
+      var spread=sorted[2]-sorted[0]; // smaller spread = closer to cube
+      if(spread<bestSpread){bestSpread=spread;bestSplit=sorted;}
+    }
+  }
+  return bestSplit;
+}
+
+function estimateCartonDims(uL,uW,uH,qty){
+  uL=parseFloat(uL)||0;uW=parseFloat(uW)||0;uH=parseFloat(uH)||0;qty=parseInt(qty)||0;
+  if(!uL||!uW||!uH||!qty)return null;
+  // Pair largest unit-dim with smallest factor (to minimize box volume)
+  var dims=[uL,uW,uH].sort(function(x,y){return y-x;}); // desc
+  var factors=bestPackSplit(qty); // asc
+  return {
+    L:Math.round(dims[0]*factors[0]*100)/100,
+    W:Math.round(dims[1]*factors[1]*100)/100,
+    H:Math.round(dims[2]*factors[2]*100)/100
+  };
+}
+
 function recalcPD(){
   if(!pdCurrentDetail)return;
   // Unit CBM from unit dims
-  var uCbm=calcCBM(g('pk-ul')&&g('pk-ul').value,g('pk-uw')&&g('pk-uw').value,g('pk-uh')&&g('pk-uh').value);
-  // Inner: if dims entered, use them. Else estimate as unit_cbm × inner_qty
+  var uL=g('pk-ul')&&g('pk-ul').value,uW=g('pk-uw')&&g('pk-uw').value,uH=g('pk-uh')&&g('pk-uh').value;
+  var uCbm=calcCBM(uL,uW,uH);
+  // Inner: if dims entered, use them. Else auto-estimate L/W/H from unit × inner qty
   var iqty=parseFloat(g('pk-iq')&&g('pk-iq').value)||0;
-  var iCbmFromDims=calcCBM(g('pk-il')&&g('pk-il').value,g('pk-iw')&&g('pk-iw').value,g('pk-ih')&&g('pk-ih').value);
+  var iLi=g('pk-il'),iWi=g('pk-iw'),iHi=g('pk-ih');
+  var iLv=iLi&&iLi.value,iWv=iWi&&iWi.value,iHv=iHi&&iHi.value;
+  if((!iLv||!iWv||!iHv)&&uL&&uW&&uH&&iqty){
+    var iEst=estimateCartonDims(uL,uW,uH,iqty);
+    if(iEst){
+      if(iLi&&!iLv){iLi.value=iEst.L;iLi.dataset.estimated='1';}
+      if(iWi&&!iWv){iWi.value=iEst.W;iWi.dataset.estimated='1';}
+      if(iHi&&!iHv){iHi.value=iEst.H;iHi.dataset.estimated='1';}
+    }
+  }
+  var iCbmFromDims=calcCBM(iLi&&iLi.value,iWi&&iWi.value,iHi&&iHi.value);
   var iCbm=iCbmFromDims||(uCbm&&iqty?parseFloat((uCbm*iqty).toFixed(6)):0);
-  // Master: if dims entered, use them. Else estimate as inner_cbm × (master_qty/inner_qty) ... or unit_cbm × master_qty if no inner
+
+  // Master: if dims entered, use them. Else auto-estimate from unit × master qty
   var mqty=parseFloat(g('pk-mq')&&g('pk-mq').value)||0;
-  var mCbmFromDims=calcCBM(g('pk-ml')&&g('pk-ml').value,g('pk-mw')&&g('pk-mw').value,g('pk-mh')&&g('pk-mh').value);
+  var mLi=g('pk-ml'),mWi=g('pk-mw'),mHi=g('pk-mh');
+  var mLv=mLi&&mLi.value,mWv=mWi&&mWi.value,mHv=mHi&&mHi.value;
+  if((!mLv||!mWv||!mHv)&&uL&&uW&&uH&&mqty){
+    var mEst=estimateCartonDims(uL,uW,uH,mqty);
+    if(mEst){
+      if(mLi&&!mLv){mLi.value=mEst.L;mLi.dataset.estimated='1';}
+      if(mWi&&!mWv){mWi.value=mEst.W;mWi.dataset.estimated='1';}
+      if(mHi&&!mHv){mHi.value=mEst.H;mHi.dataset.estimated='1';}
+    }
+  }
+  var mCbmFromDims=calcCBM(mLi&&mLi.value,mWi&&mWi.value,mHi&&mHi.value);
   var mCbm=mCbmFromDims||(uCbm&&mqty?parseFloat((uCbm*mqty).toFixed(6)):0);
+
   if(g('cbm-unit'))g('cbm-unit').textContent=uCbm||'—';
   if(g('cbm-inner'))g('cbm-inner').textContent=iCbm||'—';
   if(g('cbm-master'))g('cbm-master').textContent=mCbm||'—';
+  if(g('cs-master-cbm'))g('cs-master-cbm').value=mCbm?mCbm.toFixed(6):'';
 
   // Container quantities — usable CBM × master_qty / master_cbm
   var contUsable={'20gp':25*0.85,'40gp':54*0.85,'40hc':67*0.85};
@@ -5597,13 +5691,10 @@ function recalcPD(){
     }
   }
   if(g('cs-freight-est'))g('cs-freight-est').value=fEst?'$'+fEst.toFixed(4):'';
-  var fAct=parseFloat(g('cs-freight-actual')&&g('cs-freight-actual').value)||0;
 
-  // Landed
+  // Landed (estimated only — actual lives in SKU library)
   var lEst=totalFob+fEst+dutyU+tariffU;
-  var lAct=fAct?totalFob+fAct+dutyU+tariffU:0;
-  if(g('cs-landed-est'))g('cs-landed-est').textContent=lEst?'$'+lEst.toFixed(4):'—';
-  if(g('cs-landed-actual'))g('cs-landed-actual').textContent=lAct?'$'+lAct.toFixed(4):'—';
+  if(g('cs-landed-est'))g('cs-landed-est').value=lEst?'$'+lEst.toFixed(4):'';
 
   // Margins
   var retail=parseFloat(g('cs-retail')&&g('cs-retail').value)||0;
@@ -5611,36 +5702,26 @@ function recalcPD(){
   var dil=parseFloat(g('cs-dilution')&&g('cs-dilution').value)||0;
   var ad=parseFloat(g('cs-ad')&&g('cs-ad').value)||0;
   var com=parseFloat(g('cs-commission')&&g('cs-commission').value)||0;
-  var landed=lAct||lEst;
+  var roy=parseFloat(g('cs-royalty')&&g('cs-royalty').value)||0;
+  var landed=lEst;
+  var totalDeductPct=ret+dil+ad+com+roy;
+  var deductDollars=retail*(totalDeductPct/100);
   var grossMargin=0,netMargin=0;
   if(retail>0){
     grossMargin=((retail-landed)/retail)*100;
-    var totalDeductPct=ret+dil+ad+com;
-    var deductDollars=retail*(totalDeductPct/100);
     netMargin=((retail-landed-deductDollars)/retail)*100;
   }
   var cust=pdCurrentDetail.customers||{};
   var minGross=parseFloat(cust.min_gross_margin_pct)||0;
   var minNet=parseFloat(cust.min_net_margin_pct)||0;
-  if(g('cs-gross-margin')){
-    g('cs-gross-margin').textContent=retail>0?grossMargin.toFixed(1)+'%':'—';
-    if(g('cs-gross-status')){
-      if(retail>0&&minGross){
-        var ok=grossMargin>=minGross;
-        g('cs-gross-status').textContent=(ok?'✓ ':'⚠ ')+'Min '+minGross+'% '+(ok?'met':'not met');
-        g('cs-gross-status').style.color=ok?'#a0d8a0':'#f0d860';
-      }else g('cs-gross-status').textContent='';
-    }
+  if(g('cs-ded'))g('cs-ded').textContent=retail>0?'$'+deductDollars.toFixed(2):'—';
+  if(g('cs-gross')){
+    g('cs-gross').textContent=retail>0?grossMargin.toFixed(1)+'%':'—';
+    g('cs-gross').style.color=retail>0?(minGross&&grossMargin<minGross?'#b00':(minGross&&grossMargin<minGross+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
   }
-  if(g('cs-net-margin')){
-    g('cs-net-margin').textContent=retail>0?netMargin.toFixed(1)+'%':'—';
-    if(g('cs-net-status')){
-      if(retail>0&&minNet){
-        var okN=netMargin>=minNet;
-        g('cs-net-status').textContent=(okN?'✓ ':'⚠ ')+'Min '+minNet+'% '+(okN?'met':'not met');
-        g('cs-net-status').style.color=okN?'#a0d8a0':'#f0d860';
-      }else g('cs-net-status').textContent='';
-    }
+  if(g('cs-net')){
+    g('cs-net').textContent=retail>0?netMargin.toFixed(1)+'%':'—';
+    g('cs-net').style.color=retail>0?(minNet&&netMargin<minNet?'#b00':(minNet&&netMargin<minNet+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
   }
 }
 

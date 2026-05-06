@@ -1820,13 +1820,15 @@ function renderRFQList(assignments,existingQuotes){
       '</div>' +
     '</div>';
   }).join('');
+  // Populate Total FOB displays for forms with existing values
+  setTimeout(function(){assignments.forEach(function(a){var r=a.rfqs||{};if(r.id)updateTotalFobDisplay(r.id);});},10);
 }
 
 function renderQuoteSection(rfq,assignment,existingQuote){
   if(existingQuote){
     return '<div class="existing-quote">' +
       '<strong>✓ Quote submitted — Option '+existingQuote.quote_option+'</strong>' +
-      'FOB Price: $'+parseFloat(existingQuote.unit_fob_price||0).toFixed(2)+' · MOQ: '+(existingQuote.moq||'—')+' units' +
+      'FOB: $'+parseFloat(existingQuote.unit_fob_price||0).toFixed(4)+' + Pkg: $'+parseFloat(existingQuote.packaging_price_per_unit||0).toFixed(4)+' = Total $'+(parseFloat(existingQuote.unit_fob_price||0)+parseFloat(existingQuote.packaging_price_per_unit||0)).toFixed(4)+' · MOQ: '+(existingQuote.moq||'—')+' units' +
       '<div style="margin-top:8px;">' +
         '<button onclick="showEditQuote(\''+rfq.id+'\',\''+existingQuote.id+'\')" style="font-size:12px;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;">✏ Update Quote</button>' +
       '</div>' +
@@ -1836,10 +1838,19 @@ function renderQuoteSection(rfq,assignment,existingQuote){
   return renderQuoteForm(rfq,assignment,null,false);
 }
 
+function updateTotalFobDisplay(rfqId){
+  var fob=parseFloat(document.getElementById('qfob-'+rfqId)&&document.getElementById('qfob-'+rfqId).value)||0;
+  var pkg=parseFloat(document.getElementById('qpkg-'+rfqId)&&document.getElementById('qpkg-'+rfqId).value)||0;
+  var total=fob+pkg;
+  var el=document.getElementById('qtotalfob-'+rfqId);
+  if(el)el.value=total?'$'+total.toFixed(4):'';
+}
+
 function renderQuoteForm(rfq,assignment,existing,hidden){
   var display=hidden?'display:none;':'';
   var id='qform-'+rfq.id;
   var fob=existing?existing.unit_fob_price||'':'';
+  var pkg=existing?existing.packaging_price_per_unit||'':'';
   var moq=existing?existing.moq||'':'';
   var specs=existing?existing.factory_specifications||'':'';
   var hts=existing?existing.hts_code_factory||'':'';
@@ -1850,9 +1861,15 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
   var quoteId=existing?existing.id:'';
   return '<div class="quote-form" id="'+id+'" style="'+display+'">' +
     '<div class="quote-form-title">'+(hidden?'Update Your Quote':'Submit Your Quote')+'</div>' +
+    '<div class="quote-grid-3">' +
+      '<div class="qf"><label>Unit FOB Price (USD) *</label><input type="number" id="qfob-'+rfq.id+'" step="0.0001" placeholder="e.g. 2.5000" value="'+fob+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
+      '<div class="qf"><label>Packaging Cost / unit (USD) *</label><input type="number" id="qpkg-'+rfq.id+'" step="0.0001" placeholder="e.g. 0.3500" value="'+pkg+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
+      '<div class="qf"><label>Total FOB (calculated)</label><input type="text" id="qtotalfob-'+rfq.id+'" readonly style="background:#f8f8f4;font-weight:600;" /></div>' +
+    '</div>' +
+    '<div style="font-size:10px;color:#888;margin-bottom:10px;margin-top:-2px;">Please quote unit price and packaging cost separately. Total FOB will be calculated automatically.</div>' +
     '<div class="quote-grid">' +
-      '<div class="qf"><label>FOB Price (USD) per unit *</label><input type="number" id="qfob-'+rfq.id+'" step="0.01" placeholder="e.g. 2.50" value="'+fob+'" /></div>' +
       '<div class="qf"><label>MOQ (Minimum Order Quantity) *</label><input type="number" id="qmoq-'+rfq.id+'" placeholder="e.g. 1000" value="'+moq+'" /></div>' +
+      '<div class="qf"></div>' +
     '</div>' +
     '<div class="quote-grid">' +
       '<div class="qf"><label>HTS Code (if known)</label><input type="text" id="qhts-'+rfq.id+'" placeholder="e.g. 8513.10.2000" value="'+hts+'" /></div>' +
@@ -1939,6 +1956,7 @@ async function saveQuoteDraft(rfqId){
   var payload={
     rfq_id:rfqId,factory_id:FACTORY_ID,quote_option:1,
     unit_fob_price:parseFloat(g('qfob-'+rfqId).value)||null,
+    packaging_price_per_unit:parseFloat(g('qpkg-'+rfqId).value)||null,
     moq:parseInt(g('qmoq-'+rfqId).value)||null,
     hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
     country_of_manufacture:g('qcountry-'+rfqId).value?[g('qcountry-'+rfqId).value]:null,
@@ -1979,8 +1997,9 @@ async function submitQuote(rfqId){
     if(el){el.textContent=msg;el.style.display='block';}
   }
   var fob=parseFloat(g('qfob-'+rfqId).value)||0;
+  var pkg=parseFloat(g('qpkg-'+rfqId).value)||0;
   var moq=parseInt(g('qmoq-'+rfqId).value)||0;
-  if(!fob||!moq){alert('Please enter at least FOB price and MOQ.');return;}
+  if(!fob||!moq){alert('Please enter at least Unit FOB price and MOQ.');return;}
   var btn=g('qbtn-'+rfqId);
   btn.disabled=true;btn.textContent='Submitting...';
   var existingId=g('qquoteid-'+rfqId).value;
@@ -2051,6 +2070,7 @@ async function submitQuote(rfqId){
     factory_id:FACTORY_ID,
     quote_option:1,
     unit_fob_price:fob,
+    packaging_price_per_unit:pkg||null,
     moq:moq,
     hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
     country_of_manufacture:[g('qcountry-'+rfqId).value],
