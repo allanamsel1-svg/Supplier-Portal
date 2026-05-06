@@ -4574,13 +4574,15 @@ async function openPDDetail(pdId){
     // Load related data in parallel — all optional
     var related=await Promise.all([
       pdCurrentDetail.factory_id?fetch(SB+'/rest/v1/factories?id=eq.'+pdCurrentDetail.factory_id+'&select=factory_name_english,sales_email,sales_contact_name&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
-      pdCurrentDetail.rfq_id?fetch(SB+'/rest/v1/rfqs?id=eq.'+pdCurrentDetail.rfq_id+'&select=project_number,item_description,is_cosmetic&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
-      pdCurrentDetail.customer_id?fetch(SB+'/rest/v1/customers?id=eq.'+pdCurrentDetail.customer_id+'&select=customer_name,customer_suffix,returns_pct,dilution_pct,advertising_pct,commission_pct,min_gross_margin_pct,min_net_margin_pct&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
-      pdCurrentDetail.brand_id?fetch(SB+'/rest/v1/brands?id=eq.'+pdCurrentDetail.brand_id+'&select=brand_name,brand_prefix&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.rfq_id?fetch(SB+'/rest/v1/rfqs?id=eq.'+pdCurrentDetail.rfq_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.customer_id?fetch(SB+'/rest/v1/customers?id=eq.'+pdCurrentDetail.customer_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.brand_id?fetch(SB+'/rest/v1/brands?id=eq.'+pdCurrentDetail.brand_id+'&select=brand_name,brand_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
       pdCurrentDetail.quote_id?fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+pdCurrentDetail.quote_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
       fetch(SB+'/rest/v1/pd_variations?pd_id=eq.'+pdCurrentDetail.id+'&order=created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
       fetch(SB+'/rest/v1/pd_factory_sources?pd_id=eq.'+pdCurrentDetail.id+'&select=*,factories(factory_name_english,sales_email,sales_contact_name)&order=is_primary.desc,created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
-      fetch(SB+'/rest/v1/freight_rates?is_active=eq.true&order=origin_country,mode',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
+      fetch(SB+'/rest/v1/freight_rates?is_active=eq.true&order=origin_country,mode',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
+      pdCurrentDetail.quote_id?fetch(SB+'/rest/v1/rfq_quote_cert_assets?quote_id=eq.'+pdCurrentDetail.quote_id+'&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      fetch(SB+'/rest/v1/product_development_assets?pd_id=eq.'+pdCurrentDetail.id+'&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
     ]);
     pdCurrentDetail.factories=related[0]&&related[0][0]?related[0][0]:{};
     pdCurrentDetail.rfqs=related[1]&&related[1][0]?related[1][0]:{};
@@ -4590,6 +4592,8 @@ async function openPDDetail(pdId){
     pdCurrentDetail._variations=related[5]||[];
     pdCurrentDetail._sources=related[6]||[];
     pdCurrentDetail._freightRates=related[7]||[];
+    pdCurrentDetail._certAssets=related[8]||[];
+    pdCurrentDetail._assets=related[9]||[];
     // If no factory sources yet but PD has a factory_id from quote, auto-create primary
     if(pdCurrentDetail._sources.length===0 && pdCurrentDetail.factory_id){
       try{
@@ -4632,12 +4636,30 @@ function renderPDDetail(){
     '</label>';
   }
 
-  // Customer-driven defaults
-  var cust=p.customers||{};
-  var defReturns=fv(p,'returns_pct')!==''?fv(p,'returns_pct'):fv(cust,'returns_pct');
-  var defDilution=fv(p,'dilution_pct')!==''?fv(p,'dilution_pct'):fv(cust,'dilution_pct');
-  var defAd=fv(p,'advertising_pct')!==''?fv(p,'advertising_pct'):fv(cust,'advertising_pct');
-  var defComm=fv(p,'commission_pct')!==''?fv(p,'commission_pct'):fv(cust,'commission_pct');
+  // Customer-driven defaults — cascade: PD value → RFQ admin values → customer table → quote
+  var cust=p.customers||{};var rfqRow=p.rfqs||{};var quoteRow=p._quote||{};
+  function pick(){for(var i=0;i<arguments.length;i++){var v=arguments[i];if(v!==undefined&&v!==null&&v!=='')return v;}return '';}
+  var defReturns=pick(fv(p,'returns_pct'),fv(rfqRow,'est_returns_pct'),fv(cust,'default_returns_pct'),fv(cust,'returns_pct'));
+  var defDilution=pick(fv(p,'dilution_pct'),fv(rfqRow,'est_dilution_pct'),fv(cust,'default_dilution_pct'),fv(cust,'dilution_pct'));
+  var defAd=pick(fv(p,'advertising_pct'),fv(rfqRow,'est_ad_allowance_pct'),fv(cust,'default_ad_allowance_pct'),fv(cust,'advertising_pct'));
+  var defComm=pick(fv(p,'commission_pct'),fv(rfqRow,'est_commission_pct'),fv(cust,'default_commission_pct'),fv(cust,'commission_pct'));
+  var defRetail=pick(fv(p,'target_retail_price'),fv(rfqRow,'target_retail_price'));
+  // Costing pre-fill cascade: PD → quote → RFQ
+  var defHts=pick(fv(p,'hts_code'),fv(quoteRow,'hts_code_factory'),fv(rfqRow,'est_hts_code'));
+  var defCountry=pick(fv(p,'country_of_origin'),(quoteRow.country_of_manufacture&&quoteRow.country_of_manufacture[0])||'',fv(rfqRow,'likely_country_of_manufacture'));
+  var defPort=pick(fv(p,'fob_port'),fv(quoteRow,'fob_port'));
+  var defFob=pick(fv(p,'fob_price'),fv(quoteRow,'unit_fob_price'));
+  var defPkg=pick(fv(p,'packaging_price'),fv(quoteRow,'packaging_price_per_unit'));
+  var defDuty=pick(fv(p,'duty_pct'),fv(rfqRow,'est_duty_pct'));
+  var defTariff=pick(fv(p,'tariff_pct'),fv(rfqRow,'est_tariff_pct'));
+  // Dimensions pre-fill cascade: PD → quote → RFQ
+  var defUL=pick(fv(p,'unit_length_cm'),fv(quoteRow,'unit_length_cm'),fv(rfqRow,'est_unit_length_cm'));
+  var defUW=pick(fv(p,'unit_width_cm'),fv(quoteRow,'unit_width_cm'),fv(rfqRow,'est_unit_width_cm'));
+  var defUH=pick(fv(p,'unit_height_cm'),fv(quoteRow,'unit_height_cm'),fv(rfqRow,'est_unit_height_cm'));
+  var defUWt=pick(fv(p,'unit_weight_kg'),fv(quoteRow,'unit_weight_kg'));
+  var defInnerQty=pick(fv(p,'inner_qty'),fv(rfqRow,'inner_case_pack'));
+  var defMasterQty=pick(fv(p,'master_qty'),fv(rfqRow,'master_case_pack'));
+  var defContCost=pick(fv(p,'freight_rate'),fv(rfqRow,'container_cost_usd'));
 
   // Freight origin options
   var origins=[];
@@ -4684,7 +4706,7 @@ function renderPDDetail(){
     if(ts){
       return '<span style="font-size:10px;background:#e8f8e8;color:#1a7a1a;border:1px solid #a0d8a0;padding:2px 7px;border-radius:9px;margin-left:8px;">✓ Confirmed '+new Date(ts).toLocaleDateString()+'</span>';
     }
-    return '<button onclick="reqPDDimConf(\''+level+'\')" style="font-size:10px;padding:3px 8px;background:#fff;border:1px solid #d8d8d0;border-radius:5px;cursor:pointer;margin-left:8px;">Request confirmation</button>';
+    return '<span style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:2px 7px;border-radius:9px;margin-left:8px;">⏳ Awaiting factory</span>';
   }
 
   content.innerHTML=
@@ -4762,8 +4784,11 @@ function renderPDDetail(){
 
     // ─── 5. Packaging & Dimensions ───
     '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
-      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">📐 Packaging &amp; Dimensions</div>'+
-      '<div style="font-size:11px;color:#888;margin-bottom:10px;">Estimated values entered here. Factory must confirm each level via the supplier portal.</div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">📐 Packaging &amp; Dimensions</div>'+
+        '<button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="reqPDDimConfAll()">✉ Send Confirmation Request to Factory</button>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:10px;">Inner / Master dimensions auto-estimate from unit dims × case pack qty. Factory confirms actual values via supplier portal before PO.</div>'+
 
       // Unit
       '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;margin-bottom:8px;">'+
@@ -4771,10 +4796,10 @@ function renderPDDetail(){
           '<div style="font-size:12px;font-weight:600;">Unit</div>'+dimConfirmBadge('unit')+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
-          fld('Length (cm)',nIn('pk-ul',fv(p,'unit_length_cm')))+
-          fld('Width (cm)',nIn('pk-uw',fv(p,'unit_width_cm')))+
-          fld('Height (cm)',nIn('pk-uh',fv(p,'unit_height_cm')))+
-          fld('Weight (kg)',nIn('pk-uwt',fv(p,'unit_weight_kg'),'0.001'))+
+          fld('Length (cm)',nIn('pk-ul',defUL))+
+          fld('Width (cm)',nIn('pk-uw',defUW))+
+          fld('Height (cm)',nIn('pk-uh',defUH))+
+          fld('Weight (kg)',nIn('pk-uwt',defUWt,'0.001'))+
         '</div>'+
         '<div style="font-size:11px;color:#888;margin-top:4px;">CBM: <span id="cbm-unit">—</span></div>'+
       '</div>'+
@@ -4785,13 +4810,13 @@ function renderPDDetail(){
           '<div style="font-size:12px;font-weight:600;">Inner Carton <label style="font-size:11px;font-weight:400;margin-left:8px;"><input type="checkbox" id="pk-has-inner" '+(p.has_inner_carton?'checked':'')+' /> applicable</label></div>'+dimConfirmBadge('inner')+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">'+
-          fld('Qty per Inner',nIn('pk-iq',fv(p,'inner_qty'),'1'))+
+          fld('Qty per Inner',nIn('pk-iq',defInnerQty,'1'))+
           fld('Length',nIn('pk-il',fv(p,'inner_length_cm')))+
           fld('Width',nIn('pk-iw',fv(p,'inner_width_cm')))+
           fld('Height',nIn('pk-ih',fv(p,'inner_height_cm')))+
           fld('Weight (kg)',nIn('pk-iwt',fv(p,'inner_weight_kg'),'0.001'))+
         '</div>'+
-        '<div style="font-size:11px;color:#888;margin-top:4px;">CBM: <span id="cbm-inner">—</span></div>'+
+        '<div style="font-size:11px;color:#888;margin-top:4px;">CBM (estimated): <span id="cbm-inner">—</span></div>'+
       '</div>'+
 
       // Master
@@ -4800,23 +4825,33 @@ function renderPDDetail(){
           '<div style="font-size:12px;font-weight:600;">Master Carton</div>'+dimConfirmBadge('master')+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">'+
-          fld('Qty per Master',nIn('pk-mq',fv(p,'master_qty'),'1'))+
+          fld('Qty per Master',nIn('pk-mq',defMasterQty,'1'))+
           fld('Length',nIn('pk-ml',fv(p,'master_length_cm')))+
           fld('Width',nIn('pk-mw',fv(p,'master_width_cm')))+
           fld('Height',nIn('pk-mh',fv(p,'master_height_cm')))+
           fld('Weight (kg)',nIn('pk-mwt',fv(p,'master_weight_kg'),'0.001'))+
         '</div>'+
-        '<div style="font-size:11px;color:#888;margin-top:4px;">CBM: <span id="cbm-master">—</span></div>'+
+        '<div style="font-size:11px;color:#888;margin-top:4px;">CBM (estimated): <span id="cbm-master">—</span></div>'+
       '</div>'+
 
       // Pallet
-      '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;">'+
+      '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;margin-bottom:10px;">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
           '<div style="font-size:12px;font-weight:600;">Pallet <label style="font-size:11px;font-weight:400;margin-left:8px;"><input type="checkbox" id="pk-has-pallet" '+(p.has_pallet?'checked':'')+' /> applicable</label></div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">'+
           fld('Masters per Pallet',nIn('pk-pq',fv(p,'pallet_qty'),'1'))+
           fld('—','<input type="text" disabled style="width:100%;padding:6px 8px;font-size:12px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:6px;" />')+
+        '</div>'+
+      '</div>'+
+
+      // Container quantities (read-only, calculated)
+      '<div style="background:#1a1a2e;color:#fff;border-radius:8px;padding:12px;">'+
+        '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;opacity:0.7;margin-bottom:6px;">Container Quantities (estimated)</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'+
+          '<div><div style="font-size:10px;opacity:0.6;">20\' GP</div><div id="cont-20gp" style="font-size:18px;font-weight:600;font-family:monospace;">—</div></div>'+
+          '<div><div style="font-size:10px;opacity:0.6;">40\' GP</div><div id="cont-40gp" style="font-size:18px;font-weight:600;font-family:monospace;">—</div></div>'+
+          '<div><div style="font-size:10px;opacity:0.6;">40\' HC</div><div id="cont-40hc" style="font-size:18px;font-weight:600;font-family:monospace;">—</div></div>'+
         '</div>'+
       '</div>'+
     '</div>'+
@@ -4826,21 +4861,21 @@ function renderPDDetail(){
       '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">💰 Costing &amp; Calculator</div>'+
 
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">'+
-        fld('HTS Code',tIn('cs-hts',fv(p,'hts_code'),'e.g. 3304.99.5000')+'<button onclick="aiSuggestHTSPD()" style="margin-top:4px;width:100%;font-size:11px;padding:4px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;">✦ AI Suggest Duty &amp; Tariff</button>')+
-        fld('Country of Origin',tIn('cs-origin',fv(p,'country_of_origin')||'China'))+
-        fld('FOB Port',tIn('cs-port',fv(p,'fob_port'),'e.g. Yantian, Shekou'))+
+        fld('HTS Code',tIn('cs-hts',defHts,'e.g. 3304.99.5000')+'<button onclick="aiSuggestHTSPD()" style="margin-top:4px;width:100%;font-size:11px;padding:4px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;">✦ AI Suggest Duty &amp; Tariff</button>')+
+        fld('Country of Origin',tIn('cs-origin',defCountry||'China'))+
+        fld('FOB Port',tIn('cs-port',defPort,'e.g. Yantian, Shekou'))+
       '</div>'+
 
       '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">'+
-        fld('FOB Price (USD)',nIn('cs-fob',fv(p,'fob_price')||fv(quote,'unit_fob_price'),'0.0001','0.0000'))+
-        fld('Packaging Cost / unit',nIn('cs-pkg',fv(p,'packaging_price'),'0.0001','0.0000'))+
+        fld('FOB Price (USD)',nIn('cs-fob',defFob,'0.0001','0.0000'))+
+        fld('Packaging Cost / unit',nIn('cs-pkg',defPkg,'0.0001','0.0000'))+
         fld('Total FOB','<input type="text" id="cs-total-fob" readonly style="width:100%;padding:6px 8px;font-size:12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;font-weight:600;" />')+
       '</div>'+
 
       '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:10px;">'+
-        fld('Duty %',nIn('cs-duty',fv(p,'duty_pct'),'0.01','0.00')+'<span id="cs-duty-src" style="font-size:10px;color:#888;"></span>')+
+        fld('Duty %',nIn('cs-duty',defDuty,'0.01','0.00')+'<span id="cs-duty-src" style="font-size:10px;color:#888;"></span>')+
         fld('Duty / unit (calc)','<input type="text" id="cs-duty-unit" readonly style="width:100%;padding:6px 8px;font-size:12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" />')+
-        fld('Tariff %',nIn('cs-tariff',fv(p,'tariff_pct'),'0.01','0.00')+'<span id="cs-tariff-src" style="font-size:10px;color:#888;"></span>')+
+        fld('Tariff %',nIn('cs-tariff',defTariff,'0.01','0.00')+'<span id="cs-tariff-src" style="font-size:10px;color:#888;"></span>')+
         fld('Tariff / unit (calc)','<input type="text" id="cs-tariff-unit" readonly style="width:100%;padding:6px 8px;font-size:12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" />')+
       '</div>'+
 
@@ -4851,22 +4886,18 @@ function renderPDDetail(){
           fld('Mode','<select id="cs-freight-mode" onchange="recalcPD()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+
             ['ocean_lcl','ocean_fcl','air'].map(function(m){return '<option value="'+m+'"'+(p.freight_mode===m?' selected':'')+'>'+m.replace('_',' ').toUpperCase()+'</option>';}).join('')+
           '</select>')+
-          fld('Rate',nIn('cs-freight-rate',fv(p,'freight_rate'),'0.01','rate per CBM/container/kg'))+
+          fld('Container Cost (USD)',nIn('cs-freight-rate',defContCost,'1','e.g. 6000'))+
           fld('Container','<select id="cs-freight-cont" onchange="recalcPD()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+
             ['','20gp','40gp','40hc','45hc'].map(function(c){return '<option value="'+c+'"'+(p.freight_container===c?' selected':'')+'>'+(c||'—')+'</option>';}).join('')+
           '</select>')+
         '</div>'+
-        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">'+
+        '<div>'+
           fld('Freight estimated / unit','<input type="text" id="cs-freight-est" readonly style="width:100%;padding:6px 8px;font-size:12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" />')+
-          fld('Freight actual / unit',nIn('cs-freight-actual',fv(p,'freight_actual'),'0.0001','manual entry'))+
         '</div>'+
       '</div>'+
 
       '<div style="border-top:1px solid #e8e8e0;margin-top:10px;padding-top:10px;">'+
-        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">'+
-          '<div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:10px;"><div style="font-size:10px;color:#886600;text-transform:uppercase;margin-bottom:4px;">Landed Cost (estimated)</div><div id="cs-landed-est" style="font-size:18px;font-weight:600;font-family:monospace;color:#1a1a2e;">—</div></div>'+
-          '<div style="background:#e8f8e8;border:1px solid #a0d8a0;border-radius:8px;padding:10px;"><div style="font-size:10px;color:#1a5a1a;text-transform:uppercase;margin-bottom:4px;">Landed Cost (actual)</div><div id="cs-landed-actual" style="font-size:18px;font-weight:600;font-family:monospace;color:#1a1a2e;">—</div></div>'+
-        '</div>'+
+        '<div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:10px;"><div style="font-size:10px;color:#886600;text-transform:uppercase;margin-bottom:4px;">Landed Cost (estimated)</div><div id="cs-landed-est" style="font-size:22px;font-weight:600;font-family:monospace;color:#1a1a2e;">—</div><div style="font-size:10px;color:#886600;margin-top:4px;">Actual landed cost is recorded in the SKU library based on each shipment\'s actuals.</div></div>'+
       '</div>'+
     '</div>'+
 
@@ -4875,7 +4906,7 @@ function renderPDDetail(){
       '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📊 Customer Costing &amp; Our Margins</div>'+
 
       '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;">'+
-        fld('Target Retail',nIn('cs-retail',fv(p,'target_retail_price'),'0.01','e.g. 4.99'))+
+        fld('Target Retail',nIn('cs-retail',defRetail,'0.01','e.g. 4.99'))+
         fld('Returns %',nIn('cs-returns',defReturns,'0.01','from customer'))+
         fld('Dilution %',nIn('cs-dilution',defDilution,'0.01','from customer'))+
         fld('Advertising %',nIn('cs-ad',defAd,'0.01','from customer'))+
@@ -4904,20 +4935,67 @@ function renderPDDetail(){
       '<textarea id="cs-customer-specs" placeholder="e.g. case-pack requirements, label requirements, special inserts, retailer-specific compliance" style="width:100%;min-height:60px;padding:8px 10px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+esc(fv(p,'customer_specs'))+'</textarea>'+
     '</div>'+
 
-    // ─── 9. Compliance Documents (factory-side managed) ───
-    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
-      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📋 Compliance Documents</div>'+
-      '<div style="font-size:11px;color:#888;">View and verify compliance docs in the Compliance Alerts page or factory portal.</div>'+
-    '</div>'+
+    // ─── 9. Compliance Documents ───
+    (function(){
+      var quote=p._quote||{};var certs=p._certAssets||[];
+      var blocks=[];
+      if(quote.inci_document_url){
+        blocks.push('<a href="javascript:void(0)" onclick="openFactoryFile(\''+(quote.inci_document_url||'').replace(/\\\\/g,"\\\\\\\\").replace(/\'/g,"\\\\\'")+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:6px;text-decoration:none;color:#1a1a2e;font-size:12px;">🧴 INCI List</a>');
+      }
+      if(quote.formulation_document_url){
+        blocks.push('<a href="javascript:void(0)" onclick="openFactoryFile(\''+(quote.formulation_document_url||'').replace(/\\\\/g,"\\\\\\\\").replace(/\'/g,"\\\\\'")+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:6px;text-decoration:none;color:#1a1a2e;font-size:12px;">🧪 Formulation <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">CONFIDENTIAL</span></a>');
+      }
+      certs.forEach(function(c){
+        blocks.push('<a href="javascript:void(0)" onclick="openFactoryFile(\''+((c.file_url||c.file_path||'')).replace(/\\\\/g,"\\\\\\\\").replace(/\'/g,"\\\\\'")+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:6px;text-decoration:none;color:#1a1a2e;font-size:12px;">📄 '+esc(c.cert_type||c.file_name||'Document')+'</a>');
+      });
+      return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📋 Compliance Documents (from accepted quote)</div>'+
+        (blocks.length?'<div style="display:flex;gap:8px;flex-wrap:wrap;">'+blocks.join('')+'</div>':'<div style="font-size:12px;color:#888;">No compliance documents on the accepted quote.</div>')+
+      '</div>';
+    })()+
 
-    // ─── 10. Product Assets ───
-    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
-        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">📁 Product Assets</div>'+
-        '<button class="btn-edit" onclick="openPDUploadModal()">+ Upload Asset</button>'+
-      '</div>'+
-      '<div id="pd-assets-list"><div style="font-size:12px;color:#888;padding:8px 0;">Loading assets...</div></div>'+
-    '</div>'+
+    // ─── 10. Product Assets (named slots) ───
+    (function(){
+      var assets=p._assets||[];
+      function slot(slotKey,label,sourceLabel,isAdmin,maxFiles){
+        var matching=assets.filter(function(a){return a.slot_type===slotKey;});
+        var statusColor=matching.length?'#1a7a1a':'#888';
+        var statusText=matching.length?'✓ '+matching.length+(maxFiles>1?' / '+maxFiles:'')+' uploaded':'Missing';
+        var fileLinks=matching.map(function(a){
+          var path=a.file_path||a.file_url||'';
+          var name=a.file_name||(path.split('/').pop());
+          return '<a href="javascript:void(0)" onclick="openPDAsset(\''+path.replace(/\\\\/g,"\\\\\\\\").replace(/\'/g,"\\\\\'")+'\')" style="font-size:11px;color:#2266cc;text-decoration:none;display:block;margin-top:2px;">📄 '+esc(name)+'</a>';
+        }).join('');
+        var canUpload=isAdmin||(!maxFiles||matching.length<maxFiles);
+        return '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;margin-bottom:6px;">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'+
+            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+label+(maxFiles>1?' <span style="font-size:10px;color:#888;font-weight:400;">(up to '+maxFiles+')</span>':'')+'</div>'+
+            '<div style="display:flex;gap:6px;align-items:center;">'+
+              '<span style="font-size:10px;color:'+statusColor+';">'+statusText+'</span>'+
+              (isAdmin&&canUpload?'<button class="btn-edit" style="font-size:10px;padding:4px 8px;" onclick="openPDSlotUpload(\''+slotKey+'\','+ (maxFiles||1) +')">Upload</button>':'')+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:10px;color:#888;">'+sourceLabel+'</div>'+
+          fileLinks+
+        '</div>';
+      }
+      return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📁 Product Assets</div>'+
+
+        '<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Factory uploads (via supplier portal)</div>'+
+        slot('step_file','3D STEP File','For tooling, mockups, packaging design',false,1)+
+        slot('hires_image','Hi-Resolution Product Images','For sell sheets, e-commerce, retailer setup',false,5)+
+        slot('user_manual_factory','User Manual','Where applicable',false,1)+
+        slot('die_lines','Packaging Die Lines','PDF or AI of unit/inner/master die lines',false,1)+
+
+        '<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px 0;">TBG / Graphics team uploads</div>'+
+        slot('final_packaging','Final Packaging Artwork','Approved final art for production',true,1)+
+        slot('final_user_manual','Final User Manual','Approved final manual for production',true,1)+
+
+        '<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px 0;">Auto-generated (at PO stage)</div>'+
+        '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;font-size:11px;color:#888;">📦 Inner + Master case pack markings — auto-generated at PO time. Format/content to be defined.</div>'+
+      '</div>';
+    })()+
 
     // ─── 11. Approval Gates ───
     '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
@@ -4939,7 +5017,6 @@ function renderPDDetail(){
 
     '</div>';
 
-  loadPDAssets(p.id);
   setTimeout(recalcPD,30);
 }
 
@@ -5032,169 +5109,180 @@ async function savePDUpload(){
 async function openItemNumberModal(){
   if(!pdCurrentDetail)return;
   var p=pdCurrentDetail;
-  // Need brand and category for the prefix — fetch from RFQ if not on PD
-  var rfqId=p.rfq_id;
-  var brandId=p.brand_id,categoryId=null;
-  if(rfqId){
-    try{
-      var rfqR=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId+'&select=brand_id,category_id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      var rfqData=await rfqR.json();
-      if(rfqData&&rfqData[0]){
-        brandId=brandId||rfqData[0].brand_id;
-        categoryId=rfqData[0].category_id;
-      }
-    }catch(e){}
-  }
-  if(!brandId||!categoryId){
-    alert('This PD record is missing brand or category info. Cannot generate item number.\n\nFix the source RFQ or quote first.');
-    return;
-  }
-  // Fetch brand, category, customers list, colors list
   try{
-    var [bR,cR,custR]=await Promise.all([
-      fetch(SB+'/rest/v1/brands?id=eq.'+brandId+'&select=brand_name,brand_prefix&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
-      fetch(SB+'/rest/v1/categories?id=eq.'+categoryId+'&select=category,sub_category,sub_sub_category,model_prefix&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+    // Fetch all brands, categories, customers
+    var [brandsR,catsR,custsR]=await Promise.all([
+      fetch(SB+'/rest/v1/brands?select=id,brand_name,brand_code&order=brand_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/categories?select=id,category,sub_category,sub_sub_category,model_prefix&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
       fetch(SB+'/rest/v1/customers?select=id,customer_name,customer_suffix&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
     ]);
-    var brand=(await bR.json())[0];
-    var cat=(await cR.json())[0];
-    var customers=await custR.json();
-    if(!brand||!brand.brand_prefix){alert('Brand "'+(brand?brand.brand_name:'?')+'" has no prefix set. Add one in Setup → Brands.');return;}
-    if(!cat||!cat.model_prefix){alert('Category has no prefix set. Add one in Setup → Categories.');return;}
+    var brands=await brandsR.json();
+    var cats=await catsR.json();
+    var customers=await custsR.json();
 
-    var bp=brand.brand_prefix,cp=cat.model_prefix;
-    // Count existing SKUs with this brand+category combo to determine next sequence
-    var seqR=await fetch(SB+'/rest/v1/skus?brand_id=eq.'+brandId+'&select=model_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var existingSkus=seqR.ok?await seqR.json():[];
-    // Also count PD records pending in this combo
-    var pdR=await fetch(SB+'/rest/v1/product_development?brand_id=eq.'+brandId+'&select=item_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var existingPds=pdR.ok?await pdR.json():[];
-    var prefix=bp+'-'+cp+'-';
-    var allNumbers=[].concat(existingSkus.map(function(s){return s.model_number||'';}),existingPds.map(function(x){return x.item_number||'';}));
-    var maxSeq=0;
-    allNumbers.forEach(function(m){
-      if(m&&m.indexOf(prefix)===0){
-        var rest=m.substring(prefix.length).split('-')[0];
-        var n=parseInt(rest);
-        if(!isNaN(n)&&n>maxSeq)maxSeq=n;
-      }
-    });
-    var nextSeq=maxSeq+1;
-    var baseItem=prefix+String(nextSeq).padStart(4,'0');
+    // Pre-fill from RFQ if available
+    var rfqBrandId=p.brand_id;
+    var rfqCategoryId=null;
+    var rfqColor=null;
+    var rfqCustomerId=p.customer_id;
+    if(p.rfq_id){
+      try{
+        var rfqR=await fetch(SB+'/rest/v1/rfqs?id=eq.'+p.rfq_id+'&select=brand_id,category_id,color_code,customer_id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var rfqRows=await rfqR.json();
+        if(rfqRows&&rfqRows[0]){
+          rfqBrandId=rfqBrandId||rfqRows[0].brand_id;
+          rfqCategoryId=rfqRows[0].category_id;
+          rfqColor=rfqRows[0].color_code;
+          rfqCustomerId=rfqCustomerId||rfqRows[0].customer_id;
+        }
+      }catch(e){}
+    }
 
-    // Build modal
-    var existing=document.getElementById('pd-itemnum-modal');if(existing)existing.remove();
-    var custOpts='<option value="">— No customer (speculative item) —</option>'+customers.map(function(c){
+    var brandOpts='<option value="">— Brand —</option>'+brands.map(function(b){
+      return '<option value="'+b.id+'" data-prefix="'+esc(b.brand_code||'')+'"'+(b.id===rfqBrandId?' selected':'')+'>'+esc(b.brand_name)+(b.brand_code?' ('+esc(b.brand_code)+')':'')+'</option>';
+    }).join('');
+    var catOpts='<option value="">— Category —</option>'+cats.map(function(c){
+      var label=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
+      return '<option value="'+c.id+'" data-prefix="'+esc(c.model_prefix||'')+'"'+(c.id===rfqCategoryId?' selected':'')+'>'+esc(label)+(c.model_prefix?' ('+esc(c.model_prefix)+')':'')+'</option>';
+    }).join('');
+    var custOpts='<option value="">— No customer (speculative) —</option>'+customers.map(function(c){
       var sfx=c.customer_suffix||c.customer_name.split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,3);
-      return '<option value="'+sfx+'" data-name="'+esc(c.customer_name)+'" data-id="'+c.id+'">'+esc(c.customer_name)+' ('+esc(sfx)+')</option>';
+      return '<option value="'+c.id+'" data-suffix="'+esc(sfx)+'" data-name="'+esc(c.customer_name)+'"'+(c.id===rfqCustomerId?' selected':'')+'>'+esc(c.customer_name)+' ('+esc(sfx)+')</option>';
     }).join('');
     var colorOpts='<option value="">— No color (base item) —</option>'+
       [['BK','Black'],['WH','White'],['GY','Gray'],['SL','Silver'],['GD','Gold'],['RD','Red'],['PK','Pink'],['OR','Orange'],['YL','Yellow'],['GN','Green'],['BL','Blue'],['NV','Navy'],['PL','Purple'],['BR','Brown'],['BG','Beige'],['CR','Cream'],['CL','Clear'],['MT','Multi'],['NA','Natural']]
-      .map(function(c){return '<option value="'+c[0]+'">'+c[1]+' ('+c[0]+')</option>';}).join('');
+      .map(function(c){return '<option value="'+c[0]+'"'+(c[0]===rfqColor?' selected':'')+'>'+c[1]+' ('+c[0]+')</option>';}).join('');
 
+    var existing=document.getElementById('pd-itemnum-modal');if(existing)existing.remove();
     var modal=document.createElement('div');
     modal.id='pd-itemnum-modal';
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;';
-    modal.innerHTML='<div style="background:#fff;border-radius:12px;max-width:540px;width:100%;padding:1.5rem;" onclick="event.stopPropagation()">'+
+    modal.innerHTML='<div style="background:#fff;border-radius:12px;max-width:580px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;" onclick="event.stopPropagation()">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'+
-        '<div><div style="font-size:16px;font-weight:600;color:#1a1a2e;">Generate Item Number</div><div style="font-size:11px;color:#888;">Brand: '+esc(brand.brand_name)+' · Category: '+esc(cat.category)+(cat.sub_category?' › '+esc(cat.sub_category):'')+'</div></div>'+
+        '<div style="font-size:16px;font-weight:600;color:#1a1a2e;">Generate Item Number</div>'+
         '<button onclick="document.getElementById(\'pd-itemnum-modal\').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;">×</button>'+
       '</div>'+
 
-      '<div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;padding:12px;margin-bottom:14px;">'+
-        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Base Item Number</div>'+
-        '<div style="font-family:monospace;font-size:18px;font-weight:600;color:#1a1a2e;">'+baseItem+'</div>'+
-        '<div style="font-size:11px;color:#888;margin-top:4px;">Brand-Category-Sequential (next available)</div>'+
+      '<div style="margin-bottom:12px;">'+
+        '<label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Brand *</label>'+
+        '<select id="im-brand" onchange="updateItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;font-size:13px;">'+brandOpts+'</select>'+
+      '</div>'+
+
+      '<div style="margin-bottom:12px;">'+
+        '<label style="font-size:11px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Category *</label>'+
+        '<select id="im-cat" onchange="updateItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;font-size:13px;">'+catOpts+'</select>'+
       '</div>'+
 
       '<div style="margin-bottom:12px;">'+
         '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#1a1a2e;cursor:pointer;margin-bottom:6px;">'+
-          '<input type="checkbox" id="pd-has-color" onchange="document.getElementById(\'pd-color-row\').style.display=this.checked?\'block\':\'none\';buildItemPreview();" />'+
-          '<span><strong>Is this item for a specific color?</strong></span>'+
+          '<input type="checkbox" id="im-has-color" '+(rfqColor?'checked':'')+' onchange="document.getElementById(\'im-color-row\').style.display=this.checked?\'block\':\'none\';updateItemPreview();" />'+
+          '<span><strong>Specific color?</strong></span>'+
         '</label>'+
-        '<div id="pd-color-row" style="display:none;margin-top:6px;padding-left:24px;">'+
-          '<select id="pd-color-select" onchange="buildItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;">'+colorOpts+'</select>'+
-          '<div style="font-size:10px;color:#888;margin-top:3px;">Note: each color is a separate SKU/item number, not a variation.</div>'+
+        '<div id="im-color-row" style="display:'+(rfqColor?'block':'none')+';margin-top:6px;padding-left:24px;">'+
+          '<select id="im-color" onchange="updateItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;font-size:13px;">'+colorOpts+'</select>'+
         '</div>'+
       '</div>'+
 
       '<div style="margin-bottom:14px;">'+
         '<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#1a1a2e;cursor:pointer;margin-bottom:6px;">'+
-          '<input type="checkbox" id="pd-has-customer" onchange="document.getElementById(\'pd-customer-row\').style.display=this.checked?\'block\':\'none\';buildItemPreview();" />'+
-          '<span><strong>Is this item for a specific customer?</strong></span>'+
+          '<input type="checkbox" id="im-has-cust" '+(rfqCustomerId?'checked':'')+' onchange="document.getElementById(\'im-cust-row\').style.display=this.checked?\'block\':\'none\';updateItemPreview();" />'+
+          '<span><strong>Specific customer?</strong></span>'+
         '</label>'+
-        '<div id="pd-customer-row" style="display:none;margin-top:6px;padding-left:24px;">'+
-          '<select id="pd-customer-select" onchange="buildItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;">'+custOpts+'</select>'+
-          '<div style="font-size:10px;color:#888;margin-top:3px;">Customer suffix is auto-suggested from customer name. Each customer gets a unique item number even for the same base product.</div>'+
+        '<div id="im-cust-row" style="display:'+(rfqCustomerId?'block':'none')+';margin-top:6px;padding-left:24px;">'+
+          '<select id="im-cust" onchange="updateItemPreview()" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;font-size:13px;">'+custOpts+'</select>'+
         '</div>'+
       '</div>'+
 
       '<div style="background:#1a1a2e;color:#fff;border-radius:8px;padding:14px;margin-bottom:14px;">'+
         '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;opacity:0.7;margin-bottom:4px;">Final Item Number</div>'+
-        '<div id="pd-item-preview" style="font-family:monospace;font-size:22px;font-weight:600;">'+baseItem+'</div>'+
+        '<div id="im-preview" style="font-family:monospace;font-size:22px;font-weight:600;">— select brand &amp; category —</div>'+
       '</div>'+
 
       '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
         '<button class="btn-edit" onclick="document.getElementById(\'pd-itemnum-modal\').remove()">Cancel</button>'+
         '<button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:10px 20px;" onclick="confirmItemNumber()">Confirm &amp; Save</button>'+
       '</div>'+
-      '<div id="pd-itemnum-err" style="font-size:12px;color:#b00;margin-top:8px;display:none;"></div>'+
+      '<div id="im-err" style="font-size:12px;color:#b00;margin-top:8px;display:none;"></div>'+
     '</div>';
     document.body.appendChild(modal);
-    // Stash for confirmItemNumber
-    modal._baseItem=baseItem;
-    modal._brandId=brandId;
-    modal._categoryId=categoryId;
-  }catch(e){alert('Error: '+e.message);}
+    updateItemPreview();
+  }catch(e){alert('Modal load failed: '+e.message);}
 }
 
-function buildItemPreview(){
-  var modal=document.getElementById('pd-itemnum-modal');
-  if(!modal)return;
-  var base=modal._baseItem;
-  var hasColor=document.getElementById('pd-has-color').checked;
-  var hasCust=document.getElementById('pd-has-customer').checked;
-  var color=hasColor?document.getElementById('pd-color-select').value:'';
-  var custSuffix=hasCust?document.getElementById('pd-customer-select').value:'';
-  var final=base+(color?'-'+color:'')+(custSuffix?'-'+custSuffix:'');
-  document.getElementById('pd-item-preview').textContent=final;
+async function updateItemPreview(){
+  var bSel=document.getElementById('im-brand');
+  var cSel=document.getElementById('im-cat');
+  if(!bSel||!cSel)return;
+  var bp=bSel.options[bSel.selectedIndex]&&bSel.options[bSel.selectedIndex].dataset.prefix;
+  var cp=cSel.options[cSel.selectedIndex]&&cSel.options[cSel.selectedIndex].dataset.prefix;
+  var preview=document.getElementById('im-preview');
+  if(!bp||!cp){preview.textContent='— select brand & category —';return;}
+  // Find next sequential for this brand+category
+  preview.textContent='calculating...';
+  try{
+    var brandId=bSel.value;
+    var [skuR,pdR]=await Promise.all([
+      fetch(SB+'/rest/v1/skus?brand_id=eq.'+brandId+'&select=model_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/product_development?brand_id=eq.'+brandId+'&select=item_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+    ]);
+    var skus=skuR.ok?await skuR.json():[];
+    var pds=pdR.ok?await pdR.json():[];
+    var prefix=bp+'-'+cp+'-';
+    var maxSeq=0;
+    [].concat(skus.map(function(s){return s.model_number||'';}),pds.map(function(x){return x.item_number||'';})).forEach(function(m){
+      if(m&&m.indexOf(prefix)===0){
+        var rest=m.substring(prefix.length).split('-')[0];
+        var n=parseInt(rest);
+        if(!isNaN(n)&&n>maxSeq)maxSeq=n;
+      }
+    });
+    var base=prefix+String(maxSeq+1).padStart(4,'0');
+    var hasColor=document.getElementById('im-has-color').checked;
+    var color=hasColor?document.getElementById('im-color').value:'';
+    var hasCust=document.getElementById('im-has-cust').checked;
+    var custSel=document.getElementById('im-cust');
+    var custSuffix=hasCust&&custSel.value?(custSel.options[custSel.selectedIndex].dataset.suffix||''):'';
+    var final=base+(color?'-'+color:'')+(custSuffix?'-'+custSuffix:'');
+    preview.textContent=final;
+    var modal=document.getElementById('pd-itemnum-modal');
+    if(modal)modal._final=final;
+  }catch(e){preview.textContent='error: '+e.message;}
 }
 
 async function confirmItemNumber(){
   var modal=document.getElementById('pd-itemnum-modal');
   if(!modal||!pdCurrentDetail)return;
-  var errEl=document.getElementById('pd-itemnum-err');
-  var final=document.getElementById('pd-item-preview').textContent;
-  // Validate uniqueness
+  var errEl=document.getElementById('im-err');errEl.style.display='none';
+  var bSel=document.getElementById('im-brand');
+  var cSel=document.getElementById('im-cat');
+  if(!bSel.value||!cSel.value){errEl.textContent='Brand and Category are required.';errEl.style.display='block';return;}
+  var final=document.getElementById('im-preview').textContent;
+  if(!final||/—|calculating|error/.test(final)){errEl.textContent='Item number not ready.';errEl.style.display='block';return;}
   try{
-    var [skuCheck,pdCheck]=await Promise.all([
+    var [skuChk,pdChk]=await Promise.all([
       fetch(SB+'/rest/v1/skus?model_number=eq.'+encodeURIComponent(final)+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
       fetch(SB+'/rest/v1/product_development?item_number=eq.'+encodeURIComponent(final)+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
     ]);
-    var skuRows=await skuCheck.json();
-    var pdRows=await pdCheck.json();
+    var skuRows=await skuChk.json();
+    var pdRows=await pdChk.json();
     if((skuRows&&skuRows.length)||(pdRows&&pdRows.length>0&&pdRows[0].id!==pdCurrentDetail.id)){
-      errEl.textContent='Item number "'+final+'" already exists. Try a different combination.';
-      errEl.style.display='block';
-      return;
+      errEl.textContent='Item number "'+final+'" already exists.';errEl.style.display='block';return;
     }
-    // Capture color details
-    var hasColor=document.getElementById('pd-has-color').checked;
-    var colorCode=hasColor?document.getElementById('pd-color-select').value:null;
-    var colorSel=document.getElementById('pd-color-select');
-    var colorName=colorCode?colorSel.options[colorSel.selectedIndex].textContent.split(' (')[0]:null;
-    var hasCust=document.getElementById('pd-has-customer').checked;
-    var custSel=hasCust?document.getElementById('pd-customer-select'):null;
-    var custId=null;
-    if(custSel&&custSel.value){
-      var optEl=custSel.options[custSel.selectedIndex];
-      custId=optEl.dataset.id||null;
+    var hasColor=document.getElementById('im-has-color').checked;
+    var colorCode=hasColor?document.getElementById('im-color').value:null;
+    var colorName=null;
+    if(colorCode){
+      var colorSel=document.getElementById('im-color');
+      colorName=colorSel.options[colorSel.selectedIndex].textContent.split(' (')[0];
     }
+    var hasCust=document.getElementById('im-has-cust').checked;
+    var custSel=document.getElementById('im-cust');
+    var custId=hasCust?(custSel.value||null):null;
     var payload={
       item_number:final,
-      color_code:colorCode||null,
-      color_name:colorName||null,
-      brand_id:modal._brandId,
+      brand_id:bSel.value,
+      color_code:colorCode,
+      color_name:colorName,
       updated_at:new Date().toISOString()
     };
     if(custId)payload.customer_id=custId;
@@ -5204,12 +5292,13 @@ async function confirmItemNumber(){
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify(payload)
     });
-    Object.assign(pdCurrentDetail,payload);
     modal.remove();
-    renderPDDetail();
+    openPDDetail(pdCurrentDetail.id);
     loadPDList();
-  }catch(e){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+  }catch(e){errEl.textContent='Save failed: '+e.message;errEl.style.display='block';}
 }
+
+function buildItemPreview(){updateItemPreview();}
 
 // ── UPC Generation ──
 function upcChecksum(eleven){
@@ -5382,12 +5471,30 @@ function calcCBM(L,W,H){var l=parseFloat(L)||0,w=parseFloat(W)||0,h=parseFloat(H
 
 function recalcPD(){
   if(!pdCurrentDetail)return;
+  // Unit CBM from unit dims
   var uCbm=calcCBM(g('pk-ul')&&g('pk-ul').value,g('pk-uw')&&g('pk-uw').value,g('pk-uh')&&g('pk-uh').value);
-  var iCbm=calcCBM(g('pk-il')&&g('pk-il').value,g('pk-iw')&&g('pk-iw').value,g('pk-ih')&&g('pk-ih').value);
-  var mCbm=calcCBM(g('pk-ml')&&g('pk-ml').value,g('pk-mw')&&g('pk-mw').value,g('pk-mh')&&g('pk-mh').value);
+  // Inner: if dims entered, use them. Else estimate as unit_cbm × inner_qty
+  var iqty=parseFloat(g('pk-iq')&&g('pk-iq').value)||0;
+  var iCbmFromDims=calcCBM(g('pk-il')&&g('pk-il').value,g('pk-iw')&&g('pk-iw').value,g('pk-ih')&&g('pk-ih').value);
+  var iCbm=iCbmFromDims||(uCbm&&iqty?parseFloat((uCbm*iqty).toFixed(6)):0);
+  // Master: if dims entered, use them. Else estimate as inner_cbm × (master_qty/inner_qty) ... or unit_cbm × master_qty if no inner
+  var mqty=parseFloat(g('pk-mq')&&g('pk-mq').value)||0;
+  var mCbmFromDims=calcCBM(g('pk-ml')&&g('pk-ml').value,g('pk-mw')&&g('pk-mw').value,g('pk-mh')&&g('pk-mh').value);
+  var mCbm=mCbmFromDims||(uCbm&&mqty?parseFloat((uCbm*mqty).toFixed(6)):0);
   if(g('cbm-unit'))g('cbm-unit').textContent=uCbm||'—';
   if(g('cbm-inner'))g('cbm-inner').textContent=iCbm||'—';
   if(g('cbm-master'))g('cbm-master').textContent=mCbm||'—';
+
+  // Container quantities — usable CBM × master_qty / master_cbm
+  var contUsable={'20gp':25*0.85,'40gp':54*0.85,'40hc':67*0.85};
+  ['20gp','40gp','40hc'].forEach(function(c){
+    var el=g('cont-'+c);if(!el)return;
+    if(mCbm>0&&mqty>0){
+      var mPerCont=Math.floor(contUsable[c]/mCbm);
+      var unitsPerCont=mPerCont*mqty;
+      el.textContent=unitsPerCont>0?unitsPerCont.toLocaleString():'—';
+    }else el.textContent='—';
+  });
 
   // Costs
   var fob=parseFloat(g('cs-fob')&&g('cs-fob').value)||0;
@@ -5487,7 +5594,6 @@ async function savePDAll(silent){
     fob_price:n('cs-fob'),packaging_price:n('cs-pkg'),
     duty_pct:n('cs-duty'),tariff_pct:n('cs-tariff'),
     freight_origin:v('cs-freight-origin'),freight_mode:v('cs-freight-mode'),freight_rate:n('cs-freight-rate'),freight_container:v('cs-freight-cont'),
-    freight_actual:n('cs-freight-actual'),
     // Customer costing
     target_retail_price:n('cs-retail'),
     returns_pct:n('cs-returns'),dilution_pct:n('cs-dilution'),advertising_pct:n('cs-ad'),commission_pct:n('cs-commission'),
@@ -5605,6 +5711,103 @@ async function removePDSrc(srcId){
 // ════════════════════════════════════════
 // PD DIMENSION CONFIRMATION REQUEST
 // ════════════════════════════════════════
+// Single email to factory covering all dimension levels
+async function reqPDDimConfAll(){
+  if(!pdCurrentDetail)return;
+  // Save current values first so factory sees the latest estimates
+  await savePDAll(true);
+  var p=pdCurrentDetail;var fac=p.factories||{};var rfq=p.rfqs||{};
+  if(!fac.sales_email){alert('No factory email on file.');return;}
+  if(!confirm('Send confirmation request to '+fac.factory_name_english+' ('+fac.sales_email+')?\n\nThe factory will receive a single email with a link to the supplier portal where they can confirm or update unit, inner, and master dimensions.'))return;
+  var subject=projectEmailSubject(rfq.project_number,p.item_description||rfq.item_description||'');
+  var firstName=(fac.sales_contact_name||'Team').split(' ')[0];
+  var item=p.item_number||p.pd_number;
+  var body='Dear '+firstName+',\n\n'+
+    'For our Product Development item '+item+' ('+(p.item_description||rfq.item_description)+'), we need your confirmation of the dimensions and case pack values we have estimated.\n\n'+
+    'Please log into the supplier portal, go to the "Product Development" tab, locate this item, and confirm or correct the following:\n\n'+
+    '  • Unit dimensions (L × W × H, weight)\n'+
+    '  • Inner carton dimensions, qty per inner, weight\n'+
+    '  • Master carton dimensions, qty per master, weight\n'+
+    '  • 3D STEP file (if applicable)\n'+
+    '  • Hi-resolution product images\n'+
+    '  • User manual (if applicable)\n'+
+    '  • Packaging die lines\n\n'+
+    'Once confirmed, please save. We will be unable to issue a Purchase Order until these values are confirmed by you.\n\n'+
+    'Portal: https://portal.tbgsourcing.net\n\n'+
+    'Best regards,\nAllan Amsel\nTBG Sourcing';
+  try{
+    await sendEmail(fac.sales_email,fac.sales_contact_name,subject,body,'sourcing@tbgsourcing.net');
+    alert('✓ Confirmation request sent to '+fac.sales_email+'\n\nThe email is now in your Sourcing → Sent folder.');
+  }catch(e){alert('Send failed: '+e.message);}
+}
+
+// Open a PD asset file via signed URL
+async function openPDAsset(filePath){
+  if(!filePath){alert('No file path.');return;}
+  if(/^https?:\/\//.test(filePath)){window.open(filePath,'_blank');return;}
+  try{
+    var r=await fetch(SB+'/storage/v1/object/sign/pd-assets/'+filePath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:300})
+    });
+    if(!r.ok){alert('Could not generate link.');return;}
+    var d=await r.json();
+    window.open(SB+'/storage/v1'+d.signedURL,'_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// Slot-tagged asset upload (admin side)
+function openPDSlotUpload(slotType,maxFiles){
+  if(!pdCurrentDetail)return;
+  var existing=document.getElementById('pd-slot-modal');if(existing)existing.remove();
+  var labels={
+    final_packaging:'Final Packaging Artwork',
+    final_user_manual:'Final User Manual',
+    step_file:'3D STEP File',
+    hires_image:'Hi-Resolution Product Image',
+    user_manual_factory:'User Manual',
+    die_lines:'Packaging Die Lines'
+  };
+  var label=labels[slotType]||slotType;
+  var modal=document.createElement('div');
+  modal.id='pd-slot-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML='<div style="background:#fff;border-radius:12px;max-width:460px;width:100%;padding:1.5rem;">'+
+    '<div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">Upload — '+esc(label)+'</div>'+
+    '<input type="file" id="pd-slot-file"'+(maxFiles>1?' multiple':'')+' style="width:100%;padding:8px;border:1px solid #d8d8d0;border-radius:6px;font-size:12px;margin-bottom:10px;" />'+
+    '<div id="pd-slot-msg" style="font-size:12px;margin-bottom:10px;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+      '<button class="btn-edit" onclick="document.getElementById(\'pd-slot-modal\').remove()">Cancel</button>'+
+      '<button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="confirmPDSlotUpload(\''+slotType+'\','+maxFiles+')">Upload</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(modal);
+}
+
+async function confirmPDSlotUpload(slotType,maxFiles){
+  var fileInput=document.getElementById('pd-slot-file');
+  var msg=document.getElementById('pd-slot-msg');
+  if(!fileInput.files||!fileInput.files.length){msg.textContent='Choose a file.';msg.style.color='#b00';return;}
+  msg.textContent='Uploading...';msg.style.color='#888';
+  try{
+    var pdId=pdCurrentDetail.id;
+    var files=Array.prototype.slice.call(fileInput.files,0,maxFiles||1);
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      var ts=Date.now()+'_'+i;
+      var safe=f.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+      var path=pdId+'/'+slotType+'_'+ts+'_'+safe;
+      var ur=await fetch(SB+'/storage/v1/object/pd-assets/'+path,{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream','x-upsert':'true'},body:f});
+      if(!ur.ok){msg.textContent='Upload failed for '+safe;msg.style.color='#b00';return;}
+      // Insert metadata row
+      await fetch(SB+'/rest/v1/product_development_assets',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_id:pdId,slot_type:slotType,file_path:path,file_name:safe,uploaded_at:new Date().toISOString()})});
+    }
+    document.getElementById('pd-slot-modal').remove();
+    openPDDetail(pdId);
+  }catch(e){msg.textContent='Error: '+e.message;msg.style.color='#b00';}
+}
+
 async function reqPDDimConf(level){
   if(!pdCurrentDetail)return;
   var p=pdCurrentDetail;var fac=p.factories||{};var rfq=p.rfqs||{};
