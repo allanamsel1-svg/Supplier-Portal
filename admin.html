@@ -389,6 +389,8 @@
       <div class="slabel">Operations</div>
       <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-accounting" onclick="showPanel('accounting');loadAccounting();"><span class="sicon">💰</span> Accounting <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
+      <button class="sitem" id="nav-credit" onclick="showPanel('credit');loadCreditWatch();"><span class="sicon">🔍</span> Credit Watch <span class="scount" id="cnt-credit" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
+      <button class="sitem" id="nav-forecasting" onclick="showPanel('forecasting');loadForecasting();"><span class="sicon">🔮</span> Forecasting <span style="font-size:9px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <div class="slabel">System</div>
       <button class="sitem" id="nav-upload" onclick="showPanel('upload')"><span class="sicon">📤</span> Upload Files</button>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
@@ -452,6 +454,38 @@
           </div>
         </div>
       </div>
+      <!-- Credit Watch widget -->
+      <div id="credit-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">🔍 Credit Watch <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;vertical-align:middle;">DAILY</span></div>
+          <a href="javascript:void(0)" onclick="showPanel('credit');loadCreditWatch();" style="font-size:11px;color:#2266cc;text-decoration:none;">View all →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div onclick="showPanel('credit');loadCreditWatch('due_today');" style="cursor:pointer;padding:10px 12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">
+            <div style="font-size:10px;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Due Today</div>
+            <div style="font-size:22px;font-weight:600;color:#664400;" id="cw-due-today">—</div>
+          </div>
+          <div onclick="showPanel('credit');loadCreditWatch('on_watch');" style="cursor:pointer;padding:10px 12px;background:#fff0f0;border:1px solid #f5b8b8;border-radius:8px;">
+            <div style="font-size:10px;color:#b00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">On Watch</div>
+            <div style="font-size:22px;font-weight:600;color:#900;" id="cw-on-watch">—</div>
+          </div>
+          <div onclick="showPanel('credit');loadCreditWatch('alerts');" style="cursor:pointer;padding:10px 12px;background:#f0f8ff;border:1px solid #c8e0f8;border-radius:8px;">
+            <div style="font-size:10px;color:#2244cc;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Recent Alerts (7d)</div>
+            <div style="font-size:22px;font-weight:600;color:#1a3399;" id="cw-recent-alerts">—</div>
+          </div>
+        </div>
+        <div id="cw-recent-list" style="font-size:11px;color:#888;"></div>
+      </div>
+
+      <!-- AI Forecasting widget -->
+      <div id="forecasting-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">🔮 AI Forecasting Alerts <span style="font-size:9px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;vertical-align:middle;">BETA</span></div>
+          <a href="javascript:void(0)" onclick="showPanel('forecasting');loadForecasting();" style="font-size:11px;color:#2266cc;text-decoration:none;">View all →</a>
+        </div>
+        <div id="fc-alerts-list" style="font-size:12px;"></div>
+      </div>
+
       <div style="padding:0 1.5rem;font-size:13px;color:#888;margin-bottom:12px;font-weight:500;">Recent Registrations</div>
       <div class="factory-list" id="recent-list"></div>
     </div>
@@ -1376,37 +1410,185 @@
     <div class="panel" id="panel-accounting">
       <div class="ph">
         <div class="ph-title">💰 Accounting <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">BETA</span></div>
-        <div class="ph-sub">Invoices, payments, vendor balances, P&amp;L by SKU</div>
+        <div class="ph-sub">Custom-built — vendor + customer balances, invoicing, AR/AP aging, P&amp;L by SKU. Daily-use system; QuickBooks sync for audit only.</div>
       </div>
       <div style="padding:1.25rem 1.5rem;">
         <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:10px;padding:14px 18px;margin-bottom:1.5rem;font-size:13px;color:#664400;">
-          <strong>⚠ Beta module:</strong> Accounting functionality is in development. Integration with QuickBooks / NetSuite is planned. Currently shows aggregate views from RFQ and production data.
+          <strong>⚠ Beta module:</strong> Custom accounting system in development. This will replace the need for QuickBooks/NetSuite as the daily-use platform. QB integration planned for audit-trail purposes only.
         </div>
+
+        <!-- KPIs row -->
         <div class="stats">
           <div class="stat"><div class="stat-label">Open Invoices</div><div class="stat-val" id="acct-open-inv">—</div></div>
-          <div class="stat"><div class="stat-label">Outstanding Balance</div><div class="stat-val" id="acct-balance">—</div></div>
-          <div class="stat"><div class="stat-label">YTD Spend</div><div class="stat-val" id="acct-ytd">—</div></div>
-          <div class="stat"><div class="stat-label">Active Vendors</div><div class="stat-val" id="acct-vendors">—</div></div>
+          <div class="stat"><div class="stat-label">AR Outstanding</div><div class="stat-val" id="acct-ar-balance">—</div></div>
+          <div class="stat"><div class="stat-label">AP Outstanding</div><div class="stat-val" id="acct-ap-balance">—</div></div>
+          <div class="stat"><div class="stat-label">YTD Revenue</div><div class="stat-val" id="acct-ytd-rev">—</div></div>
+          <div class="stat"><div class="stat-label">YTD Spend</div><div class="stat-val" id="acct-ytd-spend">—</div></div>
         </div>
+
+        <!-- Integration status -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-top:1rem;">
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-size:11px;font-weight:600;color:#1a1a2e;">QuickBooks Sync</div><span style="font-size:9px;background:#f5f5e8;color:#886600;border:1px solid #d8c860;padding:1px 5px;border-radius:8px;">DISCONNECTED</span></div>
+            <div style="font-size:11px;color:#888;margin-bottom:6px;">For audit/CPA access. Daily ops stay in this system.</div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:8px;">Last sync: <strong>—</strong> · Pending: <strong id="qb-pending-count">0</strong></div>
+            <button class="btn-edit" disabled style="opacity:0.6;cursor:not-allowed;width:100%;">Connect QuickBooks Online</button>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-size:11px;font-weight:600;color:#1a1a2e;">Customer Credit (D&amp;B)</div><span style="font-size:9px;background:#f5f5e8;color:#886600;border:1px solid #d8c860;padding:1px 5px;border-radius:8px;">MANUAL</span></div>
+            <div style="font-size:11px;color:#888;margin-bottom:6px;">D&amp;B Credit Monitor — manual daily check workflow active.</div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:8px;">Customers monitored: <strong id="cust-monitored">0</strong> · On watch: <strong id="cust-onwatch">0</strong></div>
+            <button class="btn-edit" disabled style="opacity:0.6;cursor:not-allowed;width:100%;">Connect D&amp;B Direct+ API</button>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><div style="font-size:11px;font-weight:600;color:#1a1a2e;">Factory Credit (Tianyancha)</div><span style="font-size:9px;background:#f5f5e8;color:#886600;border:1px solid #d8c860;padding:1px 5px;border-radius:8px;">MANUAL</span></div>
+            <div style="font-size:11px;color:#888;margin-bottom:6px;">Enterprise API tier ($4–14K/yr range) targeted post-demo.</div>
+            <div style="font-size:10px;color:#aaa;margin-bottom:8px;">Factories monitored: <strong id="fact-monitored">0</strong> · On watch: <strong id="fact-onwatch">0</strong></div>
+            <button class="btn-edit" disabled style="opacity:0.6;cursor:not-allowed;width:100%;">Connect Tianyancha Enterprise</button>
+          </div>
+        </div>
+
+        <!-- AR / AP aging row -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
           <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">Vendor Balances</div>
-            <div id="acct-vendor-list" style="font-size:12px;"></div>
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📈 AR Aging — Customer Receivables</div>
+            <div id="acct-ar-aging" style="display:flex;flex-direction:column;gap:6px;font-size:11px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">Current</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:65%;background:#1a7a1a;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">1–30 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:20%;background:#a0d8a0;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">31–60 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:10%;background:#f0d860;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">61–90 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:3%;background:#f5b8b8;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">90+ days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:2%;background:#b00;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+            </div>
           </div>
           <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
-            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">Recent Activity</div>
-            <div style="font-size:12px;color:#888;padding:1rem 0;text-align:center;">No transactions yet — invoicing module coming soon.</div>
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📉 AP Aging — Vendor Payables</div>
+            <div id="acct-ap-aging" style="display:flex;flex-direction:column;gap:6px;font-size:11px;">
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">Current</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:75%;background:#2244cc;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">1–30 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:15%;background:#6b8cdc;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">31–60 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:7%;background:#f0d860;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">61–90 days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:2%;background:#f5b8b8;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span style="width:80px;color:#888;">90+ days</span><div style="flex:1;height:18px;background:#f0f0e8;border-radius:4px;overflow:hidden;"><div style="height:100%;width:1%;background:#b00;"></div></div><span style="width:90px;text-align:right;color:#888;font-family:monospace;">$0</span></div>
+            </div>
           </div>
         </div>
+
+        <!-- Customer + Vendor balance lists -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;">🛒 Customer Balances (AR)</div><span style="font-size:10px;color:#888;">Off-price retail focus</span></div>
+            <div id="acct-customer-list" style="font-size:12px;"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🏭 Vendor Balances (AP)</div>
+            <div id="acct-vendor-list" style="font-size:12px;"></div>
+          </div>
+        </div>
+
+        <!-- Invoices + Bills row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;">📄 Outgoing Invoices</div><button class="btn-edit" disabled style="opacity:0.6;cursor:not-allowed;">+ New Invoice</button></div>
+            <div style="font-size:12px;color:#bbb;padding:1rem 0;text-align:center;">Invoicing module — coming with full custom build.</div>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;">📋 Vendor Bills</div><button class="btn-edit" disabled style="opacity:0.6;cursor:not-allowed;">+ Record Bill</button></div>
+            <div style="font-size:12px;color:#bbb;padding:1rem 0;text-align:center;">Bill capture module — coming with full custom build.</div>
+          </div>
+        </div>
+
         <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;margin-top:1rem;">
           <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">Planned Features</div>
           <ul style="font-size:12px;color:#666;line-height:1.7;margin:0;padding-left:20px;">
-            <li>Invoice generation tied to PO/quote lifecycle</li>
-            <li>Vendor payment terms tracking and aging reports</li>
-            <li>Per-SKU profitability analysis (landed cost vs revenue)</li>
-            <li>Multi-currency support (USD, CNY, EUR, etc.)</li>
-            <li>QuickBooks Online / NetSuite integration</li>
-            <li>Automated chargeback tracking from retailer portals</li>
+            <li>Custom-built invoicing tied to PO/order/PD lifecycle</li>
+            <li>Vendor payment terms with aging reports and chargeback tracking</li>
+            <li>Real-time QuickBooks Online sync (audit-only) — every transaction mirrored within seconds</li>
+            <li>Multi-currency (USD/CNY/EUR/CAD) with daily FX rate updates</li>
+            <li>D&amp;B Credit Monitor integration for live customer credit alerts</li>
+            <li>Tianyancha Enterprise API for live factory credit/financial monitoring</li>
+            <li>Per-SKU profitability — landed cost vs revenue with full attribution</li>
+            <li>Sales tax handling by state, withholding for international vendor payments</li>
+            <li>Auto-generated 1099-MISC / 1099-NEC for US vendors</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- CREDIT WATCH -->
+    <div class="panel" id="panel-credit">
+      <div class="ph">
+        <div class="ph-title">🔍 Credit Watch <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">DAILY WORKFLOW</span></div>
+        <div class="ph-sub">Daily credit checks for customers (D&amp;B Credit Monitor) and factories (Tianyancha). Manual workflow now — API automation post-demo.</div>
+      </div>
+      <div style="padding:1.25rem 1.5rem;">
+        <!-- KPIs -->
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Pending Today</div><div class="stat-val" id="cw-pending-today">—</div></div>
+          <div class="stat"><div class="stat-label">On Watch</div><div class="stat-val" id="cw-total-watch">—</div></div>
+          <div class="stat"><div class="stat-label">Critical Alerts (7d)</div><div class="stat-val" id="cw-critical-7d">—</div></div>
+          <div class="stat"><div class="stat-label">Avg. PAYDEX</div><div class="stat-val" id="cw-avg-paydex">—</div></div>
+        </div>
+
+        <!-- Filter chips -->
+        <div style="margin:1rem 0;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="cmp-chip on" data-cw-filter="due_today" onclick="filterCreditWatch('due_today')">Due Today</button>
+          <button class="cmp-chip" data-cw-filter="on_watch" onclick="filterCreditWatch('on_watch')">On Watch List</button>
+          <button class="cmp-chip" data-cw-filter="alerts" onclick="filterCreditWatch('alerts')">Recent Alerts</button>
+          <button class="cmp-chip" data-cw-filter="customers" onclick="filterCreditWatch('customers')">All Customers</button>
+          <button class="cmp-chip" data-cw-filter="factories" onclick="filterCreditWatch('factories')">All Factories</button>
+        </div>
+
+        <!-- Today's checklist -->
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+          <div id="cw-list" style="font-size:13px;"><div style="text-align:center;color:#bbb;padding:1rem;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- Credit check entry modal placeholder -->
+      <div id="cw-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;align-items:center;justify-content:center;padding:20px;"></div>
+    </div>
+
+    <!-- AI FORECASTING -->
+    <div class="panel" id="panel-forecasting">
+      <div class="ph">
+        <div class="ph-title">🔮 AI Forecasting <span style="font-size:11px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">BETA</span></div>
+        <div class="ph-sub">AI-powered demand forecasts, reorder triggers, and trend detection per SKU and customer</div>
+      </div>
+      <div style="padding:1.25rem 1.5rem;">
+        <div style="background:#e8f0ff;border:1px solid #c8d8f8;border-radius:10px;padding:14px 18px;margin-bottom:1.5rem;font-size:13px;color:#1a3399;">
+          <strong>🔮 Beta module:</strong> AI forecasting is in development. Once production data flows through the system (sales orders, inventory movements), the AI engine will generate per-SKU demand forecasts, reorder recommendations, and trend alerts. Showing sample projections below for illustration.
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">SKUs Monitored</div><div class="stat-val" id="fc-skus-count">—</div></div>
+          <div class="stat"><div class="stat-label">Active Alerts</div><div class="stat-val" id="fc-active-alerts">—</div></div>
+          <div class="stat"><div class="stat-label">Forecast Accuracy</div><div class="stat-val">—</div></div>
+          <div class="stat"><div class="stat-label">Last Run</div><div class="stat-val" style="font-size:14px;">Pending</div></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">⚡ Action Items</div>
+            <div id="fc-action-items"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📈 Trend Opportunities</div>
+            <div id="fc-trend-items"></div>
+          </div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;margin-top:1rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;">📊 Per-SKU Forecasts</div><span style="font-size:10px;color:#888;">Sample data shown</span></div>
+          <div id="fc-sku-forecasts"></div>
+        </div>
+
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;margin-top:1rem;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">Planned Features</div>
+          <ul style="font-size:12px;color:#666;line-height:1.7;margin:0;padding-left:20px;">
+            <li>Per-SKU demand forecasts using historical sales + seasonality + trend signals</li>
+            <li>Customer-specific reorder predictions (Burlington/Ross/TJX cycle detection)</li>
+            <li>Stock-out alerts factoring in production lead times</li>
+            <li>Trend detection from Google Trends, social signals, retail trade press</li>
+            <li>New product opportunity engine — surface adjacencies to your top SKUs</li>
+            <li>Anomaly alerts when SKU velocity drops or spikes unexpectedly</li>
           </ul>
         </div>
       </div>
@@ -1644,7 +1826,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
-  if(name==='dashboard'){loadPDList();}
+  if(name==='dashboard'){loadPDList();loadCreditWatchWidget();loadForecastingWidget();}
   if(name==='pending-cats'){loadPendingCats();loadPendingCerts();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
@@ -4626,18 +4808,328 @@ async function loadWarehouse(){
 
 async function loadAccounting(){
   try{
-    var fr=await fetch(SB+'/rest/v1/factories?select=id,factory_name_english&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var fr=await fetch(SB+'/rest/v1/factories?select=id,factory_name_english,credit_watch&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var factories=fr.ok?await fr.json():[];
+    var cr=await fetch(SB+'/rest/v1/customers?select=id,customer_name,paydex_score,credit_limit,credit_watch,customer_type,payment_terms&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var customers=cr.ok?await cr.json():[];
+
+    // KPIs
     if(g('acct-open-inv'))g('acct-open-inv').textContent='0';
-    if(g('acct-balance'))g('acct-balance').textContent='$0';
-    if(g('acct-ytd'))g('acct-ytd').textContent='$0';
-    if(g('acct-vendors'))g('acct-vendors').textContent=factories.length;
-    var vlist=g('acct-vendor-list');if(!vlist)return;
-    if(!factories.length){vlist.innerHTML='<div style="color:#bbb;padding:0.5rem 0;">No vendors yet.</div>';return;}
-    vlist.innerHTML=factories.slice(0,8).map(function(f){
-      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0e8;"><span>'+esc(f.factory_name_english)+'</span><span style="color:#bbb;font-family:monospace;">$0.00</span></div>';
-    }).join('');
+    if(g('acct-ar-balance'))g('acct-ar-balance').textContent='$0';
+    if(g('acct-ap-balance'))g('acct-ap-balance').textContent='$0';
+    if(g('acct-ytd-rev'))g('acct-ytd-rev').textContent='$0';
+    if(g('acct-ytd-spend'))g('acct-ytd-spend').textContent='$0';
+    if(g('cust-monitored'))g('cust-monitored').textContent=customers.length;
+    if(g('cust-onwatch'))g('cust-onwatch').textContent=customers.filter(function(c){return c.credit_watch;}).length;
+    if(g('fact-monitored'))g('fact-monitored').textContent=factories.length;
+    if(g('fact-onwatch'))g('fact-onwatch').textContent=factories.filter(function(f){return f.credit_watch;}).length;
+
+    // Customer balance list with credit indicators
+    var clist=g('acct-customer-list');
+    if(clist){
+      if(!customers.length){clist.innerHTML='<div style="color:#bbb;padding:0.5rem 0;">No customers yet — add via Setup.</div>';}
+      else{
+        clist.innerHTML=customers.slice(0,10).map(function(c){
+          var watchBadge=c.credit_watch?'<span style="font-size:9px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 5px;border-radius:8px;margin-left:6px;">⚠ WATCH</span>':'';
+          var paydexBadge=c.paydex_score?'<span style="font-size:9px;background:'+(c.paydex_score>=80?'#e8f8e8':c.paydex_score>=60?'#fff8e0':'#fff0f0')+';color:'+(c.paydex_score>=80?'#1a7a1a':c.paydex_score>=60?'#886600':'#b00')+';border:1px solid currentColor;padding:1px 5px;border-radius:8px;margin-left:6px;">PAYDEX '+c.paydex_score+'</span>':'';
+          var typeBadge=c.customer_type?'<span style="font-size:9px;color:#888;margin-left:6px;">'+esc(c.customer_type.replace(/_/g,' '))+'</span>':'';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0e8;"><div style="flex:1;min-width:0;"><div style="font-weight:500;color:#1a1a2e;">'+esc(c.customer_name)+watchBadge+paydexBadge+'</div><div style="font-size:10px;color:#888;margin-top:2px;">Limit: '+(c.credit_limit?'$'+parseFloat(c.credit_limit).toLocaleString():'—')+' · Terms: '+(c.payment_terms||'—')+typeBadge+'</div></div><span style="color:#bbb;font-family:monospace;">$0.00</span></div>';
+        }).join('');
+      }
+    }
+
+    // Vendor balance list with credit indicators
+    var vlist=g('acct-vendor-list');
+    if(vlist){
+      if(!factories.length){vlist.innerHTML='<div style="color:#bbb;padding:0.5rem 0;">No vendors yet.</div>';}
+      else{
+        vlist.innerHTML=factories.slice(0,10).map(function(f){
+          var watchBadge=f.credit_watch?'<span style="font-size:9px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 5px;border-radius:8px;margin-left:6px;">⚠ WATCH</span>':'';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #f0f0e8;"><div><span style="font-weight:500;color:#1a1a2e;">'+esc(f.factory_name_english)+'</span>'+watchBadge+'</div><span style="color:#bbb;font-family:monospace;">$0.00</span></div>';
+        }).join('');
+      }
+    }
   }catch(e){console.log('loadAccounting:',e);}
+}
+
+// ════════════════════════════════════════
+// CREDIT WATCH (Daily manual workflow)
+// ════════════════════════════════════════
+var CW_DATA={customers:[],factories:[],recentChecks:[]};
+var cwCurrentFilter='due_today';
+
+async function loadCreditWatch(filter){
+  if(filter)cwCurrentFilter=filter;
+  var listEl=g('cw-list');
+  if(!listEl)return;
+  listEl.innerHTML='<div style="text-align:center;color:#bbb;padding:1rem;">Loading...</div>';
+  try{
+    var [crCust,crFact,crChk]=await Promise.all([
+      fetch(SB+'/rest/v1/customers?select=*&order=customer_name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/factories?select=*&order=factory_name_english',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/credit_checks?order=created_at.desc&limit=50',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+    ]);
+    CW_DATA.customers=crCust.ok?await crCust.json():[];
+    CW_DATA.factories=crFact.ok?await crFact.json():[];
+    CW_DATA.recentChecks=crChk.ok?await crChk.json():[];
+    renderCreditWatchKpis();
+    renderCreditWatchList();
+  }catch(e){listEl.innerHTML='<div style="color:#b00;padding:1rem;">Error: '+e.message+'</div>';}
+}
+
+function renderCreditWatchKpis(){
+  var dueToday=getDueToday();
+  var onWatch=[].concat(CW_DATA.customers,CW_DATA.factories).filter(function(e){return e.credit_watch;});
+  var sevenDaysAgo=new Date();sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
+  var critical7d=CW_DATA.recentChecks.filter(function(c){return c.alert_severity==='critical'&&new Date(c.created_at)>=sevenDaysAgo;});
+  var paydexScores=CW_DATA.customers.filter(function(c){return c.paydex_score;}).map(function(c){return c.paydex_score;});
+  var avgPaydex=paydexScores.length?Math.round(paydexScores.reduce(function(a,b){return a+b;},0)/paydexScores.length):'—';
+  if(g('cw-pending-today'))g('cw-pending-today').textContent=dueToday.length;
+  if(g('cw-total-watch'))g('cw-total-watch').textContent=onWatch.length;
+  if(g('cw-critical-7d'))g('cw-critical-7d').textContent=critical7d.length;
+  if(g('cw-avg-paydex'))g('cw-avg-paydex').textContent=avgPaydex;
+  // Sidebar count
+  var cnt=g('cnt-credit');if(cnt)cnt.textContent=dueToday.length;
+}
+
+function getDueToday(){
+  // Customers and factories that need a check today based on check_frequency + credit_last_updated
+  var today=new Date();today.setHours(0,0,0,0);
+  function due(entity,defaultFreq){
+    var freq=entity.check_frequency||defaultFreq;
+    if(entity.credit_watch)return true; // always due if on watch
+    if(!entity.credit_last_updated)return true;
+    var last=new Date(entity.credit_last_updated+'T00:00:00');
+    var daysSince=(today-last)/(1000*60*60*24);
+    if(freq==='daily')return daysSince>=1;
+    if(freq==='weekly')return daysSince>=7;
+    if(freq==='monthly')return daysSince>=30;
+    if(freq==='quarterly')return daysSince>=90;
+    return daysSince>=30;
+  }
+  var due_customers=CW_DATA.customers.filter(function(c){return due(c,'monthly');}).map(function(c){return Object.assign({},c,{_type:'customer'});});
+  var due_factories=CW_DATA.factories.filter(function(f){return due(f,'quarterly');}).map(function(f){return Object.assign({},f,{_type:'factory'});});
+  return [].concat(due_customers,due_factories);
+}
+
+function filterCreditWatch(filter){cwCurrentFilter=filter;renderCreditWatchList();}
+
+function renderCreditWatchList(){
+  document.querySelectorAll('.cmp-chip[data-cw-filter]').forEach(function(c){
+    c.classList.toggle('on',c.getAttribute('data-cw-filter')===cwCurrentFilter);
+  });
+  var listEl=g('cw-list');
+  var entities=[];
+  if(cwCurrentFilter==='due_today'){entities=getDueToday();}
+  else if(cwCurrentFilter==='on_watch'){
+    entities=[].concat(
+      CW_DATA.customers.filter(function(c){return c.credit_watch;}).map(function(c){return Object.assign({},c,{_type:'customer'});}),
+      CW_DATA.factories.filter(function(f){return f.credit_watch;}).map(function(f){return Object.assign({},f,{_type:'factory'});})
+    );
+  }else if(cwCurrentFilter==='alerts'){
+    listEl.innerHTML=CW_DATA.recentChecks.length?
+      CW_DATA.recentChecks.slice(0,30).map(function(c){
+        var sev=c.alert_severity||'info';
+        var sevColor=sev==='critical'?'#b00':sev==='warning'?'#886600':'#2244cc';
+        return '<div style="padding:10px;border-bottom:1px solid #f0f0e8;"><div style="display:flex;justify-content:space-between;"><div><strong style="color:'+sevColor+';">'+sev.toUpperCase()+'</strong> · '+esc(c.entity_type)+' · '+(c.source||'manual')+'</div><div style="font-size:11px;color:#888;">'+new Date(c.created_at).toLocaleDateString()+'</div></div><div style="font-size:12px;color:#666;margin-top:4px;">'+esc(c.notes||'(no notes)')+'</div></div>';
+      }).join('')
+      :'<div style="text-align:center;color:#bbb;padding:1rem;">No recent alerts.</div>';
+    return;
+  }else if(cwCurrentFilter==='customers'){
+    entities=CW_DATA.customers.map(function(c){return Object.assign({},c,{_type:'customer'});});
+  }else if(cwCurrentFilter==='factories'){
+    entities=CW_DATA.factories.map(function(f){return Object.assign({},f,{_type:'factory'});});
+  }
+
+  if(!entities.length){listEl.innerHTML='<div style="text-align:center;color:#bbb;padding:1rem;">Nothing here.</div>';return;}
+
+  listEl.innerHTML=entities.map(function(e){
+    var name=e._type==='customer'?e.customer_name:e.factory_name_english;
+    var score=e.paydex_score||e.credit_score;
+    var scoreLabel=e._type==='customer'?'PAYDEX':'Score';
+    var watchBadge=e.credit_watch?'<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 7px;border-radius:9px;margin-left:6px;font-weight:600;">⚠ ON WATCH</span>':'';
+    var typeBadge='<span style="font-size:9px;background:'+(e._type==='customer'?'#e8f0ff':'#fff5f0')+';color:'+(e._type==='customer'?'#2244cc':'#883300')+';border:1px solid '+(e._type==='customer'?'#b8ccf0':'#f5d0b8')+';padding:1px 6px;border-radius:8px;margin-left:6px;">'+e._type.toUpperCase()+'</span>';
+    var lastChecked=e.credit_last_updated?'Last checked: '+new Date(e.credit_last_updated+'T00:00:00').toLocaleDateString():'<strong style="color:#b00;">Never checked</strong>';
+    var sourceUrl=e._type==='customer'?'https://www.dnb.com/business-directory.html':'https://www.tianyancha.com';
+    var sourceName=e._type==='customer'?'D&B':'Tianyancha';
+    return '<div style="padding:12px;border-bottom:1px solid #f0f0e8;"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;"><div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#1a1a2e;">'+esc(name)+typeBadge+watchBadge+'</div><div style="font-size:11px;color:#888;margin-top:3px;">'+lastChecked+(score?' · '+scoreLabel+': <strong>'+score+'</strong>':'')+(e.payment_terms?' · Terms: '+esc(e.payment_terms):'')+'</div></div><div style="display:flex;gap:6px;"><a href="'+sourceUrl+'" target="_blank" class="btn-edit" style="text-decoration:none;">Open '+sourceName+' →</a><button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openCreditCheckModal(\''+e._type+'\',\''+e.id+'\')">Record Check</button></div></div></div>';
+  }).join('');
+}
+
+function openCreditCheckModal(entityType,entityId){
+  var entity=entityType==='customer'?CW_DATA.customers.find(function(c){return c.id===entityId;}):CW_DATA.factories.find(function(f){return f.id===entityId;});
+  if(!entity)return;
+  var name=entityType==='customer'?entity.customer_name:entity.factory_name_english;
+  var sourceName=entityType==='customer'?'D&B':'Tianyancha';
+  var overlay=g('cw-modal-overlay');
+  overlay.style.display='flex';
+  overlay.innerHTML='<div style="background:#fff;border-radius:12px;max-width:540px;width:100%;padding:1.5rem;" onclick="event.stopPropagation()">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div><div style="font-size:16px;font-weight:600;color:#1a1a2e;">Record Credit Check</div><div style="font-size:12px;color:#888;">'+esc(name)+' · Source: '+sourceName+'</div></div><button onclick="closeCreditCheckModal()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;">×</button></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+      '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Score / PAYDEX</label><input type="number" id="cc-score" placeholder="e.g. 75" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;" value="'+(entity.paydex_score||entity.credit_score||'')+'"/></div>'+
+      '<div><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Severity</label><select id="cc-severity" style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;"><option value="info">Info — Routine</option><option value="warning">Warning — Watch closely</option><option value="critical">Critical — Action needed</option></select></div>'+
+      '<div style="grid-column:1/-1;"><label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#1a1a2e;"><input type="checkbox" id="cc-watch" '+(entity.credit_watch?'checked':'')+' /> Add to / keep on watch list</label></div>'+
+      '<div style="grid-column:1/-1;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Notes / observations *</label><textarea id="cc-notes" rows="4" placeholder="What did you find? Key changes, payment behavior, court records, ownership changes, etc." style="width:100%;padding:8px 10px;border:1px solid #d8d8d0;border-radius:6px;font-family:inherit;"></textarea></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;"><button class="btn-edit" onclick="closeCreditCheckModal()">Cancel</button><button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="saveCreditCheck(\''+entityType+'\',\''+entityId+'\')">Save Check</button></div>'+
+    '<div id="cc-err" style="font-size:12px;color:#b00;margin-top:8px;display:none;"></div>'+
+  '</div>';
+}
+function closeCreditCheckModal(){g('cw-modal-overlay').style.display='none';g('cw-modal-overlay').innerHTML='';}
+
+async function saveCreditCheck(entityType,entityId){
+  var notes=g('cc-notes').value.trim();
+  if(!notes){g('cc-err').textContent='Notes required.';g('cc-err').style.display='block';return;}
+  var score=parseInt(g('cc-score').value)||null;
+  var severity=g('cc-severity').value;
+  var watch=g('cc-watch').checked;
+  var entityTable=entityType==='customer'?'customers':'factories';
+  var scoreField=entityType==='customer'?'paydex_score':'credit_score';
+  try{
+    // Pull current to compute change
+    var pr=await fetch(SB+'/rest/v1/'+entityTable+'?id=eq.'+entityId+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var rows=await pr.json();
+    var prev=(rows&&rows[0])||{};
+    var prevScore=prev[scoreField]||null;
+    var scoreChange=(score&&prevScore)?(score-prevScore):null;
+    var watchChange=(watch!==!!prev.credit_watch);
+    var significant=severity!=='info'||watchChange||(scoreChange!==null&&Math.abs(scoreChange)>=10);
+
+    // Insert credit_checks history row
+    await fetch(SB+'/rest/v1/credit_checks',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        entity_type:entityType,
+        entity_id:entityId,
+        check_date:new Date().toISOString().slice(0,10),
+        source:entityType==='customer'?'D&B':'Tianyancha',
+        score_value:score,
+        score_change:scoreChange,
+        watch_status_change:watchChange,
+        significant_change:significant,
+        alert_severity:severity,
+        notes:notes,
+        performed_by:'admin'
+      })
+    });
+    // Update entity record
+    var update={credit_watch:watch,credit_last_updated:new Date().toISOString().slice(0,10),credit_notes:notes};
+    update[scoreField]=score;
+    await fetch(SB+'/rest/v1/'+entityTable+'?id=eq.'+entityId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(update)
+    });
+    closeCreditCheckModal();
+    loadCreditWatch();
+    loadCreditWatchWidget();
+  }catch(e){g('cc-err').textContent='Error: '+e.message;g('cc-err').style.display='block';}
+}
+
+async function loadCreditWatchWidget(){
+  // Dashboard widget for Credit Watch
+  try{
+    var [crCust,crFact,crChk]=await Promise.all([
+      fetch(SB+'/rest/v1/customers?select=id,customer_name,credit_watch,paydex_score,credit_last_updated,check_frequency&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/factories?select=id,factory_name_english,credit_watch,credit_score,credit_last_updated,check_frequency&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}),
+      fetch(SB+'/rest/v1/credit_checks?order=created_at.desc&limit=10',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+    ]);
+    CW_DATA.customers=crCust.ok?await crCust.json():[];
+    CW_DATA.factories=crFact.ok?await crFact.json():[];
+    CW_DATA.recentChecks=crChk.ok?await crChk.json():[];
+
+    var dueToday=getDueToday();
+    var onWatch=[].concat(CW_DATA.customers,CW_DATA.factories).filter(function(e){return e.credit_watch;});
+    var sevenDaysAgo=new Date();sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
+    var alerts7d=CW_DATA.recentChecks.filter(function(c){return c.alert_severity!=='info'&&new Date(c.created_at)>=sevenDaysAgo;});
+
+    if(g('cw-due-today'))g('cw-due-today').textContent=dueToday.length;
+    if(g('cw-on-watch'))g('cw-on-watch').textContent=onWatch.length;
+    if(g('cw-recent-alerts'))g('cw-recent-alerts').textContent=alerts7d.length;
+    if(g('cnt-credit'))g('cnt-credit').textContent=dueToday.length;
+
+    // Recent alerts list
+    var listEl=g('cw-recent-list');
+    if(listEl){
+      if(!alerts7d.length){listEl.innerHTML='<div style="color:#bbb;padding:6px 0;">No alerts in the past 7 days.</div>';}
+      else{
+        listEl.innerHTML=alerts7d.slice(0,3).map(function(c){
+          var sevColor=c.alert_severity==='critical'?'#b00':'#886600';
+          return '<div style="padding:5px 0;border-top:1px solid #f0f0e8;"><strong style="color:'+sevColor+';">'+(c.alert_severity||'info').toUpperCase()+'</strong> · '+esc(c.notes||'').slice(0,80)+'</div>';
+        }).join('');
+      }
+    }
+  }catch(e){console.log('loadCreditWatchWidget:',e);}
+}
+
+// ════════════════════════════════════════
+// AI FORECASTING (scaffold with sample data)
+// ════════════════════════════════════════
+async function loadForecasting(){
+  // Sample data — real engine post-demo
+  if(g('fc-skus-count'))g('fc-skus-count').textContent='—';
+  if(g('fc-active-alerts'))g('fc-active-alerts').textContent='3';
+
+  var actionItems=g('fc-action-items');
+  if(actionItems){
+    actionItems.innerHTML=[
+      {sev:'critical',title:'Reorder SKU-2401 within 14 days',desc:'Current stock + in-transit will deplete by Jun 18. Lead time 70 days. PO action required NOW.',color:'#b00',bg:'#fff0f0'},
+      {sev:'warning',title:'Burlington reorder window opening',desc:'Burlington has reordered Vitamin C Serum on a 90-day cycle for past 4 quarters. Next window: ~28 days.',color:'#886600',bg:'#fff8e0'},
+      {sev:'info',title:'Velocity drop: SKU-1108 (Lip Balm)',desc:'Sell-through dropped 32% MoM. Investigate seasonality or consider promotional pricing.',color:'#2244cc',bg:'#f0f8ff'}
+    ].map(function(a){
+      return '<div style="padding:10px 12px;background:'+a.bg+';border-radius:7px;margin-bottom:6px;"><div style="font-size:12px;font-weight:600;color:'+a.color+';">'+a.title+'</div><div style="font-size:11px;color:#666;margin-top:3px;">'+a.desc+'</div></div>';
+    }).join('');
+  }
+
+  var trendItems=g('fc-trend-items');
+  if(trendItems){
+    trendItems.innerHTML=[
+      {title:'📈 Hyaluronic Acid Serum',signal:'Search volume +240% YoY · TikTok mentions +180%',action:'You have 3 quoted RFQs in this category. Fast-track approvals.'},
+      {title:'📈 Niacinamide',signal:'Sustained 90-day uptrend · all major retailers expanding shelf space',action:'Consider expanding existing niacinamide SKUs into more pack sizes.'},
+      {title:'📉 Single-use Sheet Masks',signal:'Search volume −18% YoY · sustainability backlash',action:'Review production volumes. Reduce 2026 forecasts by 15-20%.'}
+    ].map(function(t){
+      return '<div style="padding:10px 12px;background:#fafaf6;border-radius:7px;margin-bottom:6px;border-left:3px solid #2244cc;"><div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+t.title+'</div><div style="font-size:10px;color:#888;margin:2px 0;">'+t.signal+'</div><div style="font-size:11px;color:#1a3399;font-style:italic;">→ '+t.action+'</div></div>';
+    }).join('');
+  }
+
+  var skuFc=g('fc-sku-forecasts');
+  if(skuFc){
+    var sampleSkus=[
+      {item:'ITM-2401',name:'Hyaluronic Acid Serum 30ml',current:8400,projected:18200,confidence:'High',trend:'rising'},
+      {item:'ITM-1108',name:'Lip Balm 10ct',current:24000,projected:16300,confidence:'Medium',trend:'falling'},
+      {item:'ITM-0902',name:'Sheet Mask Set 5pk',current:12500,projected:10100,confidence:'Medium',trend:'falling'},
+      {item:'ITM-3301',name:'Vitamin C Serum 50ml',current:6800,projected:9400,confidence:'High',trend:'rising'}
+    ];
+    skuFc.innerHTML=sampleSkus.map(function(s){
+      var trendIcon=s.trend==='rising'?'↗':'↘';
+      var trendColor=s.trend==='rising'?'#1a7a1a':'#b00';
+      // Sparkline-style mini-bars
+      var bars=[];
+      var seed=s.item.charCodeAt(s.item.length-1);
+      for(var i=0;i<12;i++){
+        var h=20+((seed*7+i*13)%50);
+        if(s.trend==='rising')h=h*(0.5+i/12);
+        else h=h*(1.2-i/16);
+        bars.push('<div style="flex:1;background:'+trendColor+';opacity:0.6;border-radius:1px;height:'+h+'%;"></div>');
+      }
+      return '<div style="display:grid;grid-template-columns:1fr 200px 100px 80px 80px;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #f0f0e8;font-size:12px;"><div><div style="font-family:monospace;font-size:11px;color:#888;">'+s.item+'</div><div style="font-weight:500;color:#1a1a2e;">'+s.name+'</div></div><div style="display:flex;align-items:flex-end;gap:1px;height:30px;">'+bars.join('')+'</div><div style="text-align:right;color:#666;">'+s.current.toLocaleString()+' units</div><div style="text-align:right;font-weight:600;color:'+trendColor+';">'+trendIcon+' '+s.projected.toLocaleString()+'</div><div style="text-align:right;font-size:11px;color:#888;">'+s.confidence+'</div></div>';
+    }).join('');
+  }
+}
+
+async function loadForecastingWidget(){
+  // Dashboard widget — same sample alerts
+  var listEl=g('fc-alerts-list');
+  if(!listEl)return;
+  listEl.innerHTML=[
+    {sev:'CRITICAL',title:'Reorder SKU-2401 within 14 days',color:'#b00'},
+    {sev:'OPPORTUNITY',title:'Hyaluronic Acid trending +240% YoY · 3 RFQs to fast-track',color:'#1a7a1a'},
+    {sev:'WATCH',title:'Burlington reorder cycle: ~28 days out',color:'#886600'}
+  ].map(function(a){
+    return '<div style="padding:7px 0;border-top:1px solid #f0f0e8;"><strong style="color:'+a.color+';font-size:10px;">'+a.sev+'</strong> · <span style="color:#1a1a2e;">'+a.title+'</span></div>';
+  }).join('');
+  if(g('fc-active-alerts'))g('fc-active-alerts').textContent='3';
 }
 
 

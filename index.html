@@ -1851,10 +1851,23 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
     '<div class="quote-grid" style="margin-top:8px;">' +
       '<div class="qf"><label>Unit Weight (kg)</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="kg" value="'+wgt+'" /></div>' +
     '</div>' +
-    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">'+
-      '<label style="display:block;font-weight:600;color:#664400;margin-bottom:6px;">INCI Ingredient List PDF (required for cosmetics)</label>'+
-      '<div style="font-size:11px;color:#886600;margin-bottom:8px;">Upload a PDF of your full INCI list — this is required for compliance review. Existing file: '+(existing&&existing.inci_document_url?'<strong>'+esc(existing.inci_document_url.split("/").pop())+'</strong> (uploading a new one will replace it)':'<em>None uploaded</em>')+'</div>'+
-      '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:12px;" />'+
+    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents (required for cosmetics)</div>'+
+      '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">Both INCI list AND full formulation breakdown are required. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially.</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
+          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">INCI List PDF *</label>'+
+          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Standardized ingredient list (regulatory order, no percentages)</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;">Current: '+(existing&&existing.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;" />'+
+        '</div>'+
+        '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
+          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">Formulation PDF * <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">CONFIDENTIAL</span></label>'+
+          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Quantitative breakdown — ingredient %, role, active concentrations</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;">Current: '+(existing&&existing.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<input type="file" id="qformula-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;" />'+
+        '</div>'+
+      '</div>'+
     '</div>':'')+
     '<input type="hidden" id="qquoteid-'+rfq.id+'" value="'+quoteId+'" />' +
     '<input type="hidden" id="qassignid-'+rfq.id+'" value="'+assignment.id+'" />' +
@@ -1919,6 +1932,34 @@ async function submitQuote(rfqId){
     }
   }
 
+  // Upload Formulation PDF if provided
+  var formulaUrl=null;
+  var formulaInput=g('qformula-'+rfqId);
+  var formulaFile=formulaInput&&formulaInput.files&&formulaInput.files[0];
+  if(formulaFile){
+    var ts2=Date.now();
+    var safeName2=formulaFile.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var formulaPath=FACTORY_ID+'/formulation/'+ts2+'_'+safeName2;
+    try{
+      var ur2=await fetch(SB+'/storage/v1/object/factory-files/'+formulaPath,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+TOKEN,'apikey':KEY,'Content-Type':'application/pdf','x-upsert':'true'},
+        body:formulaFile
+      });
+      if(!ur2.ok){
+        var uerr2=await ur2.json().catch(function(){return{};});
+        btn.disabled=false;btn.textContent='Submit Quote';
+        showQuoteErr(rfqId,'Formulation upload failed: '+(uerr2.message||uerr2.error||ur2.status));
+        return;
+      }
+      formulaUrl=formulaPath;
+    }catch(e){
+      btn.disabled=false;btn.textContent='Submit Quote';
+      showQuoteErr(rfqId,'Formulation upload error: '+e.message);
+      return;
+    }
+  }
+
   var payload={
     rfq_id:rfqId,
     factory_id:FACTORY_ID,
@@ -1936,8 +1977,9 @@ async function submitQuote(rfqId){
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
     status:'submitted'
   };
-  // Only include inci_document_url if we just uploaded one (otherwise preserve existing)
+  // Only include URLs if just uploaded (otherwise preserve existing)
   if(inciUrl)payload.inci_document_url=inciUrl;
+  if(formulaUrl)payload.formulation_document_url=formulaUrl;
   try{
     var method=existingId?'PATCH':'POST';
     var url=existingId?SB+'/rest/v1/rfq_quotes?id=eq.'+existingId:SB+'/rest/v1/rfq_quotes';
