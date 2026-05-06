@@ -382,9 +382,13 @@
       <button class="sitem" id="nav-scanner" onclick="window.open('scanner.html','_blank')"><span class="sicon">📇</span> Card Scanner</button>
       <div class="slabel">RFQ & Products</div>
       <button class="sitem" id="nav-rfq" onclick="showPanel('rfq')"><span class="sicon">📋</span> RFQs <span class="scount" id="cnt-rfq">0</span></button>
+      <button class="sitem" id="nav-pd" onclick="showPanel('pd');loadPDList();"><span class="sicon">🧪</span> Product Development <span class="scount" id="cnt-pd">0</span></button>
       <div class="slabel">Products</div>
       <button class="sitem" id="nav-setup" onclick="window.open('setup.html','_blank')"><span class="sicon">⚙</span> Setup</button>
       <button class="sitem" id="nav-skus" onclick="window.open('skus.html','_blank')"><span class="sicon">📦</span> SKU Library</button>
+      <div class="slabel">Operations</div>
+      <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
+      <button class="sitem" id="nav-accounting" onclick="showPanel('accounting');loadAccounting();"><span class="sicon">💰</span> Accounting <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <div class="slabel">System</div>
       <button class="sitem" id="nav-upload" onclick="showPanel('upload')"><span class="sicon">📤</span> Upload Files</button>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
@@ -420,6 +424,31 @@
           <div onclick="showPanel('compliance');loadComplianceAlerts('90');" style="cursor:pointer;padding:10px 12px;background:#f0f8ff;border:1px solid #c8e0f8;border-radius:8px;">
             <div style="font-size:10px;color:#2244cc;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">61–90 days</div>
             <div style="font-size:22px;font-weight:600;color:#1a3399;" id="cwidget-90">—</div>
+          </div>
+        </div>
+      </div>
+      <!-- Product Development widget -->
+      <div id="pd-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">🧪 Product Development</div>
+          <a href="javascript:void(0)" onclick="showPanel('pd');loadPDList();" style="font-size:11px;color:#2266cc;text-decoration:none;">View all →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div onclick="showPanel('pd');loadPDList('pending');" style="cursor:pointer;padding:10px 12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">
+            <div style="font-size:10px;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Pending</div>
+            <div style="font-size:22px;font-weight:600;color:#664400;" id="pdw-pending">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDList('awaiting_factory');" style="cursor:pointer;padding:10px 12px;background:#f0f8ff;border:1px solid #c8e0f8;border-radius:8px;">
+            <div style="font-size:10px;color:#2244cc;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Awaiting Factory</div>
+            <div style="font-size:22px;font-weight:600;color:#1a3399;" id="pdw-factory">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDList('awaiting_artwork');" style="cursor:pointer;padding:10px 12px;background:#fff5f0;border:1px solid #f5d0b8;border-radius:8px;">
+            <div style="font-size:10px;color:#883300;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Awaiting Artwork</div>
+            <div style="font-size:22px;font-weight:600;color:#663300;" id="pdw-artwork">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDList('ready_for_review');" style="cursor:pointer;padding:10px 12px;background:#e8f8e8;border:1px solid #a0d8a0;border-radius:8px;">
+            <div style="font-size:10px;color:#1a7a1a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Ready for Review</div>
+            <div style="font-size:22px;font-weight:600;color:#1a5a1a;" id="pdw-ready">—</div>
           </div>
         </div>
       </div>
@@ -1263,6 +1292,126 @@
       </div>
     </div>
 
+    <!-- PRODUCT DEVELOPMENT -->
+    <div class="panel" id="panel-pd">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div><div class="ph-title">🧪 Product Development</div><div class="ph-sub">Approved RFQs in development — gather all assets, confirm specs, then go live as SKU</div></div>
+      </div>
+
+      <!-- Status filter chips -->
+      <div style="padding:1rem 1.5rem 0.5rem;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="cmp-chip on" data-pd-filter="all" onclick="filterPDList('all')">All <span id="pd-c-all">0</span></button>
+        <button class="cmp-chip" data-pd-filter="pending" onclick="filterPDList('pending')">⏳ Pending <span id="pd-c-pending">0</span></button>
+        <button class="cmp-chip" data-pd-filter="awaiting_factory" onclick="filterPDList('awaiting_factory')">Awaiting Factory <span id="pd-c-factory">0</span></button>
+        <button class="cmp-chip" data-pd-filter="awaiting_artwork" onclick="filterPDList('awaiting_artwork')">Awaiting Artwork <span id="pd-c-artwork">0</span></button>
+        <button class="cmp-chip" data-pd-filter="ready_for_review" onclick="filterPDList('ready_for_review')">Ready for Review <span id="pd-c-ready">0</span></button>
+        <button class="cmp-chip" data-pd-filter="approved" onclick="filterPDList('approved')">✓ Live <span id="pd-c-live">0</span></button>
+      </div>
+
+      <div style="padding:0 1.5rem 1.5rem;">
+        <div id="pd-list-container"><div class="empty">Loading...</div></div>
+      </div>
+
+      <!-- Detail drawer -->
+      <div id="pd-detail-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;" onclick="closePDDetail(event)">
+        <div id="pd-detail-panel" style="position:absolute;top:0;right:0;width:780px;max-width:95vw;height:100vh;background:#fafaf6;overflow-y:auto;box-shadow:-8px 0 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+          <div id="pd-detail-content"><div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WAREHOUSE (BETA scaffold) -->
+    <div class="panel" id="panel-warehouse">
+      <div class="ph">
+        <div class="ph-title">📦 Warehouse Management <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">BETA</span></div>
+        <div class="ph-sub">Track inventory, lots, receiving, and shipping across all SKUs</div>
+      </div>
+      <div style="padding:1.25rem 1.5rem;">
+        <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:10px;padding:14px 18px;margin-bottom:1.5rem;font-size:13px;color:#664400;">
+          <strong>⚠ Beta module:</strong> Warehouse functionality is in development. The structure shown below reflects the planned data model. Live inventory tracking will be enabled in a future release.
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Total SKUs Tracked</div><div class="stat-val" id="wh-total-skus">—</div></div>
+          <div class="stat"><div class="stat-label">In Stock</div><div class="stat-val" id="wh-in-stock">—</div></div>
+          <div class="stat"><div class="stat-label">In Transit</div><div class="stat-val" id="wh-in-transit">—</div></div>
+          <div class="stat"><div class="stat-label">Low Stock Alerts</div><div class="stat-val" id="wh-low-stock">—</div></div>
+        </div>
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:0;margin-top:1rem;overflow:hidden;">
+          <div style="padding:14px 16px;border-bottom:1px solid #f0f0e8;display:flex;align-items:center;justify-content:space-between;">
+            <div style="font-size:14px;font-weight:600;color:#1a1a2e;">SKU Inventory</div>
+            <button class="btn-edit" disabled style="opacity:0.5;cursor:not-allowed;">+ Receive Inventory</button>
+          </div>
+          <table style="width:100%;font-size:12px;">
+            <thead>
+              <tr style="background:#fafaf6;color:#888;">
+                <th style="padding:10px 14px;text-align:left;font-weight:500;">Item #</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:500;">Description</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:500;">Brand</th>
+                <th style="padding:10px 14px;text-align:right;font-weight:500;">On Hand</th>
+                <th style="padding:10px 14px;text-align:right;font-weight:500;">Reserved</th>
+                <th style="padding:10px 14px;text-align:right;font-weight:500;">Available</th>
+                <th style="padding:10px 14px;text-align:left;font-weight:500;">Location</th>
+              </tr>
+            </thead>
+            <tbody id="wh-table-body">
+              <tr><td colspan="7" style="padding:2rem;text-align:center;color:#bbb;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;margin-top:1rem;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">Planned Features</div>
+          <ul style="font-size:12px;color:#666;line-height:1.7;margin:0;padding-left:20px;">
+            <li>Lot/batch tracking with expiry dates for cosmetics</li>
+            <li>Multi-location inventory (warehouses, FBA, retailer DCs)</li>
+            <li>Receiving workflow with PO matching</li>
+            <li>Pick/pack/ship integration with carriers</li>
+            <li>Low-stock auto-reorder triggers</li>
+            <li>Cycle count and physical inventory reconciliation</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNTING (BETA scaffold) -->
+    <div class="panel" id="panel-accounting">
+      <div class="ph">
+        <div class="ph-title">💰 Accounting <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">BETA</span></div>
+        <div class="ph-sub">Invoices, payments, vendor balances, P&amp;L by SKU</div>
+      </div>
+      <div style="padding:1.25rem 1.5rem;">
+        <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:10px;padding:14px 18px;margin-bottom:1.5rem;font-size:13px;color:#664400;">
+          <strong>⚠ Beta module:</strong> Accounting functionality is in development. Integration with QuickBooks / NetSuite is planned. Currently shows aggregate views from RFQ and production data.
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="stat-label">Open Invoices</div><div class="stat-val" id="acct-open-inv">—</div></div>
+          <div class="stat"><div class="stat-label">Outstanding Balance</div><div class="stat-val" id="acct-balance">—</div></div>
+          <div class="stat"><div class="stat-label">YTD Spend</div><div class="stat-val" id="acct-ytd">—</div></div>
+          <div class="stat"><div class="stat-label">Active Vendors</div><div class="stat-val" id="acct-vendors">—</div></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">Vendor Balances</div>
+            <div id="acct-vendor-list" style="font-size:12px;"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;">
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">Recent Activity</div>
+            <div style="font-size:12px;color:#888;padding:1rem 0;text-align:center;">No transactions yet — invoicing module coming soon.</div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px 16px;margin-top:1rem;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">Planned Features</div>
+          <ul style="font-size:12px;color:#666;line-height:1.7;margin:0;padding-left:20px;">
+            <li>Invoice generation tied to PO/quote lifecycle</li>
+            <li>Vendor payment terms tracking and aging reports</li>
+            <li>Per-SKU profitability analysis (landed cost vs revenue)</li>
+            <li>Multi-currency support (USD, CNY, EUR, etc.)</li>
+            <li>QuickBooks Online / NetSuite integration</li>
+            <li>Automated chargeback tracking from retailer portals</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" id="panel-settings">
       <div class="ph"><div class="ph-title">Settings</div><div class="ph-sub">Configure your admin dashboard</div></div>
       <div class="set-section">
@@ -1495,6 +1644,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
+  if(name==='dashboard'){loadPDList();}
   if(name==='pending-cats'){loadPendingCats();loadPendingCerts();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
@@ -2743,6 +2893,35 @@ async function acceptQuote(quoteId,rfqId,factoryName){
     // Update quote and RFQ status
     await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'accepted'})});
     await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved'})});
+
+    // ─── Auto-create Product Development record ───
+    try{
+      // Generate PD number based on existing count
+      var countR=await fetch(SB+'/rest/v1/product_development?select=id',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact','Range':'0-0'}});
+      var totalCount=parseInt((countR.headers.get('content-range')||'0/0').split('/')[1])||0;
+      var pdNum='PD-'+String(totalCount+1).padStart(4,'0');
+      // Pull dimensions from quote if present
+      var pdPayload={
+        pd_number:pdNum,
+        rfq_id:rfqId,
+        quote_id:quoteId,
+        factory_id:q.factory_id,
+        customer_id:rfq.customer_id||null,
+        brand_id:rfq.brand_id||null,
+        item_description:rfq.item_description,
+        category:rfq.category,
+        unit_length_cm:q.unit_length_cm,
+        unit_width_cm:q.unit_width_cm,
+        unit_height_cm:q.unit_height_cm,
+        unit_weight_kg:q.unit_weight_kg,
+        status:'pending'
+      };
+      await fetch(SB+'/rest/v1/product_development',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(pdPayload)});
+      console.log('PD record created: '+pdNum);
+    }catch(pdErr){
+      console.log('PD creation failed (non-fatal):',pdErr);
+    }
+    // ─── End PD auto-create ───
 
     // Update factory scorecard
     updateFactoryScorecard(q.factory_id,'quote_accepted');
@@ -4079,6 +4258,388 @@ async function manualSendComplianceReminders(){
   }catch(e){alert('Error: '+e.message);}
   if(btn){btn.disabled=false;btn.textContent='⚡ Send today\'s reminders';}
 }
+
+// ════════════════════════════════════════
+// PRODUCT DEVELOPMENT (Phase B)
+// ════════════════════════════════════════
+
+var PD_RECORDS = [];
+var pdCurrentFilter = 'all';
+var pdCurrentDetail = null;
+
+async function loadPDList(filterOverride){
+  if(filterOverride) pdCurrentFilter = filterOverride;
+  var listEl = g('pd-list-container');
+  if(!listEl) return;
+  listEl.innerHTML = '<div class="empty">Loading...</div>';
+  try{
+    var r = await fetch(SB+'/rest/v1/product_development?select=*,factories(factory_name_english,sales_email),rfqs(project_number,item_description),customers(customer_name),brands(brand_name)&order=created_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){listEl.innerHTML='<div class="empty" style="color:#b00;">Failed to load PD records.</div>';return;}
+    PD_RECORDS = await r.json();
+    renderPDList();
+    loadPDCounts();
+  }catch(e){listEl.innerHTML='<div class="empty" style="color:#b00;">Error: '+e.message+'</div>';}
+}
+
+function loadPDCounts(){
+  var c={pending:0,awaiting_factory:0,awaiting_artwork:0,ready_for_review:0,approved:0,all:PD_RECORDS.length};
+  PD_RECORDS.forEach(function(p){if(c[p.status]!==undefined)c[p.status]++;});
+  var sb=g('cnt-pd');if(sb)sb.textContent=c.pending+c.awaiting_factory+c.awaiting_artwork+c.ready_for_review;
+  if(g('pdw-pending'))g('pdw-pending').textContent=c.pending;
+  if(g('pdw-factory'))g('pdw-factory').textContent=c.awaiting_factory;
+  if(g('pdw-artwork'))g('pdw-artwork').textContent=c.awaiting_artwork;
+  if(g('pdw-ready'))g('pdw-ready').textContent=c.ready_for_review;
+  ['all','pending','factory','artwork','ready','live'].forEach(function(k){
+    var key=k==='factory'?'awaiting_factory':k==='artwork'?'awaiting_artwork':k==='ready'?'ready_for_review':k==='live'?'approved':k;
+    var el=g('pd-c-'+k);if(el)el.textContent=c[key]||0;
+  });
+}
+
+function filterPDList(filter){pdCurrentFilter=filter;renderPDList();}
+
+function renderPDList(){
+  document.querySelectorAll('.cmp-chip[data-pd-filter]').forEach(function(c){
+    c.classList.toggle('on',c.getAttribute('data-pd-filter')===pdCurrentFilter);
+  });
+  var listEl=g('pd-list-container');
+  var filtered=pdCurrentFilter==='all'?PD_RECORDS:PD_RECORDS.filter(function(p){return p.status===pdCurrentFilter;});
+  if(!filtered.length){
+    listEl.innerHTML='<div class="empty">No items here. PD items appear automatically when you Approve a quote on the RFQs panel.</div>';
+    return;
+  }
+  var sl={pending:{l:'Pending',c:'st-pending',i:'⏳'},awaiting_factory:{l:'Awaiting Factory',c:'st-pending',i:'🏭'},awaiting_artwork:{l:'Awaiting Artwork',c:'st-pending',i:'🎨'},ready_for_review:{l:'Ready for Review',c:'st-approved',i:'👁'},approved:{l:'Live SKU',c:'st-approved',i:'✓'},archived:{l:'Archived',c:'st-pending',i:'📦'}};
+  listEl.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px;">'+filtered.map(function(p){
+    var s=sl[p.status]||sl.pending;var fac=p.factories||{};var rfq=p.rfqs||{};
+    var brandName=p.brands?p.brands.brand_name:'';var custName=p.customers?p.customers.customer_name:'';
+    var gates=[p.gate_dimensions_ok,p.gate_compliance_ok,p.gate_artwork_ok,p.gate_assets_ok];
+    var gc=gates.filter(function(x){return x;}).length;
+    return '<div onclick="openPDDetail(\''+p.id+'\')" style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;cursor:pointer;" onmouseover="this.style.borderColor=\'#1a1a2e\'" onmouseout="this.style.borderColor=\'#e8e8e0\'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">'+
+        '<div style="font-size:12px;font-family:monospace;color:#888;font-weight:600;">'+esc(p.pd_number||'PD-???')+'</div>'+
+        '<span class="status '+s.c+'">'+s.i+' '+s.l+'</span>'+
+      '</div>'+
+      '<div style="font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:2px;">'+esc(p.item_description||rfq.item_description||'(no description)')+'</div>'+
+      (p.item_number?'<div style="font-size:11px;font-family:monospace;color:#2266cc;margin-bottom:4px;">Item #'+esc(p.item_number)+'</div>':'')+
+      '<div style="font-size:11px;color:#888;line-height:1.5;">'+
+        (fac.factory_name_english?'<div>Factory: <strong>'+esc(fac.factory_name_english)+'</strong></div>':'')+
+        (custName?'<div>Customer: '+esc(custName)+(brandName?' · '+esc(brandName):'')+'</div>':'')+
+        (rfq.project_number?'<div>From RFQ: '+esc(rfq.project_number)+'</div>':'')+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0e8;">'+
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Gates: '+gc+'/4</div>'+
+        '<div style="display:flex;gap:3px;flex:1;">'+
+          gates.map(function(ok){return '<div style="flex:1;height:6px;border-radius:3px;background:'+(ok?'#1a7a1a':'#e8e8e0')+';"></div>';}).join('')+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+async function openPDDetail(pdId){
+  var overlay=g('pd-detail-overlay');var content=g('pd-detail-content');
+  if(!overlay||!content)return;
+  overlay.style.display='block';
+  content.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+pdId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(project_number,item_description,quantity,unit_of_measure,product_size,is_cosmetic),customers(customer_name),brands(brand_name)&limit=1',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    if(!rows||!rows.length){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">PD record not found.</div>';return;}
+    pdCurrentDetail=rows[0];
+    // Fetch quote separately
+    if(pdCurrentDetail.quote_id){
+      var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+pdCurrentDetail.quote_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var qrows=await qr.json();
+      pdCurrentDetail._quote=(qrows&&qrows[0])||{};
+    }else{pdCurrentDetail._quote={};}
+    renderPDDetail();
+  }catch(e){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">Error: '+e.message+'</div>';}
+}
+
+function closePDDetail(e){if(e&&e.target&&e.target.id!=='pd-detail-overlay')return;g('pd-detail-overlay').style.display='none';pdCurrentDetail=null;}
+function closePDDetailForce(){g('pd-detail-overlay').style.display='none';pdCurrentDetail=null;}
+
+function renderPDDetail(){
+  var p=pdCurrentDetail;if(!p)return;
+  var content=g('pd-detail-content');
+  var fac=p.factories||{};var rfq=p.rfqs||{};var quote=p._quote||{};
+  var brandName=p.brands?p.brands.brand_name:'';var custName=p.customers?p.customers.customer_name:'';
+  var sl={pending:{l:'Pending',c:'st-pending',i:'⏳'},awaiting_factory:{l:'Awaiting Factory',c:'st-pending',i:'🏭'},awaiting_artwork:{l:'Awaiting Artwork',c:'st-pending',i:'🎨'},ready_for_review:{l:'Ready for Review',c:'st-approved',i:'👁'},approved:{l:'Live SKU',c:'st-approved',i:'✓'},archived:{l:'Archived',c:'st-pending',i:'📦'}};
+  var s=sl[p.status]||sl.pending;
+  function gateRow(key,label,desc){
+    var on=p[key]?'checked':'';
+    return '<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:6px;background:'+(p[key]?'#f0fff0':'#fafaf6')+';margin-bottom:4px;cursor:pointer;">'+
+      '<input type="checkbox" '+on+' onchange="togglePDGate(\''+key+'\',this.checked)" style="margin-top:2px;" />'+
+      '<div><div style="font-size:13px;font-weight:500;color:#1a1a2e;">'+label+'</div><div style="font-size:11px;color:#888;">'+desc+'</div></div>'+
+    '</label>';
+  }
+  var dimRow=function(lbl,L,W,H,Wt,Q){
+    return '<tr><td style="padding:4px 8px;color:#888;font-size:11px;">'+lbl+'</td>'+
+      '<td style="padding:4px 8px;font-size:12px;">'+(Q!==undefined&&Q!==null?Q:'—')+'</td>'+
+      '<td style="padding:4px 8px;font-size:12px;">'+(L?L+' × '+(W||'?')+' × '+(H||'?'):'—')+'</td>'+
+      '<td style="padding:4px 8px;font-size:12px;">'+(Wt?Wt+' kg':'—')+'</td></tr>';
+  };
+  content.innerHTML=
+    '<div style="position:sticky;top:0;background:#fafaf6;border-bottom:1px solid #e8e8e0;padding:1rem 1.5rem;z-index:10;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div>'+
+          '<div style="font-size:11px;font-family:monospace;color:#888;font-weight:600;">'+esc(p.pd_number||'')+'</div>'+
+          '<div style="font-size:18px;font-weight:600;color:#1a1a2e;margin-top:2px;">'+esc(p.item_description||rfq.item_description||'(no description)')+'</div>'+
+          (p.item_number?'<div style="font-size:12px;font-family:monospace;color:#2266cc;margin-top:2px;">Item #'+esc(p.item_number)+'</div>':'')+
+        '</div>'+
+        '<div style="display:flex;gap:8px;align-items:center;">'+
+          '<span class="status '+s.c+'">'+s.i+' '+s.l+'</span>'+
+          '<button class="btn-edit" onclick="closePDDetailForce()">×</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="padding:1rem 1.5rem;">'+
+    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📋 Source Quote (read-only)</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;">'+
+        '<div><div style="color:#888;font-size:10px;text-transform:uppercase;">Factory</div><div style="font-weight:500;">'+esc(fac.factory_name_english||'—')+'</div></div>'+
+        '<div><div style="color:#888;font-size:10px;text-transform:uppercase;">From RFQ</div><div style="font-weight:500;">'+esc(rfq.project_number||'—')+'</div></div>'+
+        '<div><div style="color:#888;font-size:10px;text-transform:uppercase;">FOB Price</div><div style="font-weight:500;color:#1a7a1a;">$'+(quote.unit_fob_price?parseFloat(quote.unit_fob_price).toFixed(2):'—')+'</div></div>'+
+        '<div><div style="color:#888;font-size:10px;text-transform:uppercase;">MOQ</div><div style="font-weight:500;">'+(quote.moq||'—')+'</div></div>'+
+        (custName?'<div><div style="color:#888;font-size:10px;text-transform:uppercase;">Customer / Brand</div><div style="font-weight:500;">'+esc(custName)+(brandName?' · '+esc(brandName):'')+'</div></div>':'')+
+        (quote.factory_existing_model_number?'<div><div style="color:#888;font-size:10px;text-transform:uppercase;">Factory Model #</div><div style="font-weight:500;font-family:monospace;">'+esc(quote.factory_existing_model_number)+'</div></div>':'')+
+      '</div>'+
+    '</div>'+
+    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🏷 Item Number &amp; UPCs</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Item Number</label><input type="text" id="pd-item-number" value="'+esc(p.item_number||'')+'" placeholder="e.g. ITM-2026-001" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:monospace;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Unit UPC</label><input type="text" id="pd-unit-upc" value="'+esc(p.unit_upc||'')+'" placeholder="12-digit UPC" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:monospace;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Inner Carton UPC</label><input type="text" id="pd-inner-upc" value="'+esc(p.inner_upc||'')+'" placeholder="UPC for inner carton" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:monospace;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Master Carton UPC</label><input type="text" id="pd-master-upc" value="'+esc(p.master_upc||'')+'" placeholder="UPC for master carton" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:monospace;" /></div>'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;display:block;margin-bottom:3px;">Pallet UPC</label><input type="text" id="pd-pallet-upc" value="'+esc(p.pallet_upc||'')+'" placeholder="UPC for pallet (optional)" style="width:100%;padding:7px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:monospace;" /></div>'+
+      '</div>'+
+      '<button class="btn-edit" style="margin-top:10px;" onclick="savePDIdentifiers()">Save Identifiers</button>'+
+    '</div>'+
+    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">📐 Dimensions</div>'+
+        (p.dimensions_confirmed_at?'<span class="status st-approved">✓ Confirmed by factory '+new Date(p.dimensions_confirmed_at).toLocaleDateString()+'</span>':'<span class="status st-pending">⏳ Awaiting factory confirmation</span>')+
+      '</div>'+
+      '<table style="width:100%;border-collapse:collapse;">'+
+        '<thead><tr style="background:#fafaf6;color:#888;font-size:10px;text-transform:uppercase;"><th style="padding:6px 8px;text-align:left;">Level</th><th style="padding:6px 8px;text-align:left;">Qty</th><th style="padding:6px 8px;text-align:left;">L × W × H (cm)</th><th style="padding:6px 8px;text-align:left;">Weight</th></tr></thead>'+
+        '<tbody>'+
+          dimRow('Unit',p.unit_length_cm,p.unit_width_cm,p.unit_height_cm,p.unit_weight_kg,1)+
+          dimRow('Inner',p.inner_length_cm,p.inner_width_cm,p.inner_height_cm,p.inner_weight_kg,p.inner_qty)+
+          dimRow('Master',p.master_length_cm,p.master_width_cm,p.master_height_cm,p.master_weight_kg,p.master_qty)+
+          (p.pallet_qty?'<tr><td style="padding:4px 8px;color:#888;font-size:11px;">Pallet</td><td style="padding:4px 8px;font-size:12px;">'+p.pallet_qty+' units</td><td style="padding:4px 8px;font-size:12px;" colspan="2">—</td></tr>':'')+
+        '</tbody>'+
+      '</table>'+
+    '</div>'+
+    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">📁 Product Assets</div>'+
+        '<button class="btn-edit" onclick="openPDUploadModal()">+ Upload Asset</button>'+
+      '</div>'+
+      '<div id="pd-assets-list"><div style="font-size:12px;color:#888;padding:8px 0;">Loading assets...</div></div>'+
+    '</div>'+
+    '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">✓ Approval Gates</div>'+
+      gateRow('gate_dimensions_ok','Dimensions confirmed','Factory has confirmed unit, inner, and master dimensions')+
+      gateRow('gate_compliance_ok','Compliance documents complete','All required compliance docs uploaded and verified')+
+      gateRow('gate_artwork_ok','Packaging artwork approved','Final artwork files signed off by graphics team')+
+      gateRow('gate_assets_ok','Product assets received','Hi-res images, manuals, STEP files (where applicable) received')+
+    '</div>'+
+    (p.status!=='approved'
+      ? '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+          '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">🚀 Final Approval</div>'+
+          '<div style="font-size:11px;color:#888;margin-bottom:10px;">All 4 gates must be checked before this item can go live as a SKU. Once live, orders can be placed.</div>'+
+          '<button class="d-btn-approve" '+(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_artwork_ok&&p.gate_assets_ok?'':'disabled')+' onclick="approvePDToSKU()">✓ Approve as Live SKU</button>'+
+        '</div>'
+      : '<div style="background:#e8f8e8;border:1px solid #a0d8a0;border-radius:10px;padding:14px;margin-bottom:14px;color:#1a5a1a;"><strong>✓ Live SKU</strong> — This item is approved and orders can be placed.'+(p.sku_id?' <a href="skus.html?id='+p.sku_id+'" target="_blank" style="color:#1a5a1a;">View live SKU →</a>':'')+'</div>')+
+    '</div>';
+  loadPDAssets(p.id);
+}
+
+async function loadPDAssets(pdId){
+  var listEl=g('pd-assets-list');if(!listEl)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/product_development_assets?pd_id=eq.'+pdId+'&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){listEl.innerHTML='<div style="font-size:12px;color:#b00;">Failed to load.</div>';return;}
+    var assets=await r.json();
+    if(!assets.length){listEl.innerHTML='<div style="font-size:12px;color:#bbb;padding:8px 0;">No assets uploaded yet.</div>';return;}
+    var tl={packaging_artwork:'🎨 Packaging Artwork',hi_res_image:'🖼 Hi-Res Image',user_manual:'📖 User Manual',step_file:'⚙ 3D STEP File',tech_spec:'📋 Tech Spec',other:'📄 Other'};
+    listEl.innerHTML=assets.map(function(a){
+      var lbl=a.asset_type==='other'?(a.asset_type_other||'Other'):(tl[a.asset_type]||a.asset_type);
+      var sizeStr=a.file_size?(a.file_size/1024/1024).toFixed(2)+' MB':'';
+      var sb=a.status==='approved'?'<span class="status st-approved">✓ Approved</span>':a.status==='rejected'?'<span class="status st-rejected">✗ Rejected</span>':'<span class="status st-pending">⏳ Pending Review</span>';
+      var sp=(a.file_path||'').replace(/'/g,"\\'");
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:5px;">'+
+        '<div style="flex:1;min-width:0;"><div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+lbl+'</div><div style="font-size:11px;color:#888;">'+esc(a.file_name)+(sizeStr?' · '+sizeStr:'')+'</div></div>'+
+        sb+
+        '<div style="display:flex;gap:5px;">'+
+          '<button class="btn-edit" onclick="viewPDAsset(\''+sp+'\')">View</button>'+
+          (a.status!=='approved'?'<button class="btn-edit" style="background:#e8f8e8;color:#1a7a1a;border-color:#a0d8a0;" onclick="approvePDAsset(\''+a.id+'\')">Approve</button>':'')+
+          '<button class="btn-del" onclick="deletePDAsset(\''+a.id+'\',\''+sp+'\')">Delete</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){listEl.innerHTML='<div style="font-size:12px;color:#b00;">'+e.message+'</div>';}
+}
+
+async function viewPDAsset(filePath){
+  if(!filePath)return;
+  try{
+    var r=await fetch(SB+'/storage/v1/object/sign/pd-assets/'+filePath,{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify({expiresIn:300})});
+    if(!r.ok){alert('Could not generate link.');return;}
+    var d=await r.json();window.open(SB+'/storage/v1'+d.signedURL,'_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function approvePDAsset(assetId){
+  await fetch(SB+'/rest/v1/product_development_assets?id=eq.'+assetId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:'admin'})});
+  if(pdCurrentDetail)loadPDAssets(pdCurrentDetail.id);
+}
+
+async function deletePDAsset(assetId,filePath){
+  if(!confirm('Delete this asset?'))return;
+  try{
+    if(filePath)await fetch(SB+'/storage/v1/object/pd-assets/'+filePath,{method:'DELETE',headers:{'Authorization':'Bearer '+KEY,'apikey':KEY}});
+    await fetch(SB+'/rest/v1/product_development_assets?id=eq.'+assetId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(pdCurrentDetail)loadPDAssets(pdCurrentDetail.id);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+function openPDUploadModal(){
+  if(!pdCurrentDetail)return;
+  var existing=document.getElementById('pd-upload-modal');if(existing)existing.remove();
+  var modal=document.createElement('div');modal.id='pd-upload-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML='<div style="background:#fff;border-radius:12px;max-width:520px;width:100%;padding:1.5rem;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><div style="font-size:16px;font-weight:600;color:#1a1a2e;">Upload Asset</div><button onclick="document.getElementById(\'pd-upload-modal\').remove()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;">×</button></div>'+
+    '<div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Asset Type *</label><select id="pd-up-type" onchange="document.getElementById(\'pd-up-other-wrap\').style.display=this.value===\'other\'?\'block\':\'none\';" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;"><option value="">— Select —</option><option value="packaging_artwork">🎨 Packaging Artwork</option><option value="hi_res_image">🖼 Hi-Res Image</option><option value="user_manual">📖 User Manual</option><option value="step_file">⚙ 3D STEP File</option><option value="tech_spec">📋 Tech Spec</option><option value="other">Other</option></select></div>'+
+    '<div id="pd-up-other-wrap" style="display:none;margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Specify type *</label><input type="text" id="pd-up-other" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;" /></div>'+
+    '<div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">File *</label><input type="file" id="pd-up-file" style="width:100%;font-size:12px;" /></div>'+
+    '<div style="margin-bottom:10px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Notes</label><textarea id="pd-up-notes" rows="2" style="width:100%;padding:8px 10px;font-size:13px;border:1px solid #d8d8d0;border-radius:6px;font-family:inherit;"></textarea></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn-edit" onclick="document.getElementById(\'pd-upload-modal\').remove()">Cancel</button><button class="btn-edit" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="savePDUpload()">Upload</button></div>'+
+    '<div id="pd-up-err" style="font-size:12px;color:#b00;margin-top:8px;display:none;"></div>'+
+  '</div>';
+  document.body.appendChild(modal);
+}
+
+async function savePDUpload(){
+  var type=g('pd-up-type').value;
+  if(!type){g('pd-up-err').textContent='Select a type.';g('pd-up-err').style.display='block';return;}
+  var typeOther=g('pd-up-other').value.trim();
+  if(type==='other'&&!typeOther){g('pd-up-err').textContent='Specify the type.';g('pd-up-err').style.display='block';return;}
+  var file=g('pd-up-file').files[0];
+  if(!file){g('pd-up-err').textContent='Choose a file.';g('pd-up-err').style.display='block';return;}
+  if(file.size>50*1024*1024){g('pd-up-err').textContent='File over 50MB.';g('pd-up-err').style.display='block';return;}
+  try{
+    var ts=Date.now();var safeName=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var path=pdCurrentDetail.id+'/'+ts+'_'+safeName;
+    var sr=await fetch(SB+'/storage/v1/object/pd-assets/'+path,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'apikey':KEY,'x-upsert':'true','Content-Type':file.type||'application/octet-stream'},body:file});
+    if(!sr.ok){var serr=await sr.json().catch(function(){return{};});g('pd-up-err').textContent='Upload failed: '+(serr.message||sr.status);g('pd-up-err').style.display='block';return;}
+    await fetch(SB+'/rest/v1/product_development_assets',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_id:pdCurrentDetail.id,asset_type:type,asset_type_other:type==='other'?typeOther:null,file_name:file.name,file_path:path,file_size:file.size,notes:g('pd-up-notes').value.trim()||null,uploaded_by:'admin',status:'pending_review'})});
+    document.getElementById('pd-upload-modal').remove();
+    loadPDAssets(pdCurrentDetail.id);
+  }catch(e){g('pd-up-err').textContent='Error: '+e.message;g('pd-up-err').style.display='block';}
+}
+
+async function savePDIdentifiers(){
+  if(!pdCurrentDetail)return;
+  var payload={item_number:g('pd-item-number').value.trim()||null,unit_upc:g('pd-unit-upc').value.trim()||null,inner_upc:g('pd-inner-upc').value.trim()||null,master_upc:g('pd-master-upc').value.trim()||null,pallet_upc:g('pd-pallet-upc').value.trim()||null,updated_at:new Date().toISOString()};
+  if(payload.item_number&&pdCurrentDetail.status==='pending')payload.status='awaiting_factory';
+  try{
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    Object.assign(pdCurrentDetail,payload);
+    alert('Saved.');
+    loadPDList();
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+async function togglePDGate(gate,checked){
+  if(!pdCurrentDetail)return;
+  var update={};update[gate]=checked;update.updated_at=new Date().toISOString();
+  pdCurrentDetail[gate]=checked;
+  if(pdCurrentDetail.gate_dimensions_ok&&pdCurrentDetail.gate_compliance_ok&&pdCurrentDetail.gate_artwork_ok&&pdCurrentDetail.gate_assets_ok)update.status='ready_for_review';
+  else if(pdCurrentDetail.status==='ready_for_review')update.status='awaiting_factory';
+  try{
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(update)});
+    if(update.status)pdCurrentDetail.status=update.status;
+    renderPDDetail();
+    loadPDList();
+  }catch(e){alert('Save failed: '+e.message);}
+}
+
+async function approvePDToSKU(){
+  if(!pdCurrentDetail)return;
+  var p=pdCurrentDetail;
+  if(!(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_artwork_ok&&p.gate_assets_ok)){alert('All 4 gates must be checked first.');return;}
+  if(!confirm('Approve this item as a Live SKU? Once approved, orders can be placed against it.'))return;
+  try{
+    // Create SKU record
+    var skuPayload={
+      model_number:p.item_number||p.pd_number,
+      description:p.item_description||'(no description)',
+      brand_id:p.brand_id||null,
+      is_cosmetic:(p.rfqs&&p.rfqs.is_cosmetic)||false,
+      unit_upc:p.unit_upc,
+      inner_upc:p.inner_upc,
+      master_upc:p.master_upc,
+      pallet_upc:p.pallet_upc,
+      status:'active'
+    };
+    var sr=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
+    if(!sr.ok){var serr=await sr.json().catch(function(){return{};});alert('SKU create failed: '+(serr.message||serr.details||sr.status));return;}
+    var skus=await sr.json();
+    var newSkuId=Array.isArray(skus)?(skus[0]&&skus[0].id):(skus&&skus.id);
+    // Link factory as source
+    if(newSkuId&&p.factory_id){
+      await fetch(SB+'/rest/v1/sku_factory_sources',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:newSkuId,factory_id:p.factory_id,status:'active'})});
+    }
+    // Update PD record
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',sku_id:newSkuId,approved_at:new Date().toISOString(),approved_by:'admin'})});
+    alert('✓ Live SKU created. Orders can now be placed against this item.');
+    closePDDetailForce();
+    loadPDList();
+  }catch(e){alert('Approval failed: '+e.message);}
+}
+
+// ════════════════════════════════════════
+// PHASE C SCAFFOLDS — Warehouse + Accounting
+// ════════════════════════════════════════
+async function loadWarehouse(){
+  // Pull SKU list, show with placeholder stock columns
+  try{
+    var r=await fetch(SB+'/rest/v1/skus?select=id,model_number,description,brands(brand_name)&limit=100',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var skus=r.ok?await r.json():[];
+    if(g('wh-total-skus'))g('wh-total-skus').textContent=skus.length;
+    if(g('wh-in-stock'))g('wh-in-stock').textContent='—';
+    if(g('wh-in-transit'))g('wh-in-transit').textContent='—';
+    if(g('wh-low-stock'))g('wh-low-stock').textContent='—';
+    var body=g('wh-table-body');if(!body)return;
+    if(!skus.length){body.innerHTML='<tr><td colspan="7" style="padding:2rem;text-align:center;color:#bbb;">No SKUs in the system yet. Create some via the SKU Library.</td></tr>';return;}
+    body.innerHTML=skus.map(function(s){
+      return '<tr style="border-top:1px solid #f0f0e8;"><td style="padding:10px 14px;font-family:monospace;font-size:11px;">'+esc(s.model_number)+'</td><td style="padding:10px 14px;">'+esc(s.description||'—')+'</td><td style="padding:10px 14px;color:#888;">'+esc((s.brands&&s.brands.brand_name)||'—')+'</td><td style="padding:10px 14px;text-align:right;color:#bbb;">—</td><td style="padding:10px 14px;text-align:right;color:#bbb;">—</td><td style="padding:10px 14px;text-align:right;color:#bbb;">—</td><td style="padding:10px 14px;color:#bbb;">—</td></tr>';
+    }).join('');
+  }catch(e){console.log('loadWarehouse:',e);}
+}
+
+async function loadAccounting(){
+  try{
+    var fr=await fetch(SB+'/rest/v1/factories?select=id,factory_name_english&limit=200',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var factories=fr.ok?await fr.json():[];
+    if(g('acct-open-inv'))g('acct-open-inv').textContent='0';
+    if(g('acct-balance'))g('acct-balance').textContent='$0';
+    if(g('acct-ytd'))g('acct-ytd').textContent='$0';
+    if(g('acct-vendors'))g('acct-vendors').textContent=factories.length;
+    var vlist=g('acct-vendor-list');if(!vlist)return;
+    if(!factories.length){vlist.innerHTML='<div style="color:#bbb;padding:0.5rem 0;">No vendors yet.</div>';return;}
+    vlist.innerHTML=factories.slice(0,8).map(function(f){
+      return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0e8;"><span>'+esc(f.factory_name_english)+'</span><span style="color:#bbb;font-family:monospace;">$0.00</span></div>';
+    }).join('');
+  }catch(e){console.log('loadAccounting:',e);}
+}
+
 
 // ── RFQ Follow-ups ──
 async function loadRFQFollowups(){
