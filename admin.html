@@ -4582,7 +4582,7 @@ async function openPDDetail(pdId){
       fetch(SB+'/rest/v1/pd_factory_sources?pd_id=eq.'+pdCurrentDetail.id+'&select=*,factories(factory_name_english,sales_email,sales_contact_name)&order=is_primary.desc,created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
       fetch(SB+'/rest/v1/freight_rates?is_active=eq.true&order=origin_country,mode',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
       pdCurrentDetail.quote_id?fetch(SB+'/rest/v1/rfq_quote_cert_assets?quote_id=eq.'+pdCurrentDetail.quote_id+'&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
-      fetch(SB+'/rest/v1/product_development_assets?pd_id=eq.'+pdCurrentDetail.id+'&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
+      fetch(SB+'/rest/v1/product_development_assets?pd_id=eq.'+pdCurrentDetail.id+'&order=created_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
     ]);
     pdCurrentDetail.factories=related[0]&&related[0][0]?related[0][0]:{};
     pdCurrentDetail.rfqs=related[1]&&related[1][0]?related[1][0]:{};
@@ -5801,7 +5801,7 @@ async function confirmPDSlotUpload(slotType,maxFiles){
       var ur=await fetch(SB+'/storage/v1/object/pd-assets/'+path,{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream','x-upsert':'true'},body:f});
       if(!ur.ok){msg.textContent='Upload failed for '+safe;msg.style.color='#b00';return;}
       // Insert metadata row
-      await fetch(SB+'/rest/v1/product_development_assets',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_id:pdId,slot_type:slotType,file_path:path,file_name:safe,uploaded_at:new Date().toISOString()})});
+      await fetch(SB+'/rest/v1/product_development_assets',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_id:pdId,slot_type:slotType,file_path:path,file_name:safe})});
     }
     document.getElementById('pd-slot-modal').remove();
     openPDDetail(pdId);
