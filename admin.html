@@ -3132,20 +3132,28 @@ async function acceptQuote(quoteId,rfqId,factoryName){
       var firstName=(f.sales_contact_name||'Team').split(' ')[0];
       var fob=parseFloat(q.unit_fob_price)||0;
       var emailBody='Dear '+firstName+',\n\n'+
-        'We are pleased to inform you that your quote for '+rfq.item_description+' has been accepted.\n\n'+
+        'We are pleased to inform you that your quote for '+rfq.item_description+' has been accepted and moved into Product Development.\n\n'+
         'ACCEPTED QUOTE DETAILS\n'+
         'Project: '+rfq.project_number+'\n'+
         'Item: '+rfq.item_description+'\n'+
         'Accepted FOB Price: $'+fob.toFixed(2)+' per unit\n'+
-        'Quantity: '+(rfq.quote_quantity||'TBD').toLocaleString()+' '+(rfq.unit_type||'units')+'\n\n'+
-        'NEXT STEPS\n'+
-        'Upon receipt of your deposit, please log into our supplier portal and confirm the following production timeline:\n'+
-        '• Materials Arrival Date\n'+
-        '• Pre-Production Sample Ready Date\n'+
-        '• Mass Production Start Date\n'+
-        '• Inspection Date\n'+
-        '• Cargo Ready Date\n\n'+
-        'Please log into the portal to confirm these dates: https://project-7o416.vercel.app\n\n'+
+        'Quantity: '+((rfq.quote_quantity||'TBD').toString()).replace(/^TBD$/,'TBD')+' '+(rfq.unit_type||'units')+'\n\n'+
+        'NEXT STEPS — PRODUCT DEVELOPMENT\n'+
+        'Please log into the supplier portal and go to the "Product Development" tab. There you will find this item with the following actions required:\n\n'+
+        '1. Confirm unit, inner carton, and master carton dimensions\n'+
+        '2. Upload product assets:\n'+
+        '   • High-resolution product images\n'+
+        '   • User manual (where applicable)\n'+
+        '   • 3D STEP files (where applicable)\n'+
+        '   • Tech specs and any other documentation\n'+
+        '3. Confirm production timeline:\n'+
+        '   • Materials Arrival Date\n'+
+        '   • Pre-Production Sample Ready Date\n'+
+        '   • Mass Production Start Date\n'+
+        '   • Inspection Date\n'+
+        '   • Cargo Ready Date\n\n'+
+        'Once all assets are submitted and packaging artwork is finalized, the item will go live and we can place orders.\n\n'+
+        'Log in here: https://portal.tbgsourcing.net\n\n'+
         'We look forward to working with you on this project.\n\n'+
         'Best regards,\nAllan Amsel\nTBG Sourcing';
 
@@ -3154,7 +3162,8 @@ async function acceptQuote(quoteId,rfqId,factoryName){
 
     await loadRFQs();
     openRFQDetail(rfqId);
-    alert('Quote accepted! Email sent to factory. Use the + Create SKU button on the quote to create a SKU.');
+    alert('Quote accepted! A Product Development record has been created. Opening Product Development...');
+    showPanel('pd');loadPDList();
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -4544,9 +4553,14 @@ async function openPDDetail(pdId){
   overlay.style.display='block';
   content.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
   try{
-    var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+pdId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(project_number,item_description,quantity,unit_of_measure,product_size,is_cosmetic),customers(customer_name),brands(brand_name)&limit=1',{
+    var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+pdId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(project_number,item_description),customers(customer_name),brands(brand_name)&limit=1',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
+    if(!r.ok){
+      var errBody=await r.json().catch(function(){return{};});
+      content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;"><strong>Load failed (HTTP '+r.status+')</strong><br>'+esc(errBody.message||errBody.error||'unknown')+'</div>';
+      return;
+    }
     var rows=await r.json();
     if(!rows||!rows.length){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">PD record not found.</div>';return;}
     pdCurrentDetail=rows[0];
@@ -5412,13 +5426,42 @@ if(localStorage.getItem('admin_session')==='1'){
 
 async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
   if(!toEmail||!toEmail.trim()){throw new Error('No recipient email address provided');}
+  var fromEmail=replyTo||'sourcing@tbgsourcing.net';
   var r=await fetch('/api/send-email',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net',cc:cc||'',bcc:bcc||''})
+    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:fromEmail,cc:cc||'',bcc:bcc||''})
   });
   var d=await r.json().catch(function(){return{};});
   if(!r.ok){throw new Error(d.error||r.status);}
+
+  // Log outbound to inbox so it appears in Sent
+  try{
+    var dept='sourcing';
+    if(/sales@/.test(fromEmail))dept='sales';
+    else if(/accounting@/.test(fromEmail))dept='accounting';
+    else if(/graphics@/.test(fromEmail))dept='graphics';
+    else if(/logistics@/.test(fromEmail))dept='logistics';
+    var now=new Date().toISOString();
+    var hdr={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'};
+    // Try to find existing thread for this recipient + clean subject
+    var clean=(subject||'').replace(/^(Re:|Fwd:|RE:|FW:)\s*/gi,'').trim();
+    var threadId=null;
+    try{
+      var lookupR=await fetch(SB+'/rest/v1/email_threads?to_email=eq.'+encodeURIComponent(toEmail)+'&subject=eq.'+encodeURIComponent(clean)+'&order=created_at.desc&limit=1',{headers:hdr});
+      if(lookupR.ok){var rows=await lookupR.json();if(rows&&rows[0])threadId=rows[0].id;}
+    }catch(e){}
+    if(threadId){
+      await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{method:'PATCH',headers:Object.assign({},hdr,{'Prefer':'return=minimal'}),body:JSON.stringify({last_message_at:now,status:'read'})});
+    }else{
+      var tr=await fetch(SB+'/rest/v1/email_threads',{method:'POST',headers:hdr,body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:'TBG Sourcing',to_email:toEmail,direction:'outbound',status:'read',department:dept,last_message_at:now})});
+      if(tr.ok){var trrows=await tr.json();if(trrows&&trrows[0])threadId=trrows[0].id;}
+    }
+    if(threadId){
+      await fetch(SB+'/rest/v1/email_messages',{method:'POST',headers:Object.assign({},hdr,{'Prefer':'return=minimal'}),body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:'TBG Sourcing',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:now})});
+    }
+  }catch(logErr){console.log('inbox log error (non-fatal):',logErr);}
+
   return true;
 }
 
