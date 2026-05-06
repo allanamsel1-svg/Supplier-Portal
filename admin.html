@@ -3097,28 +3097,34 @@ async function acceptQuote(quoteId,rfqId,factoryName){
 
     // ─── Auto-create Product Development record ───
     try{
-      // Generate PD number based on existing count
-      var countR=await fetch(SB+'/rest/v1/product_development?select=id',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact','Range':'0-0'}});
-      var totalCount=parseInt((countR.headers.get('content-range')||'0/0').split('/')[1])||0;
-      var pdNum='PD-'+String(totalCount+1).padStart(4,'0');
-      // Pull dimensions from quote if present
-      var pdPayload={
-        pd_number:pdNum,
-        rfq_id:rfqId,
-        quote_id:quoteId,
-        factory_id:q.factory_id,
-        customer_id:rfq.customer_id||null,
-        brand_id:rfq.brand_id||null,
-        item_description:rfq.item_description,
-        category:rfq.category,
-        unit_length_cm:q.unit_length_cm,
-        unit_width_cm:q.unit_width_cm,
-        unit_height_cm:q.unit_height_cm,
-        unit_weight_kg:q.unit_weight_kg,
-        status:'pending'
-      };
-      await fetch(SB+'/rest/v1/product_development',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(pdPayload)});
-      console.log('PD record created: '+pdNum);
+      // Check if a PD record already exists for this quote — skip if yes
+      var existR=await fetch(SB+'/rest/v1/product_development?quote_id=eq.'+quoteId+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var existRows=existR.ok?await existR.json():[];
+      if(existRows&&existRows.length>0){
+        console.log('PD already exists for quote '+quoteId+', skipping creation');
+      }else{
+        // Generate PD number based on existing count
+        var countR=await fetch(SB+'/rest/v1/product_development?select=id',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'count=exact','Range':'0-0'}});
+        var totalCount=parseInt((countR.headers.get('content-range')||'0/0').split('/')[1])||0;
+        var pdNum='PD-'+String(totalCount+1).padStart(4,'0');
+        var pdPayload={
+          pd_number:pdNum,
+          rfq_id:rfqId,
+          quote_id:quoteId,
+          factory_id:q.factory_id,
+          customer_id:rfq.customer_id||null,
+          brand_id:rfq.brand_id||null,
+          item_description:rfq.item_description,
+          category:rfq.category,
+          unit_length_cm:q.unit_length_cm,
+          unit_width_cm:q.unit_width_cm,
+          unit_height_cm:q.unit_height_cm,
+          unit_weight_kg:q.unit_weight_kg,
+          status:'pending'
+        };
+        await fetch(SB+'/rest/v1/product_development',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(pdPayload)});
+        console.log('PD record created: '+pdNum);
+      }
     }catch(pdErr){
       console.log('PD creation failed (non-fatal):',pdErr);
     }
@@ -4553,7 +4559,8 @@ async function openPDDetail(pdId){
   overlay.style.display='block';
   content.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
   try{
-    var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+pdId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(project_number,item_description),customers(customer_name),brands(brand_name)&limit=1',{
+    // Plain fetch — no embeds (which can fail silently if FK relations aren't named right)
+    var r=await fetch(SB+'/rest/v1/product_development?id=eq.'+pdId+'&limit=1',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
     });
     if(!r.ok){
@@ -4564,12 +4571,19 @@ async function openPDDetail(pdId){
     var rows=await r.json();
     if(!rows||!rows.length){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">PD record not found.</div>';return;}
     pdCurrentDetail=rows[0];
-    // Fetch quote separately
-    if(pdCurrentDetail.quote_id){
-      var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+pdCurrentDetail.quote_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      var qrows=await qr.json();
-      pdCurrentDetail._quote=(qrows&&qrows[0])||{};
-    }else{pdCurrentDetail._quote={};}
+    // Load related data in parallel — all optional
+    var related=await Promise.all([
+      pdCurrentDetail.factory_id?fetch(SB+'/rest/v1/factories?id=eq.'+pdCurrentDetail.factory_id+'&select=factory_name_english,sales_email,sales_contact_name&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.rfq_id?fetch(SB+'/rest/v1/rfqs?id=eq.'+pdCurrentDetail.rfq_id+'&select=project_number,item_description&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.customer_id?fetch(SB+'/rest/v1/customers?id=eq.'+pdCurrentDetail.customer_id+'&select=customer_name&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.brand_id?fetch(SB+'/rest/v1/brands?id=eq.'+pdCurrentDetail.brand_id+'&select=brand_name&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([]),
+      pdCurrentDetail.quote_id?fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+pdCurrentDetail.quote_id+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}):Promise.resolve([])
+    ]);
+    pdCurrentDetail.factories=related[0]&&related[0][0]?related[0][0]:{};
+    pdCurrentDetail.rfqs=related[1]&&related[1][0]?related[1][0]:{};
+    pdCurrentDetail.customers=related[2]&&related[2][0]?related[2][0]:{};
+    pdCurrentDetail.brands=related[3]&&related[3][0]?related[3][0]:{};
+    pdCurrentDetail._quote=related[4]&&related[4][0]?related[4][0]:{};
     renderPDDetail();
   }catch(e){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">Error: '+e.message+'</div>';}
 }
