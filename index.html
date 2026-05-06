@@ -274,6 +274,7 @@
     <button class="ptab" onclick="ptab('overview')">Company Deck</button>
     <button class="ptab" onclick="ptab('quotes')">Quote Sheets</button>
     <button class="ptab" onclick="ptab('compliance');loadComplianceDocs();">Compliance <span id="compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('skus');loadFactorySkus();">Product Compliance <span id="sku-compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
   </div>
 
   <!-- Details pane -->
@@ -503,6 +504,117 @@
       </div>
     </div>
   </div>
+
+  <!-- Product Compliance pane (Stage 3) -->
+  <div class="ppane" id="ppane-skus">
+    <div class="card">
+      <div class="card-title">Product Compliance Documents</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;">For each SKU you produce for us, upload the required compliance documents (test reports, certifications, etc). If a document isn't ready yet, mark it "Not Complete" with an expected date so we can plan around it.</p>
+
+      <div id="sku-compliance-list"><div style="font-size:13px;color:#bbb;padding:8px 0;">Loading...</div></div>
+    </div>
+
+    <!-- Modal: shared upload / mark-incomplete form -->
+    <div id="sku-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:12px;max-width:580px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <div style="font-size:16px;font-weight:600;color:#1a1a2e;" id="sku-modal-title">Upload Document</div>
+          <button onclick="closeSkuModal()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;line-height:1;">×</button>
+        </div>
+        <div id="sku-modal-context" style="font-size:11px;color:#888;margin-bottom:14px;"></div>
+
+        <!-- Mode toggle -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;background:#f8f8f4;padding:4px;border-radius:8px;">
+          <button id="sku-mode-upload" class="cf-doc-btn" style="flex:1;padding:8px;background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="setSkuMode('upload')">📄 Upload Document</button>
+          <button id="sku-mode-incomplete" class="cf-doc-btn" style="flex:1;padding:8px;" onclick="setSkuMode('incomplete')">⏳ Not Complete Yet</button>
+        </div>
+
+        <!-- Common fields: category + type -->
+        <div class="cf-form-grid">
+          <div class="field">
+            <label>Category *</label>
+            <select id="sku-category" onchange="onSkuCategoryChange()">
+              <option value="">— Select —</option>
+              <option>Safety Testing</option>
+              <option>Regulatory</option>
+              <option>Substantiation / Claims Testing</option>
+              <option>Children's Products</option>
+              <option>Ingredient &amp; Composition</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Document Type *</label>
+            <select id="sku-type" disabled>
+              <option value="">— Select category first —</option>
+            </select>
+          </div>
+          <div class="field cf-form-full" id="sku-other-wrap" style="display:none;">
+            <label>Specify document type *</label>
+            <input type="text" id="sku-type-other" placeholder="e.g. Walmart Item Setup Sheet" />
+          </div>
+        </div>
+
+        <!-- Upload-mode fields -->
+        <div id="sku-upload-fields">
+          <div class="cf-form-grid">
+            <div class="field">
+              <label>Certificate / Report Number</label>
+              <input type="text" id="sku-cert-no" placeholder="optional" />
+            </div>
+            <div class="field">
+              <label>Test Lab</label>
+              <input type="text" id="sku-test-lab" placeholder="e.g. Eurofins, SGS" />
+            </div>
+            <div class="field">
+              <label>Issue Date</label>
+              <input type="date" id="sku-issue-date" />
+            </div>
+            <div class="field">
+              <label>Expiry Date *</label>
+              <input type="date" id="sku-expiry-date" />
+            </div>
+            <div class="field cf-form-full">
+              <label>Notes</label>
+              <textarea id="sku-notes" rows="2" placeholder="Optional notes — exclusions, scope, etc."></textarea>
+            </div>
+          </div>
+
+          <div class="upload-zone" onclick="document.getElementById('sku-file-input').click()">
+            <div class="icon">📄</div>
+            <strong>Choose PDF</strong>
+            <small>PDF only, up to 25 MB</small>
+            <div class="file-chosen" id="sku-chosen"></div>
+          </div>
+          <input type="file" id="sku-file-input" accept="application/pdf,.pdf" style="display:none" onchange="chooseFile(this,'sku-chosen','cf')" />
+        </div>
+
+        <!-- Incomplete-mode fields -->
+        <div id="sku-incomplete-fields" style="display:none;">
+          <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#664400;line-height:1.5;">
+            Mark this certification as "in progress" — let us know when you expect to have it. Once you have the actual certificate, you can upload it here and replace this placeholder.
+          </div>
+          <div class="cf-form-grid">
+            <div class="field cf-form-full">
+              <label>Expected Completion Date *</label>
+              <input type="date" id="sku-expected-date" />
+            </div>
+            <div class="field cf-form-full">
+              <label>Notes (optional)</label>
+              <textarea id="sku-incomplete-notes" rows="2" placeholder="Any context — testing in progress, lab name, etc."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+          <button class="cf-doc-btn" onclick="closeSkuModal()">Cancel</button>
+          <button class="cf-doc-btn" id="sku-modal-save" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="saveSkuModal()">Save</button>
+        </div>
+        <div class="prog" id="sku-modal-prog">Saving...</div>
+        <div class="pmsg err" id="sku-modal-err"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -581,10 +693,11 @@ async function enterPortal(){
   await loadAllFileLists();
   loadRFQBadge();
   loadComplianceDocs();
+  loadFactorySkus();
 }
 
 function ptab(t){
-  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',['details','rfqs','catalogs','overview','quotes','compliance'][i]===t);});
+  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',['details','rfqs','catalogs','overview','quotes','compliance','skus'][i]===t);});
   document.querySelectorAll('.ppane').forEach(function(el){el.classList.remove('on');});
   g('ppane-'+t).classList.add('on');
 }
@@ -983,6 +1096,515 @@ async function deleteComplianceDoc(id,filePath){
 
 // HTML-escape helper if not already defined elsewhere
 if(typeof esc!=='function'){window.esc=function(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};}
+
+// ════════════════════════════════════════
+// PRODUCT COMPLIANCE — SKU-LEVEL DOCS (Stage 3)
+// ════════════════════════════════════════
+
+var SKU_DOC_TYPES = {
+  'Safety Testing': [
+    'Microbial Test',
+    'Stability Test',
+    'Preservative Challenge Test',
+    'Compatibility Test'
+  ],
+  'Regulatory': [
+    'FDA Cosmetic Voluntary Registration',
+    'FDA OTC Monograph Compliance',
+    'EU CPNP Notification',
+    'Health Canada Cosmetic Notification',
+    'Health Canada NHP',
+    'MoCRA Product Listing',
+    'Prop 65 Compliance Statement',
+    'Prop 65 Chemical Test Report'
+  ],
+  'Substantiation / Claims Testing': [
+    'Cruelty-Free Substantiation',
+    'Vegan Substantiation',
+    'Hypoallergenic Substantiation',
+    'Dermatologist-Tested Report',
+    'Clinical / Patch Test Report',
+    'SPF Test Report',
+    'Water Resistance Test',
+    'Broad Spectrum Test'
+  ],
+  "Children's Products": [
+    'CPSIA General Conformity Certificate (GCC)',
+    "CPSIA Children's Product Certificate (CPC)",
+    'ASTM F963 Test Report',
+    'Lead Content Test',
+    'Phthalates Test',
+    'Small Parts Test (16 CFR 1501)'
+  ],
+  'Ingredient & Composition': [
+    'INCI List',
+    'Ingredient List',
+    'Safety Data Sheet (SDS / MSDS)',
+    'Allergen Test Report',
+    'IFRA Fragrance Compliance Certificate'
+  ],
+  'Other': []
+};
+
+var FACTORY_SKUS = []; // SKUs this factory is a source for
+var SKU_DOCS_BY_SKU = {}; // sku_id → array of docs linked
+var skuModalMode = 'upload'; // 'upload' or 'incomplete'
+var skuModalSkuId = null;
+var skuModalEditingDocId = null; // when replacing/editing existing in_progress doc
+
+async function loadFactorySkus(){
+  var listEl = g('sku-compliance-list');
+  if(!listEl) return;
+  if(!FACTORY_ID){
+    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">Save your factory details first.</div>';
+    return;
+  }
+  listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">Loading your SKUs...</div>';
+  try{
+    // Pull SKU sources for this factory, with sku details
+    var r = await fetch(SB+'/rest/v1/sku_factory_sources?factory_id=eq.'+FACTORY_ID+'&select=*,skus(id,model_number,description,is_cosmetic,brands(brand_name))',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){
+      listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">Could not load SKUs.</div>';
+      return;
+    }
+    var sources = await r.json();
+    // Dedupe on sku_id
+    var seen = {};
+    FACTORY_SKUS = [];
+    sources.forEach(function(s){
+      if(!s.skus || !s.skus.id) return;
+      if(seen[s.skus.id]) return;
+      seen[s.skus.id] = true;
+      FACTORY_SKUS.push(s.skus);
+    });
+    if(!FACTORY_SKUS.length){
+      listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:12px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;">You are not yet a source for any SKUs in our system. Once we approve a quote and add your factory as a source, those SKUs will appear here.</div>';
+      return;
+    }
+    // For each SKU, load linked docs
+    SKU_DOCS_BY_SKU = {};
+    var docPromises = FACTORY_SKUS.map(function(sku){
+      return fetch(SB+'/rest/v1/sku_document_links?sku_id=eq.'+sku.id+'&select=*,sku_documents(*)',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+      }).then(function(r){return r.ok?r.json():[];}).then(function(links){
+        var docs = [];
+        var seen = {};
+        (links||[]).forEach(function(lk){
+          var d = lk.sku_documents;
+          if(!d) return;
+          if(d.status === 'archived') return;
+          if(seen[d.id]) return;
+          seen[d.id] = true;
+          docs.push(d);
+        });
+        SKU_DOCS_BY_SKU[sku.id] = docs;
+      });
+    });
+    await Promise.all(docPromises);
+    renderFactorySkuList();
+    updateSkuComplianceBadge();
+  }catch(e){
+    listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+function renderFactorySkuList(){
+  var listEl = g('sku-compliance-list');
+  if(!listEl) return;
+  if(!FACTORY_SKUS.length){
+    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;">No SKUs yet.</div>';
+    return;
+  }
+  listEl.innerHTML = FACTORY_SKUS.map(function(sku){
+    var docs = SKU_DOCS_BY_SKU[sku.id] || [];
+    var brandName = sku.brands ? sku.brands.brand_name : '';
+    var docsHtml;
+    if(!docs.length){
+      docsHtml = '<div style="font-size:12px;color:#bbb;padding:8px 0;">No compliance documents yet for this SKU. Click <strong>+ Add Document</strong> below.</div>';
+    }else{
+      docsHtml = docs.map(function(d){return renderSkuDocRow(sku.id, d);}).join('');
+    }
+    return '<div style="background:#f8f8f4;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">'+
+        '<div>'+
+          '<div style="font-size:14px;font-weight:600;color:#1a1a2e;font-family:monospace;">'+esc(sku.model_number)+'</div>'+
+          '<div style="font-size:12px;color:#666;margin-top:2px;">'+esc(sku.description||'')+'</div>'+
+          (brandName?'<div style="font-size:11px;color:#888;margin-top:2px;">Brand: '+esc(brandName)+'</div>':'')+
+        '</div>'+
+        '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+sku.id+'\',null)">+ Add Document</button>'+
+      '</div>'+
+      docsHtml+
+    '</div>';
+  }).join('');
+}
+
+function renderSkuDocRow(skuId, doc){
+  var typeLabel = (doc.document_type === 'Other' ? (doc.document_type_other || 'Other') : doc.document_type);
+  var verBadge = (doc.version && doc.version > 1) ? '<span class="cf-version-badge">v'+doc.version+'</span>' : '';
+  var rowCls = 'cf-cert-row';
+  var statusEl, meta, actions;
+
+  if(doc.status === 'in_progress'){
+    var expectedStr = doc.expected_completion_date ? new Date(doc.expected_completion_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'TBD';
+    var expectedDays = daysUntil(doc.expected_completion_date);
+    var overdueLbl = (expectedDays !== null && expectedDays < 0) ? ' <strong style="color:#b00;">— overdue</strong>' : '';
+    rowCls += ' expiring60';
+    statusEl = '<span class="cf-cert-status expiring">⏳ In Progress</span>';
+    meta = 'Expected by '+expectedStr+overdueLbl+(doc.notes?' · '+esc(doc.notes):'');
+    actions = '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'edit-incomplete\')">Edit</button>'+
+              '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'upload-replace\')">+ Upload Now</button>'+
+              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\','+null+')">Delete</button>';
+  }else{
+    var status = complianceStatus(doc.expiry_date);
+    if(status.cls === 'warning' || status.cls === 'expired') rowCls += ' warning30';
+    else if(status.cls === 'expiring') rowCls += ' expiring60';
+    else rowCls += ' uploaded';
+    statusEl = '<span class="cf-cert-status '+status.cls+'">'+esc(status.label)+'</span>';
+    var expiryStr = doc.expiry_date ? new Date(doc.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+    var parts = [];
+    if(doc.document_category) parts.push(esc(doc.document_category));
+    if(doc.certificate_number) parts.push('Cert #'+esc(doc.certificate_number));
+    if(doc.test_lab) parts.push('Lab: '+esc(doc.test_lab));
+    if(expiryStr) parts.push('Expires '+expiryStr);
+    meta = parts.join(' · ');
+    var safePath = (doc.file_path||'').replace(/'/g,"\\'");
+    actions = '<button class="cf-doc-btn" onclick="viewSkuDoc(\''+safePath+'\')">View</button>'+
+              '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'replace\')">Replace</button>'+
+              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\',\''+safePath+'\')">Delete</button>';
+  }
+
+  return '<div class="'+rowCls+'" style="margin-top:6px;">'+
+    '<div class="cf-cert-name">'+
+      '<div><span class="cf-cert-name-text">'+esc(typeLabel)+'</span>'+verBadge+'</div>'+
+      '<div class="cf-cert-meta">'+meta+'</div>'+
+    '</div>'+
+    statusEl+
+    '<div class="cf-cert-actions">'+actions+'</div>'+
+  '</div>';
+}
+
+function updateSkuComplianceBadge(){
+  // Count critical: expired/<=30d uploaded docs + overdue in-progress docs
+  var critical = 0;
+  Object.keys(SKU_DOCS_BY_SKU).forEach(function(skuId){
+    (SKU_DOCS_BY_SKU[skuId]||[]).forEach(function(d){
+      if(d.status === 'in_progress'){
+        var dys = daysUntil(d.expected_completion_date);
+        if(dys !== null && dys < 0) critical++;
+      }else if(d.status === 'uploaded'){
+        var days = daysUntil(d.expiry_date);
+        if(days !== null && days < 30) critical++;
+      }
+    });
+  });
+  var badge = g('sku-compl-badge');
+  if(badge){
+    if(critical){badge.textContent = critical; badge.style.display = 'inline-block';}
+    else{badge.style.display = 'none';}
+  }
+}
+
+// ── Modal ──
+function openSkuModal(skuId, docId, action){
+  // action: undefined/null = new doc; 'replace' = replacing uploaded; 'edit-incomplete' = editing in_progress; 'upload-replace' = converting in_progress to uploaded
+  skuModalSkuId = skuId;
+  skuModalEditingDocId = docId;
+
+  // Reset form
+  g('sku-category').value = '';
+  g('sku-type').innerHTML = '<option value="">— Select category first —</option>';
+  g('sku-type').disabled = true;
+  g('sku-type-other').value = '';
+  g('sku-other-wrap').style.display = 'none';
+  g('sku-cert-no').value = '';
+  g('sku-test-lab').value = '';
+  g('sku-issue-date').value = '';
+  g('sku-expiry-date').value = '';
+  g('sku-notes').value = '';
+  g('sku-expected-date').value = '';
+  g('sku-incomplete-notes').value = '';
+  g('sku-chosen').textContent = '';
+  selFiles.cf = null;
+  g('sku-file-input').value = '';
+  g('sku-modal-prog').style.display = 'none';
+  g('sku-modal-err').style.display = 'none';
+
+  var sku = FACTORY_SKUS.find(function(s){return s.id===skuId;});
+  g('sku-modal-context').textContent = sku ? ('SKU: '+sku.model_number+' — '+(sku.description||'')) : '';
+
+  // Set title and mode based on action
+  if(action === 'edit-incomplete'){
+    setSkuMode('incomplete');
+    g('sku-modal-title').textContent = 'Edit "Not Complete" entry';
+    var d = (SKU_DOCS_BY_SKU[skuId]||[]).find(function(x){return x.id===docId;});
+    if(d){
+      g('sku-category').value = d.document_category||'';
+      onSkuCategoryChange();
+      if(d.document_type === 'Other') g('sku-type-other').value = d.document_type_other||'';
+      else g('sku-type').value = d.document_type||'';
+      g('sku-expected-date').value = d.expected_completion_date||'';
+      g('sku-incomplete-notes').value = d.notes||'';
+    }
+  }else if(action === 'upload-replace' || action === 'replace'){
+    setSkuMode('upload');
+    g('sku-modal-title').textContent = action === 'upload-replace' ? 'Upload Document (replaces "Not Complete" placeholder)' : 'Replace Document';
+    var existing = (SKU_DOCS_BY_SKU[skuId]||[]).find(function(x){return x.id===docId;});
+    if(existing){
+      g('sku-category').value = existing.document_category||'';
+      onSkuCategoryChange();
+      if(existing.document_type === 'Other') g('sku-type-other').value = existing.document_type_other||'';
+      else g('sku-type').value = existing.document_type||'';
+      g('sku-cert-no').value = existing.certificate_number||'';
+      g('sku-test-lab').value = existing.test_lab||'';
+      g('sku-issue-date').value = existing.issue_date||'';
+      g('sku-expiry-date').value = existing.expiry_date||'';
+      g('sku-notes').value = existing.notes||'';
+    }
+  }else{
+    setSkuMode('upload');
+    g('sku-modal-title').textContent = 'Add Compliance Document';
+  }
+
+  g('sku-modal').style.display = 'flex';
+}
+
+function closeSkuModal(){
+  g('sku-modal').style.display = 'none';
+  skuModalSkuId = null;
+  skuModalEditingDocId = null;
+}
+
+function setSkuMode(mode){
+  skuModalMode = mode;
+  var uploadBtn = g('sku-mode-upload');
+  var incompleteBtn = g('sku-mode-incomplete');
+  var uploadFields = g('sku-upload-fields');
+  var incompleteFields = g('sku-incomplete-fields');
+  if(mode === 'upload'){
+    uploadBtn.style.background = '#1a1a2e';
+    uploadBtn.style.color = '#fff';
+    uploadBtn.style.borderColor = '#1a1a2e';
+    incompleteBtn.style.background = '';
+    incompleteBtn.style.color = '';
+    incompleteBtn.style.borderColor = '';
+    uploadFields.style.display = 'block';
+    incompleteFields.style.display = 'none';
+  }else{
+    incompleteBtn.style.background = '#886600';
+    incompleteBtn.style.color = '#fff';
+    incompleteBtn.style.borderColor = '#886600';
+    uploadBtn.style.background = '';
+    uploadBtn.style.color = '';
+    uploadBtn.style.borderColor = '';
+    uploadFields.style.display = 'none';
+    incompleteFields.style.display = 'block';
+  }
+}
+
+function onSkuCategoryChange(){
+  var cat = g('sku-category').value;
+  var typeSel = g('sku-type');
+  var otherWrap = g('sku-other-wrap');
+  if(!cat){
+    typeSel.disabled = true;
+    typeSel.innerHTML = '<option value="">— Select category first —</option>';
+    otherWrap.style.display = 'none';
+    return;
+  }
+  if(cat === 'Other'){
+    typeSel.disabled = true;
+    typeSel.innerHTML = '<option value="Other">(specify below)</option>';
+    typeSel.value = 'Other';
+    otherWrap.style.display = 'block';
+    return;
+  }
+  otherWrap.style.display = 'none';
+  typeSel.disabled = false;
+  var types = SKU_DOC_TYPES[cat] || [];
+  typeSel.innerHTML = '<option value="">— Select —</option>'+types.map(function(t){return '<option>'+t+'</option>';}).join('');
+}
+
+async function saveSkuModal(){
+  if(!skuModalSkuId){return;}
+  var category = g('sku-category').value;
+  if(!category){showSkuErr('Select a category.');return;}
+  var docType = g('sku-type').value;
+  var docTypeOther = g('sku-type-other').value.trim();
+  if(category === 'Other'){
+    if(!docTypeOther){showSkuErr('Specify a document type.');return;}
+    docType = 'Other';
+  }else if(!docType){showSkuErr('Select a document type.');return;}
+
+  var btn = g('sku-modal-save');
+  btn.disabled = true;
+  g('sku-modal-prog').style.display = 'block';
+  g('sku-modal-err').style.display = 'none';
+
+  try{
+    if(skuModalMode === 'incomplete'){
+      var expectedDate = g('sku-expected-date').value;
+      if(!expectedDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expected completion date is required.');return;}
+
+      var payload = {
+        document_type: docType,
+        document_type_other: (docType==='Other') ? docTypeOther : null,
+        document_category: category,
+        file_name: 'Not Complete',
+        expected_completion_date: expectedDate,
+        notes: g('sku-incomplete-notes').value.trim() || null,
+        status: 'in_progress',
+        is_current: true,
+        version: 1,
+        uploaded_by: 'factory'
+      };
+
+      // If editing existing in_progress, PATCH; else POST + link to SKU
+      if(skuModalEditingDocId){
+        var pr = await fetch(SB+'/rest/v1/sku_documents?id=eq.'+skuModalEditingDocId,{
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify(payload)
+        });
+        if(!pr.ok){var perr=await pr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Update failed: '+(perr.message||pr.status));return;}
+      }else{
+        var dr = await fetch(SB+'/rest/v1/sku_documents',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
+          body:JSON.stringify(payload)
+        });
+        if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Save failed: '+(derr.message||derr.details||dr.status));return;}
+        var inserted = await dr.json().catch(function(){return null;});
+        var newId = Array.isArray(inserted) ? (inserted[0]&&inserted[0].id) : (inserted&&inserted.id);
+        if(newId){
+          await fetch(SB+'/rest/v1/sku_document_links',{
+            method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify([{document_id:newId, sku_id:skuModalSkuId}])
+          });
+        }
+      }
+    }else{
+      // upload mode
+      var expiryDate = g('sku-expiry-date').value;
+      if(!expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expiry date is required.');return;}
+      var issueDate = g('sku-issue-date').value;
+      if(issueDate && issueDate >= expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expiry must be after issue date.');return;}
+      var file = selFiles.cf;
+      if(!file){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Choose a PDF.');return;}
+      var isPdf = (file.type==='application/pdf')||/\.pdf$/i.test(file.name);
+      if(!isPdf){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('PDF only.');return;}
+      if(file.size > 25*1024*1024){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('File over 25 MB.');return;}
+
+      var ts = Date.now();
+      var safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+      var storagePath = 'sku/'+ts+'_'+safeName;
+
+      var sr = await fetch(SB+'/storage/v1/object/sku-documents/'+storagePath,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/pdf','x-upsert':'true'},
+        body: file
+      });
+      if(!sr.ok){var serr=await sr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Upload failed: '+(serr.message||serr.error||sr.status));return;}
+
+      // If replacing/converting an existing doc, archive it
+      var existingVersion = 0;
+      if(skuModalEditingDocId){
+        var existing = (SKU_DOCS_BY_SKU[skuModalSkuId]||[]).find(function(x){return x.id===skuModalEditingDocId;});
+        if(existing) existingVersion = existing.version || 1;
+        try{
+          await fetch(SB+'/rest/v1/sku_documents?id=eq.'+skuModalEditingDocId,{
+            method:'PATCH',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify({status:'archived', is_current:false})
+          });
+        }catch(e){console.log('archive prev failed:',e);}
+      }
+
+      var payload = {
+        document_type: docType,
+        document_type_other: (docType==='Other') ? docTypeOther : null,
+        document_category: category,
+        certificate_number: g('sku-cert-no').value.trim() || null,
+        test_lab: g('sku-test-lab').value.trim() || null,
+        file_name: file.name,
+        file_path: storagePath,
+        file_size: file.size,
+        issue_date: issueDate || null,
+        expiry_date: expiryDate,
+        notes: g('sku-notes').value.trim() || null,
+        version: skuModalEditingDocId ? (existingVersion+1) : 1,
+        is_current: true,
+        previous_version_id: skuModalEditingDocId || null,
+        status: 'uploaded',
+        uploaded_by: 'factory'
+      };
+
+      var dr = await fetch(SB+'/rest/v1/sku_documents',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
+        body: JSON.stringify(payload)
+      });
+      if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Save failed: '+(derr.message||derr.details||dr.status));return;}
+      var inserted = await dr.json().catch(function(){return null;});
+      var newId = Array.isArray(inserted) ? (inserted[0]&&inserted[0].id) : (inserted&&inserted.id);
+      if(newId){
+        await fetch(SB+'/rest/v1/sku_document_links',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify([{document_id:newId, sku_id:skuModalSkuId}])
+        });
+      }
+    }
+
+    btn.disabled = false;
+    g('sku-modal-prog').style.display = 'none';
+    closeSkuModal();
+    await loadFactorySkus();
+  }catch(e){
+    btn.disabled = false;
+    g('sku-modal-prog').style.display = 'none';
+    showSkuErr('Error: '+e.message);
+  }
+}
+
+function showSkuErr(msg){
+  g('sku-modal-err').textContent = msg;
+  g('sku-modal-err').style.display = 'block';
+}
+
+async function viewSkuDoc(filePath){
+  if(!filePath){alert('No file path.');return;}
+  try{
+    var r = await fetch(SB+'/storage/v1/object/sign/sku-documents/'+filePath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
+      body: JSON.stringify({expiresIn:300})
+    });
+    if(!r.ok){alert('Could not generate download link: '+r.status);return;}
+    var d = await r.json();
+    window.open(SB+'/storage/v1'+d.signedURL, '_blank');
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deleteSkuDoc(docId, filePath){
+  if(!confirm('Delete this document?'))return;
+  try{
+    if(filePath && filePath !== 'null'){
+      await fetch(SB+'/storage/v1/object/sku-documents/'+filePath,{
+        method:'DELETE',
+        headers:{'Authorization':'Bearer '+TOKEN}
+      });
+    }
+    var r = await fetch(SB+'/rest/v1/sku_documents?id=eq.'+docId,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Delete failed: '+(err.message||r.status));return;}
+    await loadFactorySkus();
+  }catch(e){alert('Error: '+e.message);}
+}
 
 async function loadDetails(){
   try{
