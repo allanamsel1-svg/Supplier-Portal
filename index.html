@@ -1840,6 +1840,7 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
       '<div class="qf"><label>HTS Code (if known)</label><input type="text" id="qhts-'+rfq.id+'" placeholder="e.g. 8513.10.2000" value="'+hts+'" /></div>' +
       '<div class="qf"><label>Country of Manufacture</label><select id="qcountry-'+rfq.id+'"><option value="China">China</option><option value="Vietnam">Vietnam</option><option value="Korea">Korea</option><option value="India">India</option><option value="Bangladesh">Bangladesh</option><option value="Other">Other</option></select></div>' +
     '</div>' +
+    '<div class="qf qf-full" style="margin-bottom:10px;"><label>Existing factory model number (if applicable)</label><input type="text" id="qmodel-'+rfq.id+'" placeholder="e.g. SKU-A123 — leave blank if this is a custom build" value="'+(existing?existing.factory_existing_model_number||'':'')+'" /></div>' +
     '<div class="qf qf-full" style="margin-bottom:10px;"><label>Product Specifications / Notes</label><textarea id="qspecs-'+rfq.id+'" rows="3" placeholder="Describe what you can produce, any variations, materials, etc.">'+specs+'</textarea></div>' +
     '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Unit Dimensions (optional)</div>' +
     '<div class="quote-grid-3">' +
@@ -1850,7 +1851,11 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
     '<div class="quote-grid" style="margin-top:8px;">' +
       '<div class="qf"><label>Unit Weight (kg)</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="kg" value="'+wgt+'" /></div>' +
     '</div>' +
-    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;"><label>INCI Ingredient List (required for cosmetics)</label><input type="url" id="qinci-'+rfq.id+'" placeholder="Link to your INCI document (Google Drive, Dropbox, etc.)" value="'+(existing?existing.inci_document_url||'':'')+'" /></div>':'')+
+    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">'+
+      '<label style="display:block;font-weight:600;color:#664400;margin-bottom:6px;">INCI Ingredient List PDF (required for cosmetics)</label>'+
+      '<div style="font-size:11px;color:#886600;margin-bottom:8px;">Upload a PDF of your full INCI list — this is required for compliance review. Existing file: '+(existing&&existing.inci_document_url?'<strong>'+esc(existing.inci_document_url.split("/").pop())+'</strong> (uploading a new one will replace it)':'<em>None uploaded</em>')+'</div>'+
+      '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:12px;" />'+
+    '</div>':'')+
     '<input type="hidden" id="qquoteid-'+rfq.id+'" value="'+quoteId+'" />' +
     '<input type="hidden" id="qassignid-'+rfq.id+'" value="'+assignment.id+'" />' +
     '<button class="submit-quote-btn" id="qbtn-'+rfq.id+'" onclick="submitQuote(\''+rfq.id+'\')">'+(hidden?'Update Quote':'Submit Quote')+'</button>' +
@@ -1870,6 +1875,10 @@ function showEditQuote(rfqId,quoteId){
 }
 
 async function submitQuote(rfqId){
+  function showQuoteErr(rid,msg){
+    var el=g('qerr-'+rid);
+    if(el){el.textContent=msg;el.style.display='block';}
+  }
   var fob=parseFloat(g('qfob-'+rfqId).value)||0;
   var moq=parseInt(g('qmoq-'+rfqId).value)||0;
   if(!fob||!moq){alert('Please enter at least FOB price and MOQ.');return;}
@@ -1881,6 +1890,35 @@ async function submitQuote(rfqId){
   var wid=parseFloat(g('qwid-'+rfqId).value)||null;
   var hei=parseFloat(g('qhei-'+rfqId).value)||null;
   var cbm=(len&&wid&&hei)?(len*wid*hei/1000000):null;
+
+  // Upload INCI PDF if provided
+  var inciUrl=null;
+  var inciInput=g('qinci-'+rfqId);
+  var inciFile=inciInput&&inciInput.files&&inciInput.files[0];
+  if(inciFile){
+    var ts=Date.now();
+    var safeName=inciFile.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var inciPath=FACTORY_ID+'/inci/'+ts+'_'+safeName;
+    try{
+      var ur=await fetch(SB+'/storage/v1/object/factory-files/'+inciPath,{
+        method:'POST',
+        headers:{'Authorization':'Bearer '+TOKEN,'apikey':KEY,'Content-Type':'application/pdf','x-upsert':'true'},
+        body:inciFile
+      });
+      if(!ur.ok){
+        var uerr=await ur.json().catch(function(){return{};});
+        btn.disabled=false;btn.textContent='Submit Quote';
+        showQuoteErr(rfqId,'INCI upload failed: '+(uerr.message||uerr.error||ur.status));
+        return;
+      }
+      inciUrl=inciPath;
+    }catch(e){
+      btn.disabled=false;btn.textContent='Submit Quote';
+      showQuoteErr(rfqId,'INCI upload error: '+e.message);
+      return;
+    }
+  }
+
   var payload={
     rfq_id:rfqId,
     factory_id:FACTORY_ID,
@@ -1888,16 +1926,18 @@ async function submitQuote(rfqId){
     unit_fob_price:fob,
     moq:moq,
     hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
-    country_of_manufacture:g('qcountry-'+rfqId).value,
+    country_of_manufacture:[g('qcountry-'+rfqId).value],
+    factory_existing_model_number:g('qmodel-'+rfqId)?g('qmodel-'+rfqId).value.trim()||null:null,
     factory_specifications:g('qspecs-'+rfqId).value.trim()||null,
     unit_length_cm:len,
     unit_width_cm:wid,
     unit_height_cm:hei,
     unit_cbm:cbm,
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
-    inci_document_url:g('qinci-'+rfqId)?g('qinci-'+rfqId).value.trim()||null:null,
     status:'submitted'
   };
+  // Only include inci_document_url if we just uploaded one (otherwise preserve existing)
+  if(inciUrl)payload.inci_document_url=inciUrl;
   try{
     var method=existingId?'PATCH':'POST';
     var url=existingId?SB+'/rest/v1/rfq_quotes?id=eq.'+existingId:SB+'/rest/v1/rfq_quotes';
