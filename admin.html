@@ -1642,6 +1642,42 @@
   </div>
 </div>
 
+<!-- Reject Quote Modal -->
+<div class="modal-overlay" id="reject-modal">
+  <div class="modal" style="max-width:680px;">
+    <h2>Not Approved — Send Reply to Factory</h2>
+    <div class="modal-to" id="reject-to">—</div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Reason (template will pre-fill)</label>
+      <select id="reject-reason" onchange="rejectReasonChanged()" style="width:100%;padding:9px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;background:#fff;color:#1a1a2e;">
+        <option value="price_too_high">Price too high</option>
+        <option value="specs_mismatch">Specifications do not match</option>
+        <option value="certs_missing">Certifications missing</option>
+        <option value="incomplete_quote">Quote is incomplete (missing required fields)</option>
+        <option value="another_supplier">Going with another supplier</option>
+        <option value="moq_too_high">MOQ too high</option>
+        <option value="lead_time_too_long">Lead time too long</option>
+        <option value="discontinued">Product discontinued / no longer needed</option>
+        <option value="other">Other (custom)</option>
+      </select>
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Email subject</label>
+      <input type="text" id="reject-subject" style="width:100%;padding:9px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;color:#1a1a2e;" />
+    </div>
+    <div style="margin-bottom:6px;">
+      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Email body (edit freely before sending)</label>
+    </div>
+    <textarea id="reject-body" placeholder="Email body..."></textarea>
+    <div style="font-size:11px;color:#888;margin-top:-6px;margin-bottom:10px;">Internal note saved with rejection: <strong id="reject-internal-note">—</strong></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeRejectModal()">Cancel</button>
+      <button class="btn-send" id="reject-send-btn" onclick="confirmRejectQuote()">Reject &amp; Send Email ✉</button>
+    </div>
+    <div class="modal-msg" id="reject-msg">✓ Quote rejected. Email sent.</div>
+  </div>
+</div>
+
 <!-- ── Supplier Detail Drawer ── -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="supplier-drawer">
@@ -3018,13 +3054,16 @@ function renderQuoteCard(q,rfq,idx,versions){
   var isUpdated=q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(q.created_at);
   var submittedDate=q.created_at?new Date(q.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
   var updatedDate=isUpdated?new Date(q.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
+  var missing=getMissingFields(q,rfq);
+  var missingBadge=missing.length?'<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 7px;border-radius:10px;font-weight:600;">⚠ '+missing.length+' missing</span>':'';
 
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
       '<div style="flex:1;">'+
-        '<div style="display:flex;align-items:center;gap:8px;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
           '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
           (isUpdated?'<span style="font-size:10px;background:#fff0c0;color:#886600;border:1px solid #e0c040;padding:2px 7px;border-radius:10px;font-weight:600;">🔄 Updated '+updatedDate+'</span>':'')+
+          missingBadge+
         '</div>'+
         '<div style="font-size:12px;margin-top:2px;">'+
           '<span style="font-size:16px;font-weight:700;color:'+fobColor+';">$'+totalFob.toFixed(4)+' Total FOB</span>'+
@@ -3036,6 +3075,10 @@ function renderQuoteCard(q,rfq,idx,versions){
       '<span style="color:#bbb;font-size:18px;">▾</span>'+
     '</div>'+
     '<div class="quote-card-body" id="qbody-'+q.id+'">'+
+      (missing.length?'<div style="background:#fff5f5;border:1px solid #fdd;border-radius:8px;padding:12px 14px;margin-bottom:12px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#b00;margin-bottom:6px;">⚠ Missing or incomplete fields ('+missing.length+')</div>'+
+        '<div style="font-size:12px;color:#a04040;line-height:1.7;">'+missing.map(function(m){return '<span style="display:inline-block;background:#fff;border:1px solid #fdd;border-radius:4px;padding:2px 7px;margin:0 4px 4px 0;font-size:11px;">'+m+'</span>';}).join('')+'</div>'+
+      '</div>':'')+
       '<div class="qdet-grid">'+
         (q.factory_specifications?'<div class="qdet-item" style="grid-column:span 2;"><div class="qdet-label">Specifications</div><div class="qdet-val" style="font-size:12px;font-weight:400;">'+q.factory_specifications+'</div></div>':'')+
         (q.unit_of_measure?'<div class="qdet-item"><div class="qdet-label">Unit of Measure</div><div class="qdet-val">'+q.unit_of_measure+'</div></div>':'')+
@@ -3073,6 +3116,7 @@ function renderQuoteCard(q,rfq,idx,versions){
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
+        (missing.length?'<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMissingFields(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">⚠ Request Missing Fields ('+missing.length+')</button>':'')+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMoreInfo(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">? Request More Info</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="saveQuoteToFactory(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f5f5f0;color:#555;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">💾 Save to Factory</button>'+
         (q.status==='accepted'?'<a data-qid="'+q.id+'" data-rid="'+rfq.id+'" href="setup.html?from_quote='+q.id+'&rfq='+rfq.id+'" target="_blank" style="padding:8px 16px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:7px;font-size:12px;cursor:pointer;text-decoration:none;font-weight:600;">＋ Create SKU</a>':'')+
@@ -3181,45 +3225,163 @@ async function acceptQuote(quoteId,rfqId,factoryName){
   }catch(e){alert('Error: '+e.message);}
 }
 
+// ── Reject Quote Modal ──
+var rejectCtx={quoteId:null,rfqId:null,quote:null,factory:null,rfq:null};
+var REJECT_TEMPLATES={
+  price_too_high:{
+    subject:'Quote not approved — price',
+    label:'Price too high',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter review, the unit pricing exceeds our target for this program. We are unable to move forward with this option at the current price level. If you are able to revisit your costing — particularly on the FOB unit price and packaging — we would welcome a revised quote.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  specs_mismatch:{
+    subject:'Quote not approved — specifications',
+    label:'Specifications do not match',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter review, the product specifications you have quoted do not match the requirements of this RFQ. Please review the original specifications carefully — if you can produce to the exact requirements, you are welcome to submit a revised quote.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  certs_missing:{
+    subject:'Quote not approved — certifications',
+    label:'Certifications missing',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThis program requires certifications that were not confirmed in your submission. Without those certifications in place, we are unable to move forward with this quote. If you can obtain the required certifications, please let us know and we can revisit.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  incomplete_quote:{
+    subject:'Quote not approved — incomplete submission',
+    label:'Quote is incomplete',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nUnfortunately your submission is missing several required fields'+(c.missingList?' ('+c.missingList+')':'')+'. We are unable to evaluate the quote without this information. Please resubmit with the complete details and we will gladly review.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  another_supplier:{
+    subject:'RFQ update',
+    label:'Going with another supplier',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter careful review of all submissions, we have decided to move forward with another supplier for this particular program. We appreciate the time and effort you put into your quote and look forward to working with '+c.factoryName+' on future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  moq_too_high:{
+    subject:'Quote not approved — MOQ',
+    label:'MOQ too high',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThe minimum order quantity quoted exceeds the volume our customer is committing to for this program. If you can offer a lower MOQ — or pricing tiers at a smaller quantity — we would be glad to reconsider.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  lead_time_too_long:{
+    subject:'Quote not approved — lead time',
+    label:'Lead time too long',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThe production lead time you quoted does not meet our customer\'s in-store deadline for this program. If you can compress the timeline, we would welcome a revised quote.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  discontinued:{
+    subject:'RFQ withdrawn',
+    label:'Product discontinued / not needed',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nOur customer has decided not to move forward with this product at this time. The RFQ has been withdrawn. We appreciate the work you put into your quote and look forward to future opportunities with '+c.factoryName+'.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  },
+  other:{
+    subject:'Quote not approved',
+    label:'Other',
+    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter careful review, we are unable to proceed with this quote at this time.\n\nWe value our relationship with '+c.factoryName+' and look forward to working together on future opportunities.\n\nBest regards,\nAllan Amsel\nTBG Sourcing';}
+  }
+};
 async function rejectQuote(quoteId,rfqId){
-  var reasons=['Price too high','Specifications do not match','Certifications missing','Going with another supplier','Product discontinued','Other'];
-  var reason=prompt('Select rejection reason:\n1. Price too high\n2. Specifications do not match\n3. Certifications missing\n4. Going with another supplier\n5. Product discontinued\n6. Other\n\nEnter number or type reason:');
-  if(!reason)return;
-  var reasonText=reasons[parseInt(reason)-1]||reason;
-
   try{
-    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(item_description,project_number)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(item_description,project_number,is_cosmetic,certifications_required)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var quotes=await qr.json();
-    var q=quotes[0];
-    var f=q&&q.factories||{};
-    var rfqData=q&&q.rfqs||{};
-
-    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected',admin_notes:reasonText})});
-
-    // Update scorecard
-    updateFactoryScorecard(q.factory_id,'quote_rejected');
-
-    // Send rejection email
+    var q=quotes&&quotes[0];
+    if(!q){alert('Quote not found.');return;}
+    rejectCtx.quoteId=quoteId;rejectCtx.rfqId=rfqId;rejectCtx.quote=q;rejectCtx.factory=q.factories||{};rejectCtx.rfq=q.rfqs||{};
+    var f=rejectCtx.factory;
+    g('reject-to').innerHTML='To: <strong>'+(f.sales_contact_name||'Factory Team')+'</strong> &lt;'+(f.sales_email||'no email on file')+'&gt; — '+(f.factory_name_english||'');
+    // Default to most likely reason: incomplete if missing fields, else price
+    var missing=getMissingFields(q,rejectCtx.rfq);
+    var defReason=missing.length>=3?'incomplete_quote':'price_too_high';
+    g('reject-reason').value=defReason;
+    rejectReasonChanged();
+    g('reject-modal').classList.add('on');
+    g('reject-msg').style.display='none';
+  }catch(e){alert('Error loading quote: '+e.message);}
+}
+function rejectReasonChanged(){
+  var key=g('reject-reason').value;
+  var t=REJECT_TEMPLATES[key]||REJECT_TEMPLATES.other;
+  var rfq=rejectCtx.rfq||{};
+  var f=rejectCtx.factory||{};
+  var q=rejectCtx.quote||{};
+  var missing=getMissingFields(q,rfq);
+  var ctx={
+    firstName:(f.sales_contact_name||'Team').split(' ')[0],
+    factoryName:f.factory_name_english||'your team',
+    itemDesc:rfq.item_description||'this product',
+    proj:rfq.project_number||'',
+    missingList:missing.join(', ')
+  };
+  g('reject-subject').value='['+ctx.proj+'] '+t.subject+' — '+ctx.itemDesc;
+  g('reject-body').value=t.body(ctx);
+  g('reject-internal-note').textContent=t.label;
+}
+function closeRejectModal(){g('reject-modal').classList.remove('on');}
+async function confirmRejectQuote(){
+  var btn=g('reject-send-btn');
+  if(btn.disabled)return;
+  btn.disabled=true;btn.textContent='Sending...';
+  var quoteId=rejectCtx.quoteId,rfqId=rejectCtx.rfqId;
+  var f=rejectCtx.factory||{};
+  var reasonKey=g('reject-reason').value;
+  var reasonLabel=(REJECT_TEMPLATES[reasonKey]||REJECT_TEMPLATES.other).label;
+  var subject=g('reject-subject').value.trim();
+  var body=g('reject-body').value.trim();
+  try{
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected',admin_notes:reasonLabel})});
+    updateFactoryScorecard(rejectCtx.quote.factory_id,'quote_rejected');
     if(f.sales_email){
-      var firstName=(f.sales_contact_name||'Team').split(' ')[0];
-      var emailBody='Dear '+firstName+',\n\n'+
-        'Thank you for submitting your quote for '+rfqData.item_description+' ('+(rfqData.project_number||'')+').\n\n'+
-        'After careful review, we are unable to proceed with this quote at this time.\n'+
-        'Reason: '+reasonText+'\n\n'+
-        'We value our relationship with '+f.factory_name_english+' and look forward to working together on future opportunities.\n\n'+
-        'Best regards,\nAllan Amsel\nTBG Sourcing';
-
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','['+rfqData.project_number+'] '+(rfqData.item_description||''),emailBody,'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team',subject,body,'sourcing@tbgsourcing.net');
     }
+    g('reject-msg').textContent='✓ Quote rejected. Email sent to '+(f.sales_email||'factory')+'.';
+    g('reject-msg').style.display='block';
+    btn.textContent='Reject & Send Email ✉';btn.disabled=false;
+    setTimeout(function(){
+      closeRejectModal();
+      loadRFQs();
+      openRFQDetail(rfqId);
+    },1200);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Reject & Send Email ✉';
+    alert('Error: '+e.message);
+  }
+}
 
-    await loadRFQs();
-    openRFQDetail(rfqId);
-    alert('Quote rejected. Email sent to factory.');
+// Compute missing required fields on a quote, given the RFQ context
+function getMissingFields(q,rfq){
+  q=q||{};rfq=rfq||{};
+  var missing=[];
+  if(!q.unit_fob_price)missing.push('Unit FOB price');
+  if(q.packaging_price_per_unit==null||q.packaging_price_per_unit===''||isNaN(parseFloat(q.packaging_price_per_unit)))missing.push('Packaging cost');
+  if(!q.moq)missing.push('MOQ');
+  if(!q.fob_ports||(Array.isArray(q.fob_ports)&&q.fob_ports.length===0))missing.push('FOB port');
+  if(!q.country_of_manufacture||(Array.isArray(q.country_of_manufacture)&&q.country_of_manufacture.length===0))missing.push('Country of manufacture');
+  if(!q.hts_code_factory)missing.push('HTS code');
+  if(!q.unit_length_cm||!q.unit_width_cm||!q.unit_height_cm)missing.push('Unit dimensions');
+  if(!q.unit_weight_kg)missing.push('Unit weight');
+  if(!q.production_lead_time_days)missing.push('Production lead time');
+  if(!q.sample_price&&q.sample_price!==0)missing.push('Sample price');
+  if(!q.sample_lead_time_days)missing.push('Sample lead time');
+  if(rfq.is_cosmetic){
+    if(!q.inci_document_url)missing.push('INCI list');
+    if(!q.formulation_document_url)missing.push('Formulation breakdown');
+  }
+  if(rfq.certifications_required&&Array.isArray(rfq.certifications_required)&&rfq.certifications_required.length>0){
+    var confirmed=Array.isArray(q.certifications_confirmed)?q.certifications_confirmed:[];
+    if(confirmed.length===0)missing.push('Certifications (none confirmed)');
+  }
+  return missing;
+}
+
+async function requestMissingFields(quoteId,rfqId){
+  // Look up the quote + RFQ to compute missing list
+  try{
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,rfqs(item_description,project_number,is_cosmetic,certifications_required)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var qrows=await qr.json();
+    var q=qrows&&qrows[0];if(!q){alert('Quote not found.');return;}
+    var missing=getMissingFields(q,q.rfqs||{});
+    if(!missing.length){alert('No missing required fields on this quote.');return;}
+    var prefill='To complete our evaluation we need the following missing or incomplete fields:\n\n• '+missing.join('\n• ')+'\n\nPlease update your quote in the supplier portal with these details.';
+    requestMoreInfo(quoteId,rfqId,prefill);
   }catch(e){alert('Error: '+e.message);}
 }
 
-async function requestMoreInfo(quoteId,rfqId){
-  var info=prompt('What information do you need? (e.g. Better photos, INCI list, Lead time, Sample price, HTS code clarification)');
+async function requestMoreInfo(quoteId,rfqId,prefill){
+  var info=prompt('What information do you need? (Edit as needed before sending)',prefill||'');
   if(!info)return;
 
   try{
