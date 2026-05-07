@@ -3092,6 +3092,8 @@ function renderQuoteCard(q,rfq,idx,versions){
         (q.unit_length_cm?'<div class="qdet-item"><div class="qdet-label">Unit Dimensions</div><div class="qdet-val">'+q.unit_length_cm+'×'+q.unit_width_cm+'×'+q.unit_height_cm+' cm</div></div>':'')+
         (q.unit_cbm?'<div class="qdet-item"><div class="qdet-label">Unit CBM</div><div class="qdet-val">'+parseFloat(q.unit_cbm).toFixed(6)+'</div></div>':'')+
         (q.unit_weight_kg?'<div class="qdet-item"><div class="qdet-label">Unit Weight</div><div class="qdet-val">'+q.unit_weight_kg+' kg</div></div>':'')+
+        (q.production_lead_time_days?'<div class="qdet-item"><div class="qdet-label">Production Lead Time</div><div class="qdet-val">'+q.production_lead_time_days+' days</div></div>':'')+
+        (q.sample_lead_time_days?'<div class="qdet-item"><div class="qdet-label">Sample Lead Time</div><div class="qdet-val">'+q.sample_lead_time_days+' days</div></div>':'')+
         (q.certifications_confirmed&&q.certifications_confirmed.length?'<div class="qdet-item"><div class="qdet-label">Certifications Confirmed</div><div class="qdet-val" style="font-size:12px;">'+q.certifications_confirmed.join(', ')+'</div></div>':'')+
       '</div>'+
       // Margin comparison
@@ -3104,10 +3106,11 @@ function renderQuoteCard(q,rfq,idx,versions){
       :'')+
       // Product image
       (q.factory_product_image_url?'<div style="margin-bottom:12px;"><img src="'+q.factory_product_image_url+'" style="max-height:160px;border-radius:8px;border:1px solid #e0e0d8;" /></div>':'')+
-      // INCI + Formulation documents
-      ((q.inci_document_url||q.formulation_document_url)?'<div style="margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;">'+
+      // INCI + Formulation + Certification documents
+      ((q.inci_document_url||q.formulation_document_url||(Array.isArray(q.certification_documents)&&q.certification_documents.length))?'<div style="margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">'+
         (q.inci_document_url?'<a href="javascript:void(0)" onclick="openFactoryFile(\''+(q.inci_document_url||'').replace(/'/g,"\\'")+'\')" style="font-size:12px;color:#2266cc;text-decoration:none;">🧴 View INCI Document</a>':'')+
         (q.formulation_document_url?'<a href="javascript:void(0)" onclick="openFactoryFile(\''+(q.formulation_document_url||'').replace(/'/g,"\\'")+'\')" style="font-size:12px;color:#2266cc;text-decoration:none;">🧪 View Formulation <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;margin-left:3px;">CONFIDENTIAL</span></a>':'')+
+        (Array.isArray(q.certification_documents)&&q.certification_documents.length?q.certification_documents.map(function(c){return '<a href="javascript:void(0)" onclick="openFactoryFile(\''+(c.url||'').replace(/'/g,"\\'")+'\')" style="font-size:12px;color:#2266cc;text-decoration:none;">📜 '+esc(c.name||(c.url||'').split("/").pop())+'</a>';}).join(''):'')+
       '</div>':'')+
       // Version diff section
       (isUpdated&&versions&&versions.length?buildDiffSection(versions[versions.length-1].snapshot,q):'')+
@@ -3354,15 +3357,16 @@ function getMissingFields(q,rfq){
   if(!q.unit_length_cm||!q.unit_width_cm||!q.unit_height_cm)missing.push('Unit dimensions');
   if(!q.unit_weight_kg)missing.push('Unit weight');
   if(!q.production_lead_time_days)missing.push('Production lead time');
-  if(!q.sample_price&&q.sample_price!==0)missing.push('Sample price');
   if(!q.sample_lead_time_days)missing.push('Sample lead time');
   if(rfq.is_cosmetic){
     if(!q.inci_document_url)missing.push('INCI list');
     if(!q.formulation_document_url)missing.push('Formulation breakdown');
   }
+  // Certifications: only flag if RFQ explicitly required certs AND factory provided none
   if(rfq.certifications_required&&Array.isArray(rfq.certifications_required)&&rfq.certifications_required.length>0){
-    var confirmed=Array.isArray(q.certifications_confirmed)?q.certifications_confirmed:[];
-    if(confirmed.length===0)missing.push('Certifications (none confirmed)');
+    var docs=Array.isArray(q.certification_documents)?q.certification_documents:[];
+    var legacy=Array.isArray(q.certifications_confirmed)?q.certifications_confirmed:[];
+    if(docs.length===0&&legacy.length===0)missing.push('Certifications (none uploaded)');
   }
   return missing;
 }

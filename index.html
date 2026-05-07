@@ -1827,7 +1827,74 @@ function renderRFQList(assignments,existingQuotes){
     '</div>';
   }).join('');
   // Populate Total FOB displays for forms with existing values
-  setTimeout(function(){assignments.forEach(function(a){var r=a.rfqs||{};if(r.id)updateTotalFobDisplay(r.id);});},10);
+  setTimeout(function(){
+    assignments.forEach(function(a){
+      var r=a.rfqs||{};
+      if(r.id){
+        updateTotalFobDisplay(r.id);
+        // Seed one empty cert row if container exists and is empty
+        var cont=g('qcerts-rows-'+r.id);
+        if(cont&&cont.children.length===0)addCertRow(r.id,'','');
+      }
+    });
+  },10);
+}
+
+// ── Certification rows (multi-upload) ──
+var CERT_ROW_COUNTER=0;
+function addCertRow(rfqId,existingName,existingUrl){
+  CERT_ROW_COUNTER++;
+  var rowId='certrow-'+rfqId+'-'+CERT_ROW_COUNTER;
+  var name=existingName||'';
+  var hasExisting=!!existingUrl;
+  var existingLabel=hasExisting?'<div style="font-size:10px;color:#1a7a1a;margin-bottom:4px;word-break:break-all;">📎 '+esc(existingUrl.split("/").pop())+' <span style="color:#888;">(replace by uploading a new file)</span></div>':'';
+  var html='<div id="'+rowId+'" class="cert-row" data-rfqid="'+rfqId+'" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;padding:8px;background:#fffceb;border:1px solid #f0d860;border-radius:5px;">'+
+    '<div style="flex:1;min-width:0;">'+
+      '<input type="text" placeholder="Certification name (e.g. FDA Registration)" value="'+esc(name)+'" data-cert-field="name" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px;font-family:inherit;box-sizing:border-box;margin-bottom:4px;" />'+
+      existingLabel+
+      '<input type="file" accept="application/pdf,.pdf,.png,.jpg,.jpeg,image/*" data-cert-field="file" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
+      (hasExisting?'<input type="hidden" data-cert-field="existing-url" value="'+esc(existingUrl)+'" />':'')+
+    '</div>'+
+    '<button type="button" onclick="removeCertRow(\''+rowId+'\')" style="padding:4px 9px;background:#fff;border:1px solid #ddd;border-radius:5px;font-size:14px;cursor:pointer;color:#888;font-family:inherit;flex-shrink:0;" title="Remove">✕</button>'+
+  '</div>';
+  var container=g('qcerts-rows-'+rfqId);
+  if(container)container.insertAdjacentHTML('beforeend',html);
+}
+function removeCertRow(rowId){
+  var el=g(rowId);
+  if(el)el.parentNode.removeChild(el);
+}
+function clearCertRows(rfqId){
+  var container=g('qcerts-rows-'+rfqId);
+  if(container)container.innerHTML='';
+}
+async function uploadCertRows(rfqId){
+  // Iterate cert rows for this rfq, upload any new files, return array of {name, url, uploaded_at}
+  var container=g('qcerts-rows-'+rfqId);
+  if(!container)return [];
+  var rows=container.querySelectorAll('.cert-row');
+  var out=[];
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i];
+    var nameInput=row.querySelector('[data-cert-field="name"]');
+    var fileInput=row.querySelector('[data-cert-field="file"]');
+    var existingHidden=row.querySelector('[data-cert-field="existing-url"]');
+    var name=nameInput?nameInput.value.trim():'';
+    var file=fileInput&&fileInput.files&&fileInput.files[0];
+    if(file){
+      var ts=Date.now()+i;
+      var safe=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+      var path=USER.id+'/certifications/'+ts+'_'+safe;
+      var ct=file.type||'application/octet-stream';
+      try{
+        var ur=await fetch(SB+'/storage/v1/object/factory-files/'+path,{method:'POST',headers:{'Authorization':'Bearer '+TOKEN,'apikey':KEY,'Content-Type':ct,'x-upsert':'true'},body:file});
+        if(ur.ok)out.push({name:name||file.name,url:path,uploaded_at:new Date().toISOString()});
+      }catch(e){console.log('cert upload failed:',e);}
+    }else if(existingHidden&&existingHidden.value){
+      out.push({name:name,url:existingHidden.value,uploaded_at:''});
+    }
+  }
+  return out;
 }
 
 function renderQuoteSection(rfq,assignment,quotes){
@@ -1900,12 +1967,19 @@ function populateQuoteForm(rfqId,q){
   setVal('qwid-'+rfqId,q?q.unit_width_cm:'');
   setVal('qhei-'+rfqId,q?q.unit_height_cm:'');
   setVal('qwgt-'+rfqId,q?q.unit_weight_kg:'');
+  setVal('qprodlt-'+rfqId,q?q.production_lead_time_days:'');
+  setVal('qsamplt-'+rfqId,q?q.sample_lead_time_days:'');
   setVal('qfobport-'+rfqId,q&&Array.isArray(q.fob_ports)?q.fob_ports.join(', '):(q?q.fob_ports||'':''));
   var country=g('qcountry-'+rfqId);
   if(country){
     var cv=q&&q.country_of_manufacture?(Array.isArray(q.country_of_manufacture)?q.country_of_manufacture[0]:q.country_of_manufacture):'China';
     country.value=cv;
   }
+  // INCI/Formulation "current" labels
+  var inciCur=g('qinci-current-'+rfqId);
+  if(inciCur)inciCur.innerHTML='Current: '+(q&&q.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(q.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>');
+  var formCur=g('qformula-current-'+rfqId);
+  if(formCur)formCur.innerHTML='Current: '+(q&&q.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(q.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>');
   // Update title/buttons to reflect mode
   var title=g('qformtitle-'+rfqId);
   if(title)title.textContent=q?'Update Your Quote (Option '+(q.quote_option||'?')+')':'Submit a New Quote';
@@ -1914,6 +1988,14 @@ function populateQuoteForm(rfqId,q){
   // File inputs can't be programmatically populated — reset them
   var inci=g('qinci-'+rfqId);if(inci)inci.value='';
   var formula=g('qformula-'+rfqId);if(formula)formula.value='';
+  // Rebuild certification rows
+  clearCertRows(rfqId);
+  var existingCerts=q&&Array.isArray(q.certification_documents)?q.certification_documents:[];
+  if(existingCerts.length){
+    existingCerts.forEach(function(c){addCertRow(rfqId,c&&c.name,c&&c.url);});
+  }else{
+    addCertRow(rfqId,'','');
+  }
   // Clear any prior error/ok messages
   var ok=g('qok-'+rfqId);if(ok)ok.style.display='none';
   var er=g('qerr-'+rfqId);if(er)er.style.display='none';
@@ -1968,24 +2050,36 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
     '<div class="quote-grid" style="margin-top:8px;">' +
       '<div class="qf"><label>Unit Weight (kg)</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="kg" value="'+wgt+'" /></div>' +
     '</div>' +
-    (rfq.is_cosmetic?'<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;box-sizing:border-box;">'+
-      '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents (required for cosmetics)</div>'+
-      '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">Both INCI list AND full formulation breakdown are required. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially.</div>'+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">'+
+    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:10px;">Lead Times</div>' +
+    '<div class="quote-grid">' +
+      '<div class="qf"><label>Production Lead Time (days) *</label><input type="number" id="qprodlt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 45" /></div>' +
+      '<div class="qf"><label>Sample Lead Time (days) *</label><input type="number" id="qsamplt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 14" /></div>' +
+    '</div>' +
+    '<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;box-sizing:border-box;">'+
+      '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents'+(rfq.is_cosmetic?' <span style="font-size:11px;font-weight:500;">(INCI + Formulation required for cosmetics)</span>':'')+'</div>'+
+      (rfq.is_cosmetic?'<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">Both INCI list AND full formulation breakdown are required for cosmetic products. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially.</div>':'<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">Upload any product-specific certifications you can provide for this SKU (FDA, ISO, FCC, CE, RoHS, organic, etc.). Add as many as needed.</div>')+
+      (rfq.is_cosmetic?'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px;">'+
         '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
           '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">INCI List PDF *</label>'+
           '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Standardized ingredient list (regulatory order, no percentages)</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;">Current: '+(existing&&existing.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qinci-current-'+rfq.id+'">Current: <em>None</em></div>'+
           '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
         '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
           '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">Formulation PDF * <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">CONFIDENTIAL</span></label>'+
           '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Quantitative breakdown — ingredient %, role, active concentrations</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;">Current: '+(existing&&existing.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(existing.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>')+'</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qformula-current-'+rfq.id+'">Current: <em>None</em></div>'+
           '<input type="file" id="qformula-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
+      '</div>':'')+
+      // Certifications — always shown
+      '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
+        '<label style="display:block;font-weight:600;color:#664400;margin-bottom:6px;font-size:12px;">Certifications &amp; Test Reports</label>'+
+        (rfq.certifications_required&&rfq.certifications_required.length?'<div style="font-size:10px;color:#886600;margin-bottom:8px;">Buyer requested: <strong>'+rfq.certifications_required.join(', ')+'</strong></div>':'<div style="font-size:10px;color:#886600;margin-bottom:8px;">Add any SKU-specific certifications (FDA, ISO, FCC, CE, RoHS, USDA Organic, etc.)</div>')+
+        '<div id="qcerts-rows-'+rfq.id+'"></div>'+
+        '<button type="button" onclick="addCertRow(\''+rfq.id+'\')" style="margin-top:6px;padding:7px 12px;background:#fff;border:1px dashed #c0a830;color:#664400;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;">＋ Add a Certification</button>'+
       '</div>'+
-    '</div>':'')+
+    '</div>'+
     '<input type="hidden" id="qquoteid-'+rfq.id+'" value="'+quoteId+'" />' +
     '<input type="hidden" id="qassignid-'+rfq.id+'" value="'+assignment.id+'" />' +
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
@@ -2000,11 +2094,6 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
 function toggleRFQ(rfqId){
   var body=g('rfqbody-'+rfqId);
   if(body)body.classList.toggle('open');
-}
-
-function showEditQuote(rfqId,quoteId){
-  var form=g('qform-'+rfqId);
-  if(form)form.style.display=form.style.display==='none'?'block':'none';
 }
 
 async function saveQuoteDraft(rfqId){
@@ -2048,6 +2137,9 @@ async function saveQuoteDraft(rfqId){
       quoteOptionNumD=maxOptD+1;
     }catch(e){quoteOptionNumD=1;}
   }
+  // Upload cert files for draft too
+  var certDocsD=[];
+  try{certDocsD=await uploadCertRows(rfqId);}catch(e){}
   var payload={
     rfq_id:rfqId,factory_id:FACTORY_ID,
     unit_fob_price:parseFloat(g('qfob-'+rfqId).value)||null,
@@ -2061,6 +2153,9 @@ async function saveQuoteDraft(rfqId){
     unit_length_cm:len,unit_width_cm:wid,unit_height_cm:hei,
     unit_cbm:(len&&wid&&hei)?(len*wid*hei/1000000):null,
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
+    production_lead_time_days:parseInt(g('qprodlt-'+rfqId).value)||null,
+    sample_lead_time_days:parseInt(g('qsamplt-'+rfqId).value)||null,
+    certification_documents:certDocsD,
     status:'draft'
   };
   if(!existingId)payload.quote_option=quoteOptionNumD;
@@ -2177,6 +2272,10 @@ async function submitQuote(rfqId){
     }catch(e){quoteOptionNum=1;}
   }
 
+  // Upload certification files
+  var certDocs=[];
+  try{certDocs=await uploadCertRows(rfqId);}catch(e){console.log('cert upload err',e);}
+
   var payload={
     rfq_id:rfqId,
     factory_id:FACTORY_ID,
@@ -2193,6 +2292,9 @@ async function submitQuote(rfqId){
     unit_height_cm:hei,
     unit_cbm:cbm,
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
+    production_lead_time_days:parseInt(g('qprodlt-'+rfqId).value)||null,
+    sample_lead_time_days:parseInt(g('qsamplt-'+rfqId).value)||null,
+    certification_documents:certDocs,
     status:'submitted'
   };
   if(!existingId)payload.quote_option=quoteOptionNum;
