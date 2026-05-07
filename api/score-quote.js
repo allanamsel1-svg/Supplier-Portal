@@ -285,7 +285,7 @@ async function handler(req, res) {
     const prompt = buildPrompt(rfq, quote, criteria);
     const message = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 8000,
+      max_tokens: 16000,
       messages: [
         {
           role: 'user',
