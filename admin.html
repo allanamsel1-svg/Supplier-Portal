@@ -3173,6 +3173,161 @@ function buildDiffSection(oldSnapshot,newQuote){
   '</div>';
 }
 
+// ── AI Formulation Scoring ──────────────────────────────────────────
+async function scoreQuoteWithAI(quoteId){
+  var btns=document.querySelectorAll('button[data-qid="'+quoteId+'"]');
+  // Find the score button specifically
+  var scoreBtn=null;
+  btns.forEach(function(b){if(b.textContent.indexOf('Score')>=0||b.textContent.indexOf('Re-score')>=0)scoreBtn=b;});
+  if(scoreBtn){
+    scoreBtn.disabled=true;
+    scoreBtn.dataset.originalText=scoreBtn.textContent;
+    scoreBtn.textContent='⏳ Scoring (~30-60s)...';
+    scoreBtn.style.opacity='0.6';
+  }
+  // Show progress overlay on the quote card
+  var card=g('qcard-'+quoteId);
+  var existingOverlay=g('scoring-overlay-'+quoteId);
+  if(!existingOverlay&&card){
+    var overlay=document.createElement('div');
+    overlay.id='scoring-overlay-'+quoteId;
+    overlay.style.cssText='background:#f3edff;border:1px solid #c8b8e8;border-radius:8px;padding:14px 16px;margin:12px;font-size:13px;color:#5a2db8;text-align:center;';
+    overlay.innerHTML='✦ AI is reading the PDFs and scoring against ~50 criteria. This usually takes 30-60 seconds.<br><span style="font-size:11px;color:#888;">Don\'t close this tab.</span>';
+    card.querySelector('.quote-card-body').insertBefore(overlay,card.querySelector('.quote-card-body').firstChild);
+  }
+  try {
+    var r=await fetch('/api/score-quote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quote_id:quoteId})});
+    var data=await r.json();
+    if(!r.ok||!data.success){
+      throw new Error(data.error||'Scoring failed (status '+r.status+')');
+    }
+    // Refresh the RFQ detail pane to pick up new scorecard
+    var rfqId=card&&card.dataset.rid;
+    if(!rfqId){
+      // Fallback: find the parent open RFQ
+      var openCards=document.querySelectorAll('.rfq-card-body[style*="display: block"], .rfq-card-body.open');
+      if(openCards.length){var idAttr=openCards[0].id||'';rfqId=idAttr.replace('rfqdetailbody-','');}
+    }
+    // Simpler: just reload the whole quotes list — find the openRFQDetail and rerun
+    // Most reliable: just refresh the scorecard panel inline
+    var sc=data.scorecard;
+    var existingPanel=g('scpanel-'+quoteId);
+    var panelHtml=renderScorecardPanel({id:quoteId,formulation_score:sc.overall_score,formulation_scorecard:sc},sc);
+    if(existingPanel){
+      existingPanel.innerHTML=panelHtml;
+    } else if(card){
+      var actionRow=card.querySelector('.quote-card-body > div:last-child');
+      var newPanel=document.createElement('div');
+      newPanel.id='scpanel-'+quoteId;
+      newPanel.style.cssText='margin-bottom:12px;';
+      newPanel.innerHTML=panelHtml;
+      if(actionRow)actionRow.parentNode.insertBefore(newPanel,actionRow);
+    }
+    // Update the score badge in the header
+    var headerBadgeRow=card&&card.querySelector('.quote-card-header > div:first-child > div:first-child');
+    if(headerBadgeRow){
+      var existingScoreBadge=headerBadgeRow.querySelector('span[data-score-badge]');
+      if(existingScoreBadge)existingScoreBadge.remove();
+      var num=Math.round(parseFloat(sc.overall_score));
+      var grade=sc.letter_grade||'';
+      var color=num>=85?'#1a7a1a':num>=70?'#3a7a3a':num>=55?'#aa6600':'#b00';
+      var bg=num>=85?'#edfaed':num>=70?'#f0f8f0':num>=55?'#fff8e0':'#fff0f0';
+      var border=num>=85?'#a0d8a0':num>=70?'#c0d8c0':num>=55?'#e0c060':'#fdd';
+      var newBadge=document.createElement('span');
+      newBadge.setAttribute('data-score-badge','1');
+      newBadge.style.cssText='font-size:11px;background:'+bg+';color:'+color+';border:1px solid '+border+';padding:2px 8px;border-radius:10px;font-weight:700;';
+      newBadge.textContent='✦ '+num+'/100'+(grade?' · '+grade:'');
+      // Insert after the factory name (first child)
+      var nameDiv=headerBadgeRow.firstElementChild;
+      if(nameDiv&&nameDiv.nextSibling)headerBadgeRow.insertBefore(newBadge,nameDiv.nextSibling);
+      else headerBadgeRow.appendChild(newBadge);
+    }
+    // Remove progress overlay
+    var overlay=g('scoring-overlay-'+quoteId);if(overlay)overlay.remove();
+    if(scoreBtn){
+      scoreBtn.disabled=false;
+      scoreBtn.textContent='✦ Re-score with AI';
+      scoreBtn.style.opacity='1';
+    }
+  } catch (e) {
+    var overlay=g('scoring-overlay-'+quoteId);if(overlay)overlay.remove();
+    if(scoreBtn){
+      scoreBtn.disabled=false;
+      scoreBtn.textContent=scoreBtn.dataset.originalText||'✦ Score with AI';
+      scoreBtn.style.opacity='1';
+    }
+    alert('Scoring failed: '+e.message);
+  }
+}
+
+function renderScorecardPanel(q,sc){
+  if(!sc)return '';
+  var num=Math.round(parseFloat(sc.overall_score||0));
+  var grade=sc.letter_grade||'';
+  var color=num>=85?'#1a7a1a':num>=70?'#3a7a3a':num>=55?'#aa6600':'#b00';
+  var bg=num>=85?'#edfaed':num>=70?'#f0f8f0':num>=55?'#fff8e0':'#fff0f0';
+  var autoFail=sc.auto_fail_triggered?'<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:8px 12px;border-radius:7px;margin:8px 0;font-size:12px;font-weight:600;">⛔ AUTO-FAIL: '+esc(sc.auto_fail_reason||'')+'</div>':'';
+  var rows=Array.isArray(sc.scorecard)?sc.scorecard:[];
+  // Group by tier and source
+  var critical=rows.filter(function(r){return r.tier==='critical';});
+  var important=rows.filter(function(r){return r.tier==='important';});
+  var nice=rows.filter(function(r){return r.tier==='nice_to_have';});
+  var other=rows.filter(function(r){return !r.tier||(r.tier!=='critical'&&r.tier!=='important'&&r.tier!=='nice_to_have');});
+  var bonus=Array.isArray(sc.bonus_findings)?sc.bonus_findings:[];
+
+  function rowEl(r){
+    var s=Math.round(parseFloat(r.score||0));
+    var rc=s>=85?'#1a7a1a':s>=70?'#3a7a3a':s>=55?'#aa6600':s>0?'#b00':'#888';
+    var icon=r.passed===true?'✓':r.passed===false?'✗':'•';
+    var iconColor=r.passed===true?'#1a7a1a':r.passed===false?'#b00':'#888';
+    var src=r.source==='ai_extracted'?'<span style="font-size:9px;background:#f3edff;color:#5a2db8;padding:1px 5px;border-radius:6px;margin-left:4px;">AI</span>':r.source==='uploaded_cert'?'<span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:6px;margin-left:4px;">CERT</span>':r.source==='factory_typed'?'<span style="font-size:9px;background:#fff8e0;color:#886600;padding:1px 5px;border-radius:6px;margin-left:4px;">FACTORY</span>':r.source==='missing'?'<span style="font-size:9px;background:#fff0f0;color:#b00;padding:1px 5px;border-radius:6px;margin-left:4px;">MISSING</span>':'';
+    var weight=r.weight?'<span style="font-size:9px;color:#888;margin-left:4px;">w'+r.weight+'</span>':'';
+    return '<tr style="border-bottom:1px solid #f0f0e8;">'+
+      '<td style="padding:6px 8px;font-size:11px;width:24px;color:'+iconColor+';font-weight:700;">'+icon+'</td>'+
+      '<td style="padding:6px 8px;font-size:12px;color:#1a1a2e;">'+esc(r.criterion_label||r.criterion_key||'')+src+weight+'<div style="font-size:11px;color:#666;line-height:1.4;margin-top:2px;">'+esc(r.reasoning||'')+'</div></td>'+
+      '<td style="padding:6px 8px;font-size:13px;font-weight:700;color:'+rc+';width:50px;text-align:right;">'+s+'</td>'+
+    '</tr>';
+  }
+  function section(title,items){
+    if(!items.length)return '';
+    return '<div style="margin-top:10px;"><div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">'+title+' ('+items.length+')</div>'+
+      '<table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e0e0d8;border-radius:6px;overflow:hidden;">'+
+      items.map(rowEl).join('')+
+      '</table></div>';
+  }
+  var bonusHtml=bonus.length?'<div style="margin-top:10px;background:#fffbf0;border:1px solid #f0d860;border-radius:7px;padding:10px 12px;"><div style="font-size:11px;font-weight:700;color:#664400;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">⭐ Bonus Findings ('+bonus.length+')</div>'+bonus.map(function(b){return '<div style="font-size:12px;color:#553300;margin-bottom:6px;line-height:1.5;"><strong>'+esc(b.label||'')+':</strong> '+esc(b.reasoning||'')+'</div>';}).join('')+'</div>':'';
+  var notesHtml=sc.ai_notes?'<div style="margin-top:10px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;padding:10px 12px;"><div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">AI Summary</div><div style="font-size:12px;color:#1a1a2e;line-height:1.5;">'+esc(sc.ai_notes)+'</div></div>':'';
+  var meta=(sc.scored_at?'Scored '+new Date(sc.scored_at).toLocaleString():'')+(sc.model?' · '+sc.model:'')+(sc.criteria_count?' · '+sc.criteria_count+' criteria':'')+(sc.pdf_count?' · '+sc.pdf_count+' PDFs':'');
+
+  return '<div style="background:'+bg+';border:1px solid '+(num>=70?'#c0d8c0':num>=55?'#e0c060':'#fdd')+';border-radius:10px;padding:14px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;cursor:pointer;" onclick="toggleScorecardBody(\''+q.id+'\')">'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:700;color:#1a1a2e;">✦ Formulation Scorecard <span id="sctoggle-'+q.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
+        '<div style="font-size:10px;color:#888;margin-top:2px;">'+esc(meta)+'</div>'+
+      '</div>'+
+      '<div style="font-size:24px;font-weight:800;color:'+color+';">'+num+'<span style="font-size:14px;font-weight:600;">/100</span>'+(grade?' · '+grade:'')+'</div>'+
+    '</div>'+
+    autoFail+
+    '<div id="scbody-'+q.id+'" style="margin-top:10px;">'+
+      section('Critical',critical)+
+      section('Important',important)+
+      section('Nice to have',nice)+
+      section('Other',other)+
+      bonusHtml+
+      notesHtml+
+    '</div>'+
+  '</div>';
+}
+
+function toggleScorecardBody(quoteId){
+  var body=g('scbody-'+quoteId);
+  var toggle=g('sctoggle-'+quoteId);
+  if(!body)return;
+  var isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(toggle)toggle.textContent=isOpen?'▸':'▾';
+}
+
 function renderQuoteCard(q,rfq,idx,versions){
   var f=q.factories||{};
   var fob=parseFloat(q.unit_fob_price)||0;
@@ -3187,11 +3342,22 @@ function renderQuoteCard(q,rfq,idx,versions){
   var missing=getMissingFields(q,rfq);
   var missingBadge=missing.length?'<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 7px;border-radius:10px;font-weight:600;">⚠ '+missing.length+' missing</span>':'';
 
+  // Formulation score badge
+  var hasScore=q.formulation_score!==null&&q.formulation_score!==undefined;
+  var scoreNum=hasScore?Math.round(parseFloat(q.formulation_score)):null;
+  var sc=q.formulation_scorecard||null;
+  var letterGrade=sc&&sc.letter_grade?sc.letter_grade:'';
+  var scoreColor=hasScore?(scoreNum>=85?'#1a7a1a':scoreNum>=70?'#3a7a3a':scoreNum>=55?'#aa6600':'#b00'):'#888';
+  var scoreBg=hasScore?(scoreNum>=85?'#edfaed':scoreNum>=70?'#f0f8f0':scoreNum>=55?'#fff8e0':'#fff0f0'):'#f5f5f0';
+  var scoreBorder=hasScore?(scoreNum>=85?'#a0d8a0':scoreNum>=70?'#c0d8c0':scoreNum>=55?'#e0c060':'#fdd'):'#e0e0d8';
+  var scoreBadge=hasScore?'<span style="font-size:11px;background:'+scoreBg+';color:'+scoreColor+';border:1px solid '+scoreBorder+';padding:2px 8px;border-radius:10px;font-weight:700;">✦ '+scoreNum+'/100'+(letterGrade?' · '+letterGrade:'')+'</span>':'';
+
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
       '<div style="flex:1;">'+
         '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
           '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
+          scoreBadge+
           (isUpdated?'<span style="font-size:10px;background:#fff0c0;color:#886600;border:1px solid #e0c040;padding:2px 7px;border-radius:10px;font-weight:600;">🔄 Updated '+updatedDate+'</span>':'')+
           missingBadge+
         '</div>'+
@@ -3245,8 +3411,12 @@ function renderQuoteCard(q,rfq,idx,versions){
       // Version diff section
       (isUpdated&&versions&&versions.length?buildDiffSection(versions[versions.length-1].snapshot,q):'')+
 
+      // Formulation Scorecard panel (collapsed by default; only shown if a score exists)
+      (sc?'<div id="scpanel-'+q.id+'" style="margin-bottom:12px;">'+renderScorecardPanel(q,sc)+'</div>':'')+
+
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
+        '<button data-qid="'+q.id+'" onclick="scoreQuoteWithAI(this.dataset.qid)" style="padding:8px 16px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">'+(hasScore?'✦ Re-score with AI':'✦ Score with AI')+'</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
         (missing.length?'<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMissingFields(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">⚠ Request Missing Fields ('+missing.length+')</button>':'')+
