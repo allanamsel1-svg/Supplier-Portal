@@ -2054,8 +2054,7 @@ function renderRecommendedDocsPanel(rfq,existing){
   var crit=getCategoryHierarchyCriteria(rfq);
   var certs=Array.isArray(crit.required_certifications)?crit.required_certifications:[];
   var nums=Array.isArray(crit.numeric_specs)?crit.numeric_specs:[];
-  var rubrics=Array.isArray(crit.ai_rubrics)?crit.ai_rubrics:[];
-  if(!certs.length&&!nums.length&&!rubrics.length)return ''; // category not configured yet
+  if(!certs.length&&!nums.length)return ''; // category not configured yet
 
   // Detect which docs the factory has already provided
   var hasInci=!!(existing&&existing.inci_document_url);
@@ -2107,7 +2106,7 @@ function renderRecommendedDocsPanel(rfq,existing){
       items.map(function(it){return row(it,kind);}).join('')+'</div>';
   }
 
-  var summaryNum=certs.length+nums.length+rubrics.length;
+  var summaryNum=certs.length+nums.length;
   var headerCounts=(critical.length?'<span style="color:#b00;font-weight:600;">'+critical.length+' critical</span>':'')+
     (important.length?(critical.length?' · ':'')+'<span style="color:#886600;font-weight:600;">'+important.length+' important</span>':'')+
     (nice.length?(critical.length||important.length?' · ':'')+'<span style="color:#3a7a3a;">'+nice.length+' nice-to-have</span>':'');
@@ -2116,18 +2115,17 @@ function renderRecommendedDocsPanel(rfq,existing){
     '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;flex-wrap:wrap;gap:8px;" onclick="toggleRecDocs(\''+rfq.id+'\')">'+
       '<div>'+
         '<div style="font-size:13px;font-weight:700;color:#2244cc;">📋 Recommended Documents for this Category <span id="recdocs-toggle-'+rfq.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
-        '<div style="font-size:11px;color:#666;margin-top:2px;">'+headerCounts+(headerCounts?' · ':'')+nums.length+' test specs · '+rubrics.length+' AI checks</div>'+
+        '<div style="font-size:11px;color:#666;margin-top:2px;">'+headerCounts+(headerCounts?' · ':'')+nums.length+' test specs</div>'+
       '</div>'+
       '<div style="font-size:10px;color:#666;background:#fff;border:1px solid #c8d8f0;padding:4px 8px;border-radius:6px;">Optional but recommended</div>'+
     '</div>'+
-    '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">These documents strengthen your quote and avoid back-and-forth review cycles. <strong>You can submit your quote without them</strong> — but providing them improves your formulation score and speeds approval.</div>'+
+    '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">These documents strengthen your quote and avoid back-and-forth review cycles. <strong>You can submit your quote without them</strong> — but providing them speeds approval.</div>'+
     '<div id="recdocs-body-'+rfq.id+'" style="margin-top:8px;">'+
       section('Critical Certifications',critical,'cert')+
       section('Important Certifications',important,'cert')+
       section('Nice-to-Have Certifications',nice,'cert')+
       (other.length?section('Other Certifications',other,'cert'):'')+
       (nums.length?section('Test Reports / Numeric Specs',nums,'numeric'):'')+
-      (rubrics.length?section('AI Formulation Reviews (no doc needed — AI evaluates from INCI + Formulation)',rubrics,'rubric'):'')+
     '</div>'+
   '</div>';
 }
