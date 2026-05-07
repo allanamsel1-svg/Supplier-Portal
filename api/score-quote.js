@@ -41,10 +41,29 @@ async function sb(path, opts = {}) {
   return res.status === 204 ? null : await res.json();
 }
 
-// ── PDF fetcher (Supabase storage URLs are public for signed buckets) ──
-async function fetchPdfBase64(url) {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`PDF fetch ${res.status} ${url}`);
+// ── PDF fetcher: handles both full URLs and relative storage paths ──
+//    Stored format in DB: "{factory_id}/inci/{timestamp}_{filename}.pdf" (relative)
+//    Full URL needed:     "{SUPABASE_URL}/storage/v1/object/factory-files/{path}"
+//    Bucket "factory-files" is private — needs service-role auth header.
+async function fetchPdfBase64(urlOrPath) {
+  let url;
+  if (/^https?:\/\//i.test(urlOrPath)) {
+    url = urlOrPath; // already a full URL
+  } else {
+    // Strip leading slashes; bucket name is "factory-files"
+    const path = String(urlOrPath).replace(/^\/+/, '');
+    url = `${process.env.SUPABASE_URL}/storage/v1/object/factory-files/${path}`;
+  }
+  const res = await fetch(url, {
+    headers: {
+      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`PDF fetch ${res.status} for ${url} — ${body.slice(0, 200)}`);
+  }
   const buf = await res.arrayBuffer();
   return Buffer.from(buf).toString('base64');
 }
