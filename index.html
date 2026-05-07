@@ -626,6 +626,7 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var USER=null,TOKEN=null,FACTORY_NAME='',FACTORY_ID=null;
 var selFiles={cat:null,ov:null,qt:null,cf:null};
 var allRFQs=[];
+var allCategories=[]; // cached categories with scoring_criteria, used for "Recommended Documents" panel
 
 function g(id){return document.getElementById(id);}
 
@@ -1761,6 +1762,13 @@ async function loadRFQs(){
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     var existingQuotes=qr.ok?await qr.json():[];
+    // Load categories with scoring_criteria for "Recommended Documents" panel
+    try {
+      var cr=await fetch(SB+'/rest/v1/categories?select=id,category,sub_category,sub_sub_category,scoring_criteria',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+      });
+      if(cr.ok){allCategories=await cr.json()||[];}
+    } catch(e){allCategories=[];}
     allRFQs=assignments;
     renderRFQList(assignments,existingQuotes);
     // Clear badge
@@ -2010,6 +2018,129 @@ function updateTotalFobDisplay(rfqId){
   if(el)el.value=total?'$'+total.toFixed(4):'';
 }
 
+// ── Walk category hierarchy and merge scoring_criteria (parent first, child wins on key conflicts) ──
+function getCategoryHierarchyCriteria(rfq){
+  if(!rfq||!rfq.category||!Array.isArray(allCategories)||!allCategories.length)return {};
+  var top=allCategories.find(function(c){return c.category===rfq.category&&!c.sub_category&&!c.sub_sub_category;});
+  var sub=rfq.sub_category?allCategories.find(function(c){return c.category===rfq.category&&c.sub_category===rfq.sub_category&&!c.sub_sub_category;}):null;
+  var leaf=rfq.sub_sub_category?allCategories.find(function(c){return c.category===rfq.category&&c.sub_category===rfq.sub_category&&c.sub_sub_category===rfq.sub_sub_category;}):null;
+  function pick(o){return (o&&o.scoring_criteria)?o.scoring_criteria:{};}
+  return mergeRfqCriteria(mergeRfqCriteria(pick(top),pick(sub)),pick(leaf));
+}
+
+// Merge criteria objects — for arrays of {key,...}, child entries override parent by key
+function mergeRfqCriteria(parent,child){
+  parent=parent||{};child=child||{};var out={};
+  ['regulatory_profile','target_markets'].forEach(function(k){
+    var s=new Set([].concat(parent[k]||[],child[k]||[]));
+    if(s.size)out[k]=Array.from(s);
+  });
+  if(parent.banned_ingredients_check||child.banned_ingredients_check){
+    var lists=new Set([].concat((parent.banned_ingredients_check||{}).lists||[],(child.banned_ingredients_check||{}).lists||[]));
+    if(lists.size)out.banned_ingredients_check={lists:Array.from(lists),weight:10};
+  }
+  ['required_certifications','numeric_specs','boolean_specs','ai_rubrics'].forEach(function(k){
+    var byKey=new Map();
+    (parent[k]||[]).forEach(function(it){byKey.set((it.key||it.label||'').toLowerCase(),it);});
+    (child[k]||[]).forEach(function(it){byKey.set((it.key||it.label||'').toLowerCase(),it);});
+    if(byKey.size)out[k]=Array.from(byKey.values());
+  });
+  if(child.cost_quality||parent.cost_quality)out.cost_quality=child.cost_quality||parent.cost_quality;
+  return out;
+}
+
+// Render the "Recommended Documents" panel for a given RFQ
+function renderRecommendedDocsPanel(rfq,existing){
+  var crit=getCategoryHierarchyCriteria(rfq);
+  var certs=Array.isArray(crit.required_certifications)?crit.required_certifications:[];
+  var nums=Array.isArray(crit.numeric_specs)?crit.numeric_specs:[];
+  var rubrics=Array.isArray(crit.ai_rubrics)?crit.ai_rubrics:[];
+  if(!certs.length&&!nums.length&&!rubrics.length)return ''; // category not configured yet
+
+  // Detect which docs the factory has already provided
+  var hasInci=!!(existing&&existing.inci_document_url);
+  var hasFormulation=!!(existing&&existing.formulation_document_url);
+  var providedCertNames=(existing&&Array.isArray(existing.certification_documents))?existing.certification_documents.map(function(c){return (c.name||'').toLowerCase();}):[];
+  function certProvided(certKey,certLabel){
+    var k=(certKey||'').toLowerCase();var l=(certLabel||'').toLowerCase();
+    if(certKey==='inci'||l.indexOf('inci')>=0)return hasInci;
+    if(certKey==='formulation'||l.indexOf('formulation')>=0)return hasFormulation;
+    return providedCertNames.some(function(n){return k&&n.indexOf(k)>=0||(l&&l.length>4&&n.indexOf(l.split(' ')[0])>=0);});
+  }
+
+  // Group certs by tier
+  var critical=certs.filter(function(c){return c.tier==='critical';});
+  var important=certs.filter(function(c){return c.tier==='important';});
+  var nice=certs.filter(function(c){return c.tier==='nice_to_have';});
+  var other=certs.filter(function(c){return !c.tier||(c.tier!=='critical'&&c.tier!=='important'&&c.tier!=='nice_to_have');});
+
+  function tierColor(tier){
+    if(tier==='critical')return {bg:'#fff0f0',border:'#fdd',text:'#b00',label:'CRITICAL'};
+    if(tier==='important')return {bg:'#fff8e0',border:'#e0c060',text:'#886600',label:'IMPORTANT'};
+    if(tier==='nice_to_have')return {bg:'#f0f8f0',border:'#c0d8c0',text:'#3a7a3a',label:'NICE-TO-HAVE'};
+    return {bg:'#f5f5f0',border:'#e0e0d8',text:'#666',label:''};
+  }
+
+  function row(item,kind){
+    var key=item.key||item.label||'';
+    var label=item.label||item.key||'';
+    var tier=item.tier;
+    var c=tierColor(tier);
+    var provided=kind==='cert'?certProvided(key,label):false;
+    var icon=provided?'<span style="color:#1a7a1a;font-weight:700;">✓</span>':'<span style="color:#bbb;">◻</span>';
+    var tierBadge=c.label?'<span style="font-size:9px;background:'+c.bg+';color:'+c.text+';border:1px solid '+c.border+';padding:1px 5px;border-radius:6px;margin-left:6px;font-weight:600;">'+c.label+'</span>':'';
+    var weight=item.weight?'<span style="font-size:9px;color:#aaa;margin-left:4px;">w'+item.weight+'</span>':'';
+    var hint='';
+    if(kind==='numeric'){
+      var rangeBits=[];
+      if(item.min!==undefined)rangeBits.push('min '+item.min);
+      if(item.max!==undefined)rangeBits.push('max '+item.max);
+      var unit=item.unit?' '+item.unit:'';
+      if(rangeBits.length)hint='<div style="font-size:10px;color:#888;margin-left:24px;margin-top:2px;">Target: '+rangeBits.join(', ')+unit+' — provide a test report or COA showing this</div>';
+    }
+    return '<div style="padding:4px 0;font-size:12px;color:#1a1a2e;">'+icon+' '+label+tierBadge+weight+hint+'</div>';
+  }
+
+  function section(title,items,kind){
+    if(!items.length)return '';
+    return '<div style="margin-top:10px;"><div style="font-size:10px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">'+title+'</div>'+
+      items.map(function(it){return row(it,kind);}).join('')+'</div>';
+  }
+
+  var summaryNum=certs.length+nums.length+rubrics.length;
+  var headerCounts=(critical.length?'<span style="color:#b00;font-weight:600;">'+critical.length+' critical</span>':'')+
+    (important.length?(critical.length?' · ':'')+'<span style="color:#886600;font-weight:600;">'+important.length+' important</span>':'')+
+    (nice.length?(critical.length||important.length?' · ':'')+'<span style="color:#3a7a3a;">'+nice.length+' nice-to-have</span>':'');
+
+  return '<div style="background:#f3f7ff;border:1px solid #c8d8f0;border-radius:9px;padding:12px 14px;margin-bottom:14px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;flex-wrap:wrap;gap:8px;" onclick="toggleRecDocs(\''+rfq.id+'\')">'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:700;color:#2244cc;">📋 Recommended Documents for this Category <span id="recdocs-toggle-'+rfq.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
+        '<div style="font-size:11px;color:#666;margin-top:2px;">'+headerCounts+(headerCounts?' · ':'')+nums.length+' test specs · '+rubrics.length+' AI checks</div>'+
+      '</div>'+
+      '<div style="font-size:10px;color:#666;background:#fff;border:1px solid #c8d8f0;padding:4px 8px;border-radius:6px;">Optional but recommended</div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">These documents strengthen your quote and avoid back-and-forth review cycles. <strong>You can submit your quote without them</strong> — but providing them improves your formulation score and speeds approval.</div>'+
+    '<div id="recdocs-body-'+rfq.id+'" style="margin-top:8px;">'+
+      section('Critical Certifications',critical,'cert')+
+      section('Important Certifications',important,'cert')+
+      section('Nice-to-Have Certifications',nice,'cert')+
+      (other.length?section('Other Certifications',other,'cert'):'')+
+      (nums.length?section('Test Reports / Numeric Specs',nums,'numeric'):'')+
+      (rubrics.length?section('AI Formulation Reviews (no doc needed — AI evaluates from INCI + Formulation)',rubrics,'rubric'):'')+
+    '</div>'+
+  '</div>';
+}
+
+function toggleRecDocs(rfqId){
+  var body=g('recdocs-body-'+rfqId);
+  var toggle=g('recdocs-toggle-'+rfqId);
+  if(!body)return;
+  var isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(toggle)toggle.textContent=isOpen?'▸':'▾';
+}
+
 function renderQuoteForm(rfq,assignment,existing,hidden){
   var display=hidden?'display:none;':'';
   var id='qform-'+rfq.id;
@@ -2025,6 +2156,7 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
   var quoteId=existing?existing.id:'';
   return '<div class="quote-form" id="'+id+'" style="'+display+'">' +
     '<div class="quote-form-title" id="qformtitle-'+rfq.id+'">Submit a New Quote</div>' +
+    renderRecommendedDocsPanel(rfq,existing) +
     '<div class="quote-grid-3">' +
       '<div class="qf"><label>Unit FOB Price (USD) *</label><input type="number" id="qfob-'+rfq.id+'" step="0.0001" placeholder="e.g. 2.5000" value="'+fob+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
       '<div class="qf"><label>Packaging Cost / unit (USD) *</label><input type="number" id="qpkg-'+rfq.id+'" step="0.0001" placeholder="e.g. 0.3500" value="'+pkg+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
