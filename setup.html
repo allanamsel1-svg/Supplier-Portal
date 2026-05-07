@@ -203,6 +203,24 @@
         <div class="card-title" id="cat-form-title">New Category</div>
         <div class="form-section">
           <input type="hidden" id="cf-id" />
+
+          <!-- COSMETIC FLAG - prominently displayed at top -->
+          <div id="cf-cosmetic-banner" style="background:#fff;border:2px solid #f0b8d0;border-radius:10px;padding:14px 16px;margin-bottom:1rem;">
+            <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
+              <input type="checkbox" id="cf-cosmetic-checkbox" onchange="cosmeticToggled()" style="width:22px;height:22px;cursor:pointer;flex-shrink:0;margin-top:2px;" />
+              <div style="flex:1;">
+                <div style="font-size:15px;font-weight:700;color:#880044;">🧴 This category is a COSMETIC product</div>
+                <div style="font-size:12px;color:#666;margin-top:4px;line-height:1.5;">When checked, factories must upload INCI ingredient list + formulation breakdown when quoting. The category is also tagged with FDA Cosmetic / MoCRA + Health Canada Cosmetic Hotlist regulatory profile.</div>
+                <div id="cf-cosmetic-status" style="font-size:11px;margin-top:6px;font-weight:600;"></div>
+              </div>
+            </label>
+          </div>
+          <!-- legacy hidden select for back-compat with save logic -->
+          <select id="cf-cosmetic" style="display:none;">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+
           <div class="f"><label>Category *</label><input type="text" id="cf-cat" placeholder="e.g. Skin Care" oninput="genPrefix()" /></div>
           <div class="f"><label>Sub-Category</label><input type="text" id="cf-sub" placeholder="e.g. Moisturizer" oninput="genPrefix()" /></div>
           <div class="f"><label>Sub-Sub-Category</label><input type="text" id="cf-subsub" placeholder="e.g. Face Cream" oninput="genPrefix()" /></div>
@@ -212,13 +230,6 @@
               <input type="text" id="cf-prefix" placeholder="SMF" maxlength="5" style="text-transform:uppercase;font-family:monospace;font-weight:700;font-size:15px;" oninput="markPrefixEdited()" />
               <div class="prefix-hint">Auto-generated · edit if needed</div>
               <div class="prefix-warn" id="cf-prefix-warn"></div>
-            </div>
-            <div class="f">
-              <label>Cosmetic Category?</label>
-              <select id="cf-cosmetic">
-                <option value="false">No</option>
-                <option value="true">Yes — requires INCI</option>
-              </select>
             </div>
           </div>
           <div class="section-divider">Margin Thresholds (optional)</div>
@@ -1249,10 +1260,34 @@ function genPrefix(){
   showPrefixWarning();
 }
 
+function cosmeticToggled(){
+  var cb=g('cf-cosmetic-checkbox');
+  var sel=g('cf-cosmetic');
+  if(cb&&sel){
+    sel.value=cb.checked?'true':'false';
+    updateCosmeticStatusDisplay(cb.checked);
+  }
+}
+
+function updateCosmeticStatusDisplay(isCosmetic){
+  var statusEl=g('cf-cosmetic-status');
+  var bannerEl=g('cf-cosmetic-banner');
+  if(!statusEl)return;
+  if(isCosmetic){
+    statusEl.innerHTML='<span style="color:#1a7a1a;">✓ Marked as cosmetic. Factories will be required to upload INCI + formulation. Linked to FDA MoCRA + Health Canada Hotlist regulatory profile.</span>';
+    if(bannerEl)bannerEl.style.background='#fce8f0';
+  } else {
+    statusEl.innerHTML='<span style="color:#888;">Not cosmetic — INCI and formulation upload will not be required.</span>';
+    if(bannerEl)bannerEl.style.background='#fff';
+  }
+}
+
 function newCatForm(){
   g('cf-id').value='';g('cf-cat').value='';g('cf-sub').value='';g('cf-subsub').value='';
   var prefixEl=g('cf-prefix');if(prefixEl){prefixEl.value='';prefixEl.dataset.userEdited='false';}
   g('cf-cosmetic').value='false';
+  var cb=g('cf-cosmetic-checkbox');if(cb)cb.checked=false;
+  updateCosmeticStatusDisplay(false);
   g('cf-gross').value='';g('cf-net').value='';g('cf-notes').value='';
   g('cat-form-title').textContent='New Category';
   g('cat-ok').style.display='none';g('cat-err').style.display='none';
@@ -1266,6 +1301,8 @@ function editCat(id){
   g('cf-id').value=c.id;g('cf-cat').value=c.category||'';
   g('cf-sub').value=c.sub_category||'';g('cf-subsub').value=c.sub_sub_category||'';
   g('cf-prefix').value=c.model_prefix||'';g('cf-cosmetic').value=c.is_cosmetic?'true':'false';
+  var cb=g('cf-cosmetic-checkbox');if(cb)cb.checked=!!c.is_cosmetic;
+  updateCosmeticStatusDisplay(!!c.is_cosmetic);
   var prefixEl=g('cf-prefix');if(prefixEl)prefixEl.dataset.userEdited='true';
   g('cf-gross').value=c.min_gross_margin_pct||'';g('cf-net').value=c.min_net_margin_pct||'';
   g('cf-notes').value=c.notes||'';
