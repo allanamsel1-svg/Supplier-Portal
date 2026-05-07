@@ -1000,10 +1000,18 @@
           <div id="rfq-img-preview" style="margin-top:8px;display:none;"><img id="rfq-img-thumb" style="max-height:120px;border-radius:8px;border:1px solid #e0e0d8;" /></div>
         </div>
 
-        <!-- Cosmetics INCI notice -->
-        <div id="rfq-inci-notice" style="display:none;background:#fce8f0;border:1px solid #f0b8d0;border-radius:9px;padding:12px 14px;font-size:13px;color:#880044;margin-bottom:1rem;">
-          🧴 <strong>Cosmetic Category:</strong> Factories will be required to provide their INCI ingredient list and formulation details with their quote.
+        <!-- Cosmetic Product checkbox (auto-checks based on category, manually overridable) -->
+        <div id="rfq-cosmetic-card" style="background:#fff;border:1px solid #f0b8d0;border-radius:9px;padding:12px 14px;margin-bottom:1rem;">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="rfq-is-cosmetic" onchange="rfqCosmeticToggled()" style="width:18px;height:18px;cursor:pointer;flex-shrink:0;" />
+            <span>
+              <strong style="color:#880044;">🧴 Cosmetic Product</strong>
+              <span style="color:#888;font-size:11px;display:block;margin-top:2px;">Check this if factories must provide INCI ingredient list and formulation details. Auto-set from category, but manually overridable.</span>
+            </span>
+          </label>
         </div>
+        <!-- legacy notice (now hidden, kept for back-compat with code that toggles it) -->
+        <div id="rfq-inci-notice" style="display:none;"></div>
 
         <!-- Factory Matching -->
         <div class="mgr-card" style="margin-bottom:1rem;">
@@ -3575,6 +3583,9 @@ function populateRFQEditForm(rfq){
   g('rfq-project-number').textContent=rfq.project_number||'';
   g('rfq-id').value=rfq.id||'';
   if(g('rfq-category-id'))g('rfq-category-id').value=rfq.category_id||'';
+  // Set cosmetic checkbox to current RFQ value, mark as user-overridden so category change doesn't reset it
+  var cosCb=g('rfq-is-cosmetic');
+  if(cosCb){cosCb.checked=!!rfq.is_cosmetic;cosCb.dataset.userOverride='true';}
   if(g('rfq-unit-type'))g('rfq-unit-type').value=rfq.unit_type||'each';
   if(g('rfq-description'))g('rfq-description').value=rfq.item_description||'';
   if(g('rfq-specs'))g('rfq-specs').value=rfq.detailed_specifications||'';
@@ -3705,6 +3716,8 @@ function resetRFQForm(){
   g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
   g('rfq-pkg-notes').value='';
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
+  // Clear user-override flag so new RFQs auto-set from category
+  var cosCb=g('rfq-is-cosmetic');if(cosCb){cosCb.checked=false;cosCb.dataset.userOverride='false';}
   g('rfq-inci-notice').style.display='none';
   g('factory-match-list').innerHTML='';
   g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
@@ -3767,7 +3780,17 @@ function rfqCategoryChanged(){
   var sel=g('rfq-category-id');
   var opt=sel.options[sel.selectedIndex];
   var isCosmetic=opt&&opt.dataset.cosmetic==='true';
-  g('rfq-inci-notice').style.display=isCosmetic?'block':'none';
+  var cb=g('rfq-is-cosmetic');
+  // Only auto-set the checkbox if user hasn't manually overridden it
+  if(cb&&cb.dataset.userOverride!=='true'){
+    cb.checked=isCosmetic;
+  }
+}
+
+function rfqCosmeticToggled(){
+  // Mark as user-overridden so changing category doesn't reset it
+  var cb=g('rfq-is-cosmetic');
+  if(cb)cb.dataset.userOverride='true';
 }
 
 function rfqImageChosen(input){
@@ -4070,8 +4093,8 @@ async function saveRFQ(action){
     packaging_type:pkgTypes.join(',')||null,
     packaging_notes:g('rfq-pkg-notes').value.trim()||null,
     certifications_required:certs.length?certs:null,
-    is_cosmetic:catRow?catRow.is_cosmetic:false,
-    inci_required:catRow?catRow.is_cosmetic:false,
+    is_cosmetic:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
+    inci_required:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
     customer_id:g('rfq-customer-id').value||null,
     comp_retail_price:null,
     target_retail_price:parseFloat(g('rfq-target-retail').value)||null,
