@@ -246,17 +246,17 @@
           <div id="sc-suggest-status" style="font-size:11px;color:#666;margin-bottom:6px;display:none;"></div>
           <div id="sc-inherited-container"></div>
 
-          <div class="sc-section">
+          <div class="sc-section" id="sc-regulatory-section" style="display:none;">
             <div class="sc-section-title"><span class="sc-section-title-text">Regulatory Profile</span></div>
-            <div class="sc-hint">Multi-select. Drives which compliance checks apply.</div>
+            <div class="sc-hint">Auto-suggested by AI. Click any to toggle on/off.</div>
             <div class="sc-chips" id="sc-regulatory" data-key="regulatory_profile"></div>
           </div>
 
-          <div class="sc-section">
+          <div class="sc-section" id="sc-banned-section" style="display:none;">
             <div class="sc-section-title">
               <span class="sc-section-title-text">Banned Ingredient Screen <span style="font-size:10px;color:#888;font-weight:400;">(weight 10 — fail = quote rejected)</span></span>
             </div>
-            <div class="sc-hint">Lists to cross-check the formulation against. AI runs on admin trigger.</div>
+            <div class="sc-hint">Auto-suggested. Lists to cross-check the formulation against.</div>
             <div class="sc-chips" id="sc-banned" data-key="banned_ingredients"></div>
           </div>
 
@@ -306,9 +306,9 @@
             </div>
           </div>
 
-          <div class="sc-section">
+          <div class="sc-section" id="sc-markets-section" style="display:none;">
             <div class="sc-section-title"><span class="sc-section-title-text">Target Markets</span></div>
-            <div class="sc-hint">Where these products are sold. Drives which regional certs are required.</div>
+            <div class="sc-hint">Auto-suggested. Click any to toggle on/off.</div>
             <div class="sc-chips" id="sc-markets" data-key="target_markets"></div>
           </div>
 
@@ -1196,9 +1196,16 @@ async function suggestCriteriaWithAI(){
 
 function populateCriteriaForm(crit){
   crit=crit||{};
-  renderChips('sc-regulatory',SC_REGULATORY_PROFILE,crit.regulatory_profile||[]);
-  renderChips('sc-banned',SC_BANNED_LISTS,(crit.banned_ingredients_check&&crit.banned_ingredients_check.lists)||[]);
-  renderChips('sc-markets',SC_TARGET_MARKETS,crit.target_markets||[]);
+  var reg=crit.regulatory_profile||[];
+  var banned=(crit.banned_ingredients_check&&crit.banned_ingredients_check.lists)||[];
+  var markets=crit.target_markets||[];
+  renderChips('sc-regulatory',SC_REGULATORY_PROFILE,reg);
+  renderChips('sc-banned',SC_BANNED_LISTS,banned);
+  renderChips('sc-markets',SC_TARGET_MARKETS,markets);
+  // Hide chip sections until populated by AI or existing data
+  var regSec=g('sc-regulatory-section');if(regSec)regSec.style.display=reg.length?'block':'none';
+  var bannedSec=g('sc-banned-section');if(bannedSec)bannedSec.style.display=banned.length?'block':'none';
+  var marketsSec=g('sc-markets-section');if(marketsSec)marketsSec.style.display=markets.length?'block':'none';
   ['certifications','numeric','boolean','rubric'].forEach(function(t){var c=g('sc-'+t+'-rows');if(c)c.innerHTML='';});
   (crit.required_certifications||[]).forEach(function(item){addCriterionRow('certifications',item);});
   (crit.numeric_specs||[]).forEach(function(item){addCriterionRow('numeric',item);});

@@ -1013,6 +1013,18 @@
         <!-- legacy notice (now hidden, kept for back-compat with code that toggles it) -->
         <div id="rfq-inci-notice" style="display:none;"></div>
 
+        <!-- CA Prop 65 Compliance Strategy -->
+        <div id="rfq-prop65-card" style="background:#fff;border:1px solid #f0d4a0;border-radius:9px;padding:12px 14px;margin-bottom:1rem;">
+          <div style="font-size:13px;font-weight:700;color:#774400;margin-bottom:8px;">🚨 CA Prop 65 Compliance Strategy</div>
+          <div style="font-size:11px;color:#666;margin-bottom:8px;line-height:1.5;">California requires either reformulation OR a warning label. Pick the strategy retailers for this RFQ accept. Affects factory expectations and AI scoring.</div>
+          <select id="rfq-prop65-strategy" style="width:100%;padding:8px 10px;border:1px solid #e0c8a0;border-radius:6px;font-size:13px;font-family:inherit;background:#fffdf6;">
+            <option value="">— Not specified (default: either acceptable) —</option>
+            <option value="conform">Must conform — no detectable Prop 65 chemicals (premium retailers, clean-beauty positioning)</option>
+            <option value="warning_label">Warning label acceptable — standard Prop 65 warning on packaging is OK (most general retail)</option>
+            <option value="either">Either — flexible based on final retailer</option>
+          </select>
+        </div>
+
         <!-- Factory Matching -->
         <div class="mgr-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Factory Matching
@@ -3756,6 +3768,8 @@ function populateRFQEditForm(rfq){
   // Set cosmetic checkbox to current RFQ value, mark as user-overridden so category change doesn't reset it
   var cosCb=g('rfq-is-cosmetic');
   if(cosCb){cosCb.checked=!!rfq.is_cosmetic;cosCb.dataset.userOverride='true';}
+  // Load Prop 65 strategy
+  var p65=g('rfq-prop65-strategy');if(p65)p65.value=rfq.prop65_strategy||'';
   if(g('rfq-unit-type'))g('rfq-unit-type').value=rfq.unit_type||'each';
   if(g('rfq-description'))g('rfq-description').value=rfq.item_description||'';
   if(g('rfq-specs'))g('rfq-specs').value=rfq.detailed_specifications||'';
@@ -3888,6 +3902,7 @@ function resetRFQForm(){
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
   // Clear user-override flag so new RFQs auto-set from category
   var cosCb=g('rfq-is-cosmetic');if(cosCb){cosCb.checked=false;cosCb.dataset.userOverride='false';}
+  var p65=g('rfq-prop65-strategy');if(p65)p65.value='';
   g('rfq-inci-notice').style.display='none';
   g('factory-match-list').innerHTML='';
   g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
@@ -4265,6 +4280,7 @@ async function saveRFQ(action){
     certifications_required:certs.length?certs:null,
     is_cosmetic:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
     inci_required:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
+    prop65_strategy:(g('rfq-prop65-strategy')&&g('rfq-prop65-strategy').value)||null,
     customer_id:g('rfq-customer-id').value||null,
     comp_retail_price:null,
     target_retail_price:parseFloat(g('rfq-target-retail').value)||null,

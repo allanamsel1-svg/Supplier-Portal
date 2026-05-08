@@ -2111,6 +2111,16 @@ function renderRecommendedDocsPanel(rfq,existing){
     (important.length?(critical.length?' · ':'')+'<span style="color:#886600;font-weight:600;">'+important.length+' important</span>':'')+
     (nice.length?(critical.length||important.length?' · ':'')+'<span style="color:#3a7a3a;">'+nice.length+' nice-to-have</span>':'');
 
+  // Prop 65 strategy banner (RFQ-level setting)
+  var p65Banner='';
+  if(rfq.prop65_strategy==='conform'){
+    p65Banner='<div style="background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#882200;line-height:1.5;"><strong style="color:#b00;">🚨 CA Prop 65 Strategy: Must Conform.</strong> Final product must contain no detectable Prop 65-listed chemicals. Provide third-party Prop 65 chemical screening test report from an accredited lab. <strong>Reformulation required if any listed chemical is present.</strong></div>';
+  } else if(rfq.prop65_strategy==='warning_label'){
+    p65Banner='<div style="background:#fff8e0;border:1px solid #e0c060;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#664400;line-height:1.5;"><strong style="color:#886600;">🚨 CA Prop 65 Strategy: Warning Label Acceptable.</strong> Standard CA Prop 65 warning must appear on packaging artwork ("WARNING: This product can expose you to chemicals known to the State of California to cause cancer..."). <strong>Submit packaging mockup with warning label visible.</strong> Reformulation NOT required.</div>';
+  } else if(rfq.prop65_strategy==='either'){
+    p65Banner='<div style="background:#f0f8f0;border:1px solid #c0d8c0;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#1a5a1a;line-height:1.5;"><strong style="color:#3a7a3a;">🚨 CA Prop 65: Flexible.</strong> Either conformance (no detectable listed chemicals) OR a packaging warning label is acceptable. Conformance is preferred but warning label is OK.</div>';
+  }
+
   return '<div style="background:#f3f7ff;border:1px solid #c8d8f0;border-radius:9px;padding:12px 14px;margin-bottom:14px;">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;flex-wrap:wrap;gap:8px;" onclick="toggleRecDocs(\''+rfq.id+'\')">'+
       '<div>'+
@@ -2119,6 +2129,7 @@ function renderRecommendedDocsPanel(rfq,existing){
       '</div>'+
       '<div style="font-size:10px;color:#666;background:#fff;border:1px solid #c8d8f0;padding:4px 8px;border-radius:6px;">Optional but recommended</div>'+
     '</div>'+
+    p65Banner+
     '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">These documents strengthen your quote and avoid back-and-forth review cycles. <strong>You can submit your quote without them</strong> — but providing them speeds approval.</div>'+
     '<div id="recdocs-body-'+rfq.id+'" style="margin-top:8px;">'+
       section('Critical Certifications',critical,'cert')+
