@@ -140,13 +140,29 @@ function buildPrompt(rfq, quote, criteria) {
   const path = [rfq.category, rfq.sub_category, rfq.sub_sub_category]
     .filter(Boolean)
     .join(' › ');
+
+  // Prop 65 strategy guidance
+  const prop65Block = (() => {
+    const s = rfq.prop65_strategy;
+    if (s === 'conform') {
+      return `\n# CA Prop 65 Compliance Strategy: MUST CONFORM\nThe buyer requires this product to contain NO detectable Prop 65-listed chemicals (lead, cadmium, formaldehyde, certain phthalates, BPA, etc.). When evaluating the formulation:\n- Flag ANY ingredient that appears on the California Prop 65 list as a CRITICAL issue.\n- A third-party Prop 65 chemical screening test report is required. If absent, treat heavy metals/contaminants as unverified.\n- This affects the "banned_ingredients_check" criterion — Prop 65 must be applied at the conform-strict level.`;
+    }
+    if (s === 'warning_label') {
+      return `\n# CA Prop 65 Compliance Strategy: WARNING LABEL ACCEPTABLE\nThe buyer is OK with the standard CA Prop 65 warning on packaging (instead of reformulation). When evaluating:\n- Detection of Prop 65-listed chemicals is NOT a critical fail by itself.\n- Look for the standard Prop 65 warning text in any submitted packaging artwork. If packaging is provided without warning, flag this as a critical packaging-compliance gap.\n- The "banned_ingredients_check" should focus on FDA/Health Canada/MoCRA bans, NOT Prop 65 conformance.`;
+    }
+    if (s === 'either') {
+      return `\n# CA Prop 65 Compliance Strategy: FLEXIBLE (Either)\nEither conformance OR warning label is acceptable. Score conformance higher than warning-only when comparing factories. Detection of Prop 65 chemicals is not a critical fail provided a warning label path is documented.`;
+    }
+    return '';
+  })();
+
   return `You are a senior cosmetic chemistry & regulatory expert evaluating a factory quote against a scoring rubric.
 
 # RFQ Context
 Product description: ${rfq.item_description || 'N/A'}
 Category path: ${path}
 Project number: ${rfq.project_number || 'N/A'}
-Is cosmetic: ${rfq.is_cosmetic ? 'yes' : 'no'}
+Is cosmetic: ${rfq.is_cosmetic ? 'yes' : 'no'}${prop65Block}
 
 # Factory Quote Data (typed by factory)
 ${JSON.stringify(factoryData, null, 2)}
