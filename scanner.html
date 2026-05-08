@@ -391,7 +391,7 @@ async function scanCard(card,apiKey){
   try{
     var resized=await resizeImg(card.dataUrl,1600,0.85);
     var base64=resized.split(',')[1];
-    var prompt='This image may contain one or more business cards. Treat each as a completely independent record.\nCRITICAL: NEVER mix data from different cards. IGNORE fax numbers entirely. Decode any QR codes — WeChat QR goes in sales_wechat, website QR in website.\nReturn ONLY a JSON array with these keys for each card (empty string if not found):\n[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]\nReturn ONLY the raw JSON array, no markdown.';
+    var prompt='This image contains one or more business cards. First decide whether each card stands alone or is multi-panel (folded, double-sided, or photographed showing multiple sides).\n\nDISTINGUISHING:\n- Multiple SEPARATE cards (different people, different companies, different designs) → return as separate records\n- ONE card with MULTIPLE PANELS (same company logo/colors, same person, often bilingual or folded) → return as ONE record, merging info from all panels\n\nMulti-panel single cards are very common in Asian sourcing. Treat as ONE record when you see:\n- Same logo, colors, or design language across panels\n- Same person\'s name appearing on both sides\n- One panel in English and another in Chinese / Japanese / Korean / Thai / Vietnamese\n- A visible fold line between panels\n- Complementary info (title on one side, mobile on the other) for the same person\n\nWhen merging panel data:\n- factory_name_english: the English/Latin-script company name\n- factory_name_local: the local-language company name (Chinese, Japanese, etc.)\n- Use the more complete version when the same field appears on both panels\n- Combine complementary fields across panels into one record\n\nCRITICAL:\n- IGNORE fax numbers entirely\n- Decode QR codes: WeChat QR → sales_wechat, website QR → website\n- For images with multiple SEPARATE cards, NEVER mix data between them\n- For multi-panel single cards, ALWAYS combine into one record\n\nReturn ONLY a JSON array with these keys for each card (empty string if not found):\n[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]\n\nReturn ONLY the raw JSON array, no markdown.';
     var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},{type:'text',text:prompt}]}]})});
     var d=await resp.json();
     if(d.error){card.status='error';card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';}
@@ -514,7 +514,21 @@ async function saveDraft(id){
       });
     }
 
-    // Step 4: Upload factory photos
+    // Step 4: Upload original business card image
+    if(card.dataUrl){
+      try{
+        var bcResized=await resizeImg(card.dataUrl,1600,0.85);
+        var bcBlob=await fetch(bcResized).then(function(r2){return r2.blob();});
+        var bcPath=factoryId+'/business-card/scan_'+dateStamp()+'_'+Date.now()+'.jpg';
+        var bcR=await fetch(SB+'/storage/v1/object/factory-files/'+bcPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:bcBlob});
+        if(bcR.ok){
+          var bcUrl=SB+'/storage/v1/object/public/factory-files/'+bcPath;
+          await fetch(SB+'/rest/v1/factories?id=eq.'+factoryId,{method:'PATCH',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify({business_card_image_url:bcUrl})});
+        }
+      }catch(e){console.log('Business card upload error:',e.message);}
+    }
+
+    // Step 5: Upload factory photos
     for(var pi=0;pi<card.factoryPhotos.length;pi++){
       var photo=card.factoryPhotos[pi];
       try{
@@ -529,7 +543,7 @@ async function saveDraft(id){
       }catch(e){alert('Photo upload error: '+e.message);}
     }
 
-    // Step 5: Upload catalog
+    // Step 6: Upload catalog
     if(card.catalogFile){
       if(card.catalogFile.size>50*1024*1024){
         alert('Catalog file is too large ('+(card.catalogFile.size/1024/1024).toFixed(1)+'MB). Max is 50MB. Please compress and re-upload from the factory detail page.');
@@ -544,7 +558,7 @@ async function saveDraft(id){
       }catch(e){alert('Catalog upload error: '+e.message);}
     }
 
-    // Step 6: Upload quote sheet
+    // Step 7: Upload quote sheet
     if(card.quoteFile){
       try{
         var qtPath=factoryId+'/quotes/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Quote Sheet_'+dateStamp()+'.'+card.quoteFile.name.split('.').pop();

@@ -74,6 +74,12 @@
     .auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .aerr { font-size: 12px; color: #c00; margin-top: 8px; display: none; }
     .aok { font-size: 12px; color: #1a7a1a; margin-top: 8px; display: none; }
+    /* Password show/hide toggle */
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 38px !important; }
+    .pw-toggle { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 4px 6px; color: #888; font-size: 13px; line-height: 1; font-family: inherit; }
+    .pw-toggle:hover { color: #1a1a2e; }
+    .pw-toggle:focus { outline: none; }
 
     /* ── Portal ── */
     #portal { display: none; min-height: 100vh; flex-direction: column; }
@@ -100,6 +106,13 @@
     .banner { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 1.25rem; display: none; }
     .banner.approved { background: #e8f8e8; color: #1a7a1a; border: 1px solid #a0d8a0; }
     .banner.pending { background: #fff8e0; color: #886600; border: 1px solid #f0d060; }
+
+    /* Welcome banner — only shows until profile is approved */
+    .welcome-banner { background: linear-gradient(135deg,#eef2ff 0%,#f0f8ff 100%); border: 1px solid #c0d0f0; border-radius: 12px; padding: 20px 22px; margin-bottom: 1.25rem; display: none; }
+    .welcome-banner.show { display: block; }
+    .welcome-banner h2 { font-size: 18px; font-weight: 600; color: #1a1a2e; margin: 0 0 8px; line-height: 1.35; }
+    .welcome-banner p { font-size: 14px; color: #445; margin: 0; line-height: 1.55; }
+    .welcome-banner strong { color: #1a1a2e; }
 
     /* ── Cards ── */
     .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -233,7 +246,10 @@
       <label>Email Address</label>
       <input type="email" id="l-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')login()" />
       <label>Password</label>
-      <input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()" />
+      <div class="pw-wrap">
+        <input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()" />
+        <button type="button" class="pw-toggle" id="l-pass-toggle" onclick="togglePw('l-pass')" aria-label="Show password">👁</button>
+      </div>
       <button class="auth-btn" id="l-btn" onclick="login()">Sign In</button>
       <div class="aerr" id="l-err"></div>
     </div>
@@ -242,9 +258,15 @@
       <label>Email Address</label>
       <input type="email" id="s-email" placeholder="your@email.com" />
       <label>Password (min 6 characters)</label>
-      <input type="password" id="s-pass" placeholder="••••••••" />
+      <div class="pw-wrap">
+        <input type="password" id="s-pass" placeholder="••••••••" />
+        <button type="button" class="pw-toggle" id="s-pass-toggle" onclick="togglePw('s-pass')" aria-label="Show password">👁</button>
+      </div>
       <label>Confirm Password</label>
-      <input type="password" id="s-pass2" placeholder="••••••••" />
+      <div class="pw-wrap">
+        <input type="password" id="s-pass2" placeholder="••••••••" />
+        <button type="button" class="pw-toggle" id="s-pass2-toggle" onclick="togglePw('s-pass2')" aria-label="Show password">👁</button>
+      </div>
       <button class="auth-btn" id="s-btn" onclick="signup()">Create Account</button>
       <div class="aerr" id="s-err"></div>
     </div>
@@ -282,7 +304,16 @@
 
   <!-- Details pane -->
   <div class="ppane on" id="ppane-details">
+    <div class="welcome-banner" id="welcome-banner">
+      <h2>Welcome aboard.</h2>
+      <p>The more detail you share about your factory, the better we can match you with the right opportunities. Please complete your profile in full — and don't forget the <strong>other tabs</strong> to upload your catalog, company deck, and pricing sheets.</p>
+    </div>
     <div class="banner" id="status-banner"></div>
+    <div class="card" id="card-bizcard" style="display:none;">
+      <div class="card-title">Your Business Card</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">This is the card we scanned when we connected. If anything looks off, please correct it in the form below.</div>
+      <img id="bizcard-img" alt="Business card" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #e0e0d8;display:block;margin:0 auto;" />
+    </div>
     <div class="card">
       <div class="card-title">Factory Information</div>
       <div class="field-grid">
@@ -303,6 +334,10 @@
         <div class="field"><label>WeChat ID</label><input type="text" id="p-wechat" placeholder="WeChat ID" /></div>
         <div class="field"><label>WhatsApp</label><input type="tel" id="p-whatsapp" placeholder="+86 138 0000 0000" /></div>
       </div>
+      <div class="sec-label">About Your Company</div>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;">Briefly describe your factory in your own words — what you make, what makes you unique, who you serve. <strong>Any language is fine.</strong> This helps our team understand and categorize your business.</div>
+      <textarea id="p-company_description" rows="4" placeholder="e.g. We manufacture skin care packaging — primarily glass jars and pump bottles for cosmetic brands in North America and Europe. Family-owned, 15 years in business, 2 production facilities in Guangzhou..." style="width:100%;padding:10px 12px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;color:#1a1a2e;background:#fff;resize:vertical;line-height:1.5;"></textarea>
+
       <div class="sec-label">Manufacturing Categories *</div>
       <div style="font-size:12px;color:#888;margin-bottom:10px;">Select all categories that apply to your factory and enter the approximate percentage of your business each represents. All percentages should add up to 100%.</div>
       <div id="cat-stage1" class="cat-stage1">
@@ -636,6 +671,14 @@ function authTab(t){
   g('pane-'+t).classList.add('on');
 }
 function showAerr(id,msg){var el=g(id);el.textContent=msg;el.style.display='block';}
+
+function togglePw(inputId){
+  var inp=g(inputId);
+  var btn=g(inputId+'-toggle');
+  if(!inp||!btn)return;
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}
+  else{inp.type='password';btn.textContent='👁';btn.setAttribute('aria-label','Show password');}
+}
 
 async function signup(){
   var email=g('s-email').value.trim(),pass=g('s-pass').value,pass2=g('s-pass2').value;
@@ -1633,18 +1676,34 @@ async function loadDetails(){
       g('p-contact_email').value=f.sales_email||'';
       g('p-wechat').value=f.sales_wechat||'';
       g('p-whatsapp').value=f.sales_whatsapp||'';
+      // Company description (free text)
+      var descEl=g('p-company_description');
+      if(descEl)descEl.value=f.company_description||'';
+      // Business card image — show only if a saved scan exists
+      var bcCard=g('card-bizcard'),bcImg=g('bizcard-img');
+      if(bcCard&&bcImg){
+        if(f.business_card_image_url){bcImg.src=f.business_card_image_url;bcCard.style.display='block';}
+        else{bcCard.style.display='none';}
+      }
       renderCertifications(f.certifications||[]);
       FACTORY_CHECKED_CERTS=Array.isArray(f.certifications)?f.certifications.slice():[];
       var banner=g('status-banner');
       banner.style.display='block';
+      var welcomeBanner=g('welcome-banner');
       if(f.status==='approved'){
         banner.textContent='Your factory is approved and active in our supplier network.';
         banner.className='banner approved';
+        if(welcomeBanner)welcomeBanner.classList.remove('show');
       }else{
         banner.textContent='Your registration is under review. Our team will be in touch shortly.';
         banner.className='banner pending';
+        if(welcomeBanner)welcomeBanner.classList.add('show');
       }
       g('save-btn').textContent='Update Factory Details';
+    }else{
+      // New factory — no data yet, show welcome banner
+      var welcomeBannerNew=g('welcome-banner');
+      if(welcomeBannerNew)welcomeBannerNew.classList.add('show');
     }
   }catch(e){console.log('loadDetails error:',e);}
 }
@@ -1676,6 +1735,7 @@ async function saveDetails(){
     sales_email:g('p-contact_email').value.trim(),
     sales_wechat:g('p-wechat').value.trim()||null,
     sales_whatsapp:g('p-whatsapp').value.trim()||null,
+    company_description:(g('p-company_description')?g('p-company_description').value.trim():'')||null,
     certifications:certs,
     product_categories:getSelectedTopCategories(),
     status:'pending'
