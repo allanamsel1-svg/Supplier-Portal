@@ -131,6 +131,13 @@
 
   <!-- ── DETAILS ── -->
   <div class="tab-panel on" id="tab-details">
+    <div class="card" id="d-bizcard-card" style="display:none;">
+      <div class="card-title">Scanned Business Card</div>
+      <a id="d-bizcard-link" href="#" target="_blank" style="display:block;text-decoration:none;">
+        <img id="d-bizcard-img" alt="Business card" style="max-width:100%;max-height:280px;border-radius:8px;border:1px solid #e0e0d8;display:block;margin:0 auto;cursor:zoom-in;" />
+      </a>
+      <div style="font-size:11px;color:#aaa;text-align:center;margin-top:8px;">Click image to open full size in a new tab</div>
+    </div>
     <div class="card">
       <div class="card-title">Company Information</div>
       <div class="fg2">
@@ -345,6 +352,13 @@ function populateForm(){
   sb.textContent=factory.status||'pending';
   sb.className='status-badge '+(factory.status==='approved'?'st-approved':'st-pending');
   document.title=(factory.factory_name_english||'Factory')+' — Supplier Portal';
+
+  // Business card image (from scanner intake)
+  var bcCard=g('d-bizcard-card'),bcImg=g('d-bizcard-img'),bcLink=g('d-bizcard-link');
+  if(bcCard&&bcImg&&bcLink){
+    if(factory.business_card_image_url){bcImg.src=factory.business_card_image_url;bcLink.href=factory.business_card_image_url;bcCard.style.display='block';}
+    else{bcCard.style.display='none';}
+  }
 
   g('d-name_en').value=factory.factory_name_english||'';
   g('d-name_local').value=factory.factory_name_local||'';

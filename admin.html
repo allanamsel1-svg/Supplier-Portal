@@ -1846,6 +1846,14 @@
   </div>
   <div class="drawer-body">
 
+    <div class="d-section" id="d-bizcard-section" style="display:none;">
+      <div class="d-section-title">Scanned Business Card</div>
+      <a id="d-bizcard-link" href="#" target="_blank" style="display:block;text-decoration:none;">
+        <img id="d-bizcard-img" alt="Business card" style="max-width:100%;max-height:240px;border-radius:8px;border:1px solid #e0e0d8;display:block;margin:0 auto;cursor:zoom-in;" />
+      </a>
+      <div style="font-size:11px;color:#aaa;text-align:center;margin-top:6px;">Click image to open full size in a new tab</div>
+    </div>
+
     <div class="d-section">
       <div class="d-section-title">Factory Information</div>
       <div class="d-grid-3">
@@ -2231,6 +2239,13 @@ async function openDrawer(id,e){
   var badge=g('d-status-badge');
   badge.textContent=f.status||'pending';
   badge.className='fc-status '+(f.status==='approved'?'st-approved':'st-pending');
+
+  // Business card image (from scanner)
+  var bcSection=g('d-bizcard-section'),bcImg=g('d-bizcard-img'),bcLink=g('d-bizcard-link');
+  if(bcSection&&bcImg&&bcLink){
+    if(f.business_card_image_url){bcImg.src=f.business_card_image_url;bcLink.href=f.business_card_image_url;bcSection.style.display='block';}
+    else{bcSection.style.display='none';}
+  }
 
   // Factory info
   dv('d-years',f.years_in_business?f.years_in_business+' years':null);
