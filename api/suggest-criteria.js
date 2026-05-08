@@ -64,7 +64,7 @@ REGULATORY FRAMEWORK KEYS — pick from this list, only include those that ACTUA
 - "fda_food_safety_fsma" (food, edible items)
 - "health_canada_cosmetic_hotlist" (cosmetics sold in Canada)
 - "health_canada_natural_health_products" (NHPD/NPN for supplements/wellness in Canada)
-- "prop65" (any product sold in California — chemical disclosure)
+- "prop65" (any product sold in California — chemical disclosure. Note: Prop 65 has TWO compliance paths — full conformance OR a standard warning label on packaging. The buyer chooses the strategy per RFQ; do not score conformance as critical here at the category level.)
 - "fpla_us" (Fair Packaging & Labeling Act — most US consumer products)
 - "cfia_canada" (Canadian Food Inspection Agency — food/edible)
 - "cpsia" (Children's Product Safety — under-12 products, lead/phthalate)
