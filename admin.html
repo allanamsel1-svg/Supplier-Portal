@@ -437,6 +437,7 @@
       <button class="sitem" id="nav-setup" onclick="window.open('setup.html','_blank')"><span class="sicon">⚙</span> Setup</button>
       <button class="sitem" id="nav-skus" onclick="window.open('skus.html','_blank')"><span class="sicon">📦</span> SKU Library</button>
       <div class="slabel">Operations</div>
+      <button class="sitem" id="nav-orders" onclick="showPanel('orders');loadOpenOrders();"><span class="sicon">📋</span> Open Orders <span class="scount" id="cnt-orders-urgent" style="background:#fff0f0;color:#b00;border:1px solid #fdd;font-weight:600;">3</span></button>
       <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-accounting" onclick="showPanel('accounting');loadAccounting();"><span class="sicon">💰</span> Accounting <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-credit" onclick="showPanel('credit');loadCreditWatch();"><span class="sicon">🔍</span> Credit Watch <span class="scount" id="cnt-credit" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
@@ -454,6 +455,48 @@
         <div class="stat"><div class="stat-label">Approved</div><div class="stat-val" id="s-approved">—</div></div>
         <div class="stat"><div class="stat-label">With Files</div><div class="stat-val" id="s-files">—</div></div>
       </div>
+
+      <!-- Production Pipeline widget — Demo placeholder -->
+      <div id="pipeline-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">📋 Production Pipeline</div>
+          <a href="javascript:void(0)" onclick="showPanel('orders');loadOpenOrders();" style="font-size:11px;color:#2266cc;text-decoration:none;">View all open orders →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+          <div onclick="showPanel('orders');loadOpenOrders('coming_3');" style="cursor:pointer;padding:10px 12px;background:#fff0f0;border:1px solid #f5b8b8;border-radius:8px;">
+            <div style="font-size:10px;color:#b00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Coming up in 3 days</div>
+            <div style="font-size:22px;font-weight:600;color:#7a0000;" id="pipe-3day">2</div>
+          </div>
+          <div onclick="showPanel('orders');loadOpenOrders('awaiting');" style="cursor:pointer;padding:10px 12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">
+            <div style="font-size:10px;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Awaiting Confirmation</div>
+            <div style="font-size:22px;font-weight:600;color:#664400;" id="pipe-await">3</div>
+          </div>
+          <div onclick="showPanel('orders');loadOpenOrders('on_track');" style="cursor:pointer;padding:10px 12px;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;">
+            <div style="font-size:10px;color:#1a7a1a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">On Track</div>
+            <div style="font-size:22px;font-weight:600;color:#0a5a0a;" id="pipe-ontrack">8</div>
+          </div>
+          <div onclick="showPanel('orders');loadOpenOrders('delayed');" style="cursor:pointer;padding:10px 12px;background:#1a1a2e;color:#fff;border-radius:8px;">
+            <div style="font-size:10px;opacity:0.7;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Delayed</div>
+            <div style="font-size:22px;font-weight:600;" id="pipe-delayed">1</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">⏱ Next 3 Days</div>
+        <div id="pipe-upcoming" style="font-size:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#fff8e0;border:1px solid #f0d860;border-radius:6px;margin-bottom:5px;">
+            <div><strong>Guangzhou Sunlight Cosmetics</strong> · Mass Production starts <strong>tomorrow</strong> · PO-2026-0042 <span style="color:#886600;font-size:10px;background:#ffeb88;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;">NOT CONFIRMED</span></div>
+            <a href="javascript:void(0)" onclick="showPanel('orders');loadOpenOrders();" style="color:#2266cc;text-decoration:none;font-size:11px;">View →</a>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#edfaed;border:1px solid #a0d8a0;border-radius:6px;margin-bottom:5px;">
+            <div><strong>Shenzhen Kerin Hair Care</strong> · Cargo Ready in <strong>2 days</strong> · PO-2026-0038 <span style="color:#1a7a1a;font-size:10px;background:#c8edc8;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;">CONFIRMED</span></div>
+            <a href="javascript:void(0)" onclick="showPanel('orders');loadOpenOrders();" style="color:#2266cc;text-decoration:none;font-size:11px;">View →</a>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#fff0f0;border:1px solid #f5b8b8;border-radius:6px;">
+            <div><strong>Yiwu Glow Manufacturing</strong> · Pre-shipment Inspection in <strong>3 days</strong> · PO-2026-0035 <span style="color:#b00;font-size:10px;background:#ffd0d0;padding:1px 6px;border-radius:8px;margin-left:4px;font-weight:600;">DELAY FLAGGED</span></div>
+            <a href="javascript:void(0)" onclick="showPanel('orders');loadOpenOrders();" style="color:#2266cc;text-decoration:none;font-size:11px;">View →</a>
+          </div>
+        </div>
+      </div>
+
       <!-- Compliance Alerts widget -->
       <div id="compl-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -1497,6 +1540,199 @@
       </div>
     </div>
 
+    <!-- ── OPEN ORDERS — Delivery Tracking (DEMO) ── -->
+    <div class="panel" id="panel-orders">
+      <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="ph-title">📋 Open Orders <span style="font-size:11px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">DELIVERY TRACKING</span></div>
+          <div class="ph-sub">Active POs with milestone tracking — Materials → Production → Inspection → Cargo Ready</div>
+        </div>
+        <button onclick="alert('Demo placeholder — full PO creation flow coming next.');" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">+ New PO</button>
+      </div>
+
+      <div style="padding:1.25rem 1.5rem;">
+        <!-- Filter chips -->
+        <div style="margin-bottom:1.25rem;display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="filterOrders('all',this)" class="ord-chip on" style="padding:6px 14px;background:#1a1a2e;color:#fff;border:1px solid #1a1a2e;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">All Orders <span style="opacity:0.7;margin-left:4px;">14</span></button>
+          <button onclick="filterOrders('coming_3',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#b00;border:1px solid #f5b8b8;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⏰ Due in 3 days <span style="margin-left:4px;font-weight:700;">2</span></button>
+          <button onclick="filterOrders('awaiting',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#886600;border:1px solid #f0d860;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⚠ Awaiting Confirmation <span style="margin-left:4px;font-weight:700;">3</span></button>
+          <button onclick="filterOrders('on_track',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">✓ On Track <span style="margin-left:4px;font-weight:700;">8</span></button>
+          <button onclick="filterOrders('delayed',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#1a1a2e;border:1px solid #aaa;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">🚨 Delayed <span style="margin-left:4px;font-weight:700;">1</span></button>
+        </div>
+
+        <div id="orders-list">
+          <!-- Order 1: Awaiting confirmation, mass production tomorrow -->
+          <div class="order-card" style="background:#fff;border:1px solid #f0d860;border-left:4px solid #f0d860;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Guangzhou Sunlight Cosmetics Co.</div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0042 · Skin Care Serum (10,000 units) · $4.20 FOB · $42,000 total</div>
+              </div>
+              <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:3px 9px;border-radius:20px;font-weight:600;">⚠ NOT CONFIRMED</span>
+            </div>
+            <!-- Milestone track -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 28 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
+                <div style="position:absolute;top:-7px;right:-4px;background:#b00;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">TOMORROW</div>
+                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Mass Production</div>
+                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 9 · Awaiting</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Inspection</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 12</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 18</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#886600;background:#fff8e0;padding:6px 10px;border-radius:6px;border-left:3px solid #f0d860;">
+              ⚠ Reminder sent 10 days ago. Factory has not confirmed Mass Production date. <a href="javascript:void(0)" onclick="event.stopPropagation();alert('Demo: would re-send reminder to factory.');" style="color:#664400;font-weight:600;">Re-send reminder</a>
+            </div>
+          </div>
+
+          <!-- Order 2: On track, cargo ready in 2 days -->
+          <div class="order-card" style="background:#fff;border:1px solid #a0d8a0;border-left:4px solid #1a7a1a;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Shenzhen Kerin Hair Care Mfg.</div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0038 · Argan Oil Hair Mask (25,000 units) · $1.85 FOB · $46,250 total</div>
+              </div>
+              <span style="font-size:11px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:3px 9px;border-radius:20px;font-weight:600;">✓ ON TRACK</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 2 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 18 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Inspection</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 5 · Passed</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
+                <div style="position:absolute;top:-7px;right:-4px;background:#1a7a1a;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">2 DAYS</div>
+                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Cargo Ready</div>
+                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 10 · Confirmed</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#1a7a1a;background:#edfaed;padding:6px 10px;border-radius:6px;border-left:3px solid #1a7a1a;">
+              ✓ Factory confirmed cargo ready date on May 6. Forwarder notified. Container booking confirmed for May 11 pickup.
+            </div>
+          </div>
+
+          <!-- Order 3: Delayed -->
+          <div class="order-card" style="background:#fff;border:1px solid #f5b8b8;border-left:4px solid #b00;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Yiwu Glow Manufacturing Co.</div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0035 · LED Beauty Wand (15,000 units) · $3.40 FOB · $51,000 total</div>
+              </div>
+              <span style="font-size:11px;background:#fff0f0;color:#b00;border:1px solid #f5b8b8;padding:3px 9px;border-radius:20px;font-weight:600;">🚨 DELAY FLAGGED</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Mar 22 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 24 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fff0f0;border:2px solid #b00;border-radius:7px;position:relative;">
+                <div style="position:absolute;top:-7px;right:-4px;background:#b00;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">3 DAYS</div>
+                <div style="font-size:10px;color:#b00;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Inspection</div>
+                <div style="font-size:11px;color:#7a0000;margin-top:3px;font-weight:500;">May 11 (revised)</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">May 18 (revised)</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#b00;background:#fff0f0;padding:6px 10px;border-radius:6px;border-left:3px solid #b00;">
+              🚨 <strong>Factory flagged delay May 6:</strong> "PCB component shortage from supplier — revised inspection May 11, cargo ready May 18 (originally May 8 / May 14)." <a href="javascript:void(0)" onclick="event.stopPropagation();alert('Demo: would open conversation thread.');" style="color:#7a0000;font-weight:600;">View conversation →</a>
+            </div>
+          </div>
+
+          <!-- Order 4: On track, materials done -->
+          <div class="order-card" style="background:#fff;border:1px solid #a0d8a0;border-left:4px solid #1a7a1a;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Ningbo Pure Skin Labs</div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0044 · Vitamin C Brightening Set (8,000 units) · $7.80 FOB · $62,400 total</div>
+              </div>
+              <span style="font-size:11px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:3px 9px;border-radius:20px;font-weight:600;">✓ ON TRACK</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 5 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Production</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">May 18</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Inspection</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 22</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 28</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order 5: Awaiting confirmation - inspection in 8 days -->
+          <div class="order-card" style="background:#fff;border:1px solid #f0d860;border-left:4px solid #f0d860;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
+              <div>
+                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Hangzhou BellaForma Cosmetics</div>
+                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0040 · Hyaluronic Lip Plumper (20,000 units) · $2.95 FOB · $59,000 total</div>
+              </div>
+              <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:3px 9px;border-radius:20px;font-weight:600;">⚠ NOT CONFIRMED</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 14 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
+                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
+                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 1 · Done</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
+                <div style="position:absolute;top:-7px;right:-4px;background:#886600;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">8 DAYS</div>
+                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Inspection</div>
+                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 16 · Awaiting</div>
+              </div>
+              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
+                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
+                <div style="font-size:11px;color:#666;margin-top:3px;">May 23</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:#886600;background:#fff8e0;padding:6px 10px;border-radius:6px;border-left:3px solid #f0d860;">
+              ⚠ 10-day reminder sent yesterday. Awaiting factory confirmation of inspection date.
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;padding:1rem;color:#bbb;font-size:12px;">Showing 5 of 14 active orders · <a href="javascript:void(0)" style="color:#2266cc;">Load more</a></div>
+
+        <!-- Beta module disclaimer -->
+        <div style="background:#e8f0ff;border:1px solid #c8d8f8;border-radius:10px;padding:14px 18px;margin-top:1.5rem;font-size:13px;color:#1a3399;">
+          <strong>📋 Demo placeholder:</strong> Full PO milestone tracking module is in active development. The data shown above illustrates the planned workflow. When live, factories will confirm milestones via their portal, automated reminders will fire 10 days before each milestone, and delayed dates will trigger admin alerts.
+        </div>
+      </div>
+    </div>
+
     <!-- WAREHOUSE (BETA scaffold) -->
     <div class="panel" id="panel-warehouse">
       <div class="ph">
@@ -1852,6 +2088,34 @@
         <img id="d-bizcard-img" alt="Business card" style="max-width:100%;max-height:240px;border-radius:8px;border:1px solid #e0e0d8;display:block;margin:0 auto;cursor:zoom-in;" />
       </a>
       <div style="font-size:11px;color:#aaa;text-align:center;margin-top:6px;">Click image to open full size in a new tab</div>
+    </div>
+
+    <!-- Vendor Scorecard — Demo placeholder, mock data -->
+    <div class="d-section">
+      <div class="d-section-title">Vendor Scorecard <span style="font-size:10px;color:#bbb;font-weight:400;text-transform:none;letter-spacing:0;">(beta)</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+        <div style="background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">🟢 Delivery</div>
+          <div style="font-size:30px;font-weight:700;color:#0a5a0a;line-height:1;">A</div>
+          <div style="font-size:10px;color:#1a7a1a;margin-top:4px;">95% on-time · 2.1 day avg slip</div>
+        </div>
+        <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">🟡 Performance</div>
+          <div style="font-size:30px;font-weight:700;color:#664400;line-height:1;">C</div>
+          <div style="font-size:10px;color:#886600;margin-top:4px;">Responsiveness 92% · Win rate 18%</div>
+        </div>
+      </div>
+      <div style="background:#fafaf6;border:1px solid #e0e0d8;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Vibe Rating</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:18px;">👍</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;color:#1a1a2e;">Strong</div>
+            <div style="font-size:11px;color:#888;">"Reliable on quality. Slow to respond at first but follows through. Recommended for repeat orders." — Allan, Apr 2026</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#bbb;text-align:right;"><a href="javascript:void(0)" onclick="alert('Demo placeholder — full scorecard breakdown and vibe rating editor coming next.');" style="color:#2266cc;text-decoration:none;">View full scorecard breakdown →</a></div>
     </div>
 
     <div class="d-section">
@@ -7185,8 +7449,37 @@ async function aiSuggestHTSPD(){
 }
 
 // ════════════════════════════════════════
-// PHASE C SCAFFOLDS — Warehouse + Accounting
+// PHASE C SCAFFOLDS — Warehouse + Accounting + Open Orders
 // ════════════════════════════════════════
+
+// Open Orders — demo placeholder. Data is rendered statically in the HTML
+// for the investor pitch. When the milestone schema is built, this will
+// fetch from purchase_orders + po_milestones tables.
+function loadOpenOrders(filter){
+  // No-op for demo — orders are hardcoded in the panel HTML.
+  // The filter argument lets dashboard widgets jump to a filtered view.
+  if(filter){setTimeout(function(){
+    var chip=document.querySelector('.ord-chip[onclick*="\''+filter+'\'"]');
+    if(chip)filterOrders(filter,chip);
+  },50);}
+}
+
+function filterOrders(which,btn){
+  // Toggle active chip styling
+  document.querySelectorAll('.ord-chip').forEach(function(c){
+    c.classList.remove('on');
+    c.style.background='#fff';
+    if(c.textContent.indexOf('All')>=0){c.style.color='#1a1a2e';}
+  });
+  if(btn){
+    btn.classList.add('on');
+    btn.style.background='#1a1a2e';
+    btn.style.color='#fff';
+  }
+  // For the demo, all 5 cards stay visible. Real filtering wires in
+  // when the orders table exists.
+}
+
 async function loadWarehouse(){
   // Pull SKU list, show with placeholder stock columns
   try{
