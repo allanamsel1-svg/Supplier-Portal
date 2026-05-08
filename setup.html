@@ -239,7 +239,11 @@
           </div>
           <div class="f"><label>Notes</label><textarea id="cf-notes" rows="2"></textarea></div>
 
-          <div class="sc-divider">Scoring Criteria</div>
+          <div class="sc-divider" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <span>Scoring Criteria</span>
+            <button type="button" id="sc-suggest-btn" onclick="suggestCriteriaWithAI()" style="padding:6px 12px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;text-transform:none;letter-spacing:0;">✦ Suggest with AI</button>
+          </div>
+          <div id="sc-suggest-status" style="font-size:11px;color:#666;margin-bottom:6px;display:none;"></div>
           <div id="sc-inherited-container"></div>
 
           <div class="sc-section">
@@ -1146,6 +1150,50 @@ function serializeCriteriaForm(){
   }
   return crit;
 }
+async function suggestCriteriaWithAI(){
+  var cat=g('cf-cat')&&g('cf-cat').value.trim();
+  var sub=g('cf-sub')&&g('cf-sub').value.trim();
+  var subsub=g('cf-subsub')&&g('cf-subsub').value.trim();
+  if(!cat){
+    alert('Please enter a Category name first.');
+    return;
+  }
+  var isCosmetic=g('cf-cosmetic-checkbox')?g('cf-cosmetic-checkbox').checked:false;
+  var btn=g('sc-suggest-btn');
+  var status=g('sc-suggest-status');
+  if(btn){btn.disabled=true;btn.style.opacity='0.6';btn.textContent='⏳ Generating (~30s)...';}
+  if(status){status.style.display='block';status.style.color='#5a2db8';status.textContent='Asking AI to generate criteria for "'+[cat,sub,subsub].filter(Boolean).join(' › ')+'"...';}
+  try {
+    var r=await fetch('/api/suggest-criteria',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        category:cat,
+        sub_category:sub||null,
+        sub_sub_category:subsub||null,
+        target_markets:['US','CA'],
+        is_cosmetic:isCosmetic
+      })
+    });
+    var data=await r.json();
+    if(!r.ok||!data.success){
+      throw new Error(data.error||('Request failed (status '+r.status+')'));
+    }
+    if(!data.criteria){throw new Error('No criteria returned');}
+    var c=data.criteria;
+    var summary='✓ Suggested: '+(c.required_certifications?c.required_certifications.length:0)+' certifications, '+
+      (c.numeric_specs?c.numeric_specs.length:0)+' numeric specs, '+
+      (c.boolean_specs?c.boolean_specs.length:0)+' boolean checks, '+
+      (c.ai_rubrics?c.ai_rubrics.length:0)+' internal rubrics. Review below — edit anything before saving.';
+    populateCriteriaForm(c);
+    if(status){status.style.color='#1a7a1a';status.textContent=summary;}
+  } catch (e) {
+    if(status){status.style.color='#b00';status.textContent='Suggestion failed: '+e.message;}
+  } finally {
+    if(btn){btn.disabled=false;btn.style.opacity='1';btn.textContent='✦ Suggest with AI';}
+  }
+}
+
 function populateCriteriaForm(crit){
   crit=crit||{};
   renderChips('sc-regulatory',SC_REGULATORY_PROFILE,crit.regulatory_profile||[]);
