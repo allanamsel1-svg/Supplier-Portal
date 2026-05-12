@@ -332,6 +332,7 @@ function renderCard(card){
     '</div>'+
     '<div class="ci-msg ok" id="'+card.id+'_ok"></div>'+
     '<div class="ci-msg err" id="'+card.id+'_err"></div>'+
+    '<div id="'+card.id+'_dup" style="display:none;"></div>'+
     '</div>';
   }
 
@@ -486,9 +487,41 @@ function resizeImg(dataUrl,maxPx,quality){
 // ── Save full factory profile ──
 async function saveDraft(id){
   var card=cards.find(function(c){return c.id===id;});if(!card)return;
-  var btn=g(id+'_savebtn');if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  var btn=g(id+'_savebtn');if(btn){btn.disabled=true;btn.textContent='Checking...';}
 
   var gv=function(k){var el=g(id+'_'+k);return el?el.value.trim():'';};
+
+  // ── DUPLICATE CHECK: email is the unique key per person at Chinese factories ──
+  // If this email already exists in factories, skip the save silently and surface the existing record.
+  // No "save anyway" — clean and unambiguous.
+  var email=gv('email');
+  var dupSlot=g(id+'_dup');
+  if(dupSlot){dupSlot.style.display='none';dupSlot.innerHTML='';}
+  if(email){
+    try{
+      var dupR=await fetch(SB+'/rest/v1/factories?sales_email=ilike.'+encodeURIComponent(email)+'&select=id,factory_id,factory_name_english,sales_contact_name,sales_email,status,created_at&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      if(dupR.ok){
+        var dupList=await dupR.json();
+        if(dupList&&dupList.length){
+          var existing=dupList[0];
+          var savedDate=existing.created_at?new Date(existing.created_at).toLocaleDateString():'';
+          var existingHref='factory-detail.html?id='+encodeURIComponent(existing.id);
+          var html='<div style="background:#edfaed;border:1px solid #a0d8a0;border-left:3px solid #1a7a1a;border-radius:7px;padding:12px 14px;font-size:12px;color:#1a4a1a;margin-top:8px;">'+
+            '<div style="font-weight:600;margin-bottom:6px;">✓ Already in your database — nothing saved</div>'+
+            '<div style="margin-bottom:4px;"><strong>'+escapeHtml(existing.factory_name_english||'(no name)')+'</strong>'+(existing.factory_id?' · '+escapeHtml(existing.factory_id):'')+'</div>'+
+            '<div style="margin-bottom:4px;">Contact: '+escapeHtml(existing.sales_contact_name||'(none)')+' · '+escapeHtml(existing.sales_email||email)+'</div>'+
+            '<div style="margin-bottom:8px;color:#1a7a1a;">Status: '+escapeHtml(existing.status||'pending')+(savedDate?' · Added '+savedDate:'')+'</div>'+
+            '<a href="'+escapeHtml(existingHref)+'" target="_blank" style="display:inline-block;padding:6px 12px;background:#1a7a1a;color:#fff;text-decoration:none;border-radius:5px;font-size:11px;font-weight:600;">View existing factory →</a>'+
+            '</div>';
+          if(dupSlot){dupSlot.innerHTML=html;dupSlot.style.display='block';}
+          if(btn){btn.disabled=true;btn.textContent='Already in database';btn.style.opacity='0.6';}
+          return;
+        }
+      }
+    }catch(e){console.log('Duplicate check error (proceeding with save):',e.message);}
+  }
+
+  if(btn)btn.textContent='Saving...';
 
   // Required: company name
   var nameEn=gv('name_en')||gv('name_local')||gv('contact')||'Unknown Factory';
@@ -653,6 +686,8 @@ function fileToDataUrl(file){
 function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+String(d.getFullYear()).slice(-2);}
 
 function showMsg(id,type,text){var el=g(id+'_'+type);if(el){el.textContent=text;el.style.display='block';}}
+
+function escapeHtml(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 // ── SendGrid Email ──
 
 async function sendEmail(toEmail,toName,subject,body,replyTo){
