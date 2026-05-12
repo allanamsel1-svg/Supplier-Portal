@@ -815,7 +815,7 @@ async function sendInvite(){
   var emailBody='';
   if(apiKey){
     try{
-      var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Allan Amsel at a US-based product sourcing company to invite this factory to register on our supplier portal.\n\nFactory: '+(factory.factory_name_english||'')+(factory.factory_name_local?' ('+factory.factory_name_local+')':'')+'\nContact: '+(factory.sales_contact_name||'Team')+'\nCountry: '+(factory.country||'')+'\n\nRules:\n- Address by first name\n- Sign as Allan Amsel, Supplier Sourcing\n- No placeholders like [Your Name]\n- Do NOT include the portal link (added separately)\n- Keep to 3 short paragraphs\n- Write ONLY the email body';
+      var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Tyler Durden at a US-based product sourcing company to invite this factory to register on our supplier portal.\n\nFactory: '+(factory.factory_name_english||'')+(factory.factory_name_local?' ('+factory.factory_name_local+')':'')+'\nContact: '+(factory.sales_contact_name||'Team')+'\nCountry: '+(factory.country||'')+'\n\nRules:\n- Address by first name\n- Sign as Tyler Durden, Sourcing Manager, TBG Sourcing, sourcing@tbgsourcing.net\n- No placeholders like [Your Name]\n- Do NOT include the portal link (added separately)\n- Keep to 3 short paragraphs\n- Write ONLY the email body';
       var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,messages:[{role:'user',content:prompt}]})});
       var d=await r.json();
       if(d.content&&d.content[0])emailBody=d.content[0].text;
@@ -823,7 +823,7 @@ async function sendInvite(){
   }
   if(!emailBody){
     var fn=(factory.sales_contact_name||'').split(' ')[0]||'Team';
-    emailBody='Dear '+fn+',\n\nI hope this finds you well. My name is Allan Amsel and I represent a US-based product sourcing company.\n\nWe would love to include '+(factory.factory_name_english||'your company')+' in our supplier network. Please take a few minutes to register on our supplier portal using your unique link below.\n\nWe look forward to working with you.\n\nBest regards,\nAllan Amsel\nSupplier Sourcing';
+    emailBody='Dear '+fn+',\n\nI hope this finds you well. My name is Tyler Durden and I represent a US-based product sourcing company.\n\nWe would love to include '+(factory.factory_name_english||'your company')+' in our supplier network. Please take a few minutes to register on our supplier portal using your unique link below.\n\nWe look forward to working with you.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
   }
   var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(factory.factory_name_english||'');
   try{
