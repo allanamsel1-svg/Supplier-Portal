@@ -14,14 +14,14 @@ const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 
 const FROM_EMAIL = 'sourcing@tbgsourcing.net';
-const FROM_NAME = 'TBG Sourcing';
+const FROM_NAME = 'Tyler Durden';
 // Note: no CC — sourcing@tbgsourcing.net has no real mailbox.
 // Instead, every outbound reminder is logged to the email_threads/email_messages tables
 // so it shows up in the admin portal's Sourcing inbox alongside incoming factory emails.
 
 const REMINDER_BUCKETS = [90, 60, 45, 30]; // days before expiry that trigger emails
 
-const SG_KEY = ['SG.ENlkbj--SB6u7Acx36sPuA', 'neLPh7z1BA-Wm-ubP1yeUp8at6MEO1BRc0zd3FGRYco'].join('.');
+const SG_KEY = process.env.SENDGRID_API_KEY;
 
 const PORTAL_URL = 'https://portal.tbgsourcing.net/index.html';
 
@@ -184,7 +184,9 @@ ${certInfo.split('\n').map(l => '- ' + l).join('\n')}
 If you have any questions or your certificate is in the process of being renewed, just reply to this email.
 
 Thanks,
-TBG Sourcing
+Tyler Durden
+Sourcing Manager, TBG Sourcing
+sourcing@tbgsourcing.net
 `;
 
   // Build SendGrid payload (matches send-email.js pattern)
@@ -199,6 +201,9 @@ TBG Sourcing
   };
 
   try {
+    if (!SG_KEY) {
+      return { ok: false, email_to: toEmail, error: 'SENDGRID_API_KEY environment variable is not set' };
+    }
     const r = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
