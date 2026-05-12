@@ -121,7 +121,16 @@
   <div class="page-title">Business Card Scanner</div>
   <div class="page-sub">Upload or photograph business cards. Claude extracts contact details — then complete the full factory profile before saving.</div>
 
-  <div class="api-warn" id="api-warn">⚠ No Anthropic API key found. <a href="admin.html" style="color:#7a6000;font-weight:600;">Add your key in Admin Settings →</a></div>
+  <div class="api-warn" id="api-warn">
+    <div style="margin-bottom:10px;font-weight:600;">⚠ No Anthropic API key found</div>
+    <div style="margin-bottom:10px;font-size:12px;font-weight:400;">Paste your key below — it will be saved to this browser only.</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="password" id="scan-apikey" placeholder="sk-ant-..." style="flex:1;padding:8px 10px;border:1px solid #d0c890;border-radius:6px;font-size:12px;font-family:monospace;outline:none;" />
+      <button onclick="saveScanKey()" style="padding:8px 16px;background:#7a6000;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Save</button>
+    </div>
+    <div id="scan-apikey-msg" style="margin-top:6px;font-size:11px;color:#5a4500;display:none;">✓ Key saved — you can now scan cards.</div>
+    <div style="margin-top:10px;font-size:11px;color:#a08840;">Or <a href="admin.html" style="color:#7a6000;font-weight:600;">add it in Admin Settings</a> if you prefer.</div>
+  </div>
   <div class="top-banner" id="top-banner"></div>
 
   <div class="upload-card">
@@ -165,6 +174,18 @@ window.addEventListener('load',function(){
   loadCategories();
 });
 
+function saveScanKey(){
+  var input=g('scan-apikey');
+  var k=(input.value||'').trim();
+  if(!k){alert('Please paste your Anthropic API key first.');return;}
+  if(!k.startsWith('sk-ant-')){
+    if(!confirm('That key doesn\'t look like an Anthropic key (should start with "sk-ant-"). Save it anyway?'))return;
+  }
+  localStorage.setItem('anthropic_key',k);
+  var msg=g('scan-apikey-msg');msg.style.display='block';
+  setTimeout(function(){g('api-warn').style.display='none';},1500);
+}
+
 async function loadCategories(){
   try{
     var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
@@ -183,11 +204,14 @@ function handleFiles(files){
     var url=URL.createObjectURL(file);
     var img=new Image();
     img.onload=function(){
-      var canvas=document.createElement('canvas'),max=1600,w=img.width,h=img.height;
+      var canvas=document.createElement('canvas'),max=2400,w=img.width,h=img.height;
       if(w>max||h>max){if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;}}
       canvas.width=w;canvas.height=h;
-      canvas.getContext('2d').drawImage(img,0,0,w,h);
-      card.dataUrl=canvas.toDataURL('image/jpeg',0.85);
+      var ctx=canvas.getContext('2d');
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+      ctx.drawImage(img,0,0,w,h);
+      card.dataUrl=canvas.toDataURL('image/jpeg',0.95);
       URL.revokeObjectURL(url);
       renderCard(card);updateBar();
     };
@@ -389,10 +413,42 @@ async function scanAll(){
 async function scanCard(card,apiKey){
   card.status='processing';renderCard(card);
   try{
-    var resized=await resizeImg(card.dataUrl,1600,0.85);
+    var resized=await resizeImg(card.dataUrl,2400,0.95);
     var base64=resized.split(',')[1];
-    var prompt='This image contains one or more business cards. First decide whether each card stands alone or is multi-panel (folded, double-sided, or photographed showing multiple sides).\n\nDISTINGUISHING:\n- Multiple SEPARATE cards (different people, different companies, different designs) → return as separate records\n- ONE card with MULTIPLE PANELS (same company logo/colors, same person, often bilingual or folded) → return as ONE record, merging info from all panels\n\nMulti-panel single cards are very common in Asian sourcing. Treat as ONE record when you see:\n- Same logo, colors, or design language across panels\n- Same person\'s name appearing on both sides\n- One panel in English and another in Chinese / Japanese / Korean / Thai / Vietnamese\n- A visible fold line between panels\n- Complementary info (title on one side, mobile on the other) for the same person\n\nWhen merging panel data:\n- factory_name_english: the English/Latin-script company name\n- factory_name_local: the local-language company name (Chinese, Japanese, etc.)\n- Use the more complete version when the same field appears on both panels\n- Combine complementary fields across panels into one record\n\nCRITICAL:\n- IGNORE fax numbers entirely\n- Decode QR codes: WeChat QR → sales_wechat, website QR → website\n- For images with multiple SEPARATE cards, NEVER mix data between them\n- For multi-panel single cards, ALWAYS combine into one record\n\nReturn ONLY a JSON array with these keys for each card (empty string if not found):\n[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]\n\nReturn ONLY the raw JSON array, no markdown.';
-    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},{type:'text',text:prompt}]}]})});
+    var prompt='You are extracting business card data for an importer\'s supplier database. Accuracy matters more than speed. The cards are often Asian-manufacturer cards with English + Chinese/Japanese/Korean text, sometimes multi-panel/folded/bilingual.\n\n'+
+'STEP 1 — READ EVERYTHING FIRST:\n'+
+'Look at the image carefully. Read every piece of visible text — Latin characters, Chinese/Japanese/Korean characters, numbers, symbols. Do not skip small text. Do not infer or guess text that isn\'t clearly visible. If text is partially obscured or unreadable, mark that field empty rather than guessing.\n\n'+
+'STEP 2 — IDENTIFY HOW MANY CARDS:\n'+
+'Multiple SEPARATE cards (different people, different companies, different designs, different angles) → return each as its own record.\n'+
+'ONE card with MULTIPLE PANELS (same company logo/colors, same person, often bilingual or folded; visible fold line; or complementary info like title on one side and mobile on the other) → return ONE merged record.\n'+
+'When uncertain, treat as separate records. Better to over-split than to mix data between different companies.\n\n'+
+'STEP 3 — MAP TEXT TO FIELDS:\n'+
+'- factory_name_english: company name in Latin script (e.g. "Shenzhen Jiahua Cosmetics Co., Ltd."). Do NOT include the person\'s name here.\n'+
+'- factory_name_local: company name in local script (Chinese/Japanese/Korean/Thai/Vietnamese characters). Empty if none.\n'+
+'- sales_contact_name: the person\'s full name as printed. If both English and local versions appear, use the English version. Do NOT include title/role here.\n'+
+'- contact_title: job title (e.g. "Sales Manager", "Export Director", "International Sales").\n'+
+'- sales_email: the email address. If multiple emails appear, use the one closest to the person\'s name.\n'+
+'- sales_mobile: mobile/cell number. Often labeled "M:", "Mobile:", "Cell:", "手机", or shows the country code with no landline format. Include the country code if shown (e.g. "+86 138 1234 5678").\n'+
+'- telephone: landline number. Labeled "T:", "Tel:", "Phone:", "电话", "Office:". Include the country code if shown.\n'+
+'- sales_wechat: WeChat ID (often labeled "WeChat:", "微信:", or shown next to a WeChat icon). Read the actual ID, not "Scan QR".\n'+
+'- sales_whatsapp: WhatsApp number if explicitly shown. If only mobile is shown, leave WhatsApp empty.\n'+
+'- website: company website URL (e.g. "www.example.com"). Do NOT put email in this field.\n'+
+'- address: full street address as printed.\n'+
+'- city: city name only.\n'+
+'- country: country name (e.g. "China", "Vietnam"). If only a city is shown, infer the country if it\'s unambiguous (Shenzhen → China, Ho Chi Minh → Vietnam).\n'+
+'- product_categories: what the company makes, in their own words from the card (e.g. "cosmetics packaging", "hair care OEM", "LED lighting"). Empty if not stated.\n'+
+'- notes: anything else useful — slogans, certifications listed on the card (ISO, BSCI, GMP), founded year, factory size.\n\n'+
+'STRICT RULES:\n'+
+'- IGNORE all fax numbers entirely. Do not put fax in telephone.\n'+
+'- IGNORE QR codes for now (decoding QR from a photo is unreliable). Leave wechat/whatsapp empty unless the ID/number is printed in readable text.\n'+
+'- NEVER put a person\'s name in the company field, even if the card style is minimal.\n'+
+'- NEVER mix data between different cards/companies in the same image.\n'+
+'- If you\'re uncertain about a number, prefer leaving it empty over guessing wrong digits.\n'+
+'- Preserve spacing in phone numbers as printed.\n\n'+
+'OUTPUT:\n'+
+'Return ONLY a JSON array — no prose, no markdown, no code fences. Empty string for any field not found:\n'+
+'[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]';
+    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-7',max_tokens:2500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},{type:'text',text:prompt}]}]})});
     var d=await resp.json();
     if(d.error){card.status='error';card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';}
     else if(d.content&&d.content[0]&&d.content[0].text){
@@ -417,7 +473,10 @@ function resizeImg(dataUrl,maxPx,quality){
       var w=img.width,h=img.height;
       if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}
       var c=document.createElement('canvas');c.width=w;c.height=h;
-      c.getContext('2d').drawImage(img,0,0,w,h);
+      var ctx=c.getContext('2d');
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+      ctx.drawImage(img,0,0,w,h);
       resolve(c.toDataURL('image/jpeg',quality));
     };
     img.src=dataUrl;
@@ -517,7 +576,7 @@ async function saveDraft(id){
     // Step 4: Upload original business card image
     if(card.dataUrl){
       try{
-        var bcResized=await resizeImg(card.dataUrl,1600,0.85);
+        var bcResized=await resizeImg(card.dataUrl,2000,0.92);
         var bcBlob=await fetch(bcResized).then(function(r2){return r2.blob();});
         var bcPath=factoryId+'/business-card/scan_'+dateStamp()+'_'+Date.now()+'.jpg';
         var bcR=await fetch(SB+'/storage/v1/object/factory-files/'+bcPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:bcBlob});
