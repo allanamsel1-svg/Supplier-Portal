@@ -1,6 +1,7 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  const SG_KEY = ['SG.ENlkbj--SB6u7Acx36sPuA', 'neLPh7z1BA-Wm-ubP1yeUp8at6MEO1BRc0zd3FGRYco'].join('.');
+  const SG_KEY = process.env.SENDGRID_API_KEY;
+  if (!SG_KEY) return res.status(500).json({ error: 'SENDGRID_API_KEY environment variable is not set' });
   try {
     const { to, toName, subject, body, replyTo, cc, bcc } = req.body;
     if (!to || !subject || !body) return res.status(400).json({ error: 'Missing required fields' });
@@ -8,8 +9,8 @@ export default async function handler(req, res) {
     const replyToEmail = replyTo && replyTo.includes('@') ? replyTo : fromEmail;
     const payload = {
       personalizations: [{ to: [{ email: to, name: toName || '' }] }],
-      from: { email: fromEmail, name: 'TBG Sourcing' },
-      reply_to: { email: replyToEmail, name: 'TBG Sourcing' },
+      from: { email: fromEmail, name: 'Tyler Durden' },
+      reply_to: { email: replyToEmail, name: 'Tyler Durden' },
       subject: subject,
       content: [{ type: 'text/plain', value: body }]
     };
