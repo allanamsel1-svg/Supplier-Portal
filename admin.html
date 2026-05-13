@@ -541,6 +541,33 @@
           </div>
         </div>
       </div>
+      <!-- Sample Approval widget (NEW sample-approval workflow) -->
+      <div id="sample-approval-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:600;color:#1a1a2e;">🔬 Sample Approval Queue</div>
+          <a href="javascript:void(0)" onclick="showPanel('pd');loadPDItems();" style="font-size:11px;color:#2266cc;text-decoration:none;">View queue →</a>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+          <div onclick="showPanel('pd');loadPDItems('awaiting_initial_sample');" style="cursor:pointer;padding:10px 12px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;">
+            <div style="font-size:10px;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Awaiting First Sample</div>
+            <div style="font-size:22px;font-weight:600;color:#664400;" id="saw-initial">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDItems('awaiting_approval');" style="cursor:pointer;padding:10px 12px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;">
+            <div style="font-size:10px;color:#1a3a8a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Awaiting My Approval</div>
+            <div style="font-size:22px;font-weight:600;color:#1a3a8a;" id="saw-approval">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDItems('in_revision');" style="cursor:pointer;padding:10px 12px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;">
+            <div style="font-size:10px;color:#b00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">In Revision</div>
+            <div style="font-size:22px;font-weight:600;color:#b00;" id="saw-revision">—</div>
+          </div>
+          <div onclick="showPanel('pd');loadPDItems('approved');" style="cursor:pointer;padding:10px 12px;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;">
+            <div style="font-size:10px;color:#1a7a1a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;font-weight:600;">Ready to Issue PO</div>
+            <div style="font-size:22px;font-weight:600;color:#1a5a1a;" id="saw-readypo">—</div>
+          </div>
+        </div>
+        <div id="saw-attention-list" style="margin-top:10px;"></div>
+      </div>
+
       <!-- Product Development widget -->
       <div id="pd-widget" style="margin:0 1.5rem 1.5rem;padding:1rem 1.25rem;background:#fff;border:1px solid #e8e8e0;border-radius:10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
@@ -1534,11 +1561,42 @@
     <!-- PRODUCT DEVELOPMENT -->
     <div class="panel" id="panel-pd">
       <div class="ph" style="display:flex;align-items:center;justify-content:space-between;">
-        <div><div class="ph-title">🧪 Product Development</div><div class="ph-sub">Approved RFQs in development — gather all assets, confirm specs, then go live as SKU</div></div>
+        <div><div class="ph-title">🧪 Product Development</div><div class="ph-sub">Sample approval queue + SKU readiness tracking</div></div>
+      </div>
+
+      <!-- ─── Sample Approval Queue (new sample-approval workflow) ─── -->
+      <div style="padding:1rem 1.5rem 0;">
+        <div style="background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:14px 16px;margin-bottom:1rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#1a1a2e;">Sample Approval Queue</div>
+            <button onclick="loadPDItems()" style="font-size:11px;padding:5px 10px;background:#fff;border:1px solid #ddd;border-radius:5px;color:#666;cursor:pointer;font-family:inherit;">↻ Refresh</button>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="cmp-chip on" data-pdi-filter="all" onclick="filterPDItems('all')">All <span id="pdi-c-all">0</span></button>
+            <button class="cmp-chip" data-pdi-filter="awaiting_initial_sample" onclick="filterPDItems('awaiting_initial_sample')">⏳ Awaiting First Sample <span id="pdi-c-initial">0</span></button>
+            <button class="cmp-chip" data-pdi-filter="awaiting_approval" onclick="filterPDItems('awaiting_approval')">🔍 Awaiting My Approval <span id="pdi-c-approval">0</span></button>
+            <button class="cmp-chip" data-pdi-filter="in_revision" onclick="filterPDItems('in_revision')">↻ In Revision <span id="pdi-c-revision">0</span></button>
+            <button class="cmp-chip" data-pdi-filter="approved" onclick="filterPDItems('approved')">✓ Approved (Pending PO) <span id="pdi-c-approved">0</span></button>
+            <button class="cmp-chip" data-pdi-filter="rejected" onclick="filterPDItems('rejected')">✗ Rejected <span id="pdi-c-rejected">0</span></button>
+          </div>
+          <div id="pdi-list-container"><div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">Loading samples...</div></div>
+        </div>
+      </div>
+
+      <!-- Sample evaluation drawer -->
+      <div id="pdi-detail-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;" onclick="closePdiDetail(event)">
+        <div id="pdi-detail-panel" style="position:absolute;top:0;right:0;width:820px;max-width:95vw;height:100vh;background:#fafaf6;overflow-y:auto;box-shadow:-8px 0 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+          <div id="pdi-detail-content"><div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div></div>
+        </div>
+      </div>
+
+      <!-- ─── Legacy SKU-readiness flow (kept for backward compat) ─── -->
+      <div style="padding:0 1.5rem 0;">
+        <div style="font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin:8px 0 12px;">SKU Readiness — Legacy Workflow</div>
       </div>
 
       <!-- Status filter chips -->
-      <div style="padding:1rem 1.5rem 0.5rem;display:flex;gap:8px;flex-wrap:wrap;">
+      <div style="padding:0 1.5rem 0.5rem;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="cmp-chip on" data-pd-filter="all" onclick="filterPDList('all')">All <span id="pd-c-all">0</span></button>
         <button class="cmp-chip" data-pd-filter="pending" onclick="filterPDList('pending')">⏳ Pending <span id="pd-c-pending">0</span></button>
         <button class="cmp-chip" data-pd-filter="awaiting_factory" onclick="filterPDList('awaiting_factory')">Awaiting Factory <span id="pd-c-factory">0</span></button>
@@ -2296,7 +2354,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
-  if(name==='dashboard'){loadPDList();loadCreditWatchWidget();loadForecastingWidget();}
+  if(name==='dashboard'){loadPDList();loadPDItems();loadCreditWatchWidget();loadForecastingWidget();}
   if(name==='pending-cats'){loadPendingCats();loadPendingCerts();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
@@ -3917,6 +3975,34 @@ async function acceptQuote(quoteId,rfqId,factoryName){
       console.log('PD creation failed (non-fatal):',pdErr);
     }
     // ─── End PD auto-create ───
+
+    // ─── Auto-create Product Development ITEM (new sample-approval workflow) ───
+    try{
+      var existPdiR=await fetch(SB+'/rest/v1/product_development_items?accepted_quote_id=eq.'+quoteId+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var existPdi=existPdiR.ok?await existPdiR.json():[];
+      if(!existPdi||!existPdi.length){
+        var pdiPayload={
+          accepted_quote_id:quoteId,
+          rfq_id:rfqId,
+          factory_id:q.factory_id,
+          status:'awaiting_initial_sample',
+          current_version:0,
+          quote_sample_submission_days:  q.quote_sample_submission_days||null,
+          quote_materials_offset_days:   q.quote_materials_offset_days||null,
+          quote_prod_start_offset_days:  q.quote_prod_start_offset_days||null,
+          quote_prod_end_offset_days:    q.quote_prod_end_offset_days||null,
+          quote_inspection_offset_days:  q.quote_inspection_offset_days||null,
+          quote_cargo_ready_offset_days: q.quote_cargo_ready_offset_days||null
+        };
+        await fetch(SB+'/rest/v1/product_development_items',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(pdiPayload)});
+        // Log factory_event (non-blocking)
+        fetch(SB+'/rest/v1/factory_events',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({factory_id:q.factory_id,event_type:'rfq_quote_accepted',event_data:{rfq_id:rfqId,quote_id:quoteId},actor_type:'admin'})}).catch(function(){});
+        console.log('PD item (sample-approval) created for quote '+quoteId);
+      }
+    }catch(pdiErr){
+      console.log('PD-item creation failed (non-fatal):',pdiErr);
+    }
+    // ─── End PD-item auto-create ───
 
     // Update factory scorecard
     updateFactoryScorecard(q.factory_id,'quote_accepted');
@@ -6021,7 +6107,511 @@ function updatePDSaveIndicator(state){
   else if(state==='error'){el.innerHTML='⚠ Save failed';el.style.color='#b00';}
 }
 
+// ─────────────────────────────────────────────────────────
+// SAMPLE APPROVAL QUEUE — new sample-approval workflow
+// ─────────────────────────────────────────────────────────
+
+var PDI_RECORDS = [];
+var pdiCurrentFilter = 'all';
+
+async function loadPDItems(filterOverride){
+  if(filterOverride){
+    pdiCurrentFilter = filterOverride;
+    document.querySelectorAll('[data-pdi-filter]').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-pdi-filter')===filterOverride);
+    });
+  }
+  var listEl = g('pdi-list-container');
+  if(!listEl) return;
+  listEl.innerHTML = '<div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">Loading samples...</div>';
+  try{
+    var r = await fetch(SB+'/rest/v1/product_development_items?select=*,factories(factory_name_english,sales_email,sales_contact_name,country),rfqs(project_number,item_description,category),rfq_quotes!product_development_items_accepted_quote_id_fkey(unit_fob_price,packaging_price_per_unit,moq),sample_submissions(*)&order=updated_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){listEl.innerHTML='<div class="empty" style="color:#b00;padding:1.5rem;">Failed to load samples ('+r.status+').</div>';return;}
+    PDI_RECORDS = await r.json();
+    renderPDItems();
+    loadPDItemCounts();
+  }catch(e){
+    listEl.innerHTML='<div class="empty" style="color:#b00;padding:1.5rem;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+function loadPDItemCounts(){
+  var c={
+    awaiting_initial_sample:0, awaiting_approval:0,
+    in_revision:0, approved:0, rejected:0
+  };
+  PDI_RECORDS.forEach(function(p){if(c[p.status]!==undefined)c[p.status]++;});
+  var total=PDI_RECORDS.length;
+  // Filter chip counts
+  if(g('pdi-c-all'))      g('pdi-c-all').textContent      = total;
+  if(g('pdi-c-initial'))  g('pdi-c-initial').textContent  = c.awaiting_initial_sample;
+  if(g('pdi-c-approval')) g('pdi-c-approval').textContent = c.awaiting_approval;
+  if(g('pdi-c-revision')) g('pdi-c-revision').textContent = c.in_revision;
+  if(g('pdi-c-approved')) g('pdi-c-approved').textContent = c.approved;
+  if(g('pdi-c-rejected')) g('pdi-c-rejected').textContent = c.rejected;
+  // Dashboard widget counts
+  if(g('saw-initial'))    g('saw-initial').textContent    = c.awaiting_initial_sample;
+  if(g('saw-approval'))   g('saw-approval').textContent   = c.awaiting_approval;
+  if(g('saw-revision'))   g('saw-revision').textContent   = c.in_revision;
+  if(g('saw-readypo'))    g('saw-readypo').textContent    = c.approved;
+  // Attention list on dashboard widget — items in awaiting_approval > 5 business days old
+  var attentionEl = g('saw-attention-list');
+  if(attentionEl){
+    var fiveDaysMs = 5*86400*1000;
+    var now = Date.now();
+    var attention = PDI_RECORDS.filter(function(p){
+      if(p.status!=='awaiting_approval'||!p.updated_at)return false;
+      return now - new Date(p.updated_at).getTime() > fiveDaysMs;
+    }).slice(0,3);
+    if(attention.length){
+      attentionEl.innerHTML = '<div style="margin-top:8px;padding:8px 10px;background:#fff5f5;border:1px solid #fdd;border-left:3px solid #b00;border-radius:6px;font-size:11px;">'+
+        '<div style="font-weight:700;color:#b00;margin-bottom:4px;">⚠ Needs your attention — waiting > 5 business days</div>'+
+        attention.map(function(p){
+          var f=p.factories||{};
+          var rfq=p.rfqs||{};
+          var days=Math.floor((now-new Date(p.updated_at).getTime())/86400000);
+          return '<div style="margin-bottom:2px;cursor:pointer;color:#7a0000;" onclick="showPanel(\'pd\');setTimeout(function(){openPdiDetail(\''+p.id+'\');},200);">→ '+esc(f.factory_name_english||'')+' — '+esc((rfq.item_description||'').slice(0,50))+' ('+days+'d)</div>';
+        }).join('')+
+      '</div>';
+    } else {
+      attentionEl.innerHTML='';
+    }
+  }
+}
+
+function filterPDItems(filter){
+  pdiCurrentFilter = filter;
+  document.querySelectorAll('[data-pdi-filter]').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-pdi-filter')===filter);
+  });
+  renderPDItems();
+}
+
+function renderPDItems(){
+  var listEl = g('pdi-list-container');
+  if(!listEl) return;
+  var items = pdiCurrentFilter==='all' ? PDI_RECORDS : PDI_RECORDS.filter(function(p){return p.status===pdiCurrentFilter;});
+  if(!items.length){
+    listEl.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">No items in this status.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(renderPDItemCard).join('');
+}
+
+function renderPDItemCard(p){
+  var f = p.factories||{};
+  var rfq = p.rfqs||{};
+  var q = p.rfq_quotes||{};
+  var subs = Array.isArray(p.sample_submissions)?p.sample_submissions.slice().sort(function(a,b){return a.version_number-b.version_number;}):[];
+  var latest = subs.length?subs[subs.length-1]:null;
+  var stCfg = {
+    awaiting_initial_sample:{bg:'#fff8e0',border:'#f0d860',color:'#664400',label:'Awaiting First Sample'},
+    awaiting_approval:      {bg:'#f0f6ff',border:'#c0d8f0',color:'#1a3a8a',label:'Awaiting My Approval'},
+    in_revision:            {bg:'#fff0f0',border:'#fdd',   color:'#b00',   label:'In Revision'},
+    approved:               {bg:'#edfaed',border:'#a0d8a0',color:'#1a7a1a',label:'Approved — Ready to Issue PO'},
+    rejected:               {bg:'#f5f5f0',border:'#ddd',   color:'#666',   label:'Rejected'}
+  };
+  var s = stCfg[p.status]||stCfg.awaiting_initial_sample;
+  var daysSinceUpdate = p.updated_at?Math.floor((Date.now()-new Date(p.updated_at).getTime())/86400000):null;
+  var staleBadge = (p.status==='awaiting_approval' && daysSinceUpdate!==null && daysSinceUpdate>5) ?
+    '<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 6px;border-radius:8px;font-weight:600;margin-left:6px;">⚠ '+daysSinceUpdate+'d waiting</span>' : '';
+  return '<div style="background:#fff;border:1px solid '+s.border+';border-left:3px solid '+s.border+';border-radius:8px;padding:12px 14px;margin-bottom:8px;cursor:pointer;" onclick="openPdiDetail(\''+p.id+'\')">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">'+
+      '<div style="flex:1;min-width:200px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(f.factory_name_english||'(no factory)')+' — '+esc(rfq.item_description||'(no description)')+'</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:3px;">'+
+          (rfq.project_number?esc(rfq.project_number)+' · ':'')+
+          (rfq.category?esc(rfq.category)+' · ':'')+
+          (q.unit_fob_price?'$'+parseFloat(q.unit_fob_price).toFixed(4)+' FOB · ':'')+
+          'Accepted '+(p.accepted_at?new Date(p.accepted_at).toLocaleDateString():'')+
+          (subs.length?' · '+subs.length+' version'+(subs.length>1?'s':'')+' shipped':'')+
+        '</div>'+
+      '</div>'+
+      '<span style="font-size:11px;background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';padding:3px 10px;border-radius:12px;font-weight:600;white-space:nowrap;">'+s.label+'</span>'+
+      staleBadge+
+    '</div>'+
+  '</div>';
+}
+
+var PDI_CURRENT_DETAIL = null;
+
+async function openPdiDetail(pdiId){
+  var p = PDI_RECORDS.find(function(x){return x.id===pdiId;});
+  if(!p){return;}
+  PDI_CURRENT_DETAIL = p;
+  g('pdi-detail-overlay').style.display='block';
+  g('pdi-detail-content').innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
+  // Fetch fresh evals for each submission
+  var subs = Array.isArray(p.sample_submissions)?p.sample_submissions.slice().sort(function(a,b){return a.version_number-b.version_number;}):[];
+  if(subs.length){
+    var subIds = subs.map(function(s){return s.id;}).join(',');
+    try{
+      var er = await fetch(SB+'/rest/v1/sample_evaluations?sample_submission_id=in.('+subIds+')&order=decided_at.desc',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      var evals = await er.json();
+      subs.forEach(function(sub){
+        sub._evals = (Array.isArray(evals)?evals:[]).filter(function(e){return e.sample_submission_id===sub.id;});
+      });
+    }catch(e){console.log('eval fetch failed:',e);}
+  }
+  renderPdiDetail(p, subs);
+}
+
+function closePdiDetail(ev){
+  if(ev && ev.target && ev.target.id!=='pdi-detail-overlay')return;
+  g('pdi-detail-overlay').style.display='none';
+  PDI_CURRENT_DETAIL = null;
+}
+
+function renderPdiDetail(p, subs){
+  var f = p.factories||{};
+  var rfq = p.rfqs||{};
+  var q = p.rfq_quotes||{};
+  var canDecide = (p.status==='awaiting_approval');
+  var canIssuePO = (p.status==='approved' && !p.purchase_order_id);
+
+  // Sample version history
+  var versionsHtml = subs.length ? subs.map(function(sub){
+    var latestEval = (sub._evals && sub._evals[0]) || null;
+    var evColor = latestEval ? (latestEval.decision==='approve'?'#1a7a1a':latestEval.decision==='reject'?'#b00':'#886600') : '#666';
+    var evBg = latestEval ? (latestEval.decision==='approve'?'#edfaed':latestEval.decision==='reject'?'#fff0f0':'#fff8e0') : '#f5f5f0';
+    var evLabel = latestEval ? (latestEval.decision==='approve'?'✓ Approved':latestEval.decision==='reject'?'✗ Rejected':'↻ Revision requested') : 'Awaiting decision';
+    var photos = Array.isArray(sub.sample_photo_urls)?sub.sample_photo_urls:[];
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:12px 14px;margin-bottom:10px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'+
+        '<div style="font-size:13px;font-weight:700;color:#1a1a2e;">Version '+sub.version_number+'</div>'+
+        '<span style="font-size:11px;background:'+evBg+';color:'+evColor+';padding:3px 9px;border-radius:10px;font-weight:600;">'+evLabel+'</span>'+
+      '</div>'+
+      '<div style="font-size:12px;color:#666;margin-top:6px;">'+
+        (sub.ship_date?'Shipped '+esc(sub.ship_date):'')+
+        (sub.carrier?' · '+esc((sub.carrier||'').replace(/_/g,' ').toUpperCase()):'')+
+        (sub.tracking_number?' · Tracking: '+esc(sub.tracking_number):'')+
+        (sub.ship_destination_type?' · To: '+esc(sub.ship_destination_type.replace(/_/g,' ')):'')+
+      '</div>'+
+      (sub.factory_notes?'<div style="font-size:12px;color:#666;margin-top:6px;font-style:italic;">"'+esc(sub.factory_notes)+'"</div>':'')+
+      (photos.length?'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'+photos.map(function(url){return '<a href="javascript:void(0)" onclick="openFactoryFile(\''+url.replace(/\x27/g,"\\\x27")+'\')" style="display:inline-block;padding:5px 10px;background:#f0f0e8;border:1px solid #ddd;border-radius:5px;font-size:11px;color:#1a1a2e;text-decoration:none;">📷 View photo</a>';}).join('')+'</div>':'')+
+      (latestEval&&latestEval.feedback_text?'<div style="margin-top:10px;padding:10px;background:#fafaf6;border-left:3px solid '+evColor+';border-radius:5px;font-size:12px;color:#444;white-space:pre-wrap;">'+esc(latestEval.feedback_text)+'</div>':'')+
+    '</div>';
+  }).join('') : '<div class="empty" style="padding:1rem;color:#bbb;font-size:12px;">No samples shipped yet.</div>';
+
+  // Decision form (only when awaiting_approval and unevaluated latest)
+  var decisionFormHtml = '';
+  if(canDecide){
+    var latestSub = subs[subs.length-1];
+    decisionFormHtml = '<div style="background:#fff;border:2px solid #1a3a8a;border-radius:10px;padding:16px;margin-top:14px;">'+
+      '<div style="font-size:14px;font-weight:700;color:#1a3a8a;margin-bottom:10px;">Evaluate Version '+(latestSub?latestSub.version_number:'?')+'</div>'+
+      '<div style="font-size:12px;color:#666;margin-bottom:12px;">Pick a decision. For Revise or Reject, the AI will draft feedback you can edit.</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">'+
+        '<button onclick="setEvalDecision(\'approve\')" id="eval-btn-approve" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve Golden Sample</button>'+
+        '<button onclick="setEvalDecision(\'revise\')" id="eval-btn-revise" style="padding:8px 16px;background:#fff8e0;color:#664400;border:1px solid #f0d860;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">↻ Request Revision</button>'+
+        '<button onclick="setEvalDecision(\'reject\')" id="eval-btn-reject" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">✗ Reject</button>'+
+      '</div>'+
+      '<div id="eval-form-detail" style="display:none;">'+
+        '<div id="eval-categories-wrap" style="margin-bottom:12px;">'+
+          '<div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Issue categories (check all that apply)</div>'+
+          '<div style="display:flex;flex-wrap:wrap;gap:8px;">'+
+            ['color','texture','smell','formulation','packaging','dimensions','quality','labeling'].map(function(c){
+              return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#1a1a2e;cursor:pointer;background:#fafafa;padding:5px 10px;border-radius:6px;border:1px solid #e0e0d8;"><input type="checkbox" data-eval-cat="'+c+'" /> '+c+'</label>';
+            }).join('')+
+          '</div>'+
+        '</div>'+
+        '<div style="margin-bottom:10px;">'+
+          '<div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Internal notes for the AI draft (optional)</div>'+
+          '<textarea id="eval-admin-notes" rows="2" style="width:100%;padding:8px;font-size:12px;border:1px solid #ddd;border-radius:6px;font-family:inherit;box-sizing:border-box;" placeholder="Anything specific to mention — color was too warm, texture too thick, etc."></textarea>'+
+        '</div>'+
+        '<button onclick="generateFeedbackDraft()" id="gen-draft-btn" style="padding:6px 14px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:10px;">✦ Generate AI draft</button>'+
+        '<div style="margin-bottom:10px;">'+
+          '<div style="font-size:11px;font-weight:600;color:#555;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Feedback to factory <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;">(edit freely before sending)</span></div>'+
+          '<textarea id="eval-feedback-text" rows="10" style="width:100%;padding:10px;font-size:12px;border:1px solid #ddd;border-radius:6px;font-family:inherit;box-sizing:border-box;line-height:1.6;" placeholder="Click Generate AI draft above, or write your own feedback..."></textarea>'+
+        '</div>'+
+        '<div style="display:flex;gap:8px;">'+
+          '<button onclick="submitEvaluation()" id="eval-submit-btn" style="padding:10px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Send Decision to Factory</button>'+
+          '<button onclick="cancelEvalForm()" style="padding:10px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:7px;font-size:13px;cursor:pointer;font-family:inherit;">Cancel</button>'+
+        '</div>'+
+        '<div id="eval-msg" style="margin-top:8px;font-size:12px;display:none;"></div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  // Approve = special form: confirm golden sample → reveals Issue PO button
+  var issuePOHtml = '';
+  if(canIssuePO){
+    issuePOHtml = '<div style="background:#fff;border:2px solid #1a7a1a;border-radius:10px;padding:16px;margin-top:14px;">'+
+      '<div style="font-size:14px;font-weight:700;color:#1a7a1a;margin-bottom:6px;">✓ Golden sample approved</div>'+
+      '<div style="font-size:12px;color:#444;margin-bottom:12px;line-height:1.5;">Approved on '+(p.approved_at?new Date(p.approved_at).toLocaleString():'')+'. Production milestones will be calculated from this date using the factory\'s committed offsets. Review before issuing.</div>'+
+      // Show projected milestone dates
+      renderProjectedMilestones(p)+
+      '<button onclick="issuePOFromPdi(\''+p.id+'\')" style="margin-top:12px;padding:10px 20px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📄 Issue Purchase Order</button>'+
+    '</div>';
+  }
+
+  // Top header
+  var hdrColor = (p.status==='awaiting_approval'?'#1a3a8a':(p.status==='approved'?'#1a7a1a':(p.status==='in_revision'?'#b00':'#664400')));
+  var topHtml = '<div style="padding:20px 24px;border-bottom:1px solid #e8e8e0;background:#fff;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+      '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">PRODUCT DEVELOPMENT</div>'+
+      '<button onclick="closePdiDetail()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer;">✕</button>'+
+    '</div>'+
+    '<div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">'+esc(rfq.item_description||'(no description)')+'</div>'+
+    '<div style="font-size:13px;color:#666;">'+
+      esc(f.factory_name_english||'')+
+      (rfq.project_number?' · '+esc(rfq.project_number):'')+
+      (q.unit_fob_price?' · Accepted at $'+parseFloat(q.unit_fob_price).toFixed(4)+' FOB':'')+
+      (q.moq?' · MOQ '+q.moq.toLocaleString():'')+
+    '</div>'+
+  '</div>';
+
+  // Quote-committed timeline (read-only reference)
+  var tl = [
+    ['Sample submission','quote_sample_submission_days','from quote acceptance'],
+    ['Materials on hand','quote_materials_offset_days','after golden sample'],
+    ['Mass production start','quote_prod_start_offset_days','after golden sample'],
+    ['Mass production end','quote_prod_end_offset_days','after golden sample'],
+    ['Inspection','quote_inspection_offset_days','after golden sample'],
+    ['Cargo ready','quote_cargo_ready_offset_days','after golden sample']
+  ];
+  var timelineHtml = '<div style="margin-top:14px;padding:12px 14px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;">'+
+    '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Factory\'s committed timeline</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;font-size:12px;">'+
+      tl.map(function(t){
+        var v=p[t[1]];
+        return '<div style="background:#fff;padding:7px 9px;border-radius:5px;border:1px solid #f0f0e8;"><div style="font-size:10px;color:#888;">'+esc(t[0])+'</div><div style="color:#1a1a2e;font-weight:600;">'+(v!=null?(v+' days'):'<span style="color:#bbb;">not set</span>')+'</div><div style="font-size:9px;color:#888;">'+esc(t[2])+'</div></div>';
+      }).join('')+
+    '</div>'+
+  '</div>';
+
+  // Rejected reason (if rejected) + 3 alternative factories
+  var rejectedHtml = '';
+  if(p.status==='rejected'){
+    rejectedHtml = '<div style="margin-top:14px;padding:12px 14px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#b00;margin-bottom:6px;">Rejected'+(p.rejected_at?' on '+new Date(p.rejected_at).toLocaleDateString():'')+'</div>'+
+      (p.rejection_reason?'<div style="font-size:12px;color:#7a0000;line-height:1.5;white-space:pre-wrap;">'+esc(p.rejection_reason)+'</div>':'')+
+      '<div id="alt-factories-wrap-'+p.id+'" style="margin-top:10px;"><button onclick="loadAlternativeFactories(\''+p.rfq_id+'\',\''+p.factory_id+'\')" style="padding:6px 12px;background:#fff;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Show top 3 alternative factories →</button></div>'+
+    '</div>';
+  }
+
+  g('pdi-detail-content').innerHTML =
+    topHtml +
+    '<div style="padding:20px 24px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Sample Versions</div>'+
+      versionsHtml +
+      decisionFormHtml +
+      issuePOHtml +
+      timelineHtml +
+      rejectedHtml +
+    '</div>';
+}
+
+function renderProjectedMilestones(p){
+  if(!p.approved_at) return '';
+  var anchor = new Date(p.approved_at);
+  var milestones = [
+    ['Materials on hand', p.quote_materials_offset_days],
+    ['Mass production start', p.quote_prod_start_offset_days],
+    ['Mass production end', p.quote_prod_end_offset_days],
+    ['Inspection', p.quote_inspection_offset_days],
+    ['Cargo ready', p.quote_cargo_ready_offset_days]
+  ];
+  return '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:6px;padding:10px;">'+
+    '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Projected milestones if issued today</div>'+
+    milestones.map(function(m){
+      if(m[1]==null) return '<div style="font-size:12px;color:#888;">'+esc(m[0])+': <em>offset not set</em></div>';
+      var dt = new Date(anchor.getTime() + m[1]*86400000);
+      return '<div style="font-size:12px;color:#1a1a2e;">'+esc(m[0])+': <strong>'+dt.toISOString().slice(0,10)+'</strong> (+'+m[1]+'d)</div>';
+    }).join('')+
+  '</div>';
+}
+
+var EVAL_STATE = { decision: null };
+
+function setEvalDecision(decision){
+  EVAL_STATE.decision = decision;
+  document.querySelectorAll('[id^="eval-btn-"]').forEach(function(b){b.style.outline='none';});
+  var btn = g('eval-btn-'+decision);
+  if(btn){btn.style.outline='3px solid '+(decision==='approve'?'#1a7a1a':decision==='reject'?'#b00':'#664400');btn.style.outlineOffset='2px';}
+  g('eval-form-detail').style.display='block';
+  // Approve doesn't need categories or feedback
+  var catWrap = g('eval-categories-wrap');
+  var draftBtn = g('gen-draft-btn');
+  var feedbackEl = g('eval-feedback-text');
+  if(decision==='approve'){
+    if(catWrap)catWrap.style.display='none';
+    if(draftBtn)draftBtn.style.display='none';
+    if(feedbackEl){feedbackEl.placeholder='Optional internal note about why this sample was approved (factory will see this).';feedbackEl.value='';}
+    g('eval-submit-btn').textContent='✓ Approve Golden Sample';
+  }else{
+    if(catWrap)catWrap.style.display='block';
+    if(draftBtn)draftBtn.style.display='inline-block';
+    if(feedbackEl){feedbackEl.placeholder='Click Generate AI draft above, or write your own feedback...';feedbackEl.value='';}
+    g('eval-submit-btn').textContent = decision==='revise'?'Request Revision':'Reject Sample';
+  }
+}
+
+function cancelEvalForm(){
+  EVAL_STATE.decision=null;
+  document.querySelectorAll('[id^="eval-btn-"]').forEach(function(b){b.style.outline='none';});
+  g('eval-form-detail').style.display='none';
+}
+
+async function generateFeedbackDraft(){
+  if(!PDI_CURRENT_DETAIL){return;}
+  if(!EVAL_STATE.decision || EVAL_STATE.decision==='approve'){return;}
+  var btn = g('gen-draft-btn');
+  btn.disabled=true; btn.textContent='Drafting...';
+  try{
+    var cats=[];
+    document.querySelectorAll('[data-eval-cat]:checked').forEach(function(cb){cats.push(cb.getAttribute('data-eval-cat'));});
+    var adminNotes = g('eval-admin-notes').value.trim();
+    var subs = Array.isArray(PDI_CURRENT_DETAIL.sample_submissions)?PDI_CURRENT_DETAIL.sample_submissions.slice().sort(function(a,b){return a.version_number-b.version_number;}):[];
+    var latestSub = subs[subs.length-1];
+    var r = await fetch('/api/draft-sample-feedback',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        product_development_id: PDI_CURRENT_DETAIL.id,
+        sample_submission_id: latestSub?latestSub.id:null,
+        decision: EVAL_STATE.decision,
+        issue_categories: cats,
+        admin_notes: adminNotes
+      })
+    });
+    var data = await r.json();
+    if(!r.ok){throw new Error(data.error||'HTTP '+r.status);}
+    var feedbackEl = g('eval-feedback-text');
+    if(feedbackEl){
+      // If user has already typed something, ask before overwriting
+      if(feedbackEl.value.trim() && !confirm('Overwrite your current draft with the AI version?')){
+        return;
+      }
+      feedbackEl.value = data.draft||'';
+    }
+  }catch(e){
+    alert('AI draft failed: '+(e.message||e));
+  }finally{
+    btn.disabled=false; btn.textContent='✦ Generate AI draft';
+  }
+}
+
+async function submitEvaluation(){
+  if(!PDI_CURRENT_DETAIL || !EVAL_STATE.decision)return;
+  var pd = PDI_CURRENT_DETAIL;
+  var subs = Array.isArray(pd.sample_submissions)?pd.sample_submissions.slice().sort(function(a,b){return a.version_number-b.version_number;}):[];
+  var latestSub = subs[subs.length-1];
+  if(!latestSub){alert('No sample submission to evaluate.');return;}
+  var feedbackText = g('eval-feedback-text').value.trim();
+  var decision = EVAL_STATE.decision;
+  if((decision==='revise'||decision==='reject') && !feedbackText){
+    if(!confirm('Sending without any feedback text. Continue?'))return;
+  }
+  var cats=[];
+  document.querySelectorAll('[data-eval-cat]:checked').forEach(function(cb){cats.push(cb.getAttribute('data-eval-cat'));});
+
+  var btn = g('eval-submit-btn');
+  btn.disabled=true; btn.textContent='Submitting...';
+  var msgEl = g('eval-msg');
+
+  try{
+    // 1. Create sample_evaluations row
+    await fetch(SB+'/rest/v1/sample_evaluations',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        sample_submission_id: latestSub.id,
+        product_development_id: pd.id,
+        decision: decision,
+        feedback_text: feedbackText||null,
+        feedback_categories: cats,
+        decided_by: 'admin',
+        decided_at: new Date().toISOString()
+      })
+    });
+
+    // 2. Update PD item status
+    var newStatus, extraPatch={};
+    if(decision==='approve'){
+      newStatus='approved';
+      extraPatch.approved_at = new Date().toISOString();
+    }else if(decision==='revise'){
+      newStatus='in_revision';
+    }else{
+      newStatus='rejected';
+      extraPatch.rejected_at = new Date().toISOString();
+      extraPatch.rejection_reason = feedbackText||null;
+    }
+    await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pd.id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(Object.assign({status:newStatus},extraPatch))
+    });
+
+    // 3. Update sample submission status
+    await fetch(SB+'/rest/v1/sample_submissions?id=eq.'+latestSub.id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'evaluated'})
+    });
+
+    // 4. Log factory event (non-blocking)
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:pd.factory_id,event_type:(decision==='approve'?'golden_sample_approved':'sample_evaluated'),event_data:{product_development_id:pd.id,sample_submission_id:latestSub.id,decision:decision,version:latestSub.version_number},actor_type:'admin'})
+    }).catch(function(){});
+
+    // 5. Try emailing factory (non-blocking)
+    if(feedbackText){
+      try{
+        var f = pd.factories||{};
+        if(f.sales_email){
+          var subject = decision==='approve'?'Golden sample approved — '+(pd.rfqs?.item_description||'product'):
+                        decision==='revise'?'Sample revision requested — '+(pd.rfqs?.item_description||'product'):
+                        'Sample decision — '+(pd.rfqs?.item_description||'product');
+          fetch('/api/send-email',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({to:f.sales_email,toName:f.sales_contact_name||'',subject:subject,body:feedbackText+'\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net'})
+          }).catch(function(){});
+        }
+      }catch(e){console.log('email send (non-fatal):',e);}
+    }
+
+    msgEl.style.display='block';
+    msgEl.style.background='#edfaed';msgEl.style.color='#1a7a1a';msgEl.style.padding='8px 12px';msgEl.style.borderRadius='6px';
+    msgEl.textContent='✓ Decision submitted. Factory has been notified.';
+    setTimeout(function(){closePdiDetail();loadPDItems();},1200);
+  }catch(e){
+    msgEl.style.display='block';
+    msgEl.style.background='#fff0f0';msgEl.style.color='#b00';msgEl.style.padding='8px 12px';msgEl.style.borderRadius='6px';
+    msgEl.textContent='Error: '+(e.message||e);
+    btn.disabled=false;
+    btn.textContent=decision==='approve'?'✓ Approve Golden Sample':decision==='revise'?'Request Revision':'Reject Sample';
+  }
+}
+
+// Stub: Issue PO from approved PD item (full implementation in Batch 3)
+async function issuePOFromPdi(pdiId){
+  alert('PO issuance flow will be enabled in Batch 3. For now, the sample is approved and the PD item is in the "approved" state. You can review the projected milestones above.');
+}
+
+// Stub: Load alternative factories for rejected PD items (full implementation in Batch 3)
+async function loadAlternativeFactories(rfqId, excludeFactoryId){
+  var wrap = g('alt-factories-wrap-'+PDI_CURRENT_DETAIL.id);
+  if(wrap){wrap.innerHTML='<div style="font-size:11px;color:#888;font-style:italic;">Alternative factory ranking will be enabled in Batch 3.</div>';}
+}
+
+// Hook PD nav button to load BOTH the new sample queue AND the legacy SKU readiness list
 async function loadPDList(filterOverride){
+  // Also kick off sample queue load whenever we enter the PD panel
+  if(!filterOverride || (filterOverride==='all')) {
+    loadPDItems();
+  }
+  return _legacyLoadPDList(filterOverride);
+}
+
+async function _legacyLoadPDList(filterOverride){
   if(filterOverride) pdCurrentFilter = filterOverride;
   var listEl = g('pd-list-container');
   if(!listEl) return;
