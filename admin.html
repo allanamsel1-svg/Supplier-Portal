@@ -3572,6 +3572,11 @@ async function scoreQuoteWithAI(quoteId){
 
 function renderScorecardPanel(q,sc){
   if(!sc)return '';
+  // Route to v2 renderer if this is a v2 breakdown shape
+  if(sc.dimensions && sc.compliance_gate && sc.final){
+    return renderScorecardPanelV2(q,sc);
+  }
+  // ── Legacy v1 renderer below ──
   var num=Math.round(parseFloat(sc.overall_score||0));
   var grade=sc.letter_grade||'';
   var color=num>=85?'#1a7a1a':num>=70?'#3a7a3a':num>=55?'#aa6600':'#b00';
@@ -3638,6 +3643,99 @@ function toggleScorecardBody(quoteId){
   if(toggle)toggle.textContent=isOpen?'▸':'▾';
 }
 
+// ── V2 scorecard renderer: compliance gate + 5-dim breakdown ──
+function renderScorecardPanelV2(q,sc){
+  var fin=sc.final||{};
+  var num=Math.round(parseFloat(fin.overall_score||0));
+  var tier=fin.tier||'red';
+  var gate=sc.compliance_gate||{status:'pass',reasons:[]};
+  var blocked=gate.status==='blocked';
+  var dims=Array.isArray(sc.dimensions)?sc.dimensions:[];
+  var meta=sc.meta||{};
+
+  // Tier colors
+  var color, bg, border, label, dot;
+  if(blocked){color='#b00';bg='#fff0f0';border='#fdd';label='BLOCKED — COMPLIANCE';dot='⛔';}
+  else if(tier==='green'){color='#1a7a1a';bg='#edfaed';border='#a0d8a0';label='Strong match';dot='🟢';}
+  else if(tier==='yellow'){color='#886600';bg='#fff8e0';border='#f0d060';label='Acceptable';dot='🟡';}
+  else{color='#b00';bg='#fff0f0';border='#fdd';label='Weak match';dot='🔴';}
+
+  // Compliance gate block
+  var gateHtml='';
+  if(blocked){
+    var reasons=Array.isArray(gate.reasons)?gate.reasons:[];
+    gateHtml='<div style="background:#fff0f0;border:1px solid #fdd;border-left:3px solid #b00;border-radius:7px;padding:10px 12px;margin:10px 0;">'+
+      '<div style="font-size:12px;font-weight:700;color:#b00;margin-bottom:6px;">⛔ COMPLIANCE GATE — BLOCKED. Cannot be promoted to PO until resolved.</div>'+
+      reasons.map(function(r){return '<div style="font-size:12px;color:#7a0000;margin-bottom:4px;"><strong>•</strong> '+esc(r.label||'')+(r.detail?'<div style="font-size:11px;color:#a04040;margin-left:14px;">'+esc(r.detail)+'</div>':'')+'</div>';}).join('')+
+    '</div>';
+  } else if(gate.reasons && gate.reasons.length===0){
+    gateHtml='<div style="font-size:11px;color:#1a7a1a;margin:6px 0;">✓ Compliance gate: PASS</div>';
+  }
+
+  // Dimension rows
+  function dimRow(d){
+    var pct=d.weight>0?Math.round((d.score/d.weight)*100):0;
+    var dColor=pct>=80?'#1a7a1a':pct>=60?'#886600':'#b00';
+    var barW=Math.max(2,Math.min(100,pct));
+    var compHtml='';
+    if(d.key==='price_quality' && d.components){
+      var c=d.components;
+      var sm=Math.round((c.spec_match||0)*100);
+      var pc=Math.round((c.price_competitiveness||0)*100);
+      compHtml='<div style="font-size:11px;color:#666;margin-top:4px;">'+
+        '<div>Spec match: <strong>'+sm+'%</strong> · Price competitiveness: <strong>'+pc+'%</strong></div>'+
+        (c.spec_match_detail?'<div style="margin-top:3px;font-style:italic;color:#888;">"'+esc(c.spec_match_detail)+'"</div>':'')+
+        (c.price_context && c.price_context.set_stats ?'<div style="margin-top:3px;">Per '+esc((c.price_context.basis||'').replace('per_',''))+': <strong>$'+(c.price_context.my_per_unit||0).toFixed(4)+'</strong> vs median $'+(c.price_context.set_stats.median||0).toFixed(4)+' / best $'+(c.price_context.set_stats.min||0).toFixed(4)+' (n='+(c.price_context.set_stats.count||0)+')</div>':'')+
+        (Array.isArray(c.spec_breakdown) && c.spec_breakdown.length ? '<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;">'+c.spec_breakdown.map(function(b){var bp=Math.round((b.match||0)*100);var bColor=bp>=80?'#1a7a1a':bp>=60?'#886600':'#b00';return '<span style="font-size:10px;background:#fff;border:1px solid #e0e0d8;border-radius:4px;padding:2px 6px;color:'+bColor+';" title="'+esc(b.note||'')+'">'+esc(b.aspect)+': '+bp+'%</span>';}).join('')+'</div>':'')+
+      '</div>';
+    } else if(d.key==='factory_track' && Array.isArray(d.components)){
+      compHtml='<div style="font-size:11px;color:#666;margin-top:4px;">'+
+        d.components.map(function(c){return '<span style="display:inline-block;margin-right:10px;">'+esc(c.label)+': <strong>'+c.score+'</strong> <span style="color:#888;">('+esc(c.basis||'')+')</span></span>';}).join('')+
+      '</div>';
+    }
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;margin-bottom:6px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(d.label)+'</div>'+
+        '<div style="font-size:13px;font-weight:700;color:'+dColor+';white-space:nowrap;">'+d.score+' / '+d.weight+'</div>'+
+      '</div>'+
+      '<div style="background:#f0f0e8;border-radius:3px;height:4px;margin-top:6px;overflow:hidden;"><div style="background:'+dColor+';height:100%;width:'+barW+'%;"></div></div>'+
+      (d.detail?'<div style="font-size:11px;color:#666;margin-top:4px;">'+esc(d.detail)+'</div>':'')+
+      compHtml+
+    '</div>';
+  }
+
+  var metaHtml=(meta.scored_at?'Scored '+new Date(meta.scored_at).toLocaleString():'')+
+    (meta.model?' · '+esc(meta.model):'')+
+    (meta.comparison_set_method?' · matched by '+esc(meta.comparison_set_method)+' ('+meta.comparison_set_size+' quotes)':'');
+
+  return '<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:14px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;cursor:pointer;" onclick="toggleScorecardBody(\''+q.id+'\')">'+
+      '<div>'+
+        '<div style="font-size:13px;font-weight:700;color:#1a1a2e;">'+dot+' '+esc(label)+' <span id="sctoggle-'+q.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
+        '<div style="font-size:10px;color:#888;margin-top:2px;">'+metaHtml+'</div>'+
+      '</div>'+
+      '<div style="font-size:28px;font-weight:800;color:'+color+';">'+num+'<span style="font-size:14px;font-weight:600;">/100</span></div>'+
+    '</div>'+
+    gateHtml+
+    '<div id="scbody-'+q.id+'" style="margin-top:10px;">'+
+      dims.map(dimRow).join('')+
+    '</div>'+
+  '</div>';
+}
+
+function toggleScoreDetail(quoteId){
+  // Find scpanel, scroll into view and open
+  var panel=g('scpanel-'+quoteId);
+  if(!panel)return;
+  var body=g('qbody-'+quoteId);
+  if(body && !body.classList.contains('open')){
+    body.classList.add('open');
+  }
+  var sb=g('scbody-'+quoteId);
+  if(sb && sb.style.display==='none'){sb.style.display='block';}
+  panel.scrollIntoView({behavior:'smooth',block:'center'});
+}
+
 function renderQuoteCard(q,rfq,idx,versions){
   var f=q.factories||{};
   var fob=parseFloat(q.unit_fob_price)||0;
@@ -3652,15 +3750,37 @@ function renderQuoteCard(q,rfq,idx,versions){
   var missing=getMissingFields(q,rfq);
   var missingBadge=missing.length?'<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 7px;border-radius:10px;font-weight:600;">⚠ '+missing.length+' missing</span>':'';
 
-  // Formulation score badge
-  var hasScore=q.formulation_score!==null&&q.formulation_score!==undefined;
-  var scoreNum=hasScore?Math.round(parseFloat(q.formulation_score)):null;
-  var sc=q.formulation_scorecard||null;
-  var letterGrade=sc&&sc.letter_grade?sc.letter_grade:'';
-  var scoreColor=hasScore?(scoreNum>=85?'#1a7a1a':scoreNum>=70?'#3a7a3a':scoreNum>=55?'#aa6600':'#b00'):'#888';
-  var scoreBg=hasScore?(scoreNum>=85?'#edfaed':scoreNum>=70?'#f0f8f0':scoreNum>=55?'#fff8e0':'#fff0f0'):'#f5f5f0';
-  var scoreBorder=hasScore?(scoreNum>=85?'#a0d8a0':scoreNum>=70?'#c0d8c0':scoreNum>=55?'#e0c060':'#fdd'):'#e0e0d8';
-  var scoreBadge=hasScore?'<span style="font-size:11px;background:'+scoreBg+';color:'+scoreColor+';border:1px solid '+scoreBorder+';padding:2px 8px;border-radius:10px;font-weight:700;">✦ '+scoreNum+'/100'+(letterGrade?' · '+letterGrade:'')+'</span>':'';
+  // Score badge — prefer v2 (compliance gate + 100-pt composite), fall back to v1
+  var v2Score = (q.score_overall_v2 !== null && q.score_overall_v2 !== undefined) ? q.score_overall_v2 : null;
+  var v2Tier = q.score_tier || null;
+  var v2Blocked = q.compliance_gate_status === 'blocked';
+  var hasScore = v2Score !== null || (q.formulation_score !== null && q.formulation_score !== undefined);
+  var scoreNum = v2Score !== null ? Math.round(parseFloat(v2Score)) : (q.formulation_score !== null && q.formulation_score !== undefined ? Math.round(parseFloat(q.formulation_score)) : null);
+  var sc = q.score_breakdown_v2 || q.formulation_scorecard || null;
+  var useV2 = v2Score !== null;
+  var letterGrade = !useV2 && sc && sc.letter_grade ? sc.letter_grade : '';
+
+  var scoreColor, scoreBg, scoreBorder, scorePrefix;
+  if (v2Blocked) {
+    scoreColor = '#b00'; scoreBg = '#fff0f0'; scoreBorder = '#fdd'; scorePrefix = '⛔ BLOCKED · ';
+  } else if (useV2) {
+    if (v2Tier === 'green')      { scoreColor = '#1a7a1a'; scoreBg = '#edfaed'; scoreBorder = '#a0d8a0'; scorePrefix = '🟢 '; }
+    else if (v2Tier === 'yellow'){ scoreColor = '#886600'; scoreBg = '#fff8e0'; scoreBorder = '#f0d060'; scorePrefix = '🟡 '; }
+    else                         { scoreColor = '#b00';    scoreBg = '#fff0f0'; scoreBorder = '#fdd';    scorePrefix = '🔴 '; }
+  } else if (hasScore) {
+    // legacy v1
+    scoreColor = scoreNum>=85?'#1a7a1a':scoreNum>=70?'#3a7a3a':scoreNum>=55?'#aa6600':'#b00';
+    scoreBg = scoreNum>=85?'#edfaed':scoreNum>=70?'#f0f8f0':scoreNum>=55?'#fff8e0':'#fff0f0';
+    scoreBorder = scoreNum>=85?'#a0d8a0':scoreNum>=70?'#c0d8c0':scoreNum>=55?'#e0c060':'#fdd';
+    scorePrefix = '✦ ';
+  } else {
+    scoreColor = '#888'; scoreBg = '#f5f5f0'; scoreBorder = '#e0e0d8'; scorePrefix = '';
+  }
+  var scoreBadge = hasScore ? (
+    '<span data-qid="'+q.id+'" onclick="event.stopPropagation();toggleScoreDetail(this.dataset.qid)" style="font-size:11px;background:'+scoreBg+';color:'+scoreColor+';border:1px solid '+scoreBorder+';padding:2px 8px;border-radius:10px;font-weight:700;cursor:pointer;">' +
+    scorePrefix + scoreNum + '/100' + (letterGrade ? ' · ' + letterGrade : '') +
+    '</span>'
+  ) : '';
 
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
@@ -3727,7 +3847,10 @@ function renderQuoteCard(q,rfq,idx,versions){
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button data-qid="'+q.id+'" onclick="scoreQuoteWithAI(this.dataset.qid)" style="padding:8px 16px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">'+(hasScore?'✦ Re-score with AI':'✦ Score with AI')+'</button>'+
-        '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'+
+        (v2Blocked
+          ? '<button disabled title="Cannot accept — compliance gate blocked. Fix compliance issues first." style="padding:8px 16px;background:#f0f0e8;color:#888;border:1px solid #ddd;border-radius:7px;font-size:12px;font-weight:600;cursor:not-allowed;">⛔ Blocked — Cannot Accept</button>'
+          : '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'
+        )+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="rejectQuote(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✕ Reject</button>'+
         (missing.length?'<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMissingFields(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">⚠ Request Missing Fields ('+missing.length+')</button>':'')+
         '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" onclick="requestMoreInfo(this.dataset.qid,this.dataset.rid)" style="padding:8px 16px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">? Request More Info</button>'+
