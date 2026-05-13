@@ -1624,191 +1624,31 @@
           <div class="ph-title">📋 Open Orders <span style="font-size:11px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:2px 8px;border-radius:10px;margin-left:6px;font-weight:500;vertical-align:middle;">DELIVERY TRACKING</span></div>
           <div class="ph-sub">Active POs with milestone tracking — Materials → Production → Inspection → Cargo Ready</div>
         </div>
-        <button onclick="alert('Demo placeholder — full PO creation flow coming next.');" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">+ New PO</button>
       </div>
 
+      <!-- Filter chips + change-request queue + orders list -->
       <div style="padding:1.25rem 1.5rem;">
-        <!-- Filter chips -->
-        <div style="margin-bottom:1.25rem;display:flex;gap:8px;flex-wrap:wrap;">
-          <button onclick="filterOrders('all',this)" class="ord-chip on" style="padding:6px 14px;background:#1a1a2e;color:#fff;border:1px solid #1a1a2e;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">All Orders <span style="opacity:0.7;margin-left:4px;">14</span></button>
-          <button onclick="filterOrders('coming_3',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#b00;border:1px solid #f5b8b8;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⏰ Due in 3 days <span style="margin-left:4px;font-weight:700;">2</span></button>
-          <button onclick="filterOrders('awaiting',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#886600;border:1px solid #f0d860;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⚠ Awaiting Confirmation <span style="margin-left:4px;font-weight:700;">3</span></button>
-          <button onclick="filterOrders('on_track',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">✓ On Track <span style="margin-left:4px;font-weight:700;">8</span></button>
-          <button onclick="filterOrders('delayed',this)" class="ord-chip" style="padding:6px 14px;background:#fff;color:#1a1a2e;border:1px solid #aaa;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">🚨 Delayed <span style="margin-left:4px;font-weight:700;">1</span></button>
+        <!-- Filter chips (real, will populate counts from data) -->
+        <div style="margin-bottom:1rem;display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="filterOrders('all')" class="ord-chip on" data-ord-filter="all" style="padding:6px 14px;background:#1a1a2e;color:#fff;border:1px solid #1a1a2e;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">All <span id="ord-c-all" style="opacity:0.7;margin-left:4px;">0</span></button>
+          <button onclick="filterOrders('coming_3')" class="ord-chip" data-ord-filter="coming_3" style="padding:6px 14px;background:#fff;color:#b00;border:1px solid #f5b8b8;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⏰ Due in 10 days <span id="ord-c-coming" style="margin-left:4px;font-weight:700;">0</span></button>
+          <button onclick="filterOrders('awaiting')" class="ord-chip" data-ord-filter="awaiting" style="padding:6px 14px;background:#fff;color:#886600;border:1px solid #f0d860;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">⚠ Awaiting Confirmation <span id="ord-c-awaiting" style="margin-left:4px;font-weight:700;">0</span></button>
+          <button onclick="filterOrders('on_track')" class="ord-chip" data-ord-filter="on_track" style="padding:6px 14px;background:#fff;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">✓ On Track <span id="ord-c-ontrack" style="margin-left:4px;font-weight:700;">0</span></button>
+          <button onclick="filterOrders('delayed')" class="ord-chip" data-ord-filter="delayed" style="padding:6px 14px;background:#fff;color:#1a1a2e;border:1px solid #aaa;border-radius:18px;font-size:12px;font-weight:500;cursor:pointer;font-family:inherit;">🚨 Delayed <span id="ord-c-delayed" style="margin-left:4px;font-weight:700;">0</span></button>
         </div>
 
-        <div id="orders-list">
-          <!-- Order 1: Awaiting confirmation, mass production tomorrow -->
-          <div class="order-card" style="background:#fff;border:1px solid #f0d860;border-left:4px solid #f0d860;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Guangzhou Sunlight Cosmetics Co.</div>
-                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0042 · Skin Care Serum (10,000 units) · $4.20 FOB · $42,000 total</div>
-              </div>
-              <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:3px 9px;border-radius:20px;font-weight:600;">⚠ NOT CONFIRMED</span>
-            </div>
-            <!-- Milestone track -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 28 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
-                <div style="position:absolute;top:-7px;right:-4px;background:#b00;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">TOMORROW</div>
-                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Mass Production</div>
-                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 9 · Awaiting</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Inspection</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 12</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 18</div>
-              </div>
-            </div>
-            <div style="font-size:11px;color:#886600;background:#fff8e0;padding:6px 10px;border-radius:6px;border-left:3px solid #f0d860;">
-              ⚠ Reminder sent 10 days ago. Factory has not confirmed Mass Production date. <a href="javascript:void(0)" onclick="event.stopPropagation();alert('Demo: would re-send reminder to factory.');" style="color:#664400;font-weight:600;">Re-send reminder</a>
-            </div>
-          </div>
+        <!-- Timeline change request queue (only renders when there are pending) -->
+        <div id="tcr-queue" style="margin-bottom:1rem;"></div>
 
-          <!-- Order 2: On track, cargo ready in 2 days -->
-          <div class="order-card" style="background:#fff;border:1px solid #a0d8a0;border-left:4px solid #1a7a1a;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Shenzhen Kerin Hair Care Mfg.</div>
-                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0038 · Argan Oil Hair Mask (25,000 units) · $1.85 FOB · $46,250 total</div>
-              </div>
-              <span style="font-size:11px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:3px 9px;border-radius:20px;font-weight:600;">✓ ON TRACK</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 2 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 18 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Inspection</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 5 · Passed</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
-                <div style="position:absolute;top:-7px;right:-4px;background:#1a7a1a;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">2 DAYS</div>
-                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Cargo Ready</div>
-                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 10 · Confirmed</div>
-              </div>
-            </div>
-            <div style="font-size:11px;color:#1a7a1a;background:#edfaed;padding:6px 10px;border-radius:6px;border-left:3px solid #1a7a1a;">
-              ✓ Factory confirmed cargo ready date on May 6. Forwarder notified. Container booking confirmed for May 11 pickup.
-            </div>
-          </div>
+        <div id="orders-list-real"><div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">Loading orders...</div></div>
+      </div>
 
-          <!-- Order 3: Delayed -->
-          <div class="order-card" style="background:#fff;border:1px solid #f5b8b8;border-left:4px solid #b00;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Yiwu Glow Manufacturing Co.</div>
-                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0035 · LED Beauty Wand (15,000 units) · $3.40 FOB · $51,000 total</div>
-              </div>
-              <span style="font-size:11px;background:#fff0f0;color:#b00;border:1px solid #f5b8b8;padding:3px 9px;border-radius:20px;font-weight:600;">🚨 DELAY FLAGGED</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Mar 22 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 24 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fff0f0;border:2px solid #b00;border-radius:7px;position:relative;">
-                <div style="position:absolute;top:-7px;right:-4px;background:#b00;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">3 DAYS</div>
-                <div style="font-size:10px;color:#b00;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Inspection</div>
-                <div style="font-size:11px;color:#7a0000;margin-top:3px;font-weight:500;">May 11 (revised)</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">May 18 (revised)</div>
-              </div>
-            </div>
-            <div style="font-size:11px;color:#b00;background:#fff0f0;padding:6px 10px;border-radius:6px;border-left:3px solid #b00;">
-              🚨 <strong>Factory flagged delay May 6:</strong> "PCB component shortage from supplier — revised inspection May 11, cargo ready May 18 (originally May 8 / May 14)." <a href="javascript:void(0)" onclick="event.stopPropagation();alert('Demo: would open conversation thread.');" style="color:#7a0000;font-weight:600;">View conversation →</a>
-            </div>
-          </div>
-
-          <!-- Order 4: On track, materials done -->
-          <div class="order-card" style="background:#fff;border:1px solid #a0d8a0;border-left:4px solid #1a7a1a;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Ningbo Pure Skin Labs</div>
-                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0044 · Vitamin C Brightening Set (8,000 units) · $7.80 FOB · $62,400 total</div>
-              </div>
-              <span style="font-size:11px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:3px 9px;border-radius:20px;font-weight:600;">✓ ON TRACK</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 5 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Production</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">May 18</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Inspection</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 22</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">Jun 28</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Order 5: Awaiting confirmation - inspection in 8 days -->
-          <div class="order-card" style="background:#fff;border:1px solid #f0d860;border-left:4px solid #f0d860;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1rem;cursor:pointer;" onclick="alert('Demo placeholder — full PO detail page coming next.');">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;">
-              <div>
-                <div style="font-size:14px;font-weight:600;color:#1a1a2e;">Hangzhou BellaForma Cosmetics</div>
-                <div style="font-size:12px;color:#888;margin-top:2px;">PO-2026-0040 · Hyaluronic Lip Plumper (20,000 units) · $2.95 FOB · $59,000 total</div>
-              </div>
-              <span style="font-size:11px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:3px 9px;border-radius:20px;font-weight:600;">⚠ NOT CONFIRMED</span>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Materials</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">Apr 14 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#edfaed;border:1px solid #a0d8a0;border-radius:7px;">
-                <div style="font-size:10px;color:#1a7a1a;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">✓ Production</div>
-                <div style="font-size:11px;color:#0a5a0a;margin-top:3px;font-weight:500;">May 1 · Done</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fff8e0;border:2px solid #f0d860;border-radius:7px;position:relative;">
-                <div style="position:absolute;top:-7px;right:-4px;background:#886600;color:#fff;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;">8 DAYS</div>
-                <div style="font-size:10px;color:#886600;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">⏳ Inspection</div>
-                <div style="font-size:11px;color:#664400;margin-top:3px;font-weight:500;">May 16 · Awaiting</div>
-              </div>
-              <div style="text-align:center;padding:8px 6px;background:#fafaf6;border:1px solid #e0e0d8;border-radius:7px;">
-                <div style="font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">Cargo Ready</div>
-                <div style="font-size:11px;color:#666;margin-top:3px;">May 23</div>
-              </div>
-            </div>
-            <div style="font-size:11px;color:#886600;background:#fff8e0;padding:6px 10px;border-radius:6px;border-left:3px solid #f0d860;">
-              ⚠ 10-day reminder sent yesterday. Awaiting factory confirmation of inspection date.
-            </div>
-          </div>
-        </div>
-
-        <div style="text-align:center;padding:1rem;color:#bbb;font-size:12px;">Showing 5 of 14 active orders · <a href="javascript:void(0)" style="color:#2266cc;">Load more</a></div>
-
-        <!-- Beta module disclaimer -->
-        <div style="background:#e8f0ff;border:1px solid #c8d8f8;border-radius:10px;padding:14px 18px;margin-top:1.5rem;font-size:13px;color:#1a3399;">
-          <strong>📋 Demo placeholder:</strong> Full PO milestone tracking module is in active development. The data shown above illustrates the planned workflow. When live, factories will confirm milestones via their portal, automated reminders will fire 10 days before each milestone, and delayed dates will trigger admin alerts.
+      <!-- PO detail drawer -->
+      <div id="po-detail-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1100;" onclick="closePoDetail(event)">
+        <div id="po-detail-panel" style="position:absolute;top:0;right:0;width:880px;max-width:95vw;height:100vh;background:#fafaf6;overflow-y:auto;box-shadow:-8px 0 32px rgba(0,0,0,0.15);" onclick="event.stopPropagation()">
+          <div id="po-detail-content"><div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div></div>
         </div>
       </div>
-    </div>
 
     <!-- WAREHOUSE (BETA scaffold) -->
     <div class="panel" id="panel-warehouse">
@@ -2354,7 +2194,7 @@ function showPanel(name){
     if(window._inboxTimer)clearInterval(window._inboxTimer);
   }
   if(name==='all'||name==='pending'||name==='dashboard'){if(!allFactories.length)loadData();else renderAll();}
-  if(name==='dashboard'){loadPDList();loadPDItems();loadCreditWatchWidget();loadForecastingWidget();}
+  if(name==='dashboard'){loadPDList();loadPDItems();loadOpenOrders();loadCreditWatchWidget();loadForecastingWidget();}
   if(name==='pending-cats'){loadPendingCats();loadPendingCerts();}
   if(name==='brands')loadBrands();
   if(name==='customers')loadCustomers();
@@ -6591,15 +6431,204 @@ async function submitEvaluation(){
   }
 }
 
-// Stub: Issue PO from approved PD item (full implementation in Batch 3)
+// Issue PO from approved PD item — creates PO + 6 milestone rows with calculated dates.
 async function issuePOFromPdi(pdiId){
-  alert('PO issuance flow will be enabled in Batch 3. For now, the sample is approved and the PD item is in the "approved" state. You can review the projected milestones above.');
+  var p = PDI_CURRENT_DETAIL || PDI_RECORDS.find(function(x){return x.id===pdiId;});
+  if(!p){alert('PD item not loaded.');return;}
+  if(p.purchase_order_id){alert('A PO has already been issued for this PD item.');return;}
+  if(!p.approved_at){alert('Golden sample must be approved before issuing a PO.');return;}
+
+  // Validate all offsets are set
+  var offsetFields = ['quote_materials_offset_days','quote_prod_start_offset_days','quote_prod_end_offset_days','quote_inspection_offset_days','quote_cargo_ready_offset_days'];
+  var missingOffsets = offsetFields.filter(function(k){return p[k]==null;});
+  if(missingOffsets.length){
+    alert('Cannot issue PO — the factory\'s quote is missing timeline offsets for: '+missingOffsets.map(function(f){return f.replace('quote_','').replace('_offset_days','').replace(/_/g,' ');}).join(', ')+'. Ask the factory to update the quote before issuing.');
+    return;
+  }
+
+  if(!confirm('Issue Purchase Order? This locks in the milestone schedule based on the factory\'s committed offsets from the golden sample approval date. The factory will be notified.'))return;
+
+  var btn = event && event.target;
+  if(btn){btn.disabled=true;btn.textContent='Issuing PO...';}
+
+  try{
+    // Fetch the accepted quote for snapshot fields
+    var qr = await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+p.accepted_quote_id+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var quotes = await qr.json();
+    var quote = quotes && quotes[0];
+    if(!quote){throw new Error('Could not load accepted quote.');}
+
+    // Get a PO number using the SQL helper function
+    var fnR = await fetch(SB+'/rest/v1/rpc/generate_po_number',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},
+      body:'{}'
+    });
+    var poNumber = fnR.ok ? (await fnR.text()).replace(/"/g,'').trim() : ('PO-'+new Date().getFullYear()+'-'+Math.floor(Math.random()*10000).toString().padStart(4,'0'));
+
+    // Build PO snapshot
+    var anchorDate = new Date(p.approved_at);
+    var totalUnits = parseInt(quote.moq||0,10) || null;
+    var unitPrice = parseFloat(quote.unit_fob_price||0) || null;
+    var pkgPrice = parseFloat(quote.packaging_price_per_unit||0) || null;
+    var totalValue = (unitPrice && totalUnits) ? (unitPrice + (pkgPrice||0)) * totalUnits : null;
+
+    var poPayload = {
+      po_number: poNumber,
+      product_development_id: p.id,
+      rfq_quote_id: p.accepted_quote_id,
+      rfq_id: p.rfq_id,
+      factory_id: p.factory_id,
+      unit_fob_price: unitPrice,
+      packaging_price_per_unit: pkgPrice,
+      total_units: totalUnits,
+      total_value_usd: totalValue,
+      currency: 'USD',
+      payment_terms: quote.payment_terms || null,
+      fob_port: Array.isArray(quote.fob_ports)?quote.fob_ports[0]:quote.fob_ports || null,
+      golden_sample_approved_at: p.approved_at,
+      status: 'in_production',
+      issued_by: 'admin'
+    };
+
+    var poR = await fetch(SB+'/rest/v1/purchase_orders',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body: JSON.stringify(poPayload)
+    });
+    if(!poR.ok){var e=await poR.json().catch(function(){return{};});throw new Error('Failed to create PO: '+(e.message||e.details||poR.status));}
+    var po = (await poR.json())[0];
+    if(!po){throw new Error('PO created but response was empty.');}
+
+    // Calculate the 6 milestone dates
+    function dateFromOffset(anchor, offsetDays){
+      var d = new Date(anchor.getTime() + offsetDays*86400000);
+      return d.toISOString().slice(0,10);
+    }
+    // Sample milestone anchors to quote acceptance, not golden sample
+    var acceptanceDate = new Date(p.accepted_at);
+    var sampleOffset = parseInt(p.quote_sample_submission_days||14,10);
+
+    var milestones = [
+      {milestone_type:'sample_submission',     display_order:1, anchor_event:'quote_accepted',          offset_days_from_anchor:sampleOffset,                                       agreed_date:dateFromOffset(acceptanceDate, sampleOffset), status:'completed'},
+      {milestone_type:'materials_on_hand',     display_order:2, anchor_event:'golden_sample_approved', offset_days_from_anchor:parseInt(p.quote_materials_offset_days,10),         agreed_date:dateFromOffset(anchorDate, parseInt(p.quote_materials_offset_days,10))},
+      {milestone_type:'mass_production_start', display_order:3, anchor_event:'golden_sample_approved', offset_days_from_anchor:parseInt(p.quote_prod_start_offset_days,10),        agreed_date:dateFromOffset(anchorDate, parseInt(p.quote_prod_start_offset_days,10))},
+      {milestone_type:'mass_production_end',   display_order:4, anchor_event:'golden_sample_approved', offset_days_from_anchor:parseInt(p.quote_prod_end_offset_days,10),          agreed_date:dateFromOffset(anchorDate, parseInt(p.quote_prod_end_offset_days,10))},
+      {milestone_type:'inspection',            display_order:5, anchor_event:'golden_sample_approved', offset_days_from_anchor:parseInt(p.quote_inspection_offset_days,10),        agreed_date:dateFromOffset(anchorDate, parseInt(p.quote_inspection_offset_days,10))},
+      {milestone_type:'cargo_ready',           display_order:6, anchor_event:'golden_sample_approved', offset_days_from_anchor:parseInt(p.quote_cargo_ready_offset_days,10),       agreed_date:dateFromOffset(anchorDate, parseInt(p.quote_cargo_ready_offset_days,10))}
+    ].map(function(m){m.purchase_order_id = po.id; return m;});
+
+    var msR = await fetch(SB+'/rest/v1/po_milestones',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(milestones)
+    });
+    if(!msR.ok){var e2=await msR.json().catch(function(){return{};});throw new Error('Failed to create milestones: '+(e2.message||e2.details||msR.status));}
+
+    // Update PD item to point at the new PO
+    await fetch(SB+'/rest/v1/product_development_items?id=eq.'+p.id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({purchase_order_id: po.id})
+    });
+
+    // Log factory event (non-blocking)
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:p.factory_id,event_type:'po_issued',event_data:{purchase_order_id:po.id,po_number:poNumber,product_development_id:p.id},actor_type:'admin'})
+    }).catch(function(){});
+
+    // Send factory notification email (non-blocking)
+    try{
+      var f = p.factories || {};
+      var rfq = p.rfqs || {};
+      if(f.sales_email){
+        var body = 'Dear '+(f.sales_contact_name?f.sales_contact_name.split(/\s+/)[0]:'Team')+',\n\n'+
+          'Your golden sample has been approved and we are issuing Purchase Order '+poNumber+' for '+(rfq.item_description||'this product')+'.\n\n'+
+          'Production timeline (based on the offsets you committed in your quote):\n'+
+          milestones.filter(function(m){return m.milestone_type!=='sample_submission';}).map(function(m){
+            var label=({materials_on_hand:'Materials on hand',mass_production_start:'Mass production starts',mass_production_end:'Mass production ends',inspection:'Pre-shipment inspection',cargo_ready:'Cargo ready'})[m.milestone_type]||m.milestone_type;
+            return '• '+label+': '+m.agreed_date;
+          }).join('\n')+'\n\n'+
+          'Please log into the supplier portal to view the full schedule and confirm each milestone as production progresses. You can request a timeline change at any point if circumstances require it — those requests come to us for approval.\n\n'+
+          'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+        fetch('/api/send-email',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({to:f.sales_email,toName:f.sales_contact_name||'',subject:'Purchase Order '+poNumber+' issued — '+(rfq.item_description||'product'),body:body})
+        }).catch(function(){});
+      }
+    }catch(emailErr){console.log('PO email send (non-fatal):',emailErr);}
+
+    alert('✓ Purchase Order '+poNumber+' has been issued. The factory has been notified.');
+    closePdiDetail();
+    loadPDItems();
+    if(typeof loadPOs==='function')loadPOs();
+  }catch(err){
+    alert('Error issuing PO: '+(err.message||err));
+    if(btn){btn.disabled=false;btn.textContent='📄 Issue Purchase Order';}
+  }
 }
 
-// Stub: Load alternative factories for rejected PD items (full implementation in Batch 3)
+// Load top-3 alternative factories for a rejected PD item, ranked by their v2 RFQ score for the same RFQ.
 async function loadAlternativeFactories(rfqId, excludeFactoryId){
-  var wrap = g('alt-factories-wrap-'+PDI_CURRENT_DETAIL.id);
-  if(wrap){wrap.innerHTML='<div style="font-size:11px;color:#888;font-style:italic;">Alternative factory ranking will be enabled in Batch 3.</div>';}
+  var pd = PDI_CURRENT_DETAIL;
+  var wrap = pd ? g('alt-factories-wrap-'+pd.id) : null;
+  if(!wrap)return;
+  wrap.innerHTML = '<div style="font-size:11px;color:#888;">Loading top alternative factories...</div>';
+  try{
+    // Fetch other quotes for this RFQ (not from the rejected factory), with their scores
+    var r = await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&factory_id=neq.'+excludeFactoryId+'&status=neq.draft&select=id,factory_id,unit_fob_price,score_overall_v2,score_tier,compliance_gate_status,factories(factory_name_english,sales_contact_name,sales_email,country)&order=score_overall_v2.desc.nullslast&limit=10',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var quotes = await r.json();
+    if(!Array.isArray(quotes)||!quotes.length){
+      wrap.innerHTML = '<div style="font-size:11px;color:#888;font-style:italic;">No other quotes were submitted on this RFQ. You\'ll need to invite new factories or manually re-issue.</div>';
+      return;
+    }
+    // Filter out blocked-compliance quotes, take top 3
+    var eligible = quotes.filter(function(q){return q.compliance_gate_status!=='blocked';}).slice(0,3);
+    if(!eligible.length){
+      wrap.innerHTML = '<div style="font-size:11px;color:#888;font-style:italic;">All other quotes on this RFQ are blocked by compliance. Manually review or invite new factories.</div>';
+      return;
+    }
+    var html = '<div style="font-size:11px;font-weight:700;color:#555;margin-bottom:6px;">Top alternative factories (ranked by score for this RFQ):</div>'+
+      eligible.map(function(q,i){
+        var f = q.factories||{};
+        var score = q.score_overall_v2!=null?Math.round(q.score_overall_v2):'—';
+        var tierColor = q.score_tier==='green'?'#1a7a1a':q.score_tier==='yellow'?'#886600':'#b00';
+        return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:6px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;gap:10px;">'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">#'+(i+1)+' '+esc(f.factory_name_english||'(unknown)')+(f.country?' · '+esc(f.country):'')+'</div>'+
+            '<div style="font-size:11px;color:#666;">'+
+              (q.unit_fob_price?'$'+parseFloat(q.unit_fob_price).toFixed(4)+' FOB · ':'')+
+              'Score: <strong style="color:'+tierColor+';">'+score+'/100</strong>'+
+            '</div>'+
+          '</div>'+
+          '<button onclick="reissueRfqToFactory(\''+rfqId+'\',\''+q.factory_id+'\',\''+q.id+'\')" style="padding:5px 10px;background:#1a3a8a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;">Accept this quote →</button>'+
+        '</div>';
+      }).join('');
+    wrap.innerHTML = html;
+  }catch(e){
+    wrap.innerHTML = '<div style="font-size:11px;color:#b00;">Failed to load alternatives: '+esc(e.message)+'</div>';
+  }
+}
+
+async function reissueRfqToFactory(rfqId, factoryId, quoteId){
+  if(!confirm('Accept this alternative quote? This will move the RFQ forward with the new factory and create a new Product Development item.'))return;
+  try{
+    // Simulate the accept-quote flow
+    var qr = await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var quotes = await qr.json();
+    var q = quotes[0];
+    if(!q)throw new Error('Quote not found');
+    var factoryName = q.factories?q.factories.factory_name_english:'';
+    // Use the existing acceptQuote function — it handles all the side effects
+    await acceptQuote(quoteId, rfqId, factoryName);
+  }catch(e){alert('Error: '+e.message);}
 }
 
 // Hook PD nav button to load BOTH the new sample queue AND the legacy SKU readiness list
@@ -6609,6 +6638,366 @@ async function loadPDList(filterOverride){
     loadPDItems();
   }
   return _legacyLoadPDList(filterOverride);
+}
+
+// ─────────────────────────────────────────────────────────
+// OPEN ORDERS — real PO + milestone management
+// ─────────────────────────────────────────────────────────
+
+var PO_RECORDS = [];
+var orderCurrentFilter = 'all';
+
+async function loadOpenOrders(filterOverride){
+  if(filterOverride){
+    orderCurrentFilter = filterOverride;
+    document.querySelectorAll('[data-ord-filter]').forEach(function(b){
+      b.classList.toggle('on', b.getAttribute('data-ord-filter')===filterOverride);
+    });
+  }
+  var listEl = g('orders-list-real');
+  if(!listEl){return;}
+  listEl.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">Loading orders...</div>';
+  try{
+    var r = await fetch(SB+'/rest/v1/purchase_orders?status=in.(in_production,on_hold)&select=*,factories(factory_name_english,sales_email,sales_contact_name,country),rfqs(project_number,item_description,category),po_milestones(*)&order=issued_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){listEl.innerHTML='<div class="empty" style="color:#b00;padding:1.5rem;">Failed to load orders ('+r.status+').</div>';return;}
+    PO_RECORDS = await r.json();
+    loadOpenOrdersCounts();
+    renderOpenOrders();
+    loadTimelineChangeQueue();
+  }catch(e){
+    listEl.innerHTML='<div class="empty" style="color:#b00;padding:1.5rem;">Error: '+esc(e.message)+'</div>';
+  }
+}
+
+function loadOpenOrdersCounts(){
+  var counts={all:PO_RECORDS.length,coming_3:0,awaiting:0,on_track:0,delayed:0};
+  var today=new Date(); today.setHours(0,0,0,0);
+  var tenDays=new Date(today.getTime()+10*86400000);
+  PO_RECORDS.forEach(function(po){
+    var milestones=Array.isArray(po.po_milestones)?po.po_milestones:[];
+    var anyDelayed=milestones.some(function(m){return m.status==='delayed';});
+    var anyAwaiting=milestones.some(function(m){return m.status==='pending';});
+    var anyComing=milestones.some(function(m){
+      if(m.status!=='pending')return false;
+      var d=new Date(m.revised_date||m.agreed_date);
+      return d>=today && d<=tenDays;
+    });
+    var allOnTrack=milestones.length>0 && milestones.every(function(m){return m.status==='confirmed_on_track'||m.status==='completed';});
+    if(anyDelayed)counts.delayed++;
+    else if(anyComing)counts.coming_3++;
+    else if(anyAwaiting)counts.awaiting++;
+    else if(allOnTrack)counts.on_track++;
+  });
+  if(g('ord-c-all'))g('ord-c-all').textContent=counts.all;
+  if(g('ord-c-coming'))g('ord-c-coming').textContent=counts.coming_3;
+  if(g('ord-c-awaiting'))g('ord-c-awaiting').textContent=counts.awaiting;
+  if(g('ord-c-ontrack'))g('ord-c-ontrack').textContent=counts.on_track;
+  if(g('ord-c-delayed'))g('ord-c-delayed').textContent=counts.delayed;
+  // Also populate Production Pipeline widget on dashboard
+  if(g('pipe-3day'))g('pipe-3day').textContent=counts.coming_3;
+  if(g('pipe-await'))g('pipe-await').textContent=counts.awaiting;
+  if(g('pipe-ontrack'))g('pipe-ontrack').textContent=counts.on_track;
+  if(g('pipe-delayed'))g('pipe-delayed').textContent=counts.delayed;
+  // Also nav badge count
+  var navBadge=g('cnt-orders-urgent');
+  if(navBadge){
+    var urgent=counts.coming_3+counts.delayed;
+    navBadge.textContent=urgent;
+    if(urgent===0){navBadge.style.display='none';}else{navBadge.style.display='';}
+  }
+}
+
+function filterOrders(filter){
+  orderCurrentFilter=filter;
+  document.querySelectorAll('[data-ord-filter]').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-ord-filter')===filter);
+  });
+  renderOpenOrders();
+}
+
+function renderOpenOrders(){
+  var listEl=g('orders-list-real');
+  if(!listEl)return;
+  var today=new Date(); today.setHours(0,0,0,0);
+  var tenDays=new Date(today.getTime()+10*86400000);
+  var filtered=PO_RECORDS.filter(function(po){
+    if(orderCurrentFilter==='all')return true;
+    var ms=Array.isArray(po.po_milestones)?po.po_milestones:[];
+    if(orderCurrentFilter==='delayed')return ms.some(function(m){return m.status==='delayed';});
+    if(orderCurrentFilter==='coming_3')return ms.some(function(m){if(m.status!=='pending')return false;var d=new Date(m.revised_date||m.agreed_date);return d>=today && d<=tenDays;});
+    if(orderCurrentFilter==='awaiting')return ms.some(function(m){return m.status==='pending';});
+    if(orderCurrentFilter==='on_track')return ms.length>0 && ms.every(function(m){return m.status==='confirmed_on_track'||m.status==='completed';});
+    return true;
+  });
+  if(!filtered.length){
+    listEl.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:#bbb;">No orders match this filter.</div>';
+    return;
+  }
+  listEl.innerHTML=filtered.map(renderOrderRow).join('');
+}
+
+function renderOrderRow(po){
+  var f=po.factories||{};
+  var rfq=po.rfqs||{};
+  var milestones=(Array.isArray(po.po_milestones)?po.po_milestones:[]).slice().sort(function(a,b){return a.display_order-b.display_order;});
+  var today=new Date(); today.setHours(0,0,0,0);
+  var tenDays=new Date(today.getTime()+10*86400000);
+  // Top-level status
+  var anyDelayed=milestones.some(function(m){return m.status==='delayed';});
+  var anyAwaiting=milestones.some(function(m){return m.status==='pending';});
+  var allDone=milestones.length>0 && milestones.every(function(m){return m.status==='completed';});
+  var topBg='#fff', topBorder='#e8e8e0', topLabel='', topColor='#666';
+  if(anyDelayed){topBg='#fff0f0';topBorder='#fdd';topLabel='🚨 Has delays';topColor='#b00';}
+  else if(anyAwaiting){topBg='#fff8e0';topBorder='#f0d860';topLabel='⚠ Awaiting Confirmation';topColor='#886600';}
+  else if(allDone){topBg='#edfaed';topBorder='#a0d8a0';topLabel='✓ Complete';topColor='#1a7a1a';}
+  else {topBg='#edfaed';topBorder='#a0d8a0';topLabel='✓ On Track';topColor='#1a7a1a';}
+
+  var msLabels={sample_submission:'Sample',materials_on_hand:'Materials',mass_production_start:'Prod Start',mass_production_end:'Prod End',inspection:'Inspect',cargo_ready:'Cargo'};
+  // Skip sample milestone in the row track (already completed by definition when PO exists)
+  var trackHtml=milestones.filter(function(m){return m.milestone_type!=='sample_submission';}).map(function(m){
+    var d=m.revised_date||m.agreed_date;
+    var dt=new Date(d);
+    var stBg,stColor,stIcon;
+    if(m.status==='completed'){stBg='#edfaed';stColor='#1a7a1a';stIcon='✓';}
+    else if(m.status==='confirmed_on_track'){stBg='#edfaed';stColor='#1a7a1a';stIcon='✓';}
+    else if(m.status==='delayed'){stBg='#fff0f0';stColor='#b00';stIcon='⚠';}
+    else if(m.status==='at_risk'){stBg='#fff8e0';stColor='#886600';stIcon='⚠';}
+    else if(dt<today && m.status==='pending'){stBg='#fff0f0';stColor='#b00';stIcon='⚠';}
+    else if(dt<=tenDays && m.status==='pending'){stBg='#fff8e0';stColor='#886600';stIcon='⏰';}
+    else {stBg='#f5f5f0';stColor='#666';stIcon='○';}
+    return '<div style="flex:1;padding:7px 6px;background:'+stBg+';border-radius:6px;text-align:center;min-width:0;">'+
+      '<div style="font-size:9px;color:'+stColor+';font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">'+stIcon+' '+esc(msLabels[m.milestone_type]||m.milestone_type)+'</div>'+
+      '<div style="font-size:10px;color:#1a1a2e;margin-top:2px;font-weight:500;">'+esc(d)+'</div>'+
+    '</div>';
+  }).join('');
+
+  return '<div class="order-card" onclick="openPoDetail(\''+po.id+'\')" style="background:'+topBg+';border:1px solid '+topBorder+';border-left:4px solid '+topBorder+';border-radius:10px;padding:1rem 1.25rem;margin-bottom:0.75rem;cursor:pointer;">'+
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px;gap:10px;flex-wrap:wrap;">'+
+      '<div style="flex:1;min-width:200px;">'+
+        '<div style="font-size:14px;font-weight:600;color:#1a1a2e;">'+esc(f.factory_name_english||'(unknown)')+'</div>'+
+        '<div style="font-size:12px;color:#888;margin-top:2px;">'+esc(po.po_number||'')+' · '+esc(rfq.item_description||'')+
+          (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+          (po.unit_fob_price?' · $'+parseFloat(po.unit_fob_price).toFixed(4)+' FOB':'')+
+          (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString()+' total':'')+
+        '</div>'+
+      '</div>'+
+      '<span style="font-size:11px;background:'+topBg+';color:'+topColor+';border:1px solid '+topBorder+';padding:3px 9px;border-radius:20px;font-weight:600;white-space:nowrap;">'+topLabel+'</span>'+
+    '</div>'+
+    '<div style="display:flex;gap:6px;">'+trackHtml+'</div>'+
+  '</div>';
+}
+
+async function loadTimelineChangeQueue(){
+  var wrap=g('tcr-queue');
+  if(!wrap)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/timeline_change_requests?status=eq.pending&select=*,po_milestones(milestone_type,agreed_date),purchase_orders(po_number),factories(factory_name_english)&order=requested_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!r.ok){wrap.innerHTML='';return;}
+    var requests=await r.json();
+    if(!Array.isArray(requests)||!requests.length){wrap.innerHTML='';return;}
+    var msLabels={sample_submission:'Sample',materials_on_hand:'Materials',mass_production_start:'Prod Start',mass_production_end:'Prod End',inspection:'Inspection',cargo_ready:'Cargo Ready'};
+    wrap.innerHTML='<div style="background:#fff5f5;border:1px solid #f5b8b8;border-left:3px solid #b00;border-radius:8px;padding:12px 14px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#b00;margin-bottom:8px;">⚠ '+requests.length+' Timeline Change Request'+(requests.length>1?'s':'')+' Pending Your Decision</div>'+
+      requests.map(function(req){
+        var ml=msLabels[req.po_milestones?.milestone_type]||req.po_milestones?.milestone_type||'?';
+        var slipDays=Math.round((new Date(req.proposed_date)-new Date(req.previous_date))/86400000);
+        return '<div style="background:#fff;border:1px solid #f5d5d5;border-radius:6px;padding:10px 12px;margin-top:6px;">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'+
+            '<div style="flex:1;min-width:200px;">'+
+              '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(req.factories?.factory_name_english||'')+' — '+esc(req.purchase_orders?.po_number||'')+'</div>'+
+              '<div style="font-size:11px;color:#666;margin-top:2px;"><strong>'+esc(ml)+'</strong>: '+esc(req.previous_date)+' → <strong style="color:#b00;">'+esc(req.proposed_date)+'</strong> ('+(slipDays>0?'+'+slipDays:slipDays)+'d)</div>'+
+              (req.reason?'<div style="font-size:11px;color:#7a4400;margin-top:4px;font-style:italic;">"'+esc(req.reason)+'"</div>':'')+
+            '</div>'+
+            '<div style="display:flex;gap:6px;">'+
+              '<button onclick="event.stopPropagation();approveTimelineChange(\''+req.id+'\')" style="padding:5px 12px;background:#1a7a1a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Approve</button>'+
+              '<button onclick="event.stopPropagation();rejectTimelineChange(\''+req.id+'\')" style="padding:5px 12px;background:#fff;color:#b00;border:1px solid #fdd;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✗ Reject</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }catch(e){wrap.innerHTML='';console.log('tcr queue load failed:',e);}
+}
+
+async function approveTimelineChange(reqId){
+  var notes=prompt('Optional note to factory about your decision:');
+  if(notes===null)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/timeline_change_requests?id=eq.'+reqId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var reqs=await r.json(); var req=reqs[0];
+    if(!req)throw new Error('Request not found');
+    // Update the milestone's revised_date
+    await fetch(SB+'/rest/v1/po_milestones?id=eq.'+req.po_milestone_id,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({revised_date:req.proposed_date})
+    });
+    // Mark the request approved
+    await fetch(SB+'/rest/v1/timeline_change_requests?id=eq.'+reqId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'approved',admin_response_notes:notes||null,responded_at:new Date().toISOString(),responded_by:'admin'})
+    });
+    // Log history
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:req.po_milestone_id,purchase_order_id:req.purchase_order_id,change_type:'admin_approved_revision',actor_type:'admin',old_value:{date:req.previous_date},new_value:{date:req.proposed_date},notes:notes||null})
+    }).catch(function(){});
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:req.factory_id,event_type:'timeline_change_decided',event_data:{request_id:reqId,decision:'approved',new_date:req.proposed_date},actor_type:'admin'})
+    }).catch(function(){});
+    loadOpenOrders();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function rejectTimelineChange(reqId){
+  var notes=prompt('Why are you rejecting this timeline change? (Factory will see this.)');
+  if(!notes||!notes.trim())return;
+  try{
+    var r=await fetch(SB+'/rest/v1/timeline_change_requests?id=eq.'+reqId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var reqs=await r.json(); var req=reqs[0];
+    if(!req)throw new Error('Request not found');
+    await fetch(SB+'/rest/v1/timeline_change_requests?id=eq.'+reqId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'rejected',admin_response_notes:notes.trim(),responded_at:new Date().toISOString(),responded_by:'admin'})
+    });
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:req.po_milestone_id,purchase_order_id:req.purchase_order_id,change_type:'admin_rejected_revision',actor_type:'admin',notes:notes.trim()})
+    }).catch(function(){});
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:req.factory_id,event_type:'timeline_change_decided',event_data:{request_id:reqId,decision:'rejected'},actor_type:'admin'})
+    }).catch(function(){});
+    loadOpenOrders();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+var PO_CURRENT_DETAIL = null;
+
+async function openPoDetail(poId){
+  var po=PO_RECORDS.find(function(x){return x.id===poId;});
+  if(!po){return;}
+  PO_CURRENT_DETAIL=po;
+  g('po-detail-overlay').style.display='block';
+  g('po-detail-content').innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;">Loading...</div>';
+  renderPoDetail(po);
+}
+
+function closePoDetail(ev){
+  if(ev && ev.target && ev.target.id!=='po-detail-overlay')return;
+  g('po-detail-overlay').style.display='none';
+  PO_CURRENT_DETAIL=null;
+}
+
+function renderPoDetail(po){
+  var f=po.factories||{};
+  var rfq=po.rfqs||{};
+  var milestones=(Array.isArray(po.po_milestones)?po.po_milestones:[]).slice().sort(function(a,b){return a.display_order-b.display_order;});
+  var today=new Date().toISOString().slice(0,10);
+  var msLabels={sample_submission:'Sample Submission',materials_on_hand:'Materials On Hand',mass_production_start:'Mass Production Start',mass_production_end:'Mass Production End',inspection:'Pre-Shipment Inspection',cargo_ready:'Cargo Ready'};
+
+  var msHtml=milestones.map(function(m){
+    var d=m.revised_date||m.agreed_date;
+    var dt=new Date(d);
+    var overdue=d<today && m.status==='pending';
+    var stColor,stBg,stLabel;
+    if(m.status==='completed'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ Completed';}
+    else if(m.status==='confirmed_on_track'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ Confirmed on track';}
+    else if(m.status==='delayed'){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Delayed';}
+    else if(m.status==='at_risk'){stColor='#886600';stBg='#fff8e0';stLabel='⚠ At risk';}
+    else if(overdue){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Overdue';}
+    else {stColor='#666';stBg='#f5f5f0';stLabel='Pending';}
+    var actionBtns='';
+    if(m.status==='pending'||m.status==='at_risk'||m.status==='delayed'){
+      actionBtns='<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">'+
+        '<button onclick="adminMarkMilestoneCompleted(\''+m.id+'\')" style="padding:5px 10px;background:#1a7a1a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Mark completed</button>'+
+        '<button onclick="adminEditMilestoneDate(\''+m.id+'\',\''+d+'\',\''+m.milestone_type+'\')" style="padding:5px 10px;background:#fff;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Edit date</button>'+
+      '</div>';
+    }
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:12px 14px;margin-bottom:8px;">'+
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">'+
+        '<div style="flex:1;min-width:200px;">'+
+          '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(msLabels[m.milestone_type]||m.milestone_type)+'</div>'+
+          '<div style="font-size:12px;color:#666;margin-top:3px;">Due: <strong>'+esc(d)+'</strong>'+
+            (m.revised_date&&m.revised_date!==m.agreed_date?' <span style="color:#888;">(originally '+esc(m.agreed_date)+')</span>':'')+
+          '</div>'+
+          (m.delay_reason?'<div style="font-size:11px;color:#7a0000;margin-top:4px;font-style:italic;">"'+esc(m.delay_reason)+'"</div>':'')+
+          (m.factory_confirmation_at?'<div style="font-size:10px;color:#888;margin-top:3px;">Factory confirmation: '+esc(new Date(m.factory_confirmation_at).toLocaleString())+'</div>':'')+
+          actionBtns+
+        '</div>'+
+        '<span style="font-size:11px;background:'+stBg+';color:'+stColor+';border:1px solid '+stColor+'33;padding:3px 9px;border-radius:10px;font-weight:600;white-space:nowrap;">'+stLabel+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  var hdr='<div style="padding:20px 24px;border-bottom:1px solid #e8e8e0;background:#fff;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'+
+      '<div style="font-size:11px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">PURCHASE ORDER</div>'+
+      '<button onclick="closePoDetail()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer;">✕</button>'+
+    '</div>'+
+    '<div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">'+esc(po.po_number||'')+' — '+esc(rfq.item_description||'')+'</div>'+
+    '<div style="font-size:13px;color:#666;">'+
+      esc(f.factory_name_english||'')+
+      (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+      (po.unit_fob_price?' · $'+parseFloat(po.unit_fob_price).toFixed(4)+' FOB':'')+
+      (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString()+' total':'')+
+    '</div>'+
+    '<div style="font-size:12px;color:#888;margin-top:6px;">Issued '+(po.issued_at?new Date(po.issued_at).toLocaleDateString():'')+' · Golden sample approved '+(po.golden_sample_approved_at?new Date(po.golden_sample_approved_at).toLocaleDateString():'')+'</div>'+
+  '</div>';
+
+  g('po-detail-content').innerHTML = hdr +
+    '<div style="padding:20px 24px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">Milestone Schedule</div>'+
+      msHtml+
+    '</div>';
+}
+
+async function adminMarkMilestoneCompleted(milestoneId){
+  if(!confirm('Mark this milestone as completed?'))return;
+  try{
+    await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'completed',completed_at:new Date().toISOString().slice(0,10)})
+    });
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:milestoneId,purchase_order_id:PO_CURRENT_DETAIL.id,change_type:'completed',actor_type:'admin'})
+    }).catch(function(){});
+    closePoDetail();
+    loadOpenOrders();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function adminEditMilestoneDate(milestoneId, currentDate, milestoneType){
+  var newDate=prompt('New date for '+milestoneType.replace(/_/g,' ')+' (YYYY-MM-DD):', currentDate);
+  if(!newDate || !/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim()))return;
+  try{
+    await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({revised_date:newDate.trim()})
+    });
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:milestoneId,purchase_order_id:PO_CURRENT_DETAIL.id,change_type:'date_revised',actor_type:'admin',old_value:{date:currentDate},new_value:{date:newDate.trim()}})
+    }).catch(function(){});
+    closePoDetail();
+    loadOpenOrders();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 async function _legacyLoadPDList(filterOverride){
@@ -8205,31 +8594,6 @@ function aiBarSuggest(el){
 // Open Orders — demo placeholder. Data is rendered statically in the HTML
 // for the investor pitch. When the milestone schema is built, this will
 // fetch from purchase_orders + po_milestones tables.
-function loadOpenOrders(filter){
-  // No-op for demo — orders are hardcoded in the panel HTML.
-  // The filter argument lets dashboard widgets jump to a filtered view.
-  if(filter){setTimeout(function(){
-    var chip=document.querySelector('.ord-chip[onclick*="\''+filter+'\'"]');
-    if(chip)filterOrders(filter,chip);
-  },50);}
-}
-
-function filterOrders(which,btn){
-  // Toggle active chip styling
-  document.querySelectorAll('.ord-chip').forEach(function(c){
-    c.classList.remove('on');
-    c.style.background='#fff';
-    if(c.textContent.indexOf('All')>=0){c.style.color='#1a1a2e';}
-  });
-  if(btn){
-    btn.classList.add('on');
-    btn.style.background='#1a1a2e';
-    btn.style.color='#fff';
-  }
-  // For the demo, all 5 cards stay visible. Real filtering wires in
-  // when the orders table exists.
-}
-
 async function loadWarehouse(){
   // Pull SKU list, show with placeholder stock columns
   try{
