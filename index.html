@@ -295,6 +295,8 @@
   <div class="portal-tabs">
     <button class="ptab on" onclick="ptab('details')">Factory Details</button>
     <button class="ptab" onclick="ptab('rfqs');loadRFQs();">RFQs <span id="rfq-badge" style="font-size:10px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;"></span></button>
+    <button class="ptab" onclick="ptab('samples');loadSamples();">Samples <span id="samples-badge" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('orders');loadOrders();">Orders <span id="orders-badge" style="font-size:10px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
     <button class="ptab" onclick="ptab('catalogs')">Catalog</button>
     <button class="ptab" onclick="ptab('overview')">Company Deck</button>
     <button class="ptab" onclick="ptab('quotes')">Quote Sheets</button>
@@ -384,6 +386,28 @@
       <div class="rfq-empty-icon">📋</div>
       <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No RFQs yet</div>
       <div style="font-size:13px;">When our sourcing team sends you a Request for Quotation, it will appear here.</div>
+    </div>
+  </div>
+
+  <!-- Samples pane (Product Development) -->
+  <div class="ppane" id="ppane-samples">
+    <div id="samples-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading samples...</div>
+    <div id="samples-list"></div>
+    <div class="rfq-empty" id="samples-empty" style="display:none;">
+      <div class="rfq-empty-icon">🧪</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No sample activity</div>
+      <div style="font-size:13px;">After your quote is accepted, you'll be asked to submit samples here. Each version you ship is tracked in this tab.</div>
+    </div>
+  </div>
+
+  <!-- Orders pane (active POs) -->
+  <div class="ppane" id="ppane-orders">
+    <div id="orders-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading orders...</div>
+    <div id="orders-list"></div>
+    <div class="rfq-empty" id="orders-empty" style="display:none;">
+      <div class="rfq-empty-icon">📦</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No active orders</div>
+      <div style="font-size:13px;">When your golden sample is approved and we issue a Purchase Order, your production milestone schedule will appear here.</div>
     </div>
   </div>
 
@@ -1787,6 +1811,415 @@ async function loadRFQBadge(){
   }catch(e){}
 }
 
+// ─────────────────────────────────────────────────────────
+// SAMPLES (Product Development) — list view + ship-version flow
+// ─────────────────────────────────────────────────────────
+
+async function loadSamples(){
+  if(!FACTORY_ID){
+    g('samples-loading').style.display='none';
+    g('samples-empty').style.display='block';
+    return;
+  }
+  g('samples-loading').style.display='block';
+  g('samples-list').innerHTML='';
+  g('samples-empty').style.display='none';
+  try{
+    // Get PD items for this factory + their RFQ + accepted quote + sample submissions
+    var r=await fetch(SB+'/rest/v1/product_development_items?factory_id=eq.'+FACTORY_ID+'&status=in.(awaiting_initial_sample,awaiting_approval,in_revision)&select=*,rfqs(*),rfq_quotes!product_development_items_accepted_quote_id_fkey(*)&order=accepted_at.desc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var pdItems=await r.json();
+    g('samples-loading').style.display='none';
+    if(!Array.isArray(pdItems)||!pdItems.length){
+      g('samples-empty').style.display='block';
+      return;
+    }
+    // Get all sample submissions for these PD items in one query
+    var pdIds=pdItems.map(function(p){return '"'+p.id+'"';}).join(',');
+    var sr=await fetch(SB+'/rest/v1/sample_submissions?product_development_id=in.('+pdIds.replace(/"/g,'')+')&select=*,sample_evaluations(*)&order=version_number.asc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var allSubs=await sr.json();
+    var subsByPd={};
+    (Array.isArray(allSubs)?allSubs:[]).forEach(function(s){
+      if(!subsByPd[s.product_development_id])subsByPd[s.product_development_id]=[];
+      subsByPd[s.product_development_id].push(s);
+    });
+    // Get sample destinations
+    var dr=await fetch(SB+"/rest/v1/app_settings?key=eq.sample_destinations&select=value",{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var dest=await dr.json();
+    var destinations=(Array.isArray(dest)&&dest[0]&&Array.isArray(dest[0].value))?dest[0].value:[
+      {id:'china_office',label:'TBG China Office',active:true},
+      {id:'us_office',label:'TBG US Office',active:true}
+    ];
+    // Render
+    var html=pdItems.map(function(pd){return renderPDCard(pd,subsByPd[pd.id]||[],destinations);}).join('');
+    g('samples-list').innerHTML=html;
+    // Update badge
+    var attentionCount=pdItems.filter(function(p){return p.status==='awaiting_initial_sample'||p.status==='in_revision';}).length;
+    var badge=g('samples-badge');
+    if(badge){
+      if(attentionCount>0){badge.style.display='inline-block';badge.textContent=attentionCount+' need action';}
+      else{badge.style.display='none';}
+    }
+  }catch(e){
+    g('samples-loading').style.display='none';
+    g('samples-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">Could not load samples: '+esc(e.message||String(e))+'</div>';
+  }
+}
+
+function renderPDCard(pd,subs,destinations){
+  var rfq=pd.rfqs||{};
+  var quote=pd.rfq_quotes||{};
+  // Status styling
+  var stConfig={
+    awaiting_initial_sample:{bg:'#fff8e0',border:'#f0d860',color:'#664400',label:'Awaiting first sample',action:true},
+    awaiting_approval:      {bg:'#f0f6ff',border:'#c0d8f0',color:'#1a3a8a',label:'Awaiting approval',action:false},
+    in_revision:            {bg:'#fff0f0',border:'#fdd',color:'#b00',label:'Revision requested',action:true}
+  };
+  var s=stConfig[pd.status]||stConfig.awaiting_initial_sample;
+  // Latest sample + its evaluation (if any)
+  var latest=subs.length?subs[subs.length-1]:null;
+  var latestEval=null;
+  if(latest&&Array.isArray(latest.sample_evaluations)&&latest.sample_evaluations.length){
+    latestEval=latest.sample_evaluations[latest.sample_evaluations.length-1];
+  }
+  // Version history
+  var historyHtml='';
+  if(subs.length){
+    historyHtml='<div style="margin-top:12px;padding:10px 12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;">'+
+      '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Version History</div>'+
+      subs.map(function(sub){
+        var ev=Array.isArray(sub.sample_evaluations)&&sub.sample_evaluations.length?sub.sample_evaluations[sub.sample_evaluations.length-1]:null;
+        var evBadge='';
+        if(ev){
+          var evColor=ev.decision==='approve'?'#1a7a1a':ev.decision==='reject'?'#b00':'#886600';
+          var evBg=ev.decision==='approve'?'#edfaed':ev.decision==='reject'?'#fff0f0':'#fff8e0';
+          var evLabel=ev.decision==='approve'?'✓ Approved':ev.decision==='reject'?'✗ Rejected':'↻ Revision requested';
+          evBadge='<span style="font-size:10px;background:'+evBg+';color:'+evColor+';padding:2px 7px;border-radius:10px;font-weight:600;margin-left:6px;">'+evLabel+'</span>';
+        }
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0e8;">'+
+          '<div style="font-size:12px;color:#1a1a2e;"><strong>Version '+sub.version_number+'</strong>'+evBadge+
+            (sub.ship_date?'<span style="color:#888;margin-left:8px;">Shipped '+esc(sub.ship_date)+'</span>':'')+
+          '</div>'+
+          (sub.tracking_number?'<div style="font-size:11px;color:#666;">'+esc((sub.carrier||'').replace('_',' ').toUpperCase())+': '+esc(sub.tracking_number)+'</div>':'')+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+  // Admin feedback (if in_revision)
+  var feedbackHtml='';
+  if(pd.status==='in_revision'&&latestEval&&latestEval.feedback_text){
+    feedbackHtml='<div style="margin-top:12px;padding:12px 14px;background:#fff5f5;border:1px solid #fdd;border-left:3px solid #b00;border-radius:8px;">'+
+      '<div style="font-size:12px;font-weight:600;color:#b00;margin-bottom:6px;">Feedback from buyer on Version '+(latest?latest.version_number:'?')+':</div>'+
+      '<div style="font-size:12px;color:#7a0000;line-height:1.6;white-space:pre-wrap;">'+esc(latestEval.feedback_text)+'</div>'+
+    '</div>';
+  }
+  // Ship form (only when action is required)
+  var nextVersion=subs.length?subs[subs.length-1].version_number+1:1;
+  var shipFormHtml='';
+  if(s.action){
+    var destOptions=destinations.filter(function(d){return d.active!==false;}).map(function(d){
+      return '<option value="'+esc(d.id)+'">'+esc(d.label)+'</option>';
+    }).join('')+'<option value="testing_lab">Testing Lab (specify address)</option><option value="other">Other (specify address)</option>';
+    shipFormHtml='<div style="margin-top:14px;padding:14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:10px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:10px;">Ship '+(pd.status==='in_revision'?'Revised':'Initial')+' Sample (Version '+nextVersion+')</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
+        '<div class="qf"><label>Ship date *</label><input type="date" id="ss-date-'+pd.id+'" /></div>'+
+        '<div class="qf"><label>Destination *</label><select id="ss-dest-'+pd.id+'" onchange="toggleShipDestAddress(\''+pd.id+'\')">'+destOptions+'</select></div>'+
+        '<div class="qf qf-full" id="ss-addr-wrap-'+pd.id+'" style="display:none;"><label>Address *</label><input type="text" id="ss-addr-'+pd.id+'" placeholder="Full destination address" /></div>'+
+        '<div class="qf"><label>Carrier *</label><select id="ss-carrier-'+pd.id+'"><option value="sf_express">SF Express</option><option value="ups">UPS</option><option value="fedex">FedEx</option><option value="dhl">DHL</option><option value="other">Other</option></select></div>'+
+        '<div class="qf"><label>Tracking number *</label><input type="text" id="ss-track-'+pd.id+'" placeholder="e.g. SF1234567890" /></div>'+
+        '<div class="qf qf-full"><label>Notes (optional)</label><textarea id="ss-notes-'+pd.id+'" rows="2" placeholder="Anything to call out about this version"></textarea></div>'+
+        '<div class="qf qf-full"><label>Sample photo (required)</label><input type="file" id="ss-photo-'+pd.id+'" accept="image/*" /></div>'+
+      '</div>'+
+      '<button class="submit-quote-btn" id="ss-btn-'+pd.id+'" style="margin-top:10px;" onclick="submitSampleShipment(\''+pd.id+'\','+nextVersion+')">Mark Sample as Shipped</button>'+
+      '<div class="pmsg ok" id="ss-ok-'+pd.id+'"></div>'+
+      '<div class="pmsg err" id="ss-err-'+pd.id+'"></div>'+
+    '</div>';
+  } else if(pd.status==='awaiting_approval'){
+    shipFormHtml='<div style="margin-top:14px;padding:12px 14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;font-size:12px;color:#1a3a8a;">Sample Version '+(latest?latest.version_number:'?')+' is with the buyer for evaluation. You\'ll be notified once a decision is made.</div>';
+  }
+  return '<div class="rfq-card">'+
+    '<div class="rfq-card-header" style="background:'+s.bg+';border-left:3px solid '+s.border+';">'+
+      '<div style="flex:1;">'+
+        '<div class="rfq-card-title">'+esc(rfq.item_description||'(no description)')+'</div>'+
+        '<div class="rfq-card-meta">'+esc(rfq.project_number||'')+(rfq.category?' · '+esc(rfq.category):'')+(quote.unit_fob_price?' · Accepted at $'+parseFloat(quote.unit_fob_price).toFixed(4)+' FOB':'')+'</div>'+
+      '</div>'+
+      '<span class="rfq-card-badge" style="background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';">'+esc(s.label)+'</span>'+
+    '</div>'+
+    '<div class="rfq-card-body open" style="display:block;">'+
+      feedbackHtml+
+      historyHtml+
+      shipFormHtml+
+    '</div>'+
+  '</div>';
+}
+
+function toggleShipDestAddress(pdId){
+  var sel=g('ss-dest-'+pdId);
+  var wrap=g('ss-addr-wrap-'+pdId);
+  if(!sel||!wrap)return;
+  var v=sel.value;
+  wrap.style.display=(v==='testing_lab'||v==='other')?'block':'none';
+}
+
+async function submitSampleShipment(pdId,versionNumber){
+  var shipDate=g('ss-date-'+pdId).value;
+  var destType=g('ss-dest-'+pdId).value;
+  var destAddr=(g('ss-addr-'+pdId)&&g('ss-addr-'+pdId).value||'').trim();
+  var carrier=g('ss-carrier-'+pdId).value;
+  var track=g('ss-track-'+pdId).value.trim();
+  var notes=g('ss-notes-'+pdId).value.trim();
+  var photoFile=g('ss-photo-'+pdId).files[0];
+
+  // Validation
+  var errEl=g('ss-err-'+pdId),okEl=g('ss-ok-'+pdId);
+  errEl.style.display='none';okEl.style.display='none';
+  function fail(msg){errEl.textContent=msg;errEl.style.display='block';}
+  if(!shipDate)return fail('Ship date is required.');
+  if((destType==='testing_lab'||destType==='other')&&!destAddr)return fail('Address is required for testing lab or other destinations.');
+  if(!track)return fail('Tracking number is required.');
+  if(!photoFile)return fail('A sample photo is required.');
+
+  var btn=g('ss-btn-'+pdId);btn.disabled=true;btn.textContent='Uploading...';
+
+  try{
+    // Upload photo to factory-files bucket
+    var photoExt=(photoFile.name.split('.').pop()||'jpg').toLowerCase();
+    var photoPath=FACTORY_ID+'/sample-photos/'+pdId+'_v'+versionNumber+'_'+Date.now()+'.'+photoExt;
+    var up=await fetch(SB+'/storage/v1/object/factory-files/'+photoPath,{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':photoFile.type||'image/jpeg'},
+      body:photoFile
+    });
+    if(!up.ok){var t=await up.text();throw new Error('Photo upload failed: '+t.slice(0,200));}
+
+    // Create sample_submissions row
+    var payload={
+      product_development_id:pdId,
+      version_number:versionNumber,
+      ship_date:shipDate,
+      ship_destination_type:destType,
+      ship_destination_address:(destType==='testing_lab'||destType==='other')?destAddr:null,
+      carrier:carrier,
+      tracking_number:track,
+      factory_notes:notes||null,
+      sample_photo_urls:[photoPath],
+      status:'shipped'
+    };
+    btn.textContent='Saving...';
+    var r=await fetch(SB+'/rest/v1/sample_submissions',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error('Save failed: '+(e.message||e.details||r.status));}
+
+    // Transition PD item to awaiting_approval + bump current_version
+    await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'awaiting_approval',current_version:versionNumber})
+    });
+
+    // Log factory_event (non-blocking)
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:FACTORY_ID,event_type:'sample_shipped',event_data:{product_development_id:pdId,version_number:versionNumber,carrier:carrier,tracking_number:track},actor_type:'factory'})
+    }).catch(function(){});
+
+    okEl.textContent='✓ Sample Version '+versionNumber+' marked as shipped. The buyer has been notified.';okEl.style.display='block';
+    setTimeout(loadSamples,1500);
+  }catch(e){
+    fail(e.message||String(e));
+    btn.disabled=false;btn.textContent='Mark Sample as Shipped';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// ORDERS — active POs with milestone schedule
+// ─────────────────────────────────────────────────────────
+
+async function loadOrders(){
+  if(!FACTORY_ID){
+    g('orders-loading').style.display='none';
+    g('orders-empty').style.display='block';
+    return;
+  }
+  g('orders-loading').style.display='block';
+  g('orders-list').innerHTML='';
+  g('orders-empty').style.display='none';
+  try{
+    var r=await fetch(SB+"/rest/v1/purchase_orders?factory_id=eq."+FACTORY_ID+"&status=in.(in_production,on_hold)&select=*,rfqs(item_description,project_number,category),po_milestones(*)&order=issued_at.desc",{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var pos=await r.json();
+    g('orders-loading').style.display='none';
+    if(!Array.isArray(pos)||!pos.length){
+      g('orders-empty').style.display='block';
+      return;
+    }
+    g('orders-list').innerHTML=pos.map(renderOrderCard).join('');
+    // Badge: count milestones needing attention (next 10 days, not confirmed)
+    var attention=0;
+    var today=new Date();var tenDays=new Date(today.getTime()+10*86400000);
+    pos.forEach(function(po){
+      (po.po_milestones||[]).forEach(function(m){
+        var d=new Date(m.revised_date||m.agreed_date);
+        if(d<=tenDays && m.status==='pending')attention++;
+      });
+    });
+    var badge=g('orders-badge');
+    if(badge){
+      if(attention>0){badge.style.display='inline-block';badge.textContent=attention+' upcoming';}
+      else{badge.style.display='none';}
+    }
+  }catch(e){
+    g('orders-loading').style.display='none';
+    g('orders-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">Could not load orders: '+esc(e.message||String(e))+'</div>';
+  }
+}
+
+function renderOrderCard(po){
+  var rfq=po.rfqs||{};
+  var milestones=(po.po_milestones||[]).slice().sort(function(a,b){return a.display_order-b.display_order;});
+  var msLabels={
+    sample_submission:'Sample Submission',
+    materials_on_hand:'Materials On Hand',
+    mass_production_start:'Mass Production Start',
+    mass_production_end:'Mass Production End',
+    inspection:'Pre-Shipment Inspection',
+    cargo_ready:'Cargo Ready'
+  };
+  var today=new Date().toISOString().slice(0,10);
+  var msHtml=milestones.map(function(m){
+    var dateStr=m.revised_date||m.agreed_date;
+    var overdue=dateStr<today && m.status==='pending';
+    var stColor,stBg,stLabel;
+    if(m.status==='completed'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ Completed';}
+    else if(m.status==='confirmed_on_track'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ On track';}
+    else if(m.status==='delayed'){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Delayed';}
+    else if(m.status==='at_risk'){stColor='#886600';stBg='#fff8e0';stLabel='⚠ At risk';}
+    else if(overdue){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Overdue';}
+    else{stColor='#666';stBg='#f5f5f0';stLabel='Pending';}
+
+    var actionBtns='';
+    if(m.status==='pending'||m.status==='at_risk'){
+      actionBtns='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">'+
+        '<button onclick="confirmMilestone(\''+m.id+'\')" style="padding:5px 10px;background:#1a7a1a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Confirm on schedule</button>'+
+        '<button onclick="flagMilestoneDelay(\''+m.id+'\')" style="padding:5px 10px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">⚠ Flag delay</button>'+
+        '<button onclick="requestTimelineChange(\''+m.id+'\',\''+po.id+'\',\''+m.milestone_type+'\',\''+dateStr+'\')" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Request date change</button>'+
+      '</div>';
+    }
+    return '<div style="padding:10px 12px;border-bottom:1px solid #f0f0e8;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">'+
+      '<div style="flex:1;min-width:200px;">'+
+        '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(msLabels[m.milestone_type]||m.milestone_type)+'</div>'+
+        '<div style="font-size:12px;color:#666;margin-top:2px;">Due: <strong>'+esc(dateStr)+'</strong>'+
+          (m.revised_date&&m.revised_date!==m.agreed_date?' <span style="color:#888;font-size:11px;">(orig '+esc(m.agreed_date)+')</span>':'')+
+        '</div>'+
+        actionBtns+
+      '</div>'+
+      '<span style="font-size:10px;background:'+stBg+';color:'+stColor+';border:1px solid '+stColor+'33;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap;">'+stLabel+'</span>'+
+    '</div>';
+  }).join('');
+  return '<div class="rfq-card">'+
+    '<div class="rfq-card-header" style="background:#edfaed;border-left:3px solid #1a7a1a;">'+
+      '<div style="flex:1;">'+
+        '<div class="rfq-card-title">'+esc(po.po_number||'(no PO number)')+' · '+esc(rfq.item_description||'')+'</div>'+
+        '<div class="rfq-card-meta">'+
+          (rfq.project_number?esc(rfq.project_number)+' · ':'')+
+          'Issued '+(po.issued_at?esc(po.issued_at.slice(0,10)):'')+
+          (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+          (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString():'')+
+        '</div>'+
+      '</div>'+
+      '<span class="rfq-card-badge badge-quoted">In production</span>'+
+    '</div>'+
+    '<div class="rfq-card-body open" style="display:block;padding:0;">'+
+      msHtml+
+    '</div>'+
+  '</div>';
+}
+
+async function confirmMilestone(milestoneId){
+  if(!confirm('Confirm this milestone is on track for the agreed date?'))return;
+  try{
+    await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'confirmed_on_track',factory_confirmation_at:new Date().toISOString()})
+    });
+    // Log to history (non-blocking)
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:milestoneId,change_type:'factory_confirmed',actor_type:'factory',new_value:{status:'confirmed_on_track'}})
+    }).catch(function(){});
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:FACTORY_ID,event_type:'milestone_confirmed',event_data:{po_milestone_id:milestoneId},actor_type:'factory'})
+    }).catch(function(){});
+    loadOrders();
+  }catch(e){alert('Could not confirm: '+e.message);}
+}
+
+async function flagMilestoneDelay(milestoneId){
+  var reason=prompt('Briefly describe the delay (the buyer will be notified):');
+  if(!reason||!reason.trim())return;
+  try{
+    await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({status:'delayed',delay_reason:reason.trim(),factory_confirmation_at:new Date().toISOString()})
+    });
+    fetch(SB+'/rest/v1/po_milestone_history',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({po_milestone_id:milestoneId,change_type:'factory_flagged_delay',actor_type:'factory',notes:reason.trim()})
+    }).catch(function(){});
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:FACTORY_ID,event_type:'milestone_delayed',event_data:{po_milestone_id:milestoneId,reason:reason.trim()},actor_type:'factory'})
+    }).catch(function(){});
+    loadOrders();
+  }catch(e){alert('Could not flag: '+e.message);}
+}
+
+async function requestTimelineChange(milestoneId,poId,milestoneType,currentDate){
+  var newDate=prompt('Propose a new date for '+milestoneType.replace(/_/g,' ')+' (current: '+currentDate+').\n\nFormat: YYYY-MM-DD');
+  if(!newDate||!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim()))return;
+  var reason=prompt('Reason for the change request (the buyer must approve):');
+  if(!reason||!reason.trim())return;
+  try{
+    await fetch(SB+'/rest/v1/timeline_change_requests',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        po_milestone_id:milestoneId,
+        purchase_order_id:poId,
+        factory_id:FACTORY_ID,
+        previous_date:currentDate,
+        proposed_date:newDate.trim(),
+        reason:reason.trim(),
+        status:'pending'
+      })
+    });
+    fetch(SB+'/rest/v1/factory_events',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({factory_id:FACTORY_ID,event_type:'timeline_change_requested',event_data:{po_milestone_id:milestoneId,previous_date:currentDate,proposed_date:newDate.trim()},actor_type:'factory'})
+    }).catch(function(){});
+    alert('Request submitted. The buyer will review and respond.');
+  }catch(e){alert('Could not submit: '+e.message);}
+}
+
 async function loadRFQs(){
   if(!FACTORY_ID){
     g('rfq-loading').style.display='none';
@@ -2037,6 +2470,14 @@ function populateQuoteForm(rfqId,q){
   setVal('qwgt-'+rfqId,q?q.unit_weight_kg:'');
   setVal('qprodlt-'+rfqId,q?q.production_lead_time_days:'');
   setVal('qsamplt-'+rfqId,q?q.sample_lead_time_days:'');
+  // ── Production Timeline pre-fill ──
+  setVal('qtl-sample-'+rfqId,    q?q.quote_sample_submission_days:'');
+  setVal('qtl-materials-'+rfqId, q?q.quote_materials_offset_days:'');
+  setVal('qtl-prodstart-'+rfqId, q?q.quote_prod_start_offset_days:'');
+  setVal('qtl-prodend-'+rfqId,   q?q.quote_prod_end_offset_days:'');
+  setVal('qtl-inspection-'+rfqId,q?q.quote_inspection_offset_days:'');
+  setVal('qtl-cargo-'+rfqId,     q?q.quote_cargo_ready_offset_days:'');
+  setVal('qtl-notes-'+rfqId,     q?q.quote_timeline_notes:'');
   setVal('qfobport-'+rfqId,q&&Array.isArray(q.fob_ports)?q.fob_ports.join(', '):(q?q.fob_ports||'':''));
   var country=g('qcountry-'+rfqId);
   if(country){
@@ -2256,6 +2697,57 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
       '<div class="qf"><label>Production Lead Time (days) *</label><input type="number" id="qprodlt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 45" /></div>' +
       '<div class="qf"><label>Sample Lead Time (days) *</label><input type="number" id="qsamplt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 14" /></div>' +
     '</div>' +
+    // ── Production Timeline (new) ──
+    '<div style="margin-top:14px;padding:14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;">' +
+      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:6px;">📅 Production Timeline Commitment</div>' +
+      '<div style="font-size:11px;color:#445a99;line-height:1.5;margin-bottom:12px;">' +
+        'Commit to the days you need for each stage. Sample submission is days from quote acceptance. Every other stage is days from when we approve the golden sample.' +
+        (rfq.target_sample_submission_days||rfq.target_materials_offset_days?' Buyer targets shown for reference.':'') +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div class="qf">' +
+          '<label>Sample submission <span style="color:#888;font-weight:400;">(days from quote acceptance)</span>' +
+            (rfq.target_sample_submission_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_sample_submission_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-sample-'+rfq.id+'" min="1" step="1" placeholder="e.g. 14" />' +
+        '</div>' +
+        '<div class="qf">' +
+          '<label>Materials on hand <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
+            (rfq.target_materials_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_materials_offset_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-materials-'+rfq.id+'" min="0" step="1" placeholder="e.g. 14" />' +
+        '</div>' +
+        '<div class="qf">' +
+          '<label>Mass production starts <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
+            (rfq.target_prod_start_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_prod_start_offset_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-prodstart-'+rfq.id+'" min="0" step="1" placeholder="e.g. 18" />' +
+        '</div>' +
+        '<div class="qf">' +
+          '<label>Mass production ends <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
+            (rfq.target_prod_end_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_prod_end_offset_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-prodend-'+rfq.id+'" min="0" step="1" placeholder="e.g. 48" />' +
+        '</div>' +
+        '<div class="qf">' +
+          '<label>Pre-shipment inspection <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
+            (rfq.target_inspection_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_inspection_offset_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-inspection-'+rfq.id+'" min="0" step="1" placeholder="e.g. 52" />' +
+        '</div>' +
+        '<div class="qf">' +
+          '<label>Cargo ready <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
+            (rfq.target_cargo_ready_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_cargo_ready_offset_days+'d</span>':'') +
+          '</label>' +
+          '<input type="number" id="qtl-cargo-'+rfq.id+'" min="0" step="1" placeholder="e.g. 58" />' +
+        '</div>' +
+      '</div>' +
+      '<div class="qf qf-full" style="margin-top:10px;">' +
+        '<label>Timeline notes / caveats (optional)</label>' +
+        '<textarea id="qtl-notes-'+rfq.id+'" rows="2" placeholder="e.g. Materials lead time depends on supplier confirmation"></textarea>' +
+      '</div>' +
+    '</div>' +
+    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:14px;">Compliance &amp; Documents</div>' +
     '<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;box-sizing:border-box;">'+
       '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents <span style="font-size:11px;font-weight:500;">(INCI + Formulation required for cosmetics, optional for others)</span></div>'+
       '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">For cosmetic products, both INCI list AND full formulation breakdown are required. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially. Skip if non-cosmetic.</div>'+
@@ -2356,6 +2848,13 @@ async function saveQuoteDraft(rfqId){
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
     production_lead_time_days:parseInt(g('qprodlt-'+rfqId).value)||null,
     sample_lead_time_days:parseInt(g('qsamplt-'+rfqId).value)||null,
+    quote_sample_submission_days:parseInt(g('qtl-sample-'+rfqId).value)||null,
+    quote_materials_offset_days:parseInt(g('qtl-materials-'+rfqId).value)||null,
+    quote_prod_start_offset_days:parseInt(g('qtl-prodstart-'+rfqId).value)||null,
+    quote_prod_end_offset_days:parseInt(g('qtl-prodend-'+rfqId).value)||null,
+    quote_inspection_offset_days:parseInt(g('qtl-inspection-'+rfqId).value)||null,
+    quote_cargo_ready_offset_days:parseInt(g('qtl-cargo-'+rfqId).value)||null,
+    quote_timeline_notes:g('qtl-notes-'+rfqId).value.trim()||null,
     certification_documents:certDocsD,
     status:'draft'
   };
@@ -2495,6 +2994,13 @@ async function submitQuote(rfqId){
     unit_weight_kg:parseFloat(g('qwgt-'+rfqId).value)||null,
     production_lead_time_days:parseInt(g('qprodlt-'+rfqId).value)||null,
     sample_lead_time_days:parseInt(g('qsamplt-'+rfqId).value)||null,
+    quote_sample_submission_days:parseInt(g('qtl-sample-'+rfqId).value)||null,
+    quote_materials_offset_days:parseInt(g('qtl-materials-'+rfqId).value)||null,
+    quote_prod_start_offset_days:parseInt(g('qtl-prodstart-'+rfqId).value)||null,
+    quote_prod_end_offset_days:parseInt(g('qtl-prodend-'+rfqId).value)||null,
+    quote_inspection_offset_days:parseInt(g('qtl-inspection-'+rfqId).value)||null,
+    quote_cargo_ready_offset_days:parseInt(g('qtl-cargo-'+rfqId).value)||null,
+    quote_timeline_notes:g('qtl-notes-'+rfqId).value.trim()||null,
     certification_documents:certDocs,
     status:'submitted'
   };
