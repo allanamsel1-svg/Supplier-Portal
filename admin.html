@@ -3266,10 +3266,28 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
 
     // Quotes
     (quotes.length?
-      '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Quotes Received</div>'+
-      quotes.map(function(q,idx){
-        return renderQuoteCard(q,rfq,idx,quoteVersions&&quoteVersions[q.id]);
-      }).join('')
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'+
+        '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;">Quotes Received ('+quotes.length+')</div>'+
+        (quotes.length>1?'<button id="batch-score-btn-'+rfq.id+'" onclick="batchScoreAllQuotes(\''+rfq.id+'\')" style="padding:7px 14px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">✦ Score & compare all quotes</button>':'')+
+      '</div>'+
+      (function(){
+        // Pre-compute peer comparison stats for all quotes in this RFQ
+        var totals=quotes.map(function(q){return (parseFloat(q.unit_fob_price)||0)+(parseFloat(q.packaging_price_per_unit)||0);}).filter(function(v){return v>0;});
+        var peerStats=null;
+        if(totals.length>1){
+          var sorted=totals.slice().sort(function(a,b){return a-b;});
+          peerStats={
+            min:sorted[0],
+            max:sorted[sorted.length-1],
+            median:sorted[Math.floor(sorted.length/2)],
+            count:totals.length,
+            sorted:sorted
+          };
+        }
+        return quotes.map(function(q,idx){
+          return renderQuoteCard(q,rfq,idx,quoteVersions&&quoteVersions[q.id],peerStats);
+        }).join('');
+      })()
     :'<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No quotes received yet.</div>')+
   '';
 
@@ -3382,6 +3400,64 @@ function buildDiffSection(oldSnapshot,newQuote){
 }
 
 // ── AI Formulation Scoring ──────────────────────────────────────────
+async function batchScoreAllQuotes(rfqId){
+  // Find non-draft quotes for this RFQ that haven't been blocked by compliance
+  var btn=g('batch-score-btn-'+rfqId);
+  if(btn){btn.disabled=true;btn.dataset.originalText=btn.textContent;btn.textContent='Loading quotes...';btn.style.opacity='0.6';}
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?rfq_id=eq.'+rfqId+'&status=neq.draft&select=id,score_overall_v2',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var quotesToScore=await r.json();
+    if(!Array.isArray(quotesToScore)||!quotesToScore.length){
+      alert('No submitted quotes to score for this RFQ.');
+      if(btn){btn.disabled=false;btn.textContent=btn.dataset.originalText;btn.style.opacity='1';}
+      return;
+    }
+    var total=quotesToScore.length;
+    var done=0;
+    var failed=[];
+
+    // Run scoring sequentially to avoid hammering Claude API. Could parallelize 2-3 at a time later.
+    for(var i=0;i<quotesToScore.length;i++){
+      var q=quotesToScore[i];
+      if(btn)btn.textContent='Scoring '+(i+1)+' of '+total+'... (~30-60s each)';
+      try{
+        var sr=await fetch('/api/score-quote',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({quote_id:q.id})
+        });
+        var sd=await sr.json();
+        if(!sr.ok||!sd.success){
+          failed.push({id:q.id,error:sd.error||'HTTP '+sr.status});
+        }else{
+          done++;
+        }
+      }catch(e){
+        failed.push({id:q.id,error:e.message});
+      }
+    }
+
+    // Refresh the panel
+    if(btn){btn.textContent='✓ Scored '+done+' of '+total;btn.style.opacity='1';}
+    if(failed.length){
+      console.log('Batch scoring partial failures:',failed);
+      var msg='Scored '+done+' of '+total+' quotes successfully.';
+      if(failed.length){msg+='\n\n'+failed.length+' failed:\n'+failed.map(function(f){return '• '+f.error;}).slice(0,5).join('\n');}
+      alert(msg);
+    }
+    // Re-open the RFQ detail to refresh scorecards & peer comparison
+    setTimeout(function(){
+      if(typeof loadRFQDetail==='function'){loadRFQDetail(rfqId);}
+      else{location.reload();}
+    },500);
+  }catch(e){
+    alert('Batch scoring failed: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent=btn.dataset.originalText||'✦ Score & compare all quotes';btn.style.opacity='1';}
+  }
+}
+
 async function scoreQuoteWithAI(quoteId){
   var btns=document.querySelectorAll('button[data-qid="'+quoteId+'"]');
   // Find the score button specifically
@@ -3634,19 +3710,42 @@ function toggleScoreDetail(quoteId){
   panel.scrollIntoView({behavior:'smooth',block:'center'});
 }
 
-function renderQuoteCard(q,rfq,idx,versions){
+function renderQuoteCard(q,rfq,idx,versions,peerStats){
   var f=q.factories||{};
   var fob=parseFloat(q.unit_fob_price)||0;
   var pkgPrice=parseFloat(q.packaging_price_per_unit)||0;
   var totalFob=fob+pkgPrice;
   var maxFob=parseFloat(rfq.max_fob_price)||0;
   var fobColor=maxFob?(totalFob<=maxFob?'#1a7a1a':'#b00'):'#1a1a2e';
-  var fobFlag=maxFob?(totalFob<=maxFob?'✓ Under target':'⚠ Over target $'+maxFob.toFixed(2)):'';
+  var fobFlag=maxFob?(totalFob<=maxFob?'✓ Under target $'+maxFob.toFixed(2):'⚠ Over target $'+maxFob.toFixed(2)):'';
   var isUpdated=q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(q.created_at);
   var submittedDate=q.created_at?new Date(q.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
   var updatedDate=isUpdated?new Date(q.updated_at).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'';
   var missing=getMissingFields(q,rfq);
   var missingBadge=missing.length?'<span style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:2px 7px;border-radius:10px;font-weight:600;">⚠ '+missing.length+' missing</span>':'';
+
+  // ── Peer comparison (against other quotes in THIS RFQ) ──
+  var peerBadge='';
+  var peerColor='';
+  if(peerStats && totalFob>0){
+    var rank=peerStats.sorted.indexOf(totalFob)+1;
+    var pctVsMin=peerStats.min>0?((totalFob-peerStats.min)/peerStats.min)*100:0;
+    var pctVsMedian=peerStats.median>0?((totalFob-peerStats.median)/peerStats.median)*100:0;
+    var peerLabel,peerBg,peerBorder;
+    if(rank===1){
+      peerLabel='🏆 Lowest of '+peerStats.count;
+      peerBg='#edfaed';peerBorder='#a0d8a0';peerColor='#1a7a1a';
+    }else if(rank===peerStats.count && peerStats.count>2){
+      peerLabel='Highest of '+peerStats.count+' · '+(pctVsMin>=0?'+':'')+pctVsMin.toFixed(0)+'% over lowest';
+      peerBg='#fff0f0';peerBorder='#fdd';peerColor='#b00';
+    }else{
+      peerLabel='#'+rank+' of '+peerStats.count+' · '+(pctVsMedian>=0?'+':'')+pctVsMedian.toFixed(0)+'% vs median';
+      peerBg=pctVsMedian<=0?'#edfaed':'#fff8e0';
+      peerBorder=pctVsMedian<=0?'#a0d8a0':'#f0d860';
+      peerColor=pctVsMedian<=0?'#1a7a1a':'#886600';
+    }
+    peerBadge='<span style="font-size:10px;background:'+peerBg+';color:'+peerColor+';border:1px solid '+peerBorder+';padding:2px 8px;border-radius:10px;font-weight:600;">'+peerLabel+'</span>';
+  }
 
   // Score badge — prefer v2 (compliance gate + 100-pt composite), fall back to v1
   var v2Score = (q.score_overall_v2 !== null && q.score_overall_v2 !== undefined) ? q.score_overall_v2 : null;
@@ -3683,17 +3782,24 @@ function renderQuoteCard(q,rfq,idx,versions){
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
       '<div style="flex:1;">'+
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">'+
           '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
           scoreBadge+
+          peerBadge+
           (isUpdated?'<span style="font-size:10px;background:#fff0c0;color:#886600;border:1px solid #e0c040;padding:2px 7px;border-radius:10px;font-weight:600;">🔄 Updated '+updatedDate+'</span>':'')+
           missingBadge+
         '</div>'+
-        '<div style="font-size:12px;margin-top:2px;">'+
+        // ── Pricing line: visible at a glance ──
+        '<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-top:4px;">'+
           '<span style="font-size:16px;font-weight:700;color:'+fobColor+';">$'+totalFob.toFixed(4)+' Total FOB</span>'+
-          (pkgPrice?'<span style="font-size:11px;color:#666;margin-left:6px;">($'+fob.toFixed(4)+' unit + $'+pkgPrice.toFixed(4)+' pkg)</span>':'<span style="font-size:11px;color:#aa6600;margin-left:6px;">⚠ no packaging price</span>')+
-          (fobFlag?'<span style="font-size:11px;margin-left:8px;color:'+fobColor+';">'+fobFlag+'</span>':'')+
-          '<span style="font-size:11px;color:#bbb;margin-left:8px;">Submitted '+submittedDate+'</span>'+
+          '<span style="font-size:12px;color:#444;">Unit: <strong>$'+fob.toFixed(4)+'</strong></span>'+
+          '<span style="font-size:12px;color:'+(pkgPrice?'#444':'#aa6600')+';">Pkg: <strong>'+(pkgPrice?'$'+pkgPrice.toFixed(4):'⚠ not provided')+'</strong></span>'+
+          (q.moq?'<span style="font-size:12px;color:#666;">MOQ: <strong>'+q.moq.toLocaleString()+'</strong></span>':'')+
+          (q.production_lead_time_days?'<span style="font-size:12px;color:#666;">Prod: <strong>'+q.production_lead_time_days+'d</strong></span>':'')+
+        '</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:4px;">'+
+          (fobFlag?'<span style="color:'+fobColor+';margin-right:8px;">'+fobFlag+'</span>':'')+
+          '<span>Submitted '+submittedDate+'</span>'+
         '</div>'+
       '</div>'+
       '<span style="color:#bbb;font-size:18px;">▾</span>'+
