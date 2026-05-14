@@ -107,6 +107,46 @@ function loadPromptFile(slug) {
   return null;
 }
 
+// ── Robust JSON extraction ──
+// Handles common quirks in LLM JSON output: markdown fences, trailing commas,
+// leading explanation text, smart quotes, etc.
+function extractAndParseJSON(text) {
+  if (!text) throw new Error('Empty response from model.');
+
+  // 1. Strip markdown code fences (```json ... ``` or ``` ... ```)
+  let cleaned = text.replace(/```(?:json)?\s*\n?/gi, '').replace(/```\s*$/g, '');
+
+  // 2. Find the outermost JSON object — first { to its matching final }
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start < 0 || end <= start) {
+    throw new Error('No JSON object found in response.');
+  }
+  cleaned = cleaned.slice(start, end + 1);
+
+  // 3. Try parsing as-is
+  try { return JSON.parse(cleaned); } catch (e1) {
+    // 4. Try fixing common issues:
+    //    a) Trailing commas before } or ] (most common LLM mistake)
+    //    b) Smart quotes / curly quotes
+    //    c) Stray BOM
+    let repaired = cleaned
+      .replace(/,(\s*[}\]])/g, '$1')           // trailing commas
+      .replace(/[\u201C\u201D]/g, '"')         // smart double quotes → straight
+      .replace(/[\u2018\u2019]/g, "'")         // smart single quotes → straight
+      .replace(/^\uFEFF/, '');                  // BOM
+    try { return JSON.parse(repaired); } catch (e2) {
+      // 5. Last resort: report the parse error with context around the failure point
+      const m = e2.message.match(/position (\d+)/);
+      const pos = m ? parseInt(m[1], 10) : 0;
+      const ctxStart = Math.max(0, pos - 80);
+      const ctxEnd = Math.min(repaired.length, pos + 80);
+      const ctx = repaired.slice(ctxStart, ctxEnd).replace(/\n/g, '\\n');
+      throw new Error(`${e2.message} — near: ...${ctx}...`);
+    }
+  }
+}
+
 // ── Main handler ─────────────────────────────────────────────
 async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -212,22 +252,19 @@ async function handler(req, res) {
 
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: 'user', content }]
     });
 
     const responseText = msg.content[0]?.text || '';
     let analysis;
     try {
-      const start = responseText.indexOf('{');
-      const end = responseText.lastIndexOf('}');
-      if (start < 0 || end <= start) throw new Error('No JSON object found in response.');
-      analysis = JSON.parse(responseText.slice(start, end + 1));
+      analysis = extractAndParseJSON(responseText);
     } catch (parseErr) {
-      console.error('Failed to parse analysis JSON. Raw response:', responseText.slice(0, 500));
+      console.error('Failed to parse analysis JSON. Raw response (first 2000 chars):', responseText.slice(0, 2000));
       return res.status(500).json({
         error: 'AI response was not valid JSON: ' + parseErr.message,
-        raw_response_preview: responseText.slice(0, 500)
+        raw_response_preview: responseText.slice(0, 1500)
       });
     }
 
