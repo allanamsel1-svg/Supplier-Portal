@@ -77,10 +77,10 @@ function calcPricePerUnit(quote, rfq) {
 async function findBySkuMatch(quote, rfq) {
   if (!rfq?.sku_id) return [];
   const rows = await sb(
-    `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,submitted_at,rfqs!inner(sku_id,category,sub_category,item_description)` +
+    `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,created_at,rfqs!inner(sku_id,category,sub_category,item_description)` +
     `&rfqs.sku_id=eq.${rfq.sku_id}` +
     `&id=neq.${quote.id}` +
-    `&order=submitted_at.desc` +
+    `&order=created_at.desc` +
     `&limit=${COMPARISON_SET_CAP}`
   );
   return rows || [];
@@ -91,11 +91,11 @@ async function findByCategoryMatch(quote, rfq) {
   if (!rfq?.category) return [];
   const subFilter = rfq.sub_category ? `&rfqs.sub_category=eq.${encodeURIComponent(rfq.sub_category)}` : '';
   const rows = await sb(
-    `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,submitted_at,rfqs!inner(sku_id,category,sub_category,item_description)` +
+    `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,created_at,rfqs!inner(sku_id,category,sub_category,item_description)` +
     `&rfqs.category=eq.${encodeURIComponent(rfq.category)}` +
     subFilter +
     `&id=neq.${quote.id}` +
-    `&order=submitted_at.desc` +
+    `&order=created_at.desc` +
     `&limit=${COMPARISON_SET_CAP}`
   );
   return rows || [];
@@ -109,9 +109,9 @@ async function findBySemanticMatch(quote, rfq, alreadyFound) {
   const sixMonthsAgo = new Date(Date.now() - 180 * 86400 * 1000).toISOString();
   const pool = await sb(
     `rfq_quotes?select=id,rfqs(item_description,category)` +
-    `&submitted_at=gte.${sixMonthsAgo}` +
+    `&created_at=gte.${sixMonthsAgo}` +
     `&id=neq.${quote.id}` +
-    `&order=submitted_at.desc` +
+    `&order=created_at.desc` +
     `&limit=200`
   );
   if (!pool || !pool.length) return [];
@@ -172,7 +172,7 @@ async function applyManualPins(quote, matched) {
     if (toFetch.length) {
       const idList = toFetch.map(id => `"${id}"`).join(',');
       const pinned = await sb(
-        `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,submitted_at,rfqs(sku_id,category,sub_category,item_description)` +
+        `rfq_quotes?select=id,rfq_id,factory_id,fob_price_usd,fob_price,fill_volume_ml,fill_weight_g,pack_quantity,moq,lead_time_days,created_at,rfqs(sku_id,category,sub_category,item_description)` +
         `&id=in.(${idList.replace(/"/g, '')})`
       );
       result = result.concat(pinned || []);
