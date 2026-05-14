@@ -3400,6 +3400,339 @@ function buildDiffSection(oldSnapshot,newQuote){
 }
 
 // ── AI Formulation Scoring ──────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
+// FORMULATION ANALYSIS — admin-only AI review + curated send to factory
+// ─────────────────────────────────────────────────────────
+
+async function analyzeFormulationOnQuote(quoteId){
+  var btns=document.querySelectorAll('button[data-qid="'+quoteId+'"]');
+  var btn=null;
+  btns.forEach(function(b){if(b.textContent.indexOf('Formulation')>=0)btn=b;});
+  if(btn){btn.disabled=true;btn.dataset.originalText=btn.textContent;btn.textContent='🧪 Analyzing (~30-60s)...';btn.style.opacity='0.6';}
+
+  // Show progress overlay
+  var card=g('qcard-'+quoteId);
+  var faPanel=g('fapanel-'+quoteId);
+  if(faPanel){
+    faPanel.innerHTML='<div style="background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;padding:14px 16px;font-size:13px;color:#1a3a8a;text-align:center;">'+
+      '🧪 AI is reading INCI + Formulation PDFs and analyzing for US/Canada compliance, claims match, and improvement opportunities. Usually 30-60 seconds.'+
+      '<br><span style="font-size:11px;color:#888;">Don\'t close this tab.</span>'+
+    '</div>';
+  }
+
+  try{
+    var r=await fetch('/api/analyze-formulation',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({quote_id:quoteId})
+    });
+    var data=await r.json();
+    if(!r.ok||!data.success){
+      throw new Error(data.error||'Analysis failed (status '+r.status+')');
+    }
+    // Re-render the panel with the new analysis (we need quote.formulation_analysis populated)
+    if(faPanel){
+      faPanel.innerHTML=renderFormulationAnalysisPanel({id:quoteId, formulation_analysis:data.analysis, formulation_feedback_sent:false, formulation_feedback_text:null});
+    }
+    if(btn){btn.disabled=false;btn.textContent='🧪 Re-analyze Formulation';btn.style.opacity='1';}
+  }catch(e){
+    if(faPanel){
+      faPanel.innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;border-left:3px solid #b00;border-radius:8px;padding:12px 14px;font-size:12px;color:#b00;">'+
+        '⚠ Analysis failed: '+esc(e.message||String(e))+
+      '</div>';
+    }
+    if(btn){btn.disabled=false;btn.textContent=btn.dataset.originalText||'🧪 Analyze Formulation';btn.style.opacity='1';}
+  }
+}
+
+function renderFormulationAnalysisPanel(q){
+  var a=q.formulation_analysis||{};
+  if(!a.summary && !a.regulatory_us && !a.red_flags){
+    return '<div style="font-size:11px;color:#888;">No analysis available.</div>';
+  }
+
+  // ── Red flags banner (most prominent) ──
+  var redFlagsHtml='';
+  if(Array.isArray(a.red_flags) && a.red_flags.length){
+    var blockers=a.red_flags.filter(function(rf){return rf.severity==='blocker';});
+    var warns=a.red_flags.filter(function(rf){return rf.severity!=='blocker';});
+    redFlagsHtml='<div style="background:#fff0f0;border:2px solid #fdd;border-left:4px solid #b00;border-radius:8px;padding:12px 14px;margin-bottom:10px;">'+
+      '<div style="font-size:13px;font-weight:700;color:#b00;margin-bottom:6px;">🚩 RED FLAGS — '+a.red_flags.length+' issue'+(a.red_flags.length>1?'s':'')+' requiring attention</div>'+
+      blockers.concat(warns).map(function(rf){
+        var sevColor=rf.severity==='blocker'?'#7a0000':'#aa3300';
+        var sevLabel=rf.severity==='blocker'?'BLOCKER':'WARNING';
+        var sevBg=rf.severity==='blocker'?'#ffd5d5':'#fff0d5';
+        return '<div style="background:#fff;border:1px solid '+(rf.severity==='blocker'?'#fdd':'#fed5b3')+';border-radius:6px;padding:8px 10px;margin-bottom:6px;">'+
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">'+
+            '<span style="font-size:10px;background:'+sevBg+';color:'+sevColor+';padding:2px 7px;border-radius:8px;font-weight:700;">'+sevLabel+'</span>'+
+            '<span style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(rf.issue||'')+'</span>'+
+          '</div>'+
+          '<div style="font-size:11px;color:#444;line-height:1.5;">'+esc(rf.detail||'')+'</div>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  // ── Summary ──
+  var summaryHtml=a.summary?'<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#1a1a2e;line-height:1.5;"><strong style="color:#1a3a8a;">Summary:</strong> '+esc(a.summary)+'</div>':'';
+
+  // ── Compact dimension grid ──
+  function regBlock(label, data){
+    if(!data) return '';
+    var statusBg, statusColor, statusLabel;
+    if(data.status==='fail'){statusBg='#fff0f0';statusColor='#b00';statusLabel='✗ FAIL';}
+    else if(data.status==='warn'){statusBg='#fff8e0';statusColor='#886600';statusLabel='⚠ WARN';}
+    else {statusBg='#edfaed';statusColor='#1a7a1a';statusLabel='✓ PASS';}
+    var findings=Array.isArray(data.findings)?data.findings:[];
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(label)+'</div>'+
+        '<span style="font-size:10px;background:'+statusBg+';color:'+statusColor+';padding:2px 7px;border-radius:8px;font-weight:700;">'+statusLabel+'</span>'+
+      '</div>'+
+      (findings.length?findings.map(function(f){
+        var sColor=f.severity==='blocker'?'#b00':f.severity==='warn'?'#886600':'#666';
+        return '<div style="font-size:11px;color:#444;border-top:1px solid #f5f5f0;padding-top:5px;margin-top:5px;">'+
+          '<strong style="color:'+sColor+';">'+esc(f.ingredient_or_aspect||'')+':</strong> '+esc(f.detail||'')+
+          (f.framework?'<span style="color:#888;font-style:italic;"> ('+esc(f.framework)+')</span>':'')+
+        '</div>';
+      }).join(''):'<div style="font-size:11px;color:#888;font-style:italic;">No findings.</div>')+
+    '</div>';
+  }
+
+  function claimsBlock(c){
+    if(!c) return '';
+    var statusBg, statusColor, statusLabel;
+    if(c.status==='unsupported'){statusBg='#fff0f0';statusColor='#b00';statusLabel='✗ UNSUPPORTED';}
+    else if(c.status==='partial'){statusBg='#fff8e0';statusColor='#886600';statusLabel='⚠ PARTIAL';}
+    else if(c.status==='supported'){statusBg='#edfaed';statusColor='#1a7a1a';statusLabel='✓ SUPPORTED';}
+    else {statusBg='#f5f5f0';statusColor='#666';statusLabel='N/A';}
+    var evidence=Array.isArray(c.evidence)?c.evidence:[];
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">Claims Assessment</div>'+
+        '<span style="font-size:10px;background:'+statusBg+';color:'+statusColor+';padding:2px 7px;border-radius:8px;font-weight:700;">'+statusLabel+'</span>'+
+      '</div>'+
+      (evidence.length?evidence.map(function(e){
+        var vColor=e.verdict==='unsupported'?'#b00':e.verdict==='weak'?'#886600':'#1a7a1a';
+        return '<div style="font-size:11px;color:#444;border-top:1px solid #f5f5f0;padding-top:5px;margin-top:5px;">'+
+          '<strong style="color:'+vColor+';">'+esc(e.claim||'')+'</strong> — '+esc(e.detail||'')+
+          (Array.isArray(e.supported_by)&&e.supported_by.length?'<div style="font-size:10px;color:#888;margin-top:2px;">Evidence: '+e.supported_by.map(esc).join(', ')+'</div>':'')+
+        '</div>';
+      }).join(''):'<div style="font-size:11px;color:#888;font-style:italic;">No claims to assess.</div>')+
+    '</div>';
+  }
+
+  function listBlock(label, items, fmt){
+    if(!items || !items.length) return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;"><div style="font-size:12px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">'+esc(label)+'</div><div style="font-size:11px;color:#888;font-style:italic;">None.</div></div>';
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;">'+
+      '<div style="font-size:12px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">'+esc(label)+' ('+items.length+')</div>'+
+      items.map(fmt).join('')+
+    '</div>';
+  }
+
+  var missingHtml=listBlock('Missing Specifications', a.missing_specifications, function(m){
+    var iColor=m.importance==='critical'?'#b00':m.importance==='important'?'#886600':'#666';
+    return '<div style="font-size:11px;color:#444;border-top:1px solid #f5f5f0;padding-top:5px;margin-top:5px;">'+
+      '<strong style="color:'+iColor+';">'+esc(m.aspect||'')+'</strong> ('+esc(m.importance||'')+'): '+esc(m.detail||'')+
+    '</div>';
+  });
+
+  var suggestionsHtml=listBlock('Improvement Suggestions', a.improvement_suggestions, function(s){
+    return '<div style="border-top:1px solid #f5f5f0;padding-top:6px;margin-top:6px;">'+
+      '<div style="font-size:11px;font-weight:600;color:#1a3a8a;">'+esc(s.category||'')+'</div>'+
+      '<div style="font-size:11px;color:#444;margin-top:3px;"><strong>Current:</strong> '+esc(s.current||'')+'</div>'+
+      '<div style="font-size:11px;color:#1a7a1a;margin-top:2px;"><strong>Consider:</strong> '+esc(s.suggested||'')+'</div>'+
+      (s.rationale?'<div style="font-size:11px;color:#666;margin-top:2px;font-style:italic;">'+esc(s.rationale)+'</div>':'')+
+    '</div>';
+  });
+
+  // ── Feedback-sent status / Send button ──
+  var feedbackHtml='';
+  if(q.formulation_feedback_sent){
+    feedbackHtml='<div style="background:#edfaed;border:1px solid #a0d8a0;border-left:3px solid #1a7a1a;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
+      '<div style="font-size:12px;font-weight:700;color:#1a7a1a;margin-bottom:4px;">✓ Feedback sent to factory</div>'+
+      (q.formulation_feedback_text?'<div style="font-size:11px;color:#444;white-space:pre-wrap;background:#fff;border-radius:5px;padding:6px 8px;margin-top:5px;">'+esc(q.formulation_feedback_text)+'</div>':'')+
+      '<button onclick="openSendFeedbackModal(\''+q.id+'\')" style="margin-top:6px;padding:5px 10px;background:#fff;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Send updated feedback</button>'+
+    '</div>';
+  }else{
+    feedbackHtml='<div style="background:#fff8e0;border:1px solid #f0d860;border-left:3px solid #f0d860;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
+      '<div style="font-size:12px;font-weight:600;color:#664400;margin-bottom:4px;">📨 Curate &amp; send to factory</div>'+
+      '<div style="font-size:11px;color:#664400;margin-bottom:6px;">This analysis is for your eyes only. Pick what to share with the factory — you can edit anything before sending.</div>'+
+      '<button onclick="openSendFeedbackModal(\''+q.id+'\')" style="padding:6px 12px;background:#664400;color:#fff;border:none;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Open feedback editor →</button>'+
+    '</div>';
+  }
+
+  // ── Footer meta ──
+  var meta=a._meta||{};
+  var metaHtml='<div style="font-size:10px;color:#aaa;margin-top:8px;text-align:right;">'+
+    (meta.analyzed_at?'Analyzed '+new Date(meta.analyzed_at).toLocaleString():'')+
+    (meta.model?' · '+esc(meta.model):'')+
+    (meta.category_slug?' · '+esc(meta.category_slug):'')+
+    '<br><em style="color:#bbb;">AI-generated. Verify with a formulator before sourcing decisions.</em>'+
+  '</div>';
+
+  return '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:10px;padding:12px;">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;cursor:pointer;" onclick="toggleFormulationDetail(\''+q.id+'\')">'+
+      '<div style="font-size:13px;font-weight:700;color:#1a1a2e;">🧪 Formulation Analysis <span id="fatoggle-'+q.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
+      '<span style="font-size:10px;color:#888;font-style:italic;">Internal — admin only</span>'+
+    '</div>'+
+    redFlagsHtml +
+    summaryHtml +
+    '<div id="fabody-'+q.id+'">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">'+
+        regBlock('🇺🇸 US Regulatory', a.regulatory_us)+
+        regBlock('🇨🇦 Canada Regulatory', a.regulatory_canada)+
+      '</div>'+
+      claimsBlock(a.claims_assessment)+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">'+
+        missingHtml+
+        suggestionsHtml+
+      '</div>'+
+      feedbackHtml +
+      metaHtml +
+    '</div>'+
+  '</div>';
+}
+
+function toggleFormulationDetail(quoteId){
+  var body=g('fabody-'+quoteId);
+  var toggle=g('fatoggle-'+quoteId);
+  if(!body)return;
+  var isOpen=body.style.display!=='none';
+  body.style.display=isOpen?'none':'block';
+  if(toggle)toggle.textContent=isOpen?'▸':'▾';
+}
+
+// ── SEND FEEDBACK TO FACTORY: modal with editable text pre-filled from analysis ──
+async function openSendFeedbackModal(quoteId){
+  // Re-fetch the quote to get current analysis + factory contact info
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,factories(factory_name_english,sales_email,sales_contact_name),rfqs(item_description,project_number)',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var quotes=await r.json();
+    if(!Array.isArray(quotes)||!quotes.length){alert('Could not load quote.');return;}
+    var q=quotes[0];
+    var a=q.formulation_analysis;
+    if(!a){alert('No analysis on this quote yet. Run "Analyze Formulation" first.');return;}
+    var f=q.factories||{};
+    var rfq=q.rfqs||{};
+
+    // Pre-build a default curated message from the analysis
+    var contactName=(f.sales_contact_name||'Team').split(/\s+/)[0];
+    var draft='Hi '+contactName+',\n\n';
+    draft+='We have reviewed your quote for '+(rfq.item_description||'this product')+' and have some feedback before we move forward.\n\n';
+
+    var blockerRedFlags=Array.isArray(a.red_flags)?a.red_flags.filter(function(rf){return rf.severity==='blocker';}):[];
+    if(blockerRedFlags.length){
+      draft+='## Issues that must be resolved\n';
+      blockerRedFlags.forEach(function(rf){draft+='- '+rf.issue+'\n  '+rf.detail+'\n';});
+      draft+='\n';
+    }
+
+    if(a.missing_specifications && a.missing_specifications.length){
+      var crit=a.missing_specifications.filter(function(m){return m.importance==='critical'||m.importance==='important';});
+      if(crit.length){
+        draft+='## Information we need from you\n';
+        crit.forEach(function(m){draft+='- '+m.aspect+': '+m.detail+'\n';});
+        draft+='\n';
+      }
+    }
+
+    if(a.claims_assessment && a.claims_assessment.status==='unsupported'){
+      draft+='## Product claims\n';
+      draft+='The product claims we requested do not appear to be supported by the formulation as submitted. Please review the claims and either adjust the formula to support them, or let us know which claims should be removed.\n\n';
+    }
+
+    if(a.improvement_suggestions && a.improvement_suggestions.length){
+      draft+='## Suggested improvements (for your consideration)\n';
+      a.improvement_suggestions.slice(0,4).forEach(function(s){
+        draft+='- '+s.category+': '+s.suggested+'\n  Why: '+s.rationale+'\n';
+      });
+      draft+='\n';
+    }
+
+    draft+='Please review and let us know your thoughts. We are happy to discuss any of these items.\n\n';
+    draft+='Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+
+    // Build modal
+    var overlay=document.createElement('div');
+    overlay.id='fb-modal-overlay';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.onclick=function(e){if(e.target===overlay)closeFeedbackModal();};
+    overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;width:720px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+        '<div style="font-size:16px;font-weight:700;color:#1a1a2e;">📨 Send Feedback to '+esc(f.factory_name_english||'Factory')+'</div>'+
+        '<button onclick="closeFeedbackModal()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer;">✕</button>'+
+      '</div>'+
+      '<div style="font-size:12px;color:#666;margin-bottom:10px;">Pre-filled from your analysis. Edit freely before sending. The factory will only see what you keep here.</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:10px;font-size:12px;">'+
+        '<span style="color:#666;">To:</span><strong style="color:#1a1a2e;">'+esc(f.sales_email||'(no email)')+'</strong>'+
+        '<span style="color:#666;margin-left:auto;">Subject:</span>'+
+        '<input id="fb-subject" value="Feedback on your quote — '+esc((rfq.item_description||'').slice(0,60))+'" style="flex:1;padding:4px 8px;border:1px solid #ddd;border-radius:4px;font-family:inherit;font-size:12px;" />'+
+      '</div>'+
+      '<textarea id="fb-text" style="flex:1;min-height:340px;padding:10px;font-family:inherit;font-size:12px;line-height:1.6;border:1px solid #ddd;border-radius:6px;resize:vertical;">'+esc(draft)+'</textarea>'+
+      '<div id="fb-msg" style="margin-top:8px;font-size:12px;display:none;"></div>'+
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">'+
+        '<button onclick="closeFeedbackModal()" style="padding:8px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">Cancel</button>'+
+        '<button onclick="submitFeedbackToFactory(\''+quoteId+'\',\''+esc(f.sales_email||'')+'\',\''+esc(f.sales_contact_name||'')+'\')" id="fb-send-btn" style="padding:8px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Send to Factory</button>'+
+      '</div>'+
+    '</div>';
+    document.body.appendChild(overlay);
+  }catch(e){alert('Failed to open feedback editor: '+e.message);}
+}
+
+function closeFeedbackModal(){
+  var o=g('fb-modal-overlay');
+  if(o)o.remove();
+}
+
+async function submitFeedbackToFactory(quoteId, factoryEmail, factoryName){
+  var text=g('fb-text').value.trim();
+  var subject=g('fb-subject').value.trim();
+  var msgEl=g('fb-msg');
+  var btn=g('fb-send-btn');
+  if(!text){msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Feedback text is required.';return;}
+  if(!factoryEmail){msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Factory has no email on file. Add an email to the factory record first.';return;}
+
+  btn.disabled=true;btn.textContent='Sending...';
+  msgEl.style.display='none';
+  try{
+    // 1. Save the curated feedback text to the quote
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({
+        formulation_feedback_sent:true,
+        formulation_feedback_sent_at:new Date().toISOString(),
+        formulation_feedback_text:text
+      })
+    });
+
+    // 2. Send the email
+    var er=await fetch('/api/send-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({to:factoryEmail,toName:factoryName||'',subject:subject||'Feedback on your quote',body:text})
+    });
+    var ed=await er.json().catch(function(){return{};});
+    if(!er.ok){throw new Error(ed.error||'Email send failed ('+er.status+')');}
+
+    msgEl.style.display='block';msgEl.style.color='#1a7a1a';msgEl.textContent='✓ Feedback sent.';
+    setTimeout(function(){
+      closeFeedbackModal();
+      // Refresh the panel to show the "feedback sent" state
+      if(typeof loadRFQDetail==='function'){
+        var rfqIdEl=document.querySelector('[data-rfq-detail-id]');
+        if(rfqIdEl){loadRFQDetail(rfqIdEl.getAttribute('data-rfq-detail-id'));}
+      }
+    },1200);
+  }catch(e){
+    msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Error: '+(e.message||e);
+    btn.disabled=false;btn.textContent='Send to Factory';
+  }
+}
+
 async function batchScoreAllQuotes(rfqId){
   // Find non-draft quotes for this RFQ that haven't been blocked by compliance
   var btn=g('batch-score-btn-'+rfqId);
@@ -3779,6 +4112,20 @@ function renderQuoteCard(q,rfq,idx,versions,peerStats){
     '</span>'
   ) : '';
 
+  // ── Formulation analysis red-flag badge ──
+  var faRedFlagBadge='';
+  if(q.formulation_analysis && Array.isArray(q.formulation_analysis.red_flags) && q.formulation_analysis.red_flags.length){
+    var rfCount=q.formulation_analysis.red_flags.length;
+    var hasBlocker=q.formulation_analysis.red_flags.some(function(rf){return rf.severity==='blocker';});
+    var rfBg=hasBlocker?'#fff0f0':'#fff8e0';
+    var rfColor=hasBlocker?'#b00':'#886600';
+    var rfBorder=hasBlocker?'#fdd':'#f0d860';
+    var rfPrefix=hasBlocker?'🚩':'⚠';
+    faRedFlagBadge='<span style="font-size:10px;background:'+rfBg+';color:'+rfColor+';border:1px solid '+rfBorder+';padding:2px 7px;border-radius:10px;font-weight:600;">'+rfPrefix+' '+rfCount+' red flag'+(rfCount>1?'s':'')+'</span>';
+  } else if(q.formulation_analysis){
+    faRedFlagBadge='<span style="font-size:10px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:2px 7px;border-radius:10px;font-weight:600;">🧪 Analyzed</span>';
+  }
+
   return '<div class="quote-card" id="qcard-'+q.id+'">'+
     '<div class="quote-card-header" data-qid="'+q.id+'" onclick="toggleQuoteCard(this.dataset.qid)">'+
       '<div style="flex:1;">'+
@@ -3786,6 +4133,7 @@ function renderQuoteCard(q,rfq,idx,versions,peerStats){
           '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+(f.factory_name_english||'—')+' — Option '+q.quote_option+'</div>'+
           scoreBadge+
           peerBadge+
+          faRedFlagBadge+
           (isUpdated?'<span style="font-size:10px;background:#fff0c0;color:#886600;border:1px solid #e0c040;padding:2px 7px;border-radius:10px;font-weight:600;">🔄 Updated '+updatedDate+'</span>':'')+
           missingBadge+
         '</div>'+
@@ -3848,9 +4196,13 @@ function renderQuoteCard(q,rfq,idx,versions,peerStats){
       // Formulation Scorecard panel (collapsed by default; only shown if a score exists)
       (sc?'<div id="scpanel-'+q.id+'" style="margin-bottom:12px;">'+renderScorecardPanel(q,sc)+'</div>':'')+
 
+      // Formulation Analysis panel (admin-only view; only shown when analysis has been run)
+      (q.formulation_analysis?'<div id="fapanel-'+q.id+'" style="margin-bottom:12px;">'+renderFormulationAnalysisPanel(q)+'</div>':'<div id="fapanel-'+q.id+'"></div>')+
+
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button data-qid="'+q.id+'" onclick="scoreQuoteWithAI(this.dataset.qid)" style="padding:8px 16px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">'+(hasScore?'✦ Re-score with AI':'✦ Score with AI')+'</button>'+
+        '<button data-qid="'+q.id+'" onclick="analyzeFormulationOnQuote(this.dataset.qid)" style="padding:8px 16px;background:#f0f6ff;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">🧪 '+(q.formulation_analysis?'Re-analyze':'Analyze')+' Formulation</button>'+
         (v2Blocked
           ? '<button disabled title="Cannot accept — compliance gate blocked. Fix compliance issues first." style="padding:8px 16px;background:#f0f0e8;color:#888;border:1px solid #ddd;border-radius:7px;font-size:12px;font-weight:600;cursor:not-allowed;">⛔ Blocked — Cannot Accept</button>'
           : '<button data-qid="'+q.id+'" data-rid="'+rfq.id+'" data-fid="'+f.factory_name_english+'" onclick="acceptQuote(this.dataset.qid,this.dataset.rid,this.dataset.fid)" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">✓ Accept Quote</button>'
