@@ -187,10 +187,10 @@ async function scoreFactoryTrack(factory) {
   let score = 0;
   const components = [];
   const past = await sb(
-    `rfq_quotes?factory_id=eq.${factory.id}&select=id,won,submitted_at,assigned_at&order=submitted_at.desc&limit=50`
+    `rfq_quotes?factory_id=eq.${factory.id}&select=id,status,submitted_at,assigned_at&order=submitted_at.desc&limit=50`
   );
   const pastQuotes = past || [];
-  const wonCount = pastQuotes.filter(q => q.won).length;
+  const wonCount = pastQuotes.filter(q => q.status === 'accepted').length;
   const totalQuotes = pastQuotes.length;
   const winRate = totalQuotes > 0 ? wonCount / totalQuotes : null;
   if (totalQuotes >= 3) {
