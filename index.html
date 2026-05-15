@@ -768,9 +768,12 @@ async function enterPortal(){
 }
 
 function ptab(t){
-  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',['details','rfqs','catalogs','overview','quotes','compliance','skus'][i]===t);});
+  // Tab keys IN ORDER matching the HTML — must stay in sync with the .ptab buttons above
+  var TAB_KEYS = ['details','rfqs','samples','orders','catalogs','overview','quotes','compliance','skus'];
+  document.querySelectorAll('.ptab').forEach(function(el,i){el.classList.toggle('on',TAB_KEYS[i]===t);});
   document.querySelectorAll('.ppane').forEach(function(el){el.classList.remove('on');});
-  g('ppane-'+t).classList.add('on');
+  var pane = g('ppane-'+t);
+  if(pane) pane.classList.add('on');
 }
 
 // ════════════════════════════════════════
@@ -1208,27 +1211,17 @@ async function updateComplianceBanner(docs){
       badge.style.display='none';
     }
   }catch(apiErr){
-    // Fallback: legacy expiry-only check using already-loaded docs
-    console.log('compliance API call failed, falling back to legacy banner:', apiErr);
-    var critical=(docs||[]).filter(function(d){
-      var days=daysUntil(d.expiry_date);
-      return days!==null&&days<30;
-    });
-    if(critical.length){
-      var legLines=critical.map(function(d){
-        var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
-        var days=daysUntil(d.expiry_date);
-        var phrase=(days<0)?('expired '+Math.abs(days)+' days ago'):('expires in '+days+' days');
-        return '<div style="margin-top:4px;">• <strong>'+esc(typeLabel)+'</strong> — '+phrase+'</div>';
-      }).join('');
-      banner.innerHTML='<strong>⚠ Non-compliance warning:</strong> You have '+critical.length+' document'+(critical.length>1?'s':'')+' at or near expiry.'+legLines;
-      banner.style.display='block';
-      badge.textContent=critical.length;
-      badge.style.display='inline-block';
-    }else{
-      banner.style.display='none';
-      badge.style.display='none';
-    }
+    // API call failed — surface this so we know something's broken instead of silently hiding the banner
+    console.log('compliance API call failed:', apiErr);
+    banner.style.background='#fff8e0';
+    banner.style.color='#886600';
+    banner.style.border='1px solid #f0d860';
+    banner.style.padding='12px 14px';
+    banner.style.borderRadius='8px';
+    banner.style.fontSize='13px';
+    banner.innerHTML='<strong>⚠ Compliance status check unavailable</strong><div style="margin-top:4px;font-size:11px;color:#666;">'+esc(String(apiErr.message||apiErr))+'</div>';
+    banner.style.display='block';
+    badge.style.display='none';
   }
 }
 
