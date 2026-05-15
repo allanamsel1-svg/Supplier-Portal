@@ -98,7 +98,31 @@ async function runDailyCheck() {
     }
   }
 
-  return { ok: true, checked, sent, skipped, failed, errors };
+  // ── Reconcile factory.certifications array against current valid docs ──
+  // Removes any cert from factories.certifications that no longer has a
+  // current, non-expired document. This is the "auto-uncheck on expiry" logic.
+  let reconcileResult = null;
+  try {
+    const rpcRes = await fetch(SB + '/rest/v1/rpc/reconcile_factory_certifications', {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY,
+        Authorization: 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: '{}'
+    });
+    if (rpcRes.ok) {
+      reconcileResult = await rpcRes.json();
+    } else {
+      reconcileResult = { error: 'rpc HTTP ' + rpcRes.status };
+    }
+  } catch (rcErr) {
+    console.log('reconcile_factory_certifications failed (non-fatal):', rcErr.message);
+    reconcileResult = { error: rcErr.message };
+  }
+
+  return { ok: true, checked, sent, skipped, failed, errors, reconcile: reconcileResult };
 }
 
 // ── Manual single-doc reminder (admin clicks "Remind" on a row) ──
