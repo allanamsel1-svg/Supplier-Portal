@@ -58,7 +58,15 @@ async function sb(path, opts = {}) {
     const txt = await res.text();
     throw new Error(`Supabase ${res.status}: ${txt}`);
   }
-  return res.status === 204 ? null : await res.json();
+  // 204 No Content has no body; 201 with Prefer:return=minimal also has empty body.
+  // Read as text first and only JSON.parse if there's actual content — avoids "Unexpected end of JSON input".
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!text || !text.trim()) return null;
+  try { return JSON.parse(text); }
+  catch (parseErr) {
+    throw new Error(`Supabase returned non-JSON body: ${text.slice(0, 200)}`);
+  }
 }
 
 // ── Helpers ──
@@ -438,25 +446,41 @@ async function handler(req, res) {
   const factory_id = body.factory_id;
   if (!factory_id) return res.status(400).json({ error: 'Missing factory_id.' });
 
+  // Validate UUID shape so a bad input doesn't propagate into many queries
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(factory_id)) {
+    return res.status(400).json({ error: 'factory_id is not a valid UUID: ' + factory_id });
+  }
+
+  // Run each scoring function with per-dimension error attribution
+  // so failures are localized rather than vague.
+  const dimensions = {};
+  const dimensionErrors = {};
+  async function safeRun(name, fn) {
+    try { dimensions[name] = await fn(factory_id); }
+    catch (e) {
+      dimensionErrors[name] = e.message || String(e);
+      dimensions[name] = { score: null, dataPoints: 0, breakdown: { error: dimensionErrors[name] } };
+    }
+  }
+
   try {
-    // Run all 6 dimensions in parallel
-    const [resp, qq, samp, prod, comp, comm] = await Promise.all([
-      scoreResponsiveness(factory_id),
-      scoreQuoteQuality(factory_id),
-      scoreSamplePerformance(factory_id),
-      scoreProductionReliability(factory_id),
-      scoreComplianceHygiene(factory_id),
-      scoreCommunicationTone(factory_id)
+    await Promise.all([
+      safeRun('responsiveness',         scoreResponsiveness),
+      safeRun('quote_quality',          scoreQuoteQuality),
+      safeRun('sample_performance',     scoreSamplePerformance),
+      safeRun('production_reliability', scoreProductionReliability),
+      safeRun('compliance_hygiene',     scoreComplianceHygiene),
+      safeRun('communication_tone',     scoreCommunicationTone)
     ]);
 
-    const dimensions = {
-      responsiveness: resp,
-      quote_quality: qq,
-      sample_performance: samp,
-      production_reliability: prod,
-      compliance_hygiene: comp,
-      communication_tone: comm
-    };
+    // If EVERY dimension threw, propagate the first one so the user sees an actionable error
+    const errKeys = Object.keys(dimensionErrors);
+    if (errKeys.length === 6) {
+      return res.status(500).json({
+        error: 'All dimensions failed. First error from ' + errKeys[0] + ': ' + dimensionErrors[errKeys[0]],
+        dimension_errors: dimensionErrors
+      });
+    }
 
     const { composite, tier, weights_used } = buildComposite(dimensions);
 
@@ -469,42 +493,64 @@ async function handler(req, res) {
         }])
       ),
       weights_used,
-      weights_version: WEIGHTS_VERSION
+      weights_version: WEIGHTS_VERSION,
+      dimension_errors: errKeys.length ? dimensionErrors : undefined
     };
 
     const nowIso = new Date().toISOString();
     const todayDate = nowIso.slice(0, 10);
 
-    // Upsert into factory_performance_scores
-    await sb(`factory_performance_scores?factory_id=eq.${factory_id}`, {
-      method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({
-        factory_id,
-        composite_score: composite,
-        tier,
-        responsiveness_score:             resp.score,
-        quote_quality_score:              qq.score,
-        sample_performance_score:         samp.score,
-        production_reliability_score:     prod.score,
-        compliance_hygiene_score:         comp.score,
-        communication_tone_score:         comm.score,
-        responsiveness_data_points:       resp.dataPoints,
-        quote_quality_data_points:        qq.dataPoints,
-        sample_performance_data_points:   samp.dataPoints,
-        production_reliability_data_points: prod.dataPoints,
-        compliance_hygiene_data_points:   comp.dataPoints,
-        communication_tone_data_points:   comm.dataPoints,
-        score_breakdown:                  breakdown,
-        computed_at:                      nowIso,
-        weights_version:                  WEIGHTS_VERSION,
-        updated_at:                       nowIso
-      })
-    });
+    const upsertPayload = {
+      factory_id,
+      composite_score: composite,
+      tier,
+      responsiveness_score:             dimensions.responsiveness.score,
+      quote_quality_score:              dimensions.quote_quality.score,
+      sample_performance_score:         dimensions.sample_performance.score,
+      production_reliability_score:     dimensions.production_reliability.score,
+      compliance_hygiene_score:         dimensions.compliance_hygiene.score,
+      communication_tone_score:         dimensions.communication_tone.score,
+      responsiveness_data_points:       dimensions.responsiveness.dataPoints,
+      quote_quality_data_points:        dimensions.quote_quality.dataPoints,
+      sample_performance_data_points:   dimensions.sample_performance.dataPoints,
+      production_reliability_data_points: dimensions.production_reliability.dataPoints,
+      compliance_hygiene_data_points:   dimensions.compliance_hygiene.dataPoints,
+      communication_tone_data_points:   dimensions.communication_tone.dataPoints,
+      score_breakdown:                  breakdown,
+      computed_at:                      nowIso,
+      weights_version:                  WEIGHTS_VERSION,
+      updated_at:                       nowIso
+    };
 
-    // Append daily snapshot to history (unique by factory_id + snapshot_date — silently skip if already today)
+    // Upsert to factory_performance_scores using the proper PostgREST pattern:
+    // on_conflict=factory_id tells PostgREST to use factory_id as the conflict target.
     try {
-      await sb('factory_score_history', {
+      await sb('factory_performance_scores?on_conflict=factory_id', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify(upsertPayload)
+      });
+    } catch (upsertErr) {
+      // Fallback: if upsert fails for any reason, try delete-then-insert
+      console.error('Upsert failed, falling back to delete+insert:', upsertErr.message);
+      try {
+        await sb('factory_performance_scores?factory_id=eq.' + factory_id, { method: 'DELETE' });
+        await sb('factory_performance_scores', {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify(upsertPayload)
+        });
+      } catch (fallbackErr) {
+        return res.status(500).json({
+          error: 'Failed to persist score: ' + fallbackErr.message,
+          original_upsert_error: upsertErr.message
+        });
+      }
+    }
+
+    // Append daily snapshot to history. Uses ignore-duplicates so re-running same day is a no-op.
+    try {
+      await sb('factory_score_history?on_conflict=factory_id,snapshot_date', {
         method: 'POST',
         headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
         body: JSON.stringify({
@@ -512,12 +558,12 @@ async function handler(req, res) {
           snapshot_date: todayDate,
           composite_score: composite,
           tier,
-          responsiveness_score:             resp.score,
-          quote_quality_score:              qq.score,
-          sample_performance_score:         samp.score,
-          production_reliability_score:     prod.score,
-          compliance_hygiene_score:         comp.score,
-          communication_tone_score:         comm.score
+          responsiveness_score:             dimensions.responsiveness.score,
+          quote_quality_score:              dimensions.quote_quality.score,
+          sample_performance_score:         dimensions.sample_performance.score,
+          production_reliability_score:     dimensions.production_reliability.score,
+          compliance_hygiene_score:         dimensions.compliance_hygiene.score,
+          communication_tone_score:         dimensions.communication_tone.score
         })
       });
     } catch (histErr) {
@@ -533,12 +579,17 @@ async function handler(req, res) {
           Object.entries(dimensions).map(([k, v]) => [k, v.score])
         ),
         weights_used,
-        breakdown
+        breakdown,
+        dimension_errors: errKeys.length ? dimensionErrors : undefined
       }
     });
   } catch (err) {
-    console.error('compute-factory-performance error:', err);
-    return res.status(500).json({ error: String(err.message || err) });
+    console.error('compute-factory-performance fatal error:', err);
+    return res.status(500).json({
+      error: String(err.message || err),
+      stack_first_line: (err.stack || '').split('\n')[1] || null,
+      dimension_errors: dimensionErrors
+    });
   }
 }
 
