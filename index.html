@@ -295,7 +295,7 @@
   <div class="portal-tabs">
     <button class="ptab on" onclick="ptab('details')">Factory Details</button>
     <button class="ptab" onclick="ptab('rfqs');loadRFQs();">RFQs <span id="rfq-badge" style="font-size:10px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;"></span></button>
-    <button class="ptab" onclick="ptab('samples');loadSamples();">Samples <span id="samples-badge" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('samples');loadSamples();">Product Development <span id="samples-badge" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
     <button class="ptab" onclick="ptab('orders');loadOrders();">Orders <span id="orders-badge" style="font-size:10px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
     <button class="ptab" onclick="ptab('catalogs')">Catalog</button>
     <button class="ptab" onclick="ptab('overview')">Company Deck</button>
@@ -395,8 +395,8 @@
     <div id="samples-list"></div>
     <div class="rfq-empty" id="samples-empty" style="display:none;">
       <div class="rfq-empty-icon">🧪</div>
-      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No sample activity</div>
-      <div style="font-size:13px;">After your quote is accepted, you'll be asked to submit samples here. Each version you ship is tracked in this tab.</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No products in development</div>
+      <div style="font-size:13px;">After a quote you submit is accepted, the project will appear here. You'll confirm carton dimensions, upload product images, ship samples, and track approval — all from this tab.</div>
     </div>
   </div>
 
@@ -1947,6 +1947,11 @@ async function loadSamples(){
     // Render
     var html=pdItems.map(function(pd){return renderPDCard(pd,subsByPd[pd.id]||[],destinations);}).join('');
     g('samples-list').innerHTML=html;
+    // Async-load assets list + outstanding actions per PD card
+    pdItems.forEach(function(pd){
+      loadPdAssetsList(pd.id);
+      loadPdOutstandingActions(pd.id);
+    });
     // Update badge
     var attentionCount=pdItems.filter(function(p){return p.status==='awaiting_initial_sample'||p.status==='in_revision';}).length;
     var badge=g('samples-badge');
@@ -2032,7 +2037,75 @@ function renderPDCard(pd,subs,destinations){
   } else if(pd.status==='awaiting_approval'){
     shipFormHtml='<div style="margin-top:14px;padding:12px 14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;font-size:12px;color:#1a3a8a;">Sample Version '+(latest?latest.version_number:'?')+' is with the buyer for evaluation. You\'ll be notified once a decision is made.</div>';
   }
-  return '<div class="rfq-card">'+
+
+  // ── Outstanding Actions placeholder (filled async by loadPdOutstandingActions) ──
+  var actionsHtml='<div id="pd-actions-'+pd.id+'" style="margin-top:14px;"><div style="font-size:11px;color:#bbb;padding:10px;">Checking outstanding items...</div></div>';
+
+  // ── Carton Dimensions form ──
+  function valOrEmpty(v) { return (v == null || v === '') ? '' : v; }
+  var cartonsConfirmed = !!pd.cartons_confirmed_at;
+  var cartonBg = cartonsConfirmed ? '#edfaed' : '#fff8e0';
+  var cartonBorder = cartonsConfirmed ? '#c0e0c0' : '#f0d860';
+  var cartonTitleColor = cartonsConfirmed ? '#1a7a1a' : '#664400';
+  var cartonTitle = cartonsConfirmed
+    ? '✓ Carton Dimensions Confirmed'
+    : '📦 Carton Dimensions — Action Required';
+  var cartonSubtitle = cartonsConfirmed
+    ? 'Confirmed on ' + esc((pd.cartons_confirmed_at || '').slice(0, 10)) + '. Click any field to update if needed.'
+    : 'Confirm your actual packaging dimensions. Master case dimensions are required before a PO can be issued.';
+
+  var cartonsHtml =
+    '<div style="margin-top:14px;padding:14px;background:'+cartonBg+';border:1px solid '+cartonBorder+';border-radius:10px;">'+
+      '<div style="font-size:13px;font-weight:600;color:'+cartonTitleColor+';margin-bottom:4px;">'+cartonTitle+'</div>'+
+      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">'+esc(cartonSubtitle)+'</div>'+
+
+      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">Inner Case Pack <span style="color:#888;font-weight:400;text-transform:none;">(recommended)</span></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;">'+
+        '<div class="qf"><label>Units per inner</label><input type="number" id="pdcart-inner-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.inner_case_pack_units)+'" /></div>'+
+        '<div class="qf"><label>Length (cm)</label><input type="number" id="pdcart-inner-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_length_cm)+'" /></div>'+
+        '<div class="qf"><label>Width (cm)</label><input type="number" id="pdcart-inner-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_width_cm)+'" /></div>'+
+        '<div class="qf"><label>Height (cm)</label><input type="number" id="pdcart-inner-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_height_cm)+'" /></div>'+
+        '<div class="qf"><label>Weight (kg)</label><input type="number" id="pdcart-inner-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.inner_weight_kg)+'" /></div>'+
+      '</div>'+
+
+      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">Master Case Pack <span style="color:#b00;font-weight:400;text-transform:none;">(required for PO)</span></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;">'+
+        '<div class="qf"><label>Units per master</label><input type="number" id="pdcart-master-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.master_case_pack_units)+'" /></div>'+
+        '<div class="qf"><label>Length (cm)</label><input type="number" id="pdcart-master-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_length_cm)+'" /></div>'+
+        '<div class="qf"><label>Width (cm)</label><input type="number" id="pdcart-master-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_width_cm)+'" /></div>'+
+        '<div class="qf"><label>Height (cm)</label><input type="number" id="pdcart-master-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_height_cm)+'" /></div>'+
+        '<div class="qf"><label>Weight (kg)</label><input type="number" id="pdcart-master-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.master_weight_kg)+'" /></div>'+
+      '</div>'+
+
+      '<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">'+
+        '<div class="qf"><label>Master cases per pallet <span style="color:#888;font-weight:400;">(optional)</span></label><input type="number" id="pdcart-pallet-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.pallet_masters_per_pallet)+'" /></div>'+
+        '<button onclick="savePdCartons(\''+pd.id+'\')" id="pdcart-save-'+pd.id+'" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Save Dimensions</button>'+
+      '</div>'+
+      '<div id="pdcart-msg-'+pd.id+'" style="font-size:11px;margin-top:8px;"></div>'+
+    '</div>';
+
+  // ── Product Assets section ──
+  var assetsHtml =
+    '<div style="margin-top:14px;padding:14px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;">'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">📸 Product Assets</div>'+
+      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">Upload images of the production product and any technical drawings or dielines. Helps us with downstream catalog and quality reference.</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">'+
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">Product Images <span style="color:#888;font-weight:400;font-size:10px;">(multiple)</span></div>'+
+          '<input type="file" id="pd-img-input-'+pd.id+'" accept="image/*" multiple style="font-size:11px;width:100%;" />'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Product Image\', \'pd-img-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">Technical Drawing / Dieline <span style="color:#888;font-weight:400;font-size:10px;">(PDF or image)</span></div>'+
+          '<input type="file" id="pd-drw-input-'+pd.id+'" accept="application/pdf,image/*" style="font-size:11px;width:100%;" />'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Technical Drawing\', \'pd-drw-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+      '</div>'+
+      '<div id="pd-assets-list-'+pd.id+'" style="margin-top:8px;font-size:12px;color:#888;">Loading uploaded assets...</div>'+
+      '<div id="pd-asset-msg-'+pd.id+'" style="font-size:11px;margin-top:6px;"></div>'+
+    '</div>';
+
+  return '<div class="rfq-card" id="pd-card-'+pd.id+'">'+
     '<div class="rfq-card-header" style="background:'+s.bg+';border-left:3px solid '+s.border+';">'+
       '<div style="flex:1;">'+
         '<div class="rfq-card-title">'+esc(rfq.item_description||'(no description)')+'</div>'+
@@ -2041,11 +2114,272 @@ function renderPDCard(pd,subs,destinations){
       '<span class="rfq-card-badge" style="background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';">'+esc(s.label)+'</span>'+
     '</div>'+
     '<div class="rfq-card-body open" style="display:block;">'+
+      actionsHtml+
       feedbackHtml+
+      cartonsHtml+
+      assetsHtml+
       historyHtml+
       shipFormHtml+
     '</div>'+
   '</div>';
+}
+
+// ── PD: save carton dimensions ──
+async function savePdCartons(pdId) {
+  var btn = g('pdcart-save-'+pdId);
+  var msg = g('pdcart-msg-'+pdId);
+  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  if(msg){msg.style.color='#666';msg.textContent='';}
+
+  function numOrNull(id) {
+    var el = g(id);
+    if(!el) return null;
+    var v = el.value;
+    if (v === '' || v == null) return null;
+    var n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  }
+  function intOrNull(id) {
+    var el = g(id);
+    if(!el) return null;
+    var v = el.value;
+    if (v === '' || v == null) return null;
+    var n = parseInt(v, 10);
+    return isNaN(n) ? null : n;
+  }
+
+  var payload = {
+    inner_case_pack_units:   intOrNull('pdcart-inner-units-'+pdId),
+    inner_length_cm:         numOrNull('pdcart-inner-l-'+pdId),
+    inner_width_cm:          numOrNull('pdcart-inner-w-'+pdId),
+    inner_height_cm:         numOrNull('pdcart-inner-h-'+pdId),
+    inner_weight_kg:         numOrNull('pdcart-inner-wgt-'+pdId),
+    master_case_pack_units:  intOrNull('pdcart-master-units-'+pdId),
+    master_length_cm:        numOrNull('pdcart-master-l-'+pdId),
+    master_width_cm:         numOrNull('pdcart-master-w-'+pdId),
+    master_height_cm:        numOrNull('pdcart-master-h-'+pdId),
+    master_weight_kg:        numOrNull('pdcart-master-wgt-'+pdId),
+    pallet_masters_per_pallet: intOrNull('pdcart-pallet-'+pdId)
+  };
+  // Mark confirmed if all 5 master fields are filled
+  var masterComplete = payload.master_case_pack_units != null &&
+                       payload.master_length_cm != null &&
+                       payload.master_width_cm != null &&
+                       payload.master_height_cm != null &&
+                       payload.master_weight_kg != null;
+  if (masterComplete) {
+    payload.cartons_confirmed_at = new Date().toISOString();
+  }
+
+  try {
+    var r = await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    if(!r.ok){
+      var err = await r.json().catch(function(){return{};});
+      throw new Error(err.message || err.details || ('HTTP '+r.status));
+    }
+    if(btn){btn.disabled=false;btn.textContent='Save Dimensions';}
+    if(msg){
+      msg.style.color = masterComplete ? '#1a7a1a' : '#886600';
+      msg.textContent = masterComplete
+        ? '✓ Dimensions saved. Master case info is complete — PO can proceed once other requirements are met.'
+        : '✓ Saved. Master case info is incomplete — fill in all 5 master fields to satisfy the PO requirement.';
+    }
+    // Refresh actions list for this card
+    loadPdOutstandingActions(pdId);
+  } catch(e) {
+    if(btn){btn.disabled=false;btn.textContent='Save Dimensions';}
+    if(msg){msg.style.color='#b00';msg.textContent='Save failed: '+(e.message||e);}
+  }
+}
+
+// ── PD: upload product assets (images or technical drawings) ──
+async function uploadPdAssets(pdId, docType, inputId) {
+  var input = g(inputId);
+  var msg = g('pd-asset-msg-'+pdId);
+  if(!input || !input.files || !input.files.length){
+    if(msg){msg.style.color='#b00';msg.textContent='Please choose a file first.';}
+    return;
+  }
+  // Find the PD's factory_id from the card metadata (we don't have access to the JS-side pd object after render)
+  // Strategy: look it up from the URL/Supabase
+  if(msg){msg.style.color='#666';msg.textContent='Uploading...';}
+
+  var files = Array.from(input.files);
+  var successCount = 0, failCount = 0;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    if (file.size > 25 * 1024 * 1024) {
+      failCount++;
+      continue;
+    }
+    var ts = Date.now() + '_' + i;
+    var safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var storagePath = FACTORY_ID+'/pd-assets/'+pdId+'/'+ts+'_'+safeName;
+
+    try {
+      // Storage upload
+      var contentType = file.type || (docType === 'Technical Drawing' ? 'application/pdf' : 'image/jpeg');
+      var sr = await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath, {
+        method:'POST',
+        headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':contentType,'x-upsert':'true'},
+        body: file
+      });
+      if(!sr.ok){ failCount++; continue; }
+
+      // product_documents row
+      var dr = await fetch(SB+'/rest/v1/product_documents', {
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({
+          product_development_id: pdId,
+          factory_id: FACTORY_ID,
+          document_type: docType,
+          file_name: file.name,
+          file_path: storagePath,
+          file_size: file.size,
+          uploaded_by: 'factory',
+          is_current: true,
+          version: 1
+        })
+      });
+      if(!dr.ok){ failCount++; continue; }
+      successCount++;
+    } catch(e) {
+      failCount++;
+    }
+  }
+  input.value = '';
+  if(msg){
+    if(successCount > 0 && failCount === 0){
+      msg.style.color='#1a7a1a';
+      msg.textContent = '✓ Uploaded '+successCount+' file'+(successCount>1?'s':'')+'.';
+    } else if(successCount > 0){
+      msg.style.color='#886600';
+      msg.textContent = '⚠ Uploaded '+successCount+', '+failCount+' failed.';
+    } else {
+      msg.style.color='#b00';
+      msg.textContent = 'All uploads failed. Files must be <25 MB.';
+    }
+  }
+  // Refresh asset list + outstanding actions
+  loadPdAssetsList(pdId);
+  loadPdOutstandingActions(pdId);
+}
+
+// ── PD: load and render the asset list for a PD card ──
+async function loadPdAssetsList(pdId) {
+  var listEl = g('pd-assets-list-'+pdId);
+  if(!listEl) return;
+  try {
+    var r = await fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdId+'&is_current=eq.true&select=id,document_type,file_name,uploaded_at&order=uploaded_at.desc', {
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var docs = await r.json();
+    if(!Array.isArray(docs) || !docs.length){
+      listEl.innerHTML = '<div style="font-size:11px;color:#bbb;font-style:italic;">No assets uploaded yet.</div>';
+      return;
+    }
+    var byType = {};
+    docs.forEach(function(d){
+      var key = d.document_type || 'Other';
+      if(!byType[key]) byType[key] = [];
+      byType[key].push(d);
+    });
+    listEl.innerHTML = Object.keys(byType).map(function(t){
+      return '<div style="margin-top:8px;">'+
+        '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">'+esc(t)+' ('+byType[t].length+')</div>'+
+        byType[t].map(function(d){
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:5px;margin-bottom:4px;font-size:11px;">'+
+            '<span style="color:#1a1a2e;">📎 '+esc(d.file_name||'(no name)')+'</span>'+
+            '<span style="color:#888;">'+esc((d.uploaded_at||'').slice(0,10))+'</span>'+
+          '</div>';
+        }).join('')+
+      '</div>';
+    }).join('');
+  } catch(e) {
+    listEl.innerHTML = '<div style="font-size:11px;color:#b00;">Could not load assets: '+esc(e.message||e)+'</div>';
+  }
+}
+
+// ── PD: load outstanding actions (compliance + cartons + assets) ──
+async function loadPdOutstandingActions(pdId) {
+  var el = g('pd-actions-'+pdId);
+  if(!el) return;
+  try {
+    // Find the PD record to get its rfq + quote IDs
+    var pdR = await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId+'&select=accepted_quote_id,rfq_id&limit=1', {
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var pdRows = await pdR.json();
+    if(!Array.isArray(pdRows) || !pdRows.length) {
+      el.innerHTML = '';
+      return;
+    }
+    var pd = pdRows[0];
+
+    var r = await fetch('/api/check-compliance-status', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        factory_id: FACTORY_ID,
+        rfq_id: pd.rfq_id,
+        quote_id: pd.accepted_quote_id
+      })
+    });
+    if(!r.ok) {
+      el.innerHTML = '<div style="font-size:11px;color:#886600;padding:8px;">Compliance check unavailable (HTTP '+r.status+')</div>';
+      return;
+    }
+    var data = await r.json();
+    if(!data || !data.success){
+      el.innerHTML = '';
+      return;
+    }
+
+    // Aggregate red flags + warnings across all layers
+    var allRed = [], allWarn = [];
+    var layers = data.status.layers || {};
+    function pushFrom(layer, label) {
+      if(!layer) return;
+      (layer.red_flags||[]).forEach(function(f){ allRed.push({label:label, flag:f}); });
+      (layer.warnings ||[]).forEach(function(w){ allWarn.push({label:label, flag:w}); });
+    }
+    pushFrom(layers.layer_1_factory, 'Factory');
+    pushFrom(layers.layer_2_rfq,     'RFQ');
+    pushFrom(layers.layer_3_product, 'Product');
+
+    if(!allRed.length && !allWarn.length){
+      el.innerHTML = '<div style="padding:10px 12px;background:#edfaed;border:1px solid #c0e0c0;color:#1a7a1a;border-radius:8px;font-size:12px;font-weight:500;">✓ Ready for PO. No outstanding compliance items.</div>';
+      return;
+    }
+
+    var bg = allRed.length ? '#fff0f0' : '#fff8e0';
+    var border = allRed.length ? '#fdd' : '#f0d860';
+    var titleColor = allRed.length ? '#b00' : '#886600';
+    var title = allRed.length
+      ? '⛔ '+allRed.length+' item'+(allRed.length===1?'':'s')+' must be addressed before PO can issue'
+      : '⚠ '+allWarn.length+' recommended item'+(allWarn.length===1?'':'s');
+
+    function renderItem(group, color) {
+      return '<div style="padding:6px 10px;border-left:3px solid '+color+';background:'+color+'10;border-radius:4px;margin:5px 0;">'+
+        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">'+esc(group.label)+'</div>'+
+        '<div style="font-size:12px;color:'+color+';font-weight:500;">'+esc(group.flag.label)+'</div>'+
+        (group.flag.detail?'<div style="font-size:11px;color:#666;margin-top:2px;line-height:1.3;">'+esc(group.flag.detail)+'</div>':'')+
+      '</div>';
+    }
+    el.innerHTML =
+      '<div style="padding:12px 14px;background:'+bg+';border:1px solid '+border+';border-radius:8px;">'+
+        '<div style="font-size:13px;font-weight:700;color:'+titleColor+';margin-bottom:8px;">'+title+'</div>'+
+        allRed.map(function(g){return renderItem(g,'#b00');}).join('')+
+        allWarn.map(function(g){return renderItem(g,'#886600');}).join('')+
+      '</div>';
+  } catch(e) {
+    el.innerHTML = '<div style="font-size:11px;color:#b00;padding:8px;">Action check error: '+esc(e.message||e)+'</div>';
+  }
 }
 
 function toggleShipDestAddress(pdId){
