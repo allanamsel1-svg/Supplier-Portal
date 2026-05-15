@@ -1031,24 +1031,98 @@
 
         <!-- Packaging -->
         <div class="mgr-card" id="pkg-type-card" style="margin-bottom:1rem;">
-          <div class="mgr-card-title">Packaging Type</div>
-          <div class="checkbox-grid">
-            <label class="cb-item"><input type="checkbox" value="Bulk"> Bulk</label>
-            <label class="cb-item"><input type="checkbox" value="Paper Box"> Paper Box</label>
-            <label class="cb-item"><input type="checkbox" value="Glass Jar"> Glass Jar</label>
-            <label class="cb-item"><input type="checkbox" value="Plastic Bottle"> Plastic Bottle</label>
-            <label class="cb-item"><input type="checkbox" value="Bag"> Bag</label>
-            <label class="cb-item"><input type="checkbox" value="Pillow Pack"> Pillow Pack</label>
-            <label class="cb-item"><input type="checkbox" value="Hang Tag"> Hang Tag</label>
-            <label class="cb-item"><input type="checkbox" value="Tube"> Tube</label>
-            <label class="cb-item"><input type="checkbox" value="Pump Bottle"> Pump Bottle</label>
-            <label class="cb-item"><input type="checkbox" value="Spray Bottle"> Spray Bottle</label>
-            <label class="cb-item"><input type="checkbox" value="Aerosol Can"> Aerosol Can</label>
-            <label class="cb-item"><input type="checkbox" value="Blister Pack"> Blister Pack</label>
-            <label class="cb-item"><input type="checkbox" value="Other"> Other</label>
+          <div class="mgr-card-title">Packaging <span style="font-size:11px;font-weight:400;color:#888;">— structured selection across primary container, closure/applicator, and secondary display</span></div>
+
+          <!-- Legacy data banner (only shown when editing an old RFQ with no structured packaging) -->
+          <div id="pkg-legacy-banner" style="display:none;background:#fff8e0;border:1px solid #f0d860;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:#664400;">
+            <strong>Legacy packaging data:</strong> <span id="pkg-legacy-text"></span>
+            <div style="margin-top:4px;color:#886600;">This RFQ used the old packaging format. Please re-select structured options below if you want the factory to see them clearly.</div>
           </div>
-          <div id="pkg-fields" style="display:none;margin-top:1rem;">
-            <div class="mf"><label>Packaging Notes</label><textarea id="rfq-pkg-notes" rows="2" placeholder="Additional packaging details..."></textarea></div>
+
+          <!-- Primary container (single-select) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Primary Container <span style="color:#b00;">*</span></div>
+            <div style="position:relative;">
+              <input type="text" id="pkg-primary-search" placeholder="Click to see options or type to filter (e.g. 'glass', 'dropper', 'tube')..." autocomplete="off" onfocus="openPkgDropdown('primary')" oninput="filterPkgOptions('primary',this.value)" onkeydown="pkgKeyHandler(event,'primary')" style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+              <div id="pkg-primary-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:280px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+            </div>
+            <div id="pkg-primary-chip" style="margin-top:6px;"></div>
+          </div>
+
+          <!-- Closures / applicators (multi-select) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Closure / Applicator <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">— choose all that apply</span></div>
+            <div style="position:relative;">
+              <input type="text" id="pkg-closure-search" placeholder="Click to see options or type to filter (e.g. 'pump', 'dropper', 'spray')..." autocomplete="off" onfocus="openPkgDropdown('closure')" oninput="filterPkgOptions('closure',this.value)" onkeydown="pkgKeyHandler(event,'closure')" style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+              <div id="pkg-closure-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:280px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+            </div>
+            <div id="pkg-closure-chips" style="margin-top:6px;"></div>
+          </div>
+
+          <!-- Secondary / display packaging (multi-select) -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Secondary / Display <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">— what surrounds the primary container at retail</span></div>
+            <div style="position:relative;">
+              <input type="text" id="pkg-secondary-search" placeholder="Click to see options or type to filter (e.g. 'carton', 'blister', 'sleeve')..." autocomplete="off" onfocus="openPkgDropdown('secondary')" oninput="filterPkgOptions('secondary',this.value)" onkeydown="pkgKeyHandler(event,'secondary')" style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+              <div id="pkg-secondary-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:280px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+            </div>
+            <div id="pkg-secondary-chips" style="margin-top:6px;"></div>
+          </div>
+
+          <!-- Toggle for advanced fields -->
+          <div onclick="togglePkgAdvanced()" style="cursor:pointer;font-size:12px;color:#1a3a8a;margin-top:6px;user-select:none;">
+            <span id="pkg-advanced-toggle">▸</span> Decoration, finish, color &amp; sustainability claims
+          </div>
+
+          <!-- Advanced fields (collapsed by default) -->
+          <div id="pkg-advanced-section" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0d8;">
+
+            <!-- Decoration -->
+            <div style="margin-bottom:12px;">
+              <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Decoration <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">— how the artwork is applied</span></div>
+              <div style="position:relative;">
+                <input type="text" id="pkg-decoration-search" placeholder="e.g. 'silkscreen', 'foil', 'label'..." autocomplete="off" onfocus="openPkgDropdown('decoration')" oninput="filterPkgOptions('decoration',this.value)" onkeydown="pkgKeyHandler(event,'decoration')" style="width:100%;padding:7px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+                <div id="pkg-decoration-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+              </div>
+              <div id="pkg-decoration-chips" style="margin-top:6px;"></div>
+            </div>
+
+            <!-- Finish + Color side-by-side -->
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px;">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Finish</div>
+                <select id="pkg-finish" style="width:100%;padding:7px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;background:#fff;">
+                  <option value="">— Select —</option>
+                  <option value="Matte">Matte</option>
+                  <option value="Gloss">Gloss</option>
+                  <option value="Semi-matte / Satin">Semi-matte / Satin</option>
+                  <option value="Soft-touch">Soft-touch</option>
+                  <option value="Frosted">Frosted</option>
+                  <option value="Mixed">Mixed</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Color / Transparency</div>
+                <input type="text" id="pkg-color" placeholder="e.g. 'Frosted clear', 'Opaque white', 'Pantone 19-1664 TPX'" style="width:100%;padding:7px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+              </div>
+            </div>
+
+            <!-- Sustainability -->
+            <div style="margin-bottom:8px;">
+              <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Sustainability Claims <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;">— required attributes (affects factory selection)</span></div>
+              <div style="position:relative;">
+                <input type="text" id="pkg-sustainability-search" placeholder="e.g. 'PCR', 'FSC', 'recyclable', 'refillable'..." autocomplete="off" onfocus="openPkgDropdown('sustainability')" oninput="filterPkgOptions('sustainability',this.value)" onkeydown="pkgKeyHandler(event,'sustainability')" style="width:100%;padding:7px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
+                <div id="pkg-sustainability-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.08);"></div>
+              </div>
+              <div id="pkg-sustainability-chips" style="margin-top:6px;"></div>
+            </div>
+          </div>
+
+          <!-- Free-text notes (kept) -->
+          <div style="margin-top:12px;">
+            <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Additional Packaging Notes</div>
+            <textarea id="rfq-pkg-notes" rows="2" placeholder="Anything not captured above — fill volumes, dimensions, special requirements, etc." style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>
           </div>
         </div>
 
@@ -3254,7 +3328,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">'+
         '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Category</div><div style="font-size:12px;font-weight:500;">'+[rfq.category,rfq.sub_category,rfq.sub_sub_category].filter(Boolean).join(' › ')+'</div></div>'+
         '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Quantity</div><div style="font-size:12px;font-weight:500;">'+qtyStr+'</div></div>'+
-        '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Packaging</div><div style="font-size:12px;font-weight:500;">'+(rfq.packaging_type||'—')+'</div></div>'+
+        '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Packaging</div><div style="font-size:12px;font-weight:500;">'+esc(formatPackagingSummary(rfq))+'</div></div>'+
         (rfq.max_fob_price?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Max FOB Target</div><div style="font-size:12px;font-weight:700;color:#5522aa;">$'+parseFloat(rfq.max_fob_price).toFixed(2)+'</div></div>':'')+
         (rfq.target_retail_price?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Target Retail</div><div style="font-size:12px;font-weight:500;">$'+parseFloat(rfq.target_retail_price).toFixed(2)+'</div></div>':'')+
         (rfq.min_gross_margin_pct?'<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;">Min Gross Margin</div><div style="font-size:12px;font-weight:500;">'+rfq.min_gross_margin_pct+'%</div></div>':'')+
@@ -4601,8 +4675,7 @@ function populateRFQEditForm(rfq){
   if(g('rfq-inner-pack'))g('rfq-inner-pack').value=rfq.inner_case_pack||'';
   if(g('rfq-master-pack'))g('rfq-master-pack').value=rfq.master_case_pack||'';
   if(g('rfq-pkg-notes'))g('rfq-pkg-notes').value=rfq.packaging_notes||'';
-  var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
-  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){cb.checked=pkgTypes.includes(cb.value);});
+  loadPkgFormState(rfq);
   var certs=rfq.certifications_required||[];
   document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){cb.checked=certs.includes(cb.value);});
   if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
@@ -4675,11 +4748,8 @@ async function openRFQForm(id){
   g('rfq-inner-pack').value=rfq.inner_case_pack||'';
   g('rfq-master-pack').value=rfq.master_case_pack||'';
   g('rfq-pkg-notes').value=rfq.packaging_notes||'';
-  // Check packaging checkboxes
-  var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(','):[];
-  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){
-    cb.checked=pkgTypes.includes(cb.value);
-  });
+  // Load structured packaging into form
+  loadPkgFormState(rfq);
   // Check cert checkboxes
   var certs=rfq.certifications_required||[];
   document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){
@@ -4720,6 +4790,8 @@ function resetRFQForm(){
   ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){if(g(id))g(id).value='0';});
   g('rfq-inner-pack').value='';g('rfq-master-pack').value='';
   g('rfq-pkg-notes').value='';
+  // Reset structured packaging picker
+  if(typeof resetPkgState==='function') resetPkgState();
   document.querySelectorAll('#panel-rfq input[type=checkbox]').forEach(function(cb){cb.checked=false;});
   // Clear user-override flag so new RFQs auto-set from category
   var cosCb=g('rfq-is-cosmetic');if(cosCb){cosCb.checked=false;cosCb.dataset.userOverride='false';}
@@ -4791,6 +4863,482 @@ function rfqCategoryChanged(){
   if(cb&&cb.dataset.userOverride!=='true'){
     cb.checked=isCosmetic;
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// PACKAGING PICKER — structured 3-axis option selector
+// ─────────────────────────────────────────────────────────
+
+var PKG_PRIMARY_OPTIONS = [
+  // Glass
+  { group:'Glass', value:'Glass bottle - round',                          material:'Glass' },
+  { group:'Glass', value:'Glass bottle - boston round',                   material:'Glass' },
+  { group:'Glass', value:'Glass bottle - square',                         material:'Glass' },
+  { group:'Glass', value:'Glass bottle - cylindrical tall',               material:'Glass' },
+  { group:'Glass', value:'Glass bottle - cylindrical short',              material:'Glass' },
+  { group:'Glass', value:'Glass bottle - oval',                           material:'Glass' },
+  { group:'Glass', value:'Glass bottle - dropper blank',                  material:'Glass' },
+  { group:'Glass', value:'Glass jar - straight-sided',                    material:'Glass' },
+  { group:'Glass', value:'Glass jar - low-profile cosmetic',              material:'Glass' },
+  { group:'Glass', value:'Glass jar - tall cosmetic',                     material:'Glass' },
+  { group:'Glass', value:'Glass jar - hexagonal',                         material:'Glass' },
+  { group:'Glass', value:'Glass vial',                                    material:'Glass' },
+  { group:'Glass', value:'Glass ampoule',                                 material:'Glass' },
+  { group:'Glass', value:'Glass roll-on bottle',                          material:'Glass' },
+  // Plastic — bottles
+  { group:'Plastic', value:'Plastic bottle - PET round',                  material:'PET' },
+  { group:'Plastic', value:'Plastic bottle - PET boston round',           material:'PET' },
+  { group:'Plastic', value:'Plastic bottle - HDPE round',                 material:'HDPE' },
+  { group:'Plastic', value:'Plastic bottle - HDPE oval',                  material:'HDPE' },
+  { group:'Plastic', value:'Plastic bottle - PP',                         material:'PP' },
+  { group:'Plastic', value:'Plastic bottle - PCR (post-consumer recycled)', material:'PCR' },
+  { group:'Plastic', value:'Plastic bottle - airless',                    material:'PP' },
+  { group:'Plastic', value:'Plastic bottle - dropper blank',              material:'Plastic' },
+  // Plastic — jars
+  { group:'Plastic', value:'Plastic jar - PET',                           material:'PET' },
+  { group:'Plastic', value:'Plastic jar - PP',                            material:'PP' },
+  { group:'Plastic', value:'Plastic jar - PCR',                           material:'PCR' },
+  { group:'Plastic', value:'Plastic jar - airless',                       material:'PP' },
+  // Plastic — vials, roll-ons, tubes, pouches
+  { group:'Plastic', value:'Plastic vial',                                material:'Plastic' },
+  { group:'Plastic', value:'Plastic roll-on bottle',                      material:'Plastic' },
+  { group:'Plastic', value:'Squeeze tube - LDPE',                         material:'LDPE' },
+  { group:'Plastic', value:'Squeeze tube - laminate (ABL)',               material:'Laminate' },
+  { group:'Plastic', value:'Squeeze tube - aluminum-plastic laminate',    material:'Laminate' },
+  { group:'Plastic', value:'Plastic pouch / sachet',                      material:'Plastic film' },
+  { group:'Plastic', value:'Stand-up pouch (gusseted)',                   material:'Plastic film' },
+  { group:'Plastic', value:'Spout pouch',                                 material:'Plastic film' },
+  // Metal
+  { group:'Metal', value:'Aluminum bottle',                               material:'Aluminum' },
+  { group:'Metal', value:'Aluminum jar',                                  material:'Aluminum' },
+  { group:'Metal', value:'Aluminum tin (round)',                          material:'Aluminum' },
+  { group:'Metal', value:'Aluminum tin (rectangular)',                    material:'Aluminum' },
+  { group:'Metal', value:'Aluminum aerosol can',                          material:'Aluminum' },
+  { group:'Metal', value:'Steel aerosol can',                             material:'Steel' },
+  { group:'Metal', value:'Tinplate tin',                                  material:'Tinplate' },
+  { group:'Metal', value:'Aluminum collapsible tube',                     material:'Aluminum' },
+  // Paper / Board
+  { group:'Paper / Board', value:'Paperboard push-up tube (kraft)',       material:'Paperboard' },
+  { group:'Paper / Board', value:'Cardboard box (primary)',               material:'Paperboard' },
+  { group:'Paper / Board', value:'Compostable molded fiber container',    material:'Molded fiber' },
+  // Specialty
+  { group:'Specialty', value:'Compact (powder / cream)',                  material:'Mixed' },
+  { group:'Specialty', value:'Stick container (chapstick-style)',         material:'Mixed' },
+  { group:'Specialty', value:'Click-pen applicator',                      material:'Mixed' },
+  { group:'Specialty', value:'Hot-pour stick mold',                       material:'Mixed' },
+  // None / bulk
+  { group:'No primary container', value:'Bulk / no individual primary container', material:'N/A' }
+];
+
+var PKG_CLOSURE_OPTIONS = [
+  // Caps / Lids
+  { group:'Caps / Lids', value:'Screw cap - smooth' },
+  { group:'Caps / Lids', value:'Screw cap - ribbed' },
+  { group:'Caps / Lids', value:'Screw cap - disc top / flip top' },
+  { group:'Caps / Lids', value:'Screw cap - with built-in spatula' },
+  { group:'Caps / Lids', value:'Snap cap' },
+  { group:'Caps / Lids', value:'Hinged flip-top lid' },
+  { group:'Caps / Lids', value:'Twist-up tube cap' },
+  { group:'Caps / Lids', value:'Crimp seal (aluminum)' },
+  { group:'Caps / Lids', value:'Cork stopper' },
+  { group:'Caps / Lids', value:'T-top wood cap' },
+  // Pumps
+  { group:'Pumps', value:'Pump - lotion / cream' },
+  { group:'Pumps', value:'Pump - foamer' },
+  { group:'Pumps', value:'Pump - airless' },
+  { group:'Pumps', value:'Pump - treatment (small dose)' },
+  { group:'Pumps', value:'Pump - high-viscosity' },
+  // Sprayers
+  { group:'Sprayers', value:'Mist sprayer - fine mist' },
+  { group:'Sprayers', value:'Mist sprayer - continuous (no propellant)' },
+  { group:'Sprayers', value:'Trigger sprayer' },
+  { group:'Sprayers', value:'Aerosol valve - continuous spray' },
+  { group:'Sprayers', value:'Aerosol valve - metered dose' },
+  // Dispensers / Spouts
+  { group:'Dispensers / Spouts', value:'Orifice reducer' },
+  { group:'Dispensers / Spouts', value:'Disc top / flip top spout' },
+  { group:'Dispensers / Spouts', value:'Pour spout' },
+  { group:'Dispensers / Spouts', value:'Yorker spout' },
+  { group:'Dispensers / Spouts', value:'Twist-and-pour spout' },
+  // Droppers
+  { group:'Droppers', value:'Dropper - glass with rubber bulb' },
+  { group:'Droppers', value:'Dropper - calibrated / graduated' },
+  { group:'Droppers', value:'Dropper - plastic' },
+  { group:'Droppers', value:'Dropper - pipette (drop-by-drop)' },
+  // Applicators
+  { group:'Applicators', value:'Roller ball' },
+  { group:'Applicators', value:'Brush applicator (small)' },
+  { group:'Applicators', value:'Brush applicator (wide)' },
+  { group:'Applicators', value:'Wand applicator (mascara-style)' },
+  { group:'Applicators', value:'Doe foot applicator (lip gloss)' },
+  { group:'Applicators', value:'Spatula included (separate)' },
+  { group:'Applicators', value:'Spoon included (separate)' },
+  { group:'Applicators', value:'Cotton tip applicator' },
+  { group:'Applicators', value:'Foam tip applicator' },
+  { group:'Applicators', value:'Sponge applicator' },
+  // Seals
+  { group:'Seals', value:'Induction seal (foil)' },
+  { group:'Seals', value:'Tamper-evident band' },
+  { group:'Seals', value:'Pressure-sensitive seal' },
+  // Other
+  { group:'Other', value:'Twist-up mechanism (stick products)' },
+  { group:'Other', value:'Click mechanism' },
+  { group:'Other', value:'None / bulk (no closure)' }
+];
+
+var PKG_SECONDARY_OPTIONS = [
+  // Boxes
+  { group:'Boxes', value:'Paper folding carton (mono-material)' },
+  { group:'Boxes', value:'Paper folding carton (with insert)' },
+  { group:'Boxes', value:'Paper folding carton (with window cutout)' },
+  { group:'Boxes', value:'Rigid box / set-up box' },
+  { group:'Boxes', value:'Mailer box (corrugated)' },
+  { group:'Boxes', value:'Sleeve box' },
+  // Blister / Card
+  { group:'Blister / Card', value:'Blister pack (carded)' },
+  { group:'Blister / Card', value:'Clamshell' },
+  { group:'Blister / Card', value:'Skin pack' },
+  { group:'Blister / Card', value:'Slide card' },
+  // Wrapping / Sealing
+  { group:'Wrapping / Sealing', value:'Shrink sleeve (decorative full-body)' },
+  { group:'Wrapping / Sealing', value:'Shrink wrap (clear protective)' },
+  { group:'Wrapping / Sealing', value:'Belly band / paper sleeve' },
+  { group:'Wrapping / Sealing', value:'Pillow pack / flow wrap' },
+  // Hang / Display
+  { group:'Hang / Display', value:'Hang tag (paper)' },
+  { group:'Hang / Display', value:'Hang tag (plastic clip)' },
+  { group:'Hang / Display', value:'Pouch with hang hole / Eurohole' },
+  { group:'Hang / Display', value:'Display tray' },
+  { group:'Hang / Display', value:'Counter display (PDQ)' },
+  { group:'Hang / Display', value:'Floor display unit' },
+  // None
+  { group:'None', value:'Naked (no secondary packaging)' },
+  { group:'None', value:'Bulk shipper only' }
+];
+
+var PKG_DECORATION_OPTIONS = [
+  { group:'Direct on package', value:'Silkscreen print' },
+  { group:'Direct on package', value:'Pad print' },
+  { group:'Direct on package', value:'Direct digital print' },
+  { group:'Direct on package', value:'Hot stamp' },
+  { group:'Direct on package', value:'Foil stamp' },
+  { group:'Direct on package', value:'Embossing' },
+  { group:'Direct on package', value:'Debossing' },
+  { group:'Direct on package', value:'Spot UV' },
+  { group:'Direct on package', value:'Frosting / etching' },
+  { group:'Labels', value:'Paper label' },
+  { group:'Labels', value:'Clear label' },
+  { group:'Labels', value:'Metallized label' },
+  { group:'Labels', value:'Textured / specialty label' },
+  { group:'Sleeves', value:'Shrink sleeve (decorative)' },
+  { group:'None', value:'No decoration' }
+];
+
+var PKG_SUSTAINABILITY_OPTIONS = [
+  { group:'Recycled content', value:'PCR 25%+ (post-consumer recycled)' },
+  { group:'Recycled content', value:'PCR 50%+' },
+  { group:'Recycled content', value:'PCR 100%' },
+  { group:'Certifications', value:'FSC certified board' },
+  { group:'Certifications', value:'How2Recycle label compliant' },
+  { group:'Design', value:'Recyclable (single-material)' },
+  { group:'Design', value:'Refillable design' },
+  { group:'Design', value:'Lightweighted (reduced plastic)' },
+  { group:'Biodegradable / Compostable', value:'Biodegradable' },
+  { group:'Biodegradable / Compostable', value:'Industrially compostable' },
+  { group:'Biodegradable / Compostable', value:'Home compostable' },
+  { group:'Alternative materials', value:'Bio-based plastic (PE/PET)' },
+  { group:'Alternative materials', value:'Aluminum-free / plastic-free' }
+];
+
+// Per-axis lookup so we can find option metadata by value
+function pkgOptionsFor(axis){
+  if(axis==='primary')        return PKG_PRIMARY_OPTIONS;
+  if(axis==='closure')        return PKG_CLOSURE_OPTIONS;
+  if(axis==='secondary')      return PKG_SECONDARY_OPTIONS;
+  if(axis==='decoration')     return PKG_DECORATION_OPTIONS;
+  if(axis==='sustainability') return PKG_SUSTAINABILITY_OPTIONS;
+  return [];
+}
+function pkgIsMulti(axis){return axis!=='primary';}
+
+// State held in the form (cleared on each open)
+var pkgState = { primary:null, primary_material:null, closures:[], secondary:[], decoration:[], sustainability:[] };
+
+function resetPkgState(){
+  pkgState = { primary:null, primary_material:null, closures:[], secondary:[], decoration:[], sustainability:[] };
+  renderPkgPrimaryChip();
+  renderPkgChips('closure');
+  renderPkgChips('secondary');
+  renderPkgChips('decoration');
+  renderPkgChips('sustainability');
+  if(g('pkg-primary-search'))       g('pkg-primary-search').value='';
+  if(g('pkg-closure-search'))       g('pkg-closure-search').value='';
+  if(g('pkg-secondary-search'))     g('pkg-secondary-search').value='';
+  if(g('pkg-decoration-search'))    g('pkg-decoration-search').value='';
+  if(g('pkg-sustainability-search'))g('pkg-sustainability-search').value='';
+  if(g('pkg-finish'))                g('pkg-finish').value='';
+  if(g('pkg-color'))                 g('pkg-color').value='';
+  if(g('pkg-legacy-banner'))         g('pkg-legacy-banner').style.display='none';
+}
+
+function openPkgDropdown(axis){
+  // Close any other open dropdowns first
+  ['primary','closure','secondary','decoration','sustainability'].forEach(function(a){
+    var d=g('pkg-'+a+'-dropdown');
+    if(d && a!==axis) d.style.display='none';
+  });
+  renderPkgDropdown(axis, '');
+  var dd=g('pkg-'+axis+'-dropdown');
+  if(dd) dd.style.display='block';
+}
+
+function closeAllPkgDropdowns(){
+  ['primary','closure','secondary','decoration','sustainability'].forEach(function(a){
+    var d=g('pkg-'+a+'-dropdown');
+    if(d) d.style.display='none';
+  });
+}
+
+function filterPkgOptions(axis, query){
+  renderPkgDropdown(axis, query||'');
+  var dd=g('pkg-'+axis+'-dropdown');
+  if(dd) dd.style.display='block';
+}
+
+function pkgKeyHandler(ev, axis){
+  if(ev.key==='Escape'){closeAllPkgDropdowns(); ev.target.blur();}
+}
+
+function renderPkgDropdown(axis, query){
+  var dd=g('pkg-'+axis+'-dropdown');
+  if(!dd) return;
+  var opts=pkgOptionsFor(axis);
+  var multi=pkgIsMulti(axis);
+  var q=(query||'').toLowerCase().trim();
+  // Filter
+  var filtered=opts.filter(function(o){
+    if(!q) return true;
+    return o.value.toLowerCase().indexOf(q)>=0 || (o.group||'').toLowerCase().indexOf(q)>=0;
+  });
+  // Selected check
+  function isSelected(v){
+    if(!multi) return pkgState.primary===v;
+    if(axis==='closure')         return pkgState.closures.indexOf(v)>=0;
+    if(axis==='secondary')       return pkgState.secondary.indexOf(v)>=0;
+    if(axis==='decoration')      return pkgState.decoration.indexOf(v)>=0;
+    if(axis==='sustainability')  return pkgState.sustainability.indexOf(v)>=0;
+    return false;
+  }
+  // Group results
+  var groups={};
+  var groupOrder=[];
+  filtered.forEach(function(o){
+    var g0=o.group||'Other';
+    if(!groups[g0]){groups[g0]=[]; groupOrder.push(g0);}
+    groups[g0].push(o);
+  });
+  if(!filtered.length){
+    dd.innerHTML='<div style="padding:10px;font-size:12px;color:#888;font-style:italic;">No options match "'+esc(q)+'"</div>';
+    return;
+  }
+  dd.innerHTML=groupOrder.map(function(g0){
+    return '<div style="padding:6px 10px;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.06em;background:#fafaf6;border-bottom:1px solid #f0f0e8;">'+esc(g0)+'</div>'+
+      groups[g0].map(function(o){
+        var sel=isSelected(o.value);
+        var bg=sel?'#edfaed':'#fff';
+        var check=sel?'<span style="color:#1a7a1a;font-weight:700;margin-right:6px;">✓</span>':'<span style="display:inline-block;width:14px;"></span>';
+        return '<div onclick="event.preventDefault();event.stopPropagation();selectPkgOption(\''+axis+'\','+JSON.stringify(o.value)+');" onmousedown="event.preventDefault();" style="padding:7px 10px;font-size:12px;color:#1a1a2e;cursor:pointer;background:'+bg+';border-bottom:1px solid #f5f5f0;display:flex;align-items:center;" onmouseover="this.style.background=\''+(sel?'#dff3df':'#f5f5f0')+'\'" onmouseout="this.style.background=\''+bg+'\'">'+check+esc(o.value)+'</div>';
+      }).join('');
+  }).join('');
+}
+
+function selectPkgOption(axis, value){
+  var multi=pkgIsMulti(axis);
+  if(!multi){
+    // Primary — single-select
+    pkgState.primary=value;
+    var opt=PKG_PRIMARY_OPTIONS.find(function(o){return o.value===value;});
+    pkgState.primary_material=opt?opt.material:null;
+    renderPkgPrimaryChip();
+    g('pkg-primary-search').value='';
+    closeAllPkgDropdowns();
+  }else{
+    // Multi — toggle
+    var arr;
+    if(axis==='closure')              arr=pkgState.closures;
+    else if(axis==='secondary')       arr=pkgState.secondary;
+    else if(axis==='decoration')      arr=pkgState.decoration;
+    else if(axis==='sustainability')  arr=pkgState.sustainability;
+    var idx=arr.indexOf(value);
+    if(idx>=0) arr.splice(idx,1); else arr.push(value);
+    renderPkgChips(axis);
+    // Re-render dropdown so checkmark updates
+    renderPkgDropdown(axis, g('pkg-'+axis+'-search').value);
+  }
+}
+
+function removePkgChip(axis, value){
+  if(axis==='primary'){
+    pkgState.primary=null;
+    pkgState.primary_material=null;
+    renderPkgPrimaryChip();
+  }else{
+    var arr;
+    if(axis==='closure')              arr=pkgState.closures;
+    else if(axis==='secondary')       arr=pkgState.secondary;
+    else if(axis==='decoration')      arr=pkgState.decoration;
+    else if(axis==='sustainability')  arr=pkgState.sustainability;
+    if(arr){
+      var idx=arr.indexOf(value);
+      if(idx>=0) arr.splice(idx,1);
+    }
+    renderPkgChips(axis);
+  }
+}
+
+function renderPkgPrimaryChip(){
+  var el=g('pkg-primary-chip');
+  if(!el) return;
+  if(!pkgState.primary){el.innerHTML='';return;}
+  el.innerHTML='<span style="display:inline-flex;align-items:center;gap:6px;background:#1a3a8a;color:#fff;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:500;">'+
+    esc(pkgState.primary)+
+    (pkgState.primary_material?'<span style="opacity:0.7;font-size:10px;">('+esc(pkgState.primary_material)+')</span>':'')+
+    '<button onclick="removePkgChip(\'primary\',\'\')" style="background:none;border:none;color:#fff;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.7;">×</button>'+
+  '</span>';
+}
+
+function renderPkgChips(axis){
+  var el=g('pkg-'+axis+'-chips');
+  if(!el) return;
+  var arr;
+  if(axis==='closure')              arr=pkgState.closures;
+  else if(axis==='secondary')       arr=pkgState.secondary;
+  else if(axis==='decoration')      arr=pkgState.decoration;
+  else if(axis==='sustainability')  arr=pkgState.sustainability;
+  if(!arr || !arr.length){el.innerHTML='';return;}
+  el.innerHTML=arr.map(function(v){
+    return '<span style="display:inline-flex;align-items:center;gap:5px;background:#e8eef8;color:#1a3a8a;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:500;margin:0 4px 4px 0;">'+
+      esc(v)+
+      '<button onclick="removePkgChip(\''+axis+'\','+JSON.stringify(v).replace(/"/g,'&quot;')+')" style="background:none;border:none;color:#1a3a8a;cursor:pointer;font-size:14px;padding:0;line-height:1;opacity:0.6;">×</button>'+
+    '</span>';
+  }).join('');
+}
+
+function togglePkgAdvanced(){
+  var sec=g('pkg-advanced-section');
+  var tog=g('pkg-advanced-toggle');
+  if(!sec) return;
+  var isOpen=sec.style.display!=='none';
+  sec.style.display=isOpen?'none':'block';
+  if(tog) tog.textContent=isOpen?'▸':'▾';
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', function(ev){
+  // If click target is inside any pkg-* control, leave dropdowns alone (those handlers manage it)
+  var t=ev.target;
+  while(t && t!==document.body){
+    if(t.id && (t.id.indexOf('pkg-')===0 || t.id==='pkg-type-card')) return;
+    t=t.parentNode;
+  }
+  closeAllPkgDropdowns();
+});
+
+// Read state from form-level inputs (called on save)
+function getPkgFormState(){
+  return {
+    packaging_primary:           pkgState.primary || null,
+    packaging_primary_material:  pkgState.primary_material || null,
+    packaging_closures:          pkgState.closures.length ? pkgState.closures : null,
+    packaging_secondary:         pkgState.secondary.length ? pkgState.secondary : null,
+    packaging_decoration:        pkgState.decoration.length ? pkgState.decoration : null,
+    packaging_finish:            (g('pkg-finish') && g('pkg-finish').value) || null,
+    packaging_color:             (g('pkg-color') && g('pkg-color').value.trim()) || null,
+    packaging_sustainability:    pkgState.sustainability.length ? pkgState.sustainability : null
+  };
+}
+
+// Build legacy packaging_type comma-string from structured state (backward compat)
+function getPkgLegacyString(){
+  var parts=[];
+  if(pkgState.primary) parts.push(pkgState.primary);
+  pkgState.closures.forEach(function(v){parts.push(v);});
+  pkgState.secondary.forEach(function(v){parts.push(v);});
+  return parts.join(', ') || null;
+}
+
+// Populate form from a saved RFQ — handles both new structured fields and legacy packaging_type
+function loadPkgFormState(rfq){
+  resetPkgState();
+  if(!rfq) return;
+  // Prefer structured fields
+  if(rfq.packaging_primary){
+    pkgState.primary=rfq.packaging_primary;
+    pkgState.primary_material=rfq.packaging_primary_material || null;
+    renderPkgPrimaryChip();
+  }
+  if(Array.isArray(rfq.packaging_closures)){
+    pkgState.closures=rfq.packaging_closures.slice();
+    renderPkgChips('closure');
+  }
+  if(Array.isArray(rfq.packaging_secondary)){
+    pkgState.secondary=rfq.packaging_secondary.slice();
+    renderPkgChips('secondary');
+  }
+  if(Array.isArray(rfq.packaging_decoration)){
+    pkgState.decoration=rfq.packaging_decoration.slice();
+    renderPkgChips('decoration');
+  }
+  if(Array.isArray(rfq.packaging_sustainability)){
+    pkgState.sustainability=rfq.packaging_sustainability.slice();
+    renderPkgChips('sustainability');
+  }
+  if(g('pkg-finish')) g('pkg-finish').value=rfq.packaging_finish||'';
+  if(g('pkg-color'))  g('pkg-color').value=rfq.packaging_color||'';
+  // Auto-open advanced section if any advanced field is populated
+  var hasAdvanced=(rfq.packaging_decoration&&rfq.packaging_decoration.length) ||
+                  (rfq.packaging_sustainability&&rfq.packaging_sustainability.length) ||
+                  rfq.packaging_finish || rfq.packaging_color;
+  if(hasAdvanced){
+    var sec=g('pkg-advanced-section');
+    var tog=g('pkg-advanced-toggle');
+    if(sec) sec.style.display='block';
+    if(tog) tog.textContent='▾';
+  }
+  // Legacy banner: show if old data exists but no structured fields are set
+  var hasStructured=rfq.packaging_primary ||
+                    (Array.isArray(rfq.packaging_closures)&&rfq.packaging_closures.length) ||
+                    (Array.isArray(rfq.packaging_secondary)&&rfq.packaging_secondary.length);
+  if(!hasStructured && rfq.packaging_type){
+    var banner=g('pkg-legacy-banner');
+    var bText=g('pkg-legacy-text');
+    if(banner && bText){
+      bText.textContent=rfq.packaging_type;
+      banner.style.display='block';
+    }
+  }
+}
+
+// Compact display string for showing packaging on quote cards / RFQ summary
+function formatPackagingSummary(rfq){
+  if(!rfq) return '—';
+  var parts=[];
+  if(rfq.packaging_primary){
+    var p=rfq.packaging_primary;
+    if(rfq.packaging_primary_material) p+=' ('+rfq.packaging_primary_material+')';
+    parts.push(p);
+  }
+  if(Array.isArray(rfq.packaging_closures) && rfq.packaging_closures.length){
+    parts.push('with '+rfq.packaging_closures.join(' + '));
+  }
+  if(Array.isArray(rfq.packaging_secondary) && rfq.packaging_secondary.length){
+    parts.push('in '+rfq.packaging_secondary.join(' + '));
+  }
+  if(!parts.length){
+    // Fall back to legacy packaging_type
+    return rfq.packaging_type || '—';
+  }
+  return parts.join(' · ');
 }
 
 function rfqCosmeticToggled(){
@@ -5063,11 +5611,9 @@ async function saveRFQ(action){
   var catId=g('rfq-category-id').value;
   var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
 
-  // Collect packaging types
-  var pkgTypes=[];
-  document.querySelectorAll('#pkg-type-card input[type=checkbox]').forEach(function(cb){
-    if(cb.checked)pkgTypes.push(cb.value);
-  });
+  // Collect structured packaging from picker state
+  var pkgFields=getPkgFormState();
+  var legacyPkgString=getPkgLegacyString();
 
   // Collect certs
   var certs=[];
@@ -5096,7 +5642,17 @@ async function saveRFQ(action){
     quote_quantity:parseInt(g('rfq-quantity').value)||null,
     inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
     master_case_pack:parseInt(g('rfq-master-pack').value)||null,
-    packaging_type:pkgTypes.join(',')||null,
+    // Structured packaging fields (new)
+    packaging_primary:           pkgFields.packaging_primary,
+    packaging_primary_material:  pkgFields.packaging_primary_material,
+    packaging_closures:          pkgFields.packaging_closures,
+    packaging_secondary:         pkgFields.packaging_secondary,
+    packaging_decoration:        pkgFields.packaging_decoration,
+    packaging_finish:            pkgFields.packaging_finish,
+    packaging_color:             pkgFields.packaging_color,
+    packaging_sustainability:    pkgFields.packaging_sustainability,
+    // Legacy packaging_type — auto-derived from structured fields for backward compat
+    packaging_type:legacyPkgString,
     packaging_notes:g('rfq-pkg-notes').value.trim()||null,
     certifications_required:certs.length?certs:null,
     is_cosmetic:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),

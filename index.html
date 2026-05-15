@@ -2294,7 +2294,38 @@ function renderRFQList(assignments,existingQuotes){
     var date=rfq.created_at?new Date(rfq.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
     var qty=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'units'):'—';
     var uom=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'';
-    var pkgTypes=rfq.packaging_type?rfq.packaging_type.split(',').join(', '):'—';
+
+    // Build structured packaging display — prefers new structured fields, falls back to legacy packaging_type
+    var pkgLines=[];
+    if(rfq.packaging_primary){
+      var pLine=rfq.packaging_primary;
+      if(rfq.packaging_primary_material) pLine+=' <span style="color:#888;font-size:11px;">('+rfq.packaging_primary_material+')</span>';
+      pkgLines.push('<div><strong>Primary:</strong> '+pLine+'</div>');
+    }
+    if(Array.isArray(rfq.packaging_closures) && rfq.packaging_closures.length){
+      pkgLines.push('<div><strong>Closure:</strong> '+rfq.packaging_closures.join(' + ')+'</div>');
+    }
+    if(Array.isArray(rfq.packaging_secondary) && rfq.packaging_secondary.length){
+      pkgLines.push('<div><strong>Secondary:</strong> '+rfq.packaging_secondary.join(' + ')+'</div>');
+    }
+    if(Array.isArray(rfq.packaging_decoration) && rfq.packaging_decoration.length){
+      pkgLines.push('<div><strong>Decoration:</strong> '+rfq.packaging_decoration.join(', ')+'</div>');
+    }
+    if(rfq.packaging_finish || rfq.packaging_color){
+      var fcParts=[];
+      if(rfq.packaging_finish) fcParts.push('Finish: '+rfq.packaging_finish);
+      if(rfq.packaging_color)  fcParts.push('Color: '+rfq.packaging_color);
+      pkgLines.push('<div><strong>Finish/Color:</strong> '+fcParts.join(' · ')+'</div>');
+    }
+    if(Array.isArray(rfq.packaging_sustainability) && rfq.packaging_sustainability.length){
+      pkgLines.push('<div style="color:#1a7a1a;"><strong>♻ Sustainability required:</strong> '+rfq.packaging_sustainability.join(', ')+'</div>');
+    }
+    var pkgTypes;
+    if(pkgLines.length){
+      pkgTypes=pkgLines.join('');
+    }else{
+      pkgTypes=rfq.packaging_type?rfq.packaging_type.split(',').join(', '):'—';
+    }
     var certs=(rfq.certifications_required||[]).join(', ')||'None required';
     return '<div class="rfq-card" id="rfqcard-'+rfq.id+'">' +
       '<div class="rfq-card-header" onclick="toggleRFQ(\''+rfq.id+'\')">' +
@@ -2353,7 +2384,7 @@ function addCertRow(rfqId,existingName,existingUrl){
     '<div style="flex:1;min-width:0;">'+
       '<input type="text" placeholder="Certification name (e.g. FDA Registration)" value="'+esc(name)+'" data-cert-field="name" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px;font-family:inherit;box-sizing:border-box;margin-bottom:4px;" />'+
       existingLabel+
-      '<input type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,application/pdf" data-cert-field="file" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
+      '<input type="file" data-cert-field="file" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
       (hasExisting?'<input type="hidden" data-cert-field="existing-url" value="'+esc(existingUrl)+'" />':'')+
     '</div>'+
     '<button type="button" onclick="removeCertRow(\''+rowId+'\')" style="padding:4px 9px;background:#fff;border:1px solid #ddd;border-radius:5px;font-size:14px;cursor:pointer;color:#888;font-family:inherit;flex-shrink:0;" title="Remove">✕</button>'+
@@ -2383,6 +2414,20 @@ async function uploadCertRows(rfqId){
     var name=nameInput?nameInput.value.trim():'';
     var file=fileInput&&fileInput.files&&fileInput.files[0];
     if(file){
+      // Sanity check: reject obviously wrong file types (video, audio, executables).
+      // Since we removed the picker filter, validate here instead.
+      var fileName=(file.name||'').toLowerCase();
+      var fileType=(file.type||'').toLowerCase();
+      var allowedExt=/\.(pdf|png|jpg|jpeg|gif|webp|heic|heif|tif|tiff|bmp)$/;
+      var blockedType=/^(video|audio|application\/x-msdownload|application\/x-executable)/;
+      if(!allowedExt.test(fileName)&&!fileType.startsWith('image/')&&fileType!=='application/pdf'){
+        alert('File "'+file.name+'" doesn\'t look like a certification document. Please upload a PDF or image (JPG, PNG, etc.).');
+        continue;
+      }
+      if(blockedType.test(fileType)){
+        alert('File "'+file.name+'" is a '+fileType.split('/')[0]+' file — please upload the certification as a PDF or image.');
+        continue;
+      }
       var ts=Date.now()+i;
       var safe=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
       var path=USER.id+'/certifications/'+ts+'_'+safe;
