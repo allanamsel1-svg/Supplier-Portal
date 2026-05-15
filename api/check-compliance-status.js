@@ -285,11 +285,44 @@ async function checkLayer2Rfq(rfq, factoryDocs) {
   return result;
 }
 
-// ── LAYER 3: Per-quote product documents ──
-// V1 policy: warn-only (does not block PO). May be promoted to blocker later.
-async function checkLayer3Product(rfq, quote, categoryRules) {
+// ── LAYER 3: Per-quote / per-PD product documents and dimensions ──
+// Carton dimensions are blocking (freight calc requires them).
+// Product docs are warn-only in v1.
+async function checkLayer3Product(rfq, quote, categoryRules, pdItem) {
   const result = { status: 'green', red_flags: [], warnings: [] };
 
+  // ── A. Carton dimensions (from product_development_items if present) ──
+  // Only checked when we have a PD record — i.e., the quote has been accepted
+  // and the factory is in the PD workspace flow.
+  if (pdItem) {
+    const masterMissing = !pdItem.master_case_pack_units ||
+                          !pdItem.master_length_cm ||
+                          !pdItem.master_width_cm ||
+                          !pdItem.master_height_cm ||
+                          !pdItem.master_weight_kg;
+    if (masterMissing) {
+      result.red_flags.push({
+        code: 'master_carton_missing',
+        label: 'Master case dimensions not confirmed',
+        severity: 'blocker',
+        detail: 'Factory must confirm units-per-master-case + master case L/W/H and weight before PO can issue. Required for freight calculation.'
+      });
+    }
+    const innerIncomplete = !pdItem.inner_case_pack_units ||
+                            !pdItem.inner_length_cm ||
+                            !pdItem.inner_width_cm ||
+                            !pdItem.inner_height_cm;
+    if (innerIncomplete) {
+      result.warnings.push({
+        code: 'inner_carton_missing',
+        label: 'Inner case dimensions not confirmed',
+        severity: 'warning',
+        detail: 'Recommended — helps with inventory planning and order picking.'
+      });
+    }
+  }
+
+  // ── B. Required and preferred product docs ──
   // Determine required product docs:
   //   1. RFQ-level overrides if set
   //   2. Otherwise category default
@@ -300,12 +333,21 @@ async function checkLayer3Product(rfq, quote, categoryRules) {
     ? rfq.product_docs_preferred
     : ((categoryRules && categoryRules.preferred_product_docs) || []);
 
-  if (!requiredDocs.length && !preferredDocs.length) return result;
-
-  // Fetch uploaded product docs for this quote
-  const productDocs = await sb(
-    `product_documents?rfq_quote_id=eq.${quote.id}&is_current=eq.true&select=document_type,document_type_other,uploaded_at,file_name`
-  ) || [];
+  // Fetch uploaded product docs — look both by quote_id AND by pd_id
+  // (PD workspace uploads are tagged with product_development_id)
+  let productDocs = [];
+  if (quote && quote.id) {
+    const qDocs = await sb(
+      `product_documents?rfq_quote_id=eq.${quote.id}&is_current=eq.true&select=document_type,document_type_other,uploaded_at,file_name`
+    ) || [];
+    productDocs = productDocs.concat(qDocs);
+  }
+  if (pdItem && pdItem.id) {
+    const pDocs = await sb(
+      `product_documents?product_development_id=eq.${pdItem.id}&is_current=eq.true&select=document_type,document_type_other,uploaded_at,file_name`
+    ) || [];
+    productDocs = productDocs.concat(pDocs);
+  }
 
   function hasDoc(docName) {
     return productDocs.some(d =>
@@ -314,19 +356,19 @@ async function checkLayer3Product(rfq, quote, categoryRules) {
     );
   }
 
-  // Required → warnings (v1)
+  // Required → warnings (v1 — not yet promoted to blocker)
   for (const docName of requiredDocs) {
     if (!hasDoc(docName)) {
       result.warnings.push({
         code: 'product_doc_missing',
-        label: `${docName} — not uploaded for this quote`,
+        label: `${docName} — not uploaded`,
         severity: 'warning',
         detail: 'Required product document missing. Factory should upload before production starts.',
         doc_name: docName
       });
     }
   }
-  // Preferred → warnings (still warning)
+  // Preferred
   for (const docName of preferredDocs) {
     if (!hasDoc(docName)) {
       result.warnings.push({
@@ -339,7 +381,24 @@ async function checkLayer3Product(rfq, quote, categoryRules) {
     }
   }
 
-  if (result.warnings.length) result.status = 'yellow';
+  // ── C. Product images (warn if none uploaded post-acceptance) ──
+  if (pdItem) {
+    const hasImage = productDocs.some(d =>
+      (d.document_type || '').toLowerCase() === 'product image'
+    );
+    if (!hasImage) {
+      result.warnings.push({
+        code: 'product_image_missing',
+        label: 'No product images uploaded',
+        severity: 'warning',
+        detail: 'At least one product photo is recommended for downstream use (catalog, customer presentations).'
+      });
+    }
+  }
+
+  if (result.red_flags.length)      result.status = 'red';
+  else if (result.warnings.length)  result.status = 'yellow';
+  else                              result.status = 'green';
   return result;
 }
 
@@ -349,7 +408,10 @@ function rollupStatus(layers) {
   const anyRed    = present.some(l => l.red_flags.length > 0);
   const anyYellow = present.some(l => l.warnings.length > 0);
   const overall = anyRed ? 'red' : (anyYellow ? 'yellow' : 'green');
-  // PO is blocked iff any layer has red flags (Layer 3 has none in v1 by design)
+  // PO is blocked iff any layer has red flags.
+  // Layer 1: missing/expired required factory certs
+  // Layer 2: missing/expired RFQ-required certs
+  // Layer 3: missing master carton dimensions (others are warnings only)
   const blocks_po = anyRed;
   return { overall, blocks_po };
 }
@@ -412,14 +474,26 @@ async function handler(req, res) {
       }
     }
 
-    // Run Layer 3 if quote_id given
+    // Run Layer 3 if quote_id given.
+    // Also try to find the corresponding PD record so we can check carton
+    // dimensions and PD-uploaded assets, not just quote-tagged docs.
     let layer_3_product = null;
     if (quote_id && rfq) {
       const quoteRows = await sb(
         `rfq_quotes?id=eq.${quote_id}&select=id,factory_id,rfq_id&limit=1`
       );
       if (quoteRows && quoteRows.length) {
-        layer_3_product = await checkLayer3Product(rfq, quoteRows[0], categoryRules);
+        const quote = quoteRows[0];
+
+        // Find the PD item linked to this quote (may not exist yet if
+        // quote hasn't been accepted)
+        let pdItem = null;
+        const pdRows = await sb(
+          `product_development_items?accepted_quote_id=eq.${quote_id}&select=*&limit=1`
+        );
+        if (pdRows && pdRows.length) pdItem = pdRows[0];
+
+        layer_3_product = await checkLayer3Product(rfq, quote, categoryRules, pdItem);
       }
     }
 
