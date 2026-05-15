@@ -3646,9 +3646,9 @@ async function createVariantRfq(sourceRfqId, trueParentId){
     var newRfq=Array.isArray(created)?created[0]:created;
     if(!newRfq||!newRfq.id)throw new Error('New RFQ was created but no ID returned.');
 
-    // 4. Copy factory invitations (factory_rfqs) from source so the same factories can quote the variant
+    // 4. Copy factory invitations (rfq_factory_assignments) from source so the same factories can quote the variant
     try{
-      var fr=await fetch(SB+'/rest/v1/factory_rfqs?rfq_id=eq.'+sourceRfqId+'&select=factory_id,assigned_at,status',{
+      var fr=await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+sourceRfqId+'&select=factory_id,status,email_sent_to',{
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
       });
       var assignments=await fr.json();
@@ -3657,11 +3657,11 @@ async function createVariantRfq(sourceRfqId, trueParentId){
           return {
             rfq_id: newRfq.id,
             factory_id: a.factory_id,
-            status: 'invited',           // factory needs to know this is new — fresh invitation status
-            assigned_at: new Date().toISOString()
+            status: 'pending',                 // fresh status — factory needs to be notified about this variant
+            email_sent_to: a.email_sent_to || null
           };
         });
-        await fetch(SB+'/rest/v1/factory_rfqs',{
+        await fetch(SB+'/rest/v1/rfq_factory_assignments',{
           method:'POST',
           headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify(newAssignments)
