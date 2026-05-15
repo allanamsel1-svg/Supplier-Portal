@@ -132,6 +132,8 @@ function flagForCertStatus(certName, coverage, blockingSeverity = 'blocker') {
 }
 
 // ── LAYER 1: Factory baseline (per-category) ──
+// Factory may operate in multiple categories. We check Layer 1 against
+// each unique top-level category they claim, deduplicating flags.
 async function checkLayer1Factory(factory, factoryDocs) {
   const result = { status: 'green', red_flags: [], warnings: [] };
 
@@ -142,9 +144,25 @@ async function checkLayer1Factory(factory, factoryDocs) {
     return r;
   }
 
-  // Look up category rule
-  const cat = factory.category || (factory.categories && factory.categories[0]) || null;
-  if (!cat) {
+  // ── Resolve factory's categories ──
+  // Try the factory_categories join table first (canonical source).
+  // Fall back to factories.categories array column if join table is empty.
+  let categories = [];
+  try {
+    const fcRows = await sb(
+      `factory_categories?factory_id=eq.${factory.id}&select=category`
+    );
+    if (Array.isArray(fcRows) && fcRows.length) {
+      categories = [...new Set(fcRows.map(r => r.category).filter(Boolean))];
+    }
+  } catch (e) {
+    // table query failed — fall back to array column
+  }
+  if (!categories.length && Array.isArray(factory.categories)) {
+    categories = factory.categories.filter(Boolean);
+  }
+
+  if (!categories.length) {
     result.warnings.push({
       code: 'no_category',
       label: 'Factory has no category assigned',
@@ -154,22 +172,35 @@ async function checkLayer1Factory(factory, factoryDocs) {
     return finalize(result);
   }
 
+  // ── Fetch all compliance rules for the factory's categories ──
+  const categoryFilter = categories.map(c => encodeURIComponent(c)).join(',');
   const rules = await sb(
-    `compliance_requirements?category=eq.${encodeURIComponent(cat)}&select=*&limit=1`
-  );
-  if (!rules || !rules.length) {
+    `compliance_requirements?category=in.(${categoryFilter})&select=*`
+  ) || [];
+
+  if (!rules.length) {
     result.warnings.push({
       code: 'no_rules_for_category',
-      label: `No compliance rules configured for category "${cat}"`,
+      label: `No compliance rules configured for ${categories.join(', ')}`,
       severity: 'warning',
-      detail: 'Admin should configure compliance_requirements for this category.'
+      detail: 'Admin should configure compliance_requirements for these categories.'
     });
     return finalize(result);
   }
-  const rule = rules[0];
 
-  // Required certs → red flags on miss/expired
-  for (const certName of (rule.required_factory_certs || [])) {
+  // ── Aggregate required and preferred certs across all matching rules ──
+  // De-duplicate by cert name. Required wins over preferred (stricter).
+  const requiredCerts = new Set();
+  const preferredCerts = new Set();
+  rules.forEach(rule => {
+    (rule.required_factory_certs || []).forEach(c => requiredCerts.add(c));
+    (rule.preferred_factory_certs || []).forEach(c => preferredCerts.add(c));
+  });
+  // Remove from preferred any that are also required
+  requiredCerts.forEach(c => preferredCerts.delete(c));
+
+  // ── Required certs → red flags on miss/expired ──
+  for (const certName of requiredCerts) {
     const cov = checkCertCoverage(factoryDocs, certName);
     const flag = flagForCertStatus(certName, cov, 'blocker');
     if (flag) {
@@ -178,8 +209,8 @@ async function checkLayer1Factory(factory, factoryDocs) {
     }
   }
 
-  // Preferred certs → warnings only on miss
-  for (const certName of (rule.preferred_factory_certs || [])) {
+  // ── Preferred certs → warnings only ──
+  for (const certName of preferredCerts) {
     const cov = checkCertCoverage(factoryDocs, certName);
     if (cov.status === 'missing') {
       result.warnings.push({
@@ -208,7 +239,7 @@ async function checkLayer1Factory(factory, factoryDocs) {
     }
   }
 
-  // Factory's compliance_status field
+  // ── Factory's compliance_status field (if present on the row) ──
   if (factory.compliance_status === 'non_compliant' || factory.compliance_status === 'blocked') {
     result.red_flags.push({
       code: 'factory_compliance_status',
@@ -345,8 +376,9 @@ async function handler(req, res) {
 
   try {
     // Load factory + its documents in one pair of fetches
+    // Use select=* to be resilient to missing columns; we'll access fields defensively
     const factoryRows = await sb(
-      `factories?id=eq.${factory_id}&select=id,factory_name_english,country,category,categories,certifications,compliance_status,compliance_notes&limit=1`
+      `factories?id=eq.${factory_id}&select=*&limit=1`
     );
     if (!factoryRows || !factoryRows.length) {
       return res.status(404).json({ error: 'Factory not found.' });
@@ -354,7 +386,7 @@ async function handler(req, res) {
     const factory = factoryRows[0];
 
     const factoryDocs = await sb(
-      `factory_documents?factory_id=eq.${factory_id}&is_current=eq.true&select=id,document_type,document_type_other,certificate_number,issued_by,issue_date,expiry_date,uploaded_at,file_name`
+      `factory_documents?factory_id=eq.${factory_id}&is_current=eq.true&select=*`
     ) || [];
 
     // Run Layer 1 always
