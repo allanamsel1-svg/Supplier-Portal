@@ -851,7 +851,7 @@ function renderComplianceUI(){
   // ── Cert rows: one per checked cert on Factory Details ──
   var certs=Array.isArray(FACTORY_CHECKED_CERTS)?FACTORY_CHECKED_CERTS.slice():[];
   if(!certs.length){
-    certRowsEl.innerHTML='<div style="font-size:13px;color:#bbb;padding:12px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;">No certifications selected yet. Go to <strong>Factory Details</strong> and check off the certifications your factory holds.</div>';
+    certRowsEl.innerHTML='<div style="font-size:13px;color:#666;padding:14px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;line-height:1.6;">No certifications uploaded yet.<br/><strong>Use the "+ Add Other Document" button below</strong> to upload any certification — it will automatically register on your Factory Details page once uploaded.</div>';
   }else{
     // Sort: uploaded first by expiry asc, then not-uploaded alphabetical
     certs.sort(function(a,b){
@@ -1097,6 +1097,38 @@ async function saveComplianceUpload(){
       showComplErr('Database save failed: '+(derr.message||derr.details||dr.status));
       return;
     }
+
+    // ── AUTO-SYNC: add this cert to factories.certifications array so it
+    // automatically appears as "checked" on the Factory Details page.
+    // Non-blocking — if this fails, the upload still succeeded.
+    try{
+      // Only auto-check if the type is actually a known certification (not
+      // a freeform document like a custom file). We look it up against
+      // the master certifications list loaded for this session.
+      var isKnownCert = Array.isArray(allCertifications) && allCertifications.some(function(c){
+        return c.name === pendingUploadType;
+      });
+      if(isKnownCert && !FACTORY_CHECKED_CERTS.includes(pendingUploadType)){
+        var newCerts = FACTORY_CHECKED_CERTS.concat([pendingUploadType]);
+        var pr = await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID, {
+          method:'PATCH',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify({certifications: newCerts})
+        });
+        if(pr.ok){
+          FACTORY_CHECKED_CERTS = newCerts;
+          // Refresh the Factory Details checkboxes so the new one shows checked
+          if(typeof renderCertifications === 'function'){
+            renderCertifications(newCerts);
+          }
+        } else {
+          console.log('auto-check cert PATCH failed:', pr.status);
+        }
+      }
+    }catch(autoErr){
+      console.log('auto-check cert error (non-fatal):', autoErr);
+    }
+
     closeComplianceModal();
     await loadComplianceDocs();
   }catch(e){
