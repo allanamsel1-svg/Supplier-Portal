@@ -58,7 +58,15 @@ async function sb(path, opts = {}) {
     const txt = await res.text();
     throw new Error(`Supabase ${res.status}: ${txt}`);
   }
-  return res.status === 204 ? null : await res.json();
+  // 204 No Content has no body; 201 with Prefer:return=minimal also has empty body.
+  // Read as text first and only JSON.parse if there's actual content — avoids "Unexpected end of JSON input".
+  if (res.status === 204) return null;
+  const text = await res.text();
+  if (!text || !text.trim()) return null;
+  try { return JSON.parse(text); }
+  catch (parseErr) {
+    throw new Error(`Supabase returned non-JSON body: ${text.slice(0, 200)}`);
+  }
 }
 
 // ── Helpers ──
