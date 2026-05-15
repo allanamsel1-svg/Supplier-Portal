@@ -2055,7 +2055,10 @@ async function loadOrders(){
   g('orders-list').innerHTML='';
   g('orders-empty').style.display='none';
   try{
-    var r=await fetch(SB+"/rest/v1/purchase_orders?factory_id=eq."+FACTORY_ID+"&status=in.(in_production,on_hold)&select=*,rfqs(item_description,project_number,category),po_milestones(*)&order=issued_at.desc",{
+    // Include both pre-production (awaiting signing) and in-production POs.
+    // signing_status: sent_to_factory | accepted = pre-production phase requiring action.
+    // status: in_production | on_hold = production phase with milestones.
+    var r=await fetch(SB+"/rest/v1/purchase_orders?factory_id=eq."+FACTORY_ID+"&or=(signing_status.in.(sent_to_factory,accepted,signed),status.in.(in_production,on_hold))&select=*,rfqs(item_description,project_number,category),po_milestones(*)&order=issued_at.desc",{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     var pos=await r.json();
@@ -2065,8 +2068,12 @@ async function loadOrders(){
       return;
     }
     g('orders-list').innerHTML=pos.map(renderOrderCard).join('');
-    // Badge: count milestones needing attention (next 10 days, not confirmed)
+    // Badge: count POs needing acceptance/signing OR milestones approaching/overdue
     var attention=0;
+    pos.forEach(function(po){
+      if(po.signing_status==='sent_to_factory') attention++;       // needs Accept click
+      else if(po.signing_status==='accepted')   attention++;       // needs signed PDF upload
+    });
     var today=new Date();var tenDays=new Date(today.getTime()+10*86400000);
     pos.forEach(function(po){
       (po.po_milestones||[]).forEach(function(m){
@@ -2076,7 +2083,7 @@ async function loadOrders(){
     });
     var badge=g('orders-badge');
     if(badge){
-      if(attention>0){badge.style.display='inline-block';badge.textContent=attention+' upcoming';}
+      if(attention>0){badge.style.display='inline-block';badge.textContent=attention+' to action';}
       else{badge.style.display='none';}
     }
   }catch(e){
@@ -2087,6 +2094,19 @@ async function loadOrders(){
 
 function renderOrderCard(po){
   var rfq=po.rfqs||{};
+
+  // ── Pre-production: contract signing workflow ──
+  // PO is sent_to_factory (awaiting acceptance click) or accepted (awaiting signed PDF upload).
+  if(po.signing_status==='sent_to_factory' || po.signing_status==='accepted'){
+    return renderPreProductionPoCard(po, rfq);
+  }
+
+  // ── Fully signed but no production milestones yet (shouldn't normally happen) ──
+  if(po.signing_status==='signed' && (!po.po_milestones || !po.po_milestones.length)){
+    return renderPreProductionPoCard(po, rfq);
+  }
+
+  // ── In-production: milestone tracking (existing behavior) ──
   var milestones=(po.po_milestones||[]).slice().sort(function(a,b){return a.display_order-b.display_order;});
   var msLabels={
     sample_submission:'Sample Submission',
@@ -2144,6 +2164,196 @@ function renderOrderCard(po){
       msHtml+
     '</div>'+
   '</div>';
+}
+
+// ── Pre-production PO card: contract acceptance + signed PDF upload workflow ──
+function renderPreProductionPoCard(po, rfq){
+  var awaitingAccept = po.signing_status==='sent_to_factory';
+  var awaitingSignedPdf = po.signing_status==='accepted';
+  var fullyExecuted = po.signing_status==='signed';
+
+  var bannerBg, bannerColor, bannerText, badgeBg, badgeColor, badgeText;
+  if(awaitingAccept){
+    bannerBg='#fff8e0'; bannerColor='#886600'; bannerText='Action required: review and accept the contract';
+    badgeBg='#fff8e0'; badgeColor='#886600'; badgeText='Awaiting acceptance';
+  } else if(awaitingSignedPdf){
+    bannerBg='#e8f0ff'; bannerColor='#2244cc'; bannerText='Action required: print, sign, chop, and upload the executed contract';
+    badgeBg='#e8f0ff'; badgeColor='#2244cc'; badgeText='Awaiting signed PDF';
+  } else {
+    bannerBg='#edfaed'; bannerColor='#1a7a1a'; bannerText='Contract fully executed. Production milestones will be loaded shortly.';
+    badgeBg='#edfaed'; badgeColor='#1a7a1a'; badgeText='Fully executed';
+  }
+
+  // PDF preview (inline iframe if available)
+  var pdfBlock = '';
+  if(po.pdf_url){
+    pdfBlock =
+      '<div style="padding:12px;border-bottom:1px solid #f0f0e8;">'+
+        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Contract PDF (v'+(po.po_version||1)+')</div>'+
+        '<iframe src="'+esc(po.pdf_url)+'#view=FitH" style="width:100%;height:480px;border:1px solid #e0e0d8;border-radius:6px;background:#fff;"></iframe>'+
+        '<div style="margin-top:6px;">'+
+          '<a href="'+esc(po.pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">↓ Download PDF</a>'+
+        '</div>'+
+      '</div>';
+  }
+
+  // Action area
+  var actionBlock = '';
+  if(awaitingAccept){
+    actionBlock =
+      '<div style="padding:14px;background:#fafaf6;">'+
+        '<div style="font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;">'+
+          'Please review the contract above. Clicking <strong>Accept</strong> below confirms you have read and agree to the terms. '+
+          'After accepting, you will be prompted to print the contract, apply your signature and company chop, and upload the executed PDF to complete the process.'+
+        '</div>'+
+        '<button onclick="acceptPO(\''+po.id+'\',\''+esc(po.po_number||'')+'\')" style="padding:10px 18px;background:#1a7a1a;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Accept Contract</button>'+
+        '<span style="margin-left:12px;font-size:11px;color:#888;">Your acceptance will be recorded with timestamp and audit trail.</span>'+
+      '</div>';
+  } else if(awaitingSignedPdf){
+    var acceptedAt = po.factory_accepted_at ? po.factory_accepted_at.slice(0,10) : '';
+    var acceptedBy = po.factory_accepted_by_name || '';
+    actionBlock =
+      '<div style="padding:14px;background:#fafaf6;">'+
+        '<div style="background:#edfaed;color:#1a7a1a;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;">'+
+          '✓ Contract accepted '+(acceptedAt?'on '+esc(acceptedAt):'')+(acceptedBy?' by '+esc(acceptedBy):'')+
+        '</div>'+
+        '<div style="font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;">'+
+          '<strong>Final step:</strong> Print the contract above, apply your authorized signature and company chop on the signature page, scan the executed document, and upload the PDF below. The contract will be considered fully executed once uploaded.'+
+        '</div>'+
+        '<div style="margin-top:10px;">'+
+          '<input type="file" id="signed-pdf-input-'+po.id+'" accept="application/pdf" style="display:none;" onchange="uploadSignedPO(\''+po.id+'\',\''+esc(po.po_number||'')+'\',this)" />'+
+          '<button onclick="document.getElementById(\'signed-pdf-input-'+po.id+'\').click()" style="padding:10px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📎 Upload signed & chopped PDF</button>'+
+          '<span style="margin-left:12px;font-size:11px;color:#888;">PDF only. Once uploaded, the file is locked.</span>'+
+        '</div>'+
+        '<div id="signed-pdf-status-'+po.id+'" style="margin-top:10px;font-size:12px;"></div>'+
+      '</div>';
+  } else {
+    var signedAt = po.signed_pdf_uploaded_at ? po.signed_pdf_uploaded_at.slice(0,10) : '';
+    actionBlock =
+      '<div style="padding:14px;background:#fafaf6;">'+
+        '<div style="background:#edfaed;color:#1a7a1a;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:6px;">'+
+          '✓ Contract fully executed'+(signedAt?' on '+esc(signedAt):'')+'. Production milestones will appear once timeline is locked in.'+
+        '</div>'+
+        (po.signed_pdf_url?'<div style="margin-top:8px;"><a href="'+esc(po.signed_pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">↓ View your executed copy</a></div>':'')+
+      '</div>';
+  }
+
+  return '<div class="rfq-card">'+
+    '<div class="rfq-card-header" style="background:'+bannerBg+';border-left:3px solid '+bannerColor+';">'+
+      '<div style="flex:1;">'+
+        '<div class="rfq-card-title">'+esc(po.po_number||'(no PO number)')+' · '+esc(rfq.item_description||'')+'</div>'+
+        '<div class="rfq-card-meta">'+
+          (rfq.project_number?esc(rfq.project_number)+' · ':'')+
+          'Issued '+(po.issued_at?esc(po.issued_at.slice(0,10)):'')+
+          (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+          (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString():'')+
+        '</div>'+
+        '<div style="font-size:12px;color:'+bannerColor+';margin-top:4px;font-weight:500;">'+esc(bannerText)+'</div>'+
+      '</div>'+
+      '<span style="font-size:10px;background:'+badgeBg+';color:'+badgeColor+';border:1px solid '+badgeColor+'33;padding:2px 10px;border-radius:10px;font-weight:600;white-space:nowrap;">'+esc(badgeText)+'</span>'+
+    '</div>'+
+    '<div class="rfq-card-body open" style="display:block;padding:0;">'+
+      pdfBlock + actionBlock +
+    '</div>'+
+  '</div>';
+}
+
+// ── Accept PO contract (digital acknowledgment) ──
+async function acceptPO(poId, poNumber){
+  var contactName = (window.FACTORY_NAME || '');  // best-effort default
+  var name = prompt(
+    'Type your full name to digitally accept Purchase Order '+poNumber+'.\n\n' +
+    'By accepting, you confirm you are authorized to commit your company to the terms of this contract. ' +
+    'Your name, timestamp, and IP address will be recorded as part of the audit trail.\n\n' +
+    'After acceptance, you will be prompted to upload the physically signed and chopped contract.',
+    contactName
+  );
+  if(!name || !name.trim()){
+    return;
+  }
+  try{
+    var r = await fetch('/api/accept-po', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({purchase_order_id: poId, accepted_by_name: name.trim()})
+    });
+    var data = await r.json();
+    if(!r.ok || !data.success){
+      throw new Error(data.error || ('HTTP '+r.status));
+    }
+    alert('✓ Contract accepted. Please print, sign, and apply your company chop, then upload the executed PDF.');
+    loadOrders();
+  }catch(e){
+    alert('Could not accept contract: '+(e.message||e));
+  }
+}
+
+// ── Upload signed/chopped PDF, then call finalize endpoint ──
+async function uploadSignedPO(poId, poNumber, inputEl){
+  var file = inputEl.files && inputEl.files[0];
+  if(!file)return;
+  if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
+    alert('Please upload a PDF file only.');
+    inputEl.value = '';
+    return;
+  }
+  var statusEl = g('signed-pdf-status-'+poId);
+  if(statusEl){
+    statusEl.style.background='#fff8e0';statusEl.style.color='#886600';
+    statusEl.style.padding='8px 10px';statusEl.style.borderRadius='6px';
+    statusEl.textContent='Uploading... please wait.';
+  }
+  try{
+    // 1. Upload directly to Supabase storage
+    var path = poId + '/signed_' + poNumber + '_' + Date.now() + '.pdf';
+    var uploadResp = await fetch(SB+'/storage/v1/object/po-contracts/'+path, {
+      method:'POST',
+      headers:{
+        'apikey':KEY,
+        'Authorization':'Bearer '+TOKEN,
+        'Content-Type':'application/pdf',
+        'x-upsert':'true'
+      },
+      body: file
+    });
+    if(!uploadResp.ok){
+      var errTxt = await uploadResp.text();
+      throw new Error('Storage upload failed: '+errTxt);
+    }
+    var signedPdfUrl = SB+'/storage/v1/object/public/po-contracts/'+path;
+
+    // 2. Tell backend the upload is done
+    var contactName = (window.FACTORY_NAME || '');
+    var nameForRecord = prompt(
+      'Confirm your name for the record (who uploaded the signed contract):',
+      contactName
+    ) || null;
+
+    var finResp = await fetch('/api/finalize-po-signature', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        purchase_order_id: poId,
+        signed_pdf_url: signedPdfUrl,
+        uploaded_by: nameForRecord
+      })
+    });
+    var data = await finResp.json();
+    if(!finResp.ok || !data.success){
+      throw new Error(data.error || ('HTTP '+finResp.status));
+    }
+    if(statusEl){
+      statusEl.style.background='#edfaed';statusEl.style.color='#1a7a1a';
+      statusEl.textContent='✓ Signed PDF uploaded successfully. Contract is now fully executed.';
+    }
+    setTimeout(loadOrders, 1200);
+  }catch(e){
+    if(statusEl){
+      statusEl.style.background='#fff0f0';statusEl.style.color='#b00';
+      statusEl.textContent='Upload failed: '+(e.message||e);
+    }
+    inputEl.value = '';
+  }
 }
 
 async function confirmMilestone(milestoneId){

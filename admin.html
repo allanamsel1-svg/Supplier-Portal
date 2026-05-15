@@ -8003,29 +8003,21 @@ async function issuePOFromPdi(pdiId){
       body:JSON.stringify({factory_id:p.factory_id,event_type:'po_issued',event_data:{purchase_order_id:po.id,po_number:poNumber,product_development_id:p.id},actor_type:'admin'})
     }).catch(function(){});
 
-    // Send factory notification email (non-blocking)
+    // Send factory notification email + generate PO PDF (non-blocking but awaited for ack)
     try{
-      var f = p.factories || {};
-      var rfq = p.rfqs || {};
-      if(f.sales_email){
-        var body = 'Dear '+(f.sales_contact_name?f.sales_contact_name.split(/\s+/)[0]:'Team')+',\n\n'+
-          'Your golden sample has been approved and we are issuing Purchase Order '+poNumber+' for '+(rfq.item_description||'this product')+'.\n\n'+
-          'Production timeline (based on the offsets you committed in your quote):\n'+
-          milestones.filter(function(m){return m.milestone_type!=='sample_submission';}).map(function(m){
-            var label=({materials_on_hand:'Materials on hand',mass_production_start:'Mass production starts',mass_production_end:'Mass production ends',inspection:'Pre-shipment inspection',cargo_ready:'Cargo ready'})[m.milestone_type]||m.milestone_type;
-            return '• '+label+': '+m.agreed_date;
-          }).join('\n')+'\n\n'+
-          'Please log into the supplier portal to view the full schedule and confirm each milestone as production progresses. You can request a timeline change at any point if circumstances require it — those requests come to us for approval.\n\n'+
-          'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
-        fetch('/api/send-email',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({to:f.sales_email,toName:f.sales_contact_name||'',subject:'Purchase Order '+poNumber+' issued — '+(rfq.item_description||'product'),body:body})
-        }).catch(function(){});
+      var pdfResp = await fetch('/api/send-po-pdf',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({purchase_order_id: po.id})
+      });
+      if(!pdfResp.ok){
+        var pdfErr = await pdfResp.json().catch(function(){return{};});
+        console.log('PO PDF generation failed (non-fatal — PO and milestones still created):', pdfErr);
+        alert('PO '+poNumber+' was created and milestones are tracked, BUT PDF generation/email failed:\n\n'+(pdfErr.error||'unknown error')+'\n\nYou can retry by clicking the "Re-send PO PDF" button on the PO record.');
       }
-    }catch(emailErr){console.log('PO email send (non-fatal):',emailErr);}
+    }catch(emailErr){console.log('PO PDF send (non-fatal):',emailErr);}
 
-    alert('✓ Purchase Order '+poNumber+' has been issued. The factory has been notified.');
+    alert('✓ Purchase Order '+poNumber+' has been issued. The factory has been notified with the contract PDF and is now expected to log in and Accept, then upload the signed/chopped contract.');
     closePdiDetail();
     loadPDItems();
     if(typeof loadPOs==='function')loadPOs();
