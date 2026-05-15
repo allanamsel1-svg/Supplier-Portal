@@ -76,26 +76,27 @@ function hoursBetween(d1, d2) { return (new Date(d2) - new Date(d1)) / 3_600_000
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 1 — Responsiveness (25 pts)
-// Measures: time to respond to invitations and RFQs
-// Inputs: invitation_events (created_at), factory_rfqs (assigned_at), rfq_quotes (created_at)
-// Output: 0-100 score + sub-components + data points used
+// Measures: (a) time from invitation→login response, (b) quote submission frequency
+// Inputs: invitation_events, rfq_quotes
 // ─────────────────────────────────────────────────────────
 async function scoreResponsiveness(factoryId) {
   const subComponents = {};
   let dataPoints = 0;
 
-  // (a) Invitation events — pull all events and analyze timing patterns
-  // event_type values include: 'invited', 'sent', 'opened', 'logged_in', etc.
+  // (a) Invitation events — find invite→response pairs
   const invEvents = await sb(
-    `invitation_events?factory_id=eq.${factoryId}&select=event_type,created_at&order=created_at.asc&limit=50`
+    `invitation_events?factory_id=eq.${factoryId}&select=event_type,created_at&order=created_at.asc&limit=100`
   ) || [];
   if (invEvents.length >= 2) {
-    // Find first invitation-style event and first response-style event
-    const inviteEvent = invEvents.find(e => ['invited','sent','invitation_sent'].includes(e.event_type));
-    const responseEvent = invEvents.find(e =>
-      ['opened','logged_in','accepted','responded','first_login'].includes(e.event_type) &&
-      inviteEvent && new Date(e.created_at) > new Date(inviteEvent.created_at)
+    // Find earliest invitation-style event
+    const inviteEvent = invEvents.find(e =>
+      ['invited','sent','invitation_sent','pending'].includes((e.event_type || '').toLowerCase())
     );
+    // Find earliest response-style event AFTER the invitation
+    const responseEvent = inviteEvent ? invEvents.find(e =>
+      ['active','logged_in','accepted','responded','first_login','quoted'].includes((e.event_type || '').toLowerCase()) &&
+      new Date(e.created_at) > new Date(inviteEvent.created_at)
+    ) : null;
     if (inviteEvent && responseEvent) {
       const hrs = hoursBetween(inviteEvent.created_at, responseEvent.created_at);
       let s;
@@ -109,42 +110,22 @@ async function scoreResponsiveness(factoryId) {
     }
   }
 
-  // (b) Quote turnaround time — assigned_at → first rfq_quote created_at, per RFQ
-  // Excellent: <48h = 100, Good: <5d = 85, OK: <10d = 70, Slow: >10d = 55
-  const assignments = await sb(
-    `factory_rfqs?factory_id=eq.${factoryId}&select=rfq_id,assigned_at&order=assigned_at.desc&limit=30`
+  // (b) Quote engagement — count quotes submitted in last 90 days
+  // More quotes = more engaged factory.
+  // We don't have a reliable assigned_at, so use submission frequency as a proxy.
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000).toISOString();
+  const recentQuotes = await sb(
+    `rfq_quotes?factory_id=eq.${factoryId}&status=neq.draft&created_at=gte.${ninetyDaysAgo}&select=id`
   ) || [];
-  if (assignments.length) {
-    const rfqIds = assignments.map(a => a.rfq_id).filter(Boolean);
-    if (rfqIds.length) {
-      const quotesRows = await sb(
-        `rfq_quotes?factory_id=eq.${factoryId}&rfq_id=in.(${rfqIds.join(',')})&status=neq.draft&select=rfq_id,created_at&order=created_at.asc`
-      ) || [];
-      const firstQuotePerRfq = {};
-      quotesRows.forEach(q => {
-        if (!firstQuotePerRfq[q.rfq_id] || new Date(q.created_at) < new Date(firstQuotePerRfq[q.rfq_id])) {
-          firstQuotePerRfq[q.rfq_id] = q.created_at;
-        }
-      });
-      const turnaroundHours = [];
-      for (const a of assignments) {
-        if (!a.assigned_at) continue;
-        const fq = firstQuotePerRfq[a.rfq_id];
-        if (fq) turnaroundHours.push(hoursBetween(a.assigned_at, fq));
-      }
-      if (turnaroundHours.length) {
-        const avgHrs = avg(turnaroundHours);
-        let s;
-        if (avgHrs <= 48)        s = 100;
-        else if (avgHrs <= 120)  s = 85;
-        else if (avgHrs <= 240)  s = 70;
-        else                     s = 55;
-        subComponents.quote_turnaround_score = s;
-        subComponents.quote_turnaround_avg_hours = Math.round(avgHrs);
-        subComponents.quote_turnaround_sample_size = turnaroundHours.length;
-        dataPoints += turnaroundHours.length;
-      }
-    }
+  if (recentQuotes.length > 0) {
+    let s;
+    if (recentQuotes.length >= 10)      s = 100;
+    else if (recentQuotes.length >= 5)  s = 85;
+    else if (recentQuotes.length >= 2)  s = 70;
+    else                                 s = 55;
+    subComponents.quote_engagement_score = s;
+    subComponents.quotes_last_90_days = recentQuotes.length;
+    dataPoints += recentQuotes.length;
   }
 
   // Composite for this dimension — average of available sub-components
@@ -213,115 +194,129 @@ async function scoreQuoteQuality(factoryId) {
 // ─────────────────────────────────────────────────────────
 async function scoreSamplePerformance(factoryId) {
   const pds = await sb(
-    `product_development?factory_id=eq.${factoryId}&select=id,status,approved_at,rejected_at,created_at`
+    `product_development?factory_id=eq.${factoryId}&select=id,status,approved_at,created_at`
   ) || [];
   if (!pds.length) {
     return { score: null, dataPoints: 0, breakdown: { note: 'No product development records yet.' } };
   }
-  const closed = pds.filter(p => p.status === 'approved' || p.status === 'rejected');
-  if (!closed.length) {
+  // Use status field for both approved and rejected (no rejected_at column exists)
+  const approved = pds.filter(p => (p.status || '').toLowerCase() === 'approved');
+  const rejected = pds.filter(p => (p.status || '').toLowerCase() === 'rejected');
+  const closed = approved.length + rejected.length;
+  if (!closed) {
     return { score: null, dataPoints: 0, breakdown: { note: 'Product developments in progress but none closed yet.' } };
   }
-  const approved = closed.filter(p => p.status === 'approved');
-  const rejected = closed.filter(p => p.status === 'rejected');
 
-  const approvalRate = approved.length / closed.length;
-  // Score = approval rate × 100 (simple until current_version data is available)
+  const approvalRate = approved.length / closed;
   const composite = approvalRate * 100;
 
   return {
     score: clamp(composite, 0, 100),
-    dataPoints: closed.length,
+    dataPoints: closed,
     breakdown: {
-      total_pds_closed: closed.length,
+      total_pds: pds.length,
+      total_pds_closed: closed,
       approved: approved.length,
       rejected: rejected.length,
       approval_rate_pct: Math.round(approvalRate * 100),
-      formula: 'approval rate × 100 (revisions / first-pass tracking pending product_development_items migration)',
-      note: 'Once the product_development_items migration runs, this will include first-pass approval and revision counts.'
+      formula: 'approval rate × 100',
+      note: 'Once product_development_items table is migrated, will include first-pass approval and revision counts.'
     }
   };
 }
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 4 — Production Reliability (20 pts)
-// Measures: PO count + completion rate
-// Inputs: purchase_order_lines (no separate header table, no milestones table)
-// Note: rich on-time tracking will be added once po_milestones table is migrated.
+// Measures: PO activity volume + qty_received vs qty_ordered as completion proxy
+// Inputs: purchase_order_lines joined to rfq_quotes (no factory_id on lines directly)
+// Note: rich on-time tracking requires po_milestones table migration.
 // ─────────────────────────────────────────────────────────
 async function scoreProductionReliability(factoryId) {
+  // Step 1: find accepted quotes for this factory (these become POs)
+  const acceptedQuotes = await sb(
+    `rfq_quotes?factory_id=eq.${factoryId}&status=eq.accepted&select=id`
+  ) || [];
+  if (!acceptedQuotes.length) {
+    return { score: null, dataPoints: 0, breakdown: { note: 'No accepted quotes (no PO activity) for this factory yet.' } };
+  }
+  const quoteIds = acceptedQuotes.map(q => q.id);
+
+  // Step 2: find PO lines tied to those quotes
   const lines = await sb(
-    `purchase_order_lines?factory_id=eq.${factoryId}&select=id,status`
+    `purchase_order_lines?rfq_quote_id=in.(${quoteIds.join(',')})&select=id,qty_ordered,qty_received`
   ) || [];
 
   if (!lines.length) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'No POs issued to this factory yet.' } };
+    return { score: null, dataPoints: 0, breakdown: { note: 'Accepted quotes exist but no POs issued yet.' } };
   }
 
-  // Without milestones, do a simple completion-rate score
-  // Status values likely include: 'pending','in_production','shipped','delivered','cancelled'
-  // For now: count any non-cancelled lines as "in progress or done"
-  const cancelled = lines.filter(l => (l.status || '').toLowerCase() === 'cancelled');
-  const delivered = lines.filter(l => ['delivered','completed','shipped','closed'].includes((l.status || '').toLowerCase()));
-  const inProgress = lines.length - cancelled.length - delivered.length;
+  // Use qty_received / qty_ordered as a completion proxy
+  let totalOrdered = 0, totalReceived = 0;
+  lines.forEach(l => {
+    totalOrdered  += parseFloat(l.qty_ordered  || 0);
+    totalReceived += parseFloat(l.qty_received || 0);
+  });
 
-  // Simple score: deliveries / (non-cancelled lines) × 100
-  // If lots of lines but few delivered, factory may be slow OR many are still in progress
-  const denominator = lines.length - cancelled.length;
-  const deliveryRate = denominator > 0 ? delivered.length / denominator : 0;
-  const composite = deliveryRate * 100;
+  if (totalOrdered === 0) {
+    return { score: null, dataPoints: lines.length, breakdown: { note: 'PO lines exist but no qty_ordered recorded.' } };
+  }
+
+  const completionRate = Math.min(1, totalReceived / totalOrdered);
+  // Score: completion rate × 100 — but ONLY for fully closed POs (received >= ordered for any line)
+  // Pure in-progress orders shouldn't be penalized
+  const fullyReceived = lines.filter(l => parseFloat(l.qty_received || 0) >= parseFloat(l.qty_ordered || 0) && parseFloat(l.qty_ordered || 0) > 0).length;
+  const composite = completionRate * 100;
 
   return {
     score: clamp(composite, 0, 100),
     dataPoints: lines.length,
     breakdown: {
+      accepted_quotes: acceptedQuotes.length,
       total_po_lines: lines.length,
-      delivered_or_complete: delivered.length,
-      in_progress: inProgress,
-      cancelled: cancelled.length,
-      delivery_rate_pct: Math.round(deliveryRate * 100),
-      formula: 'delivered count / (total - cancelled) × 100',
-      note: 'Once po_milestones table is migrated, will include on-time-rate vs delay magnitude tracking.'
+      fully_received_lines: fullyReceived,
+      total_qty_ordered: totalOrdered,
+      total_qty_received: totalReceived,
+      completion_rate_pct: Math.round(completionRate * 100),
+      formula: 'qty_received / qty_ordered × 100 (capped at 100)',
+      note: 'Once po_milestones migration runs, will include on-time-rate vs delay magnitude.'
     }
   };
 }
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 5 — Compliance Hygiene (10 pts)
-// Measures: cert renewal timeliness, scope match, compliance gate pass rate
-// Inputs: factory_documents (certs), rfq_quotes.compliance_gate_status
+// Measures: cert expiry health + compliance gate pass rate
+// Inputs: factory_documents (document_type, expiry_date), rfq_quotes.compliance_gate_status
 // ─────────────────────────────────────────────────────────
 async function scoreComplianceHygiene(factoryId) {
   const subComponents = {};
   let dataPoints = 0;
 
-  // (a) Certs in good standing — % of certs that are not expired or expiring within 30 days
-  // Matches the working query pattern in api/score-quote.js
+  // (a) Certs in good standing — score by expiry status
+  // factory_documents schema: id, factory_id, document_type, certificate_number, expiry_date, ...
   const certs = await sb(
-    `factory_documents?factory_id=eq.${factoryId}&select=cert_status,expiry_date&order=uploaded_at.desc&limit=50`
+    `factory_documents?factory_id=eq.${factoryId}&select=document_type,expiry_date&limit=100`
   ) || [];
   if (certs.length) {
     const now = new Date();
     const thirtyDays = new Date(now.getTime() + 30 * 86400000);
-    let good = 0, expiring = 0, expired = 0;
-    // Only score docs that are approved status (skip pending/rejected)
-    const approvedCerts = certs.filter(c => c.cert_status === 'approved');
-    approvedCerts.forEach(c => {
-      if (!c.expiry_date) { good++; return; }
+    let good = 0, expiring = 0, expired = 0, noExpiry = 0;
+    certs.forEach(c => {
+      if (!c.expiry_date) { noExpiry++; good++; return; }
       const exp = new Date(c.expiry_date);
+      if (isNaN(exp.getTime())) { good++; return; }
       if (exp < now)              expired++;
       else if (exp < thirtyDays)  expiring++;
       else                         good++;
     });
-    if (approvedCerts.length) {
-      const score = ((good + expiring * 0.5) / approvedCerts.length) * 100;
-      subComponents.cert_health_score = score;
-      subComponents.certs_total = approvedCerts.length;
-      subComponents.certs_good = good;
-      subComponents.certs_expiring_30d = expiring;
-      subComponents.certs_expired = expired;
-      dataPoints += approvedCerts.length;
-    }
+    const score = ((good + expiring * 0.5) / certs.length) * 100;
+    subComponents.cert_health_score = score;
+    subComponents.certs_total = certs.length;
+    subComponents.certs_good = good;
+    subComponents.certs_expiring_30d = expiring;
+    subComponents.certs_expired = expired;
+    subComponents.certs_no_expiry_date = noExpiry;
+    dataPoints += certs.length;
   }
 
   // (b) Compliance gate pass rate on submitted quotes
@@ -329,8 +324,8 @@ async function scoreComplianceHygiene(factoryId) {
     `rfq_quotes?factory_id=eq.${factoryId}&status=neq.draft&compliance_gate_status=not.is.null&select=compliance_gate_status&order=created_at.desc&limit=30`
   ) || [];
   if (quotes.length) {
-    const passed = quotes.filter(q => q.compliance_gate_status === 'passed' || q.compliance_gate_status === 'pass').length;
-    const blocked = quotes.filter(q => q.compliance_gate_status === 'blocked').length;
+    const passed = quotes.filter(q => ['passed','pass'].includes((q.compliance_gate_status || '').toLowerCase())).length;
+    const blocked = quotes.filter(q => (q.compliance_gate_status || '').toLowerCase() === 'blocked').length;
     const score = (passed / quotes.length) * 100;
     subComponents.compliance_gate_score = score;
     subComponents.gate_total_quotes = quotes.length;
