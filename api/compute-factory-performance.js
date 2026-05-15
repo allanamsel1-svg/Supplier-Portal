@@ -76,40 +76,41 @@ function hoursBetween(d1, d2) { return (new Date(d2) - new Date(d1)) / 3_600_000
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 1 — Responsiveness (25 pts)
-// Measures: time to respond to invitations, RFQs, and admin info requests
-// Inputs: factory_rfqs (assigned_at vs first quote submission)
-//         rfq_quotes status transitions
+// Measures: time to respond to invitations and RFQs
+// Inputs: invitation_events (created_at), factory_rfqs (assigned_at), rfq_quotes (created_at)
 // Output: 0-100 score + sub-components + data points used
 // ─────────────────────────────────────────────────────────
 async function scoreResponsiveness(factoryId) {
   const subComponents = {};
   let dataPoints = 0;
 
-  // (a) Invitation-to-first-login responsiveness — from factory_events
-  //     Score = how fast did factory log in after receiving an invite?
-  //     Excellent: <24h = 100, Good: <72h = 85, OK: <7d = 70, Slow: >7d = 50
-  const invitedEvents = await sb(
-    `factory_events?factory_id=eq.${factoryId}&event_type=eq.invitation_sent&select=occurred_at&order=occurred_at.asc&limit=20`
+  // (a) Invitation events — pull all events and analyze timing patterns
+  // event_type values include: 'invited', 'sent', 'opened', 'logged_in', etc.
+  const invEvents = await sb(
+    `invitation_events?factory_id=eq.${factoryId}&select=event_type,created_at&order=created_at.asc&limit=50`
   ) || [];
-  const loginEvents = await sb(
-    `factory_events?factory_id=eq.${factoryId}&event_type=eq.first_login&select=occurred_at&order=occurred_at.asc&limit=20`
-  ) || [];
-  if (invitedEvents.length && loginEvents.length) {
-    const firstInvite = invitedEvents[0].occurred_at;
-    const firstLogin = loginEvents[0].occurred_at;
-    const hrs = hoursBetween(firstInvite, firstLogin);
-    let s;
-    if (hrs <= 24)        s = 100;
-    else if (hrs <= 72)   s = 85;
-    else if (hrs <= 168)  s = 70;
-    else                  s = 50;
-    subComponents.invitation_login_score = s;
-    subComponents.invitation_login_hours = Math.round(hrs);
-    dataPoints++;
+  if (invEvents.length >= 2) {
+    // Find first invitation-style event and first response-style event
+    const inviteEvent = invEvents.find(e => ['invited','sent','invitation_sent'].includes(e.event_type));
+    const responseEvent = invEvents.find(e =>
+      ['opened','logged_in','accepted','responded','first_login'].includes(e.event_type) &&
+      inviteEvent && new Date(e.created_at) > new Date(inviteEvent.created_at)
+    );
+    if (inviteEvent && responseEvent) {
+      const hrs = hoursBetween(inviteEvent.created_at, responseEvent.created_at);
+      let s;
+      if (hrs <= 24)        s = 100;
+      else if (hrs <= 72)   s = 85;
+      else if (hrs <= 168)  s = 70;
+      else                  s = 50;
+      subComponents.invitation_response_score = s;
+      subComponents.invitation_response_hours = Math.round(hrs);
+      dataPoints++;
+    }
   }
 
   // (b) Quote turnaround time — assigned_at → first rfq_quote created_at, per RFQ
-  //     Excellent: <48h = 100, Good: <5d = 85, OK: <10d = 70, Slow: >10d = 55
+  // Excellent: <48h = 100, Good: <5d = 85, OK: <10d = 70, Slow: >10d = 55
   const assignments = await sb(
     `factory_rfqs?factory_id=eq.${factoryId}&select=rfq_id,assigned_at&order=assigned_at.desc&limit=30`
   ) || [];
@@ -205,135 +206,82 @@ async function scoreQuoteQuality(factoryId) {
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 3 — Sample Performance (20 pts)
-// Measures: golden-sample first-pass approval rate + average revisions
-// Inputs: product_development_items + sample_evaluations
+// Measures: PD approval rate
+// Inputs: product_development (singular)
+// Note: schema doesn't have current_version, so first-pass approval can't be measured here.
+//       Will improve when product_development_items table is migrated.
 // ─────────────────────────────────────────────────────────
 async function scoreSamplePerformance(factoryId) {
   const pds = await sb(
-    `product_development_items?factory_id=eq.${factoryId}&select=id,status,current_version,approved_at,rejected_at`
+    `product_development?factory_id=eq.${factoryId}&select=id,status,approved_at,rejected_at,created_at`
   ) || [];
   if (!pds.length) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'No product development items yet.' } };
+    return { score: null, dataPoints: 0, breakdown: { note: 'No product development records yet.' } };
   }
   const closed = pds.filter(p => p.status === 'approved' || p.status === 'rejected');
   if (!closed.length) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'Samples in progress but none closed yet.' } };
+    return { score: null, dataPoints: 0, breakdown: { note: 'Product developments in progress but none closed yet.' } };
   }
   const approved = closed.filter(p => p.status === 'approved');
-  const firstPassApproved = approved.filter(p => (p.current_version || 1) === 1);
   const rejected = closed.filter(p => p.status === 'rejected');
 
-  // First-pass approval rate is the headline metric — 100% = perfect, 0% = never on first try
-  const firstPassRate = approved.length ? (firstPassApproved.length / approved.length) : 0;
-  // Approval rate overall
-  const approvalRate = closed.length ? (approved.length / closed.length) : 0;
-  // Avg revisions (excluding rejects)
-  const avgRevisions = approved.length ? avg(approved.map(p => Math.max(0, (p.current_version || 1) - 1))) : 0;
-
-  // Score formula:
-  //   60% from first-pass-approval rate (rewards getting it right the first time)
-  //   30% from overall approval rate (penalize rejections)
-  //   10% from revision count (fewer revisions = better; 0 revisions = 100, 4+ revisions = 0)
-  const revisionScore = clamp(100 - (avgRevisions * 25), 0, 100);
-  const composite = (firstPassRate * 100 * 0.6) + (approvalRate * 100 * 0.3) + (revisionScore * 0.1);
+  const approvalRate = approved.length / closed.length;
+  // Score = approval rate × 100 (simple until current_version data is available)
+  const composite = approvalRate * 100;
 
   return {
     score: clamp(composite, 0, 100),
     dataPoints: closed.length,
     breakdown: {
-      total_samples_closed: closed.length,
+      total_pds_closed: closed.length,
       approved: approved.length,
       rejected: rejected.length,
-      first_pass_approved: firstPassApproved.length,
-      first_pass_approval_rate: Math.round(firstPassRate * 100),
-      overall_approval_rate: Math.round(approvalRate * 100),
-      avg_revisions_to_approval: Math.round(avgRevisions * 10) / 10,
-      formula: '60% first-pass rate + 30% approval rate + 10% revision-count score'
+      approval_rate_pct: Math.round(approvalRate * 100),
+      formula: 'approval rate × 100 (revisions / first-pass tracking pending product_development_items migration)',
+      note: 'Once the product_development_items migration runs, this will include first-pass approval and revision counts.'
     }
   };
 }
 
 // ─────────────────────────────────────────────────────────
 // DIMENSION 4 — Production Reliability (20 pts)
-// Measures: % of PO milestones hit on time vs delayed; magnitude of delays
-// Inputs: po_milestones across all POs for this factory
+// Measures: PO count + completion rate
+// Inputs: purchase_order_lines (no separate header table, no milestones table)
+// Note: rich on-time tracking will be added once po_milestones table is migrated.
 // ─────────────────────────────────────────────────────────
 async function scoreProductionReliability(factoryId) {
-  // Get all POs for this factory
-  const pos = await sb(
-    `purchase_orders?factory_id=eq.${factoryId}&select=id`
+  const lines = await sb(
+    `purchase_order_lines?factory_id=eq.${factoryId}&select=id,status`
   ) || [];
-  if (!pos.length) {
+
+  if (!lines.length) {
     return { score: null, dataPoints: 0, breakdown: { note: 'No POs issued to this factory yet.' } };
   }
-  const poIds = pos.map(p => p.id);
-  if (!poIds.length) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'No PO ids found.' } };
-  }
 
-  const milestones = await sb(
-    `po_milestones?purchase_order_id=in.(${poIds.join(',')})&status=in.(completed,confirmed_on_track,at_risk,delayed)&select=status,agreed_date,revised_date,completed_at,milestone_type`
-  ) || [];
+  // Without milestones, do a simple completion-rate score
+  // Status values likely include: 'pending','in_production','shipped','delivered','cancelled'
+  // For now: count any non-cancelled lines as "in progress or done"
+  const cancelled = lines.filter(l => (l.status || '').toLowerCase() === 'cancelled');
+  const delivered = lines.filter(l => ['delivered','completed','shipped','closed'].includes((l.status || '').toLowerCase()));
+  const inProgress = lines.length - cancelled.length - delivered.length;
 
-  if (!milestones.length) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'POs exist but no milestone data yet.' } };
-  }
-
-  let onTimeCount = 0;
-  let delayedCount = 0;
-  let atRiskCount = 0;
-  let confirmedCount = 0;
-  const delayDaysList = [];
-
-  milestones.forEach(m => {
-    const agreed = m.agreed_date;
-    const revised = m.revised_date;
-    const completed = m.completed_at;
-    if (m.status === 'completed' && completed && agreed) {
-      const slipDays = Math.round((new Date(completed) - new Date(agreed)) / 86400000);
-      if (slipDays <= 0) onTimeCount++;
-      else { delayedCount++; delayDaysList.push(slipDays); }
-    } else if (m.status === 'delayed') {
-      delayedCount++;
-      if (revised && agreed) {
-        const slipDays = Math.round((new Date(revised) - new Date(agreed)) / 86400000);
-        if (slipDays > 0) delayDaysList.push(slipDays);
-      }
-    } else if (m.status === 'at_risk') {
-      atRiskCount++;
-    } else if (m.status === 'confirmed_on_track') {
-      confirmedCount++;
-    }
-  });
-
-  const total = onTimeCount + delayedCount + atRiskCount + confirmedCount;
-  if (!total) {
-    return { score: null, dataPoints: 0, breakdown: { note: 'No measurable milestones yet.' } };
-  }
-
-  // On-time rate = (on-time + confirmed-on-track) / total
-  // At-risk counts as half-credit since it's a warning but not yet a miss
-  const onTimeRate = (onTimeCount + confirmedCount + (atRiskCount * 0.5)) / total;
-  // Avg delay magnitude (only for those that delayed) — used as a penalty
-  const avgDelayDays = delayDaysList.length ? avg(delayDaysList) : 0;
-  // Delay magnitude penalty: 0d = 0 penalty, 7d = 10 penalty, 14d = 20 penalty, capped at 30
-  const delayPenalty = clamp(avgDelayDays * (10 / 7), 0, 30);
-
-  const composite = clamp((onTimeRate * 100) - delayPenalty, 0, 100);
+  // Simple score: deliveries / (non-cancelled lines) × 100
+  // If lots of lines but few delivered, factory may be slow OR many are still in progress
+  const denominator = lines.length - cancelled.length;
+  const deliveryRate = denominator > 0 ? delivered.length / denominator : 0;
+  const composite = deliveryRate * 100;
 
   return {
-    score: composite,
-    dataPoints: total,
+    score: clamp(composite, 0, 100),
+    dataPoints: lines.length,
     breakdown: {
-      total_milestones_measured: total,
-      on_time_count: onTimeCount,
-      confirmed_on_track_count: confirmedCount,
-      at_risk_count: atRiskCount,
-      delayed_count: delayedCount,
-      on_time_rate_pct: Math.round(onTimeRate * 100),
-      avg_delay_days_when_late: Math.round(avgDelayDays * 10) / 10,
-      delay_penalty_applied: Math.round(delayPenalty * 10) / 10,
-      formula: '(on-time rate × 100) - (avg delay penalty)'
+      total_po_lines: lines.length,
+      delivered_or_complete: delivered.length,
+      in_progress: inProgress,
+      cancelled: cancelled.length,
+      delivery_rate_pct: Math.round(deliveryRate * 100),
+      formula: 'delivered count / (total - cancelled) × 100',
+      note: 'Once po_milestones table is migrated, will include on-time-rate vs delay magnitude tracking.'
     }
   };
 }
@@ -348,27 +296,32 @@ async function scoreComplianceHygiene(factoryId) {
   let dataPoints = 0;
 
   // (a) Certs in good standing — % of certs that are not expired or expiring within 30 days
+  // Matches the working query pattern in api/score-quote.js
   const certs = await sb(
-    `factory_documents?factory_id=eq.${factoryId}&cert_status=eq.approved&select=cert_type,expiry_date`
+    `factory_documents?factory_id=eq.${factoryId}&select=cert_status,expiry_date&order=uploaded_at.desc&limit=50`
   ) || [];
   if (certs.length) {
     const now = new Date();
     const thirtyDays = new Date(now.getTime() + 30 * 86400000);
     let good = 0, expiring = 0, expired = 0;
-    certs.forEach(c => {
+    // Only score docs that are approved status (skip pending/rejected)
+    const approvedCerts = certs.filter(c => c.cert_status === 'approved');
+    approvedCerts.forEach(c => {
       if (!c.expiry_date) { good++; return; }
       const exp = new Date(c.expiry_date);
       if (exp < now)              expired++;
       else if (exp < thirtyDays)  expiring++;
       else                         good++;
     });
-    const score = certs.length ? ((good + expiring * 0.5) / certs.length) * 100 : null;
-    subComponents.cert_health_score = score;
-    subComponents.certs_total = certs.length;
-    subComponents.certs_good = good;
-    subComponents.certs_expiring_30d = expiring;
-    subComponents.certs_expired = expired;
-    dataPoints += certs.length;
+    if (approvedCerts.length) {
+      const score = ((good + expiring * 0.5) / approvedCerts.length) * 100;
+      subComponents.cert_health_score = score;
+      subComponents.certs_total = approvedCerts.length;
+      subComponents.certs_good = good;
+      subComponents.certs_expiring_30d = expiring;
+      subComponents.certs_expired = expired;
+      dataPoints += approvedCerts.length;
+    }
   }
 
   // (b) Compliance gate pass rate on submitted quotes
