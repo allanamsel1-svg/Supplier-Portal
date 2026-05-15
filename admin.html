@@ -2089,6 +2089,15 @@
   </div>
   <div class="drawer-body">
 
+    <!-- Performance Scorecard (populated async by loadFactoryPerformanceScore) -->
+    <div class="d-section" id="d-perf-section" style="display:none;">
+      <div class="d-section-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>Performance Scorecard</span>
+        <button id="d-perf-refresh-btn" onclick="refreshFactoryPerformanceScore()" style="font-size:11px;padding:4px 9px;background:#fff;border:1px solid #ddd;border-radius:5px;color:#666;cursor:pointer;font-family:inherit;">↻ Recompute</button>
+      </div>
+      <div id="d-perf-content"></div>
+    </div>
+
     <div class="d-section" id="d-bizcard-section" style="display:none;">
       <div class="d-section-title">Scanned Business Card</div>
       <a id="d-bizcard-link" href="#" target="_blank" style="display:block;text-decoration:none;">
@@ -2496,12 +2505,176 @@ function sendInviteById(id,e){
 }
 
 
+// ─────────────────────────────────────────────────────────
+// FACTORY PERFORMANCE SCORECARD — drawer integration
+// ─────────────────────────────────────────────────────────
+
+async function loadFactoryPerformanceScore(factoryId){
+  var section=g('d-perf-section');
+  var content=g('d-perf-content');
+  if(!section||!content)return;
+  section.style.display='block';
+  content.innerHTML='<div style="padding:1rem;color:#bbb;font-size:12px;text-align:center;">Loading performance score...</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/factory_performance_scores?factory_id=eq.'+factoryId+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    if(!Array.isArray(rows)||!rows.length){
+      // No score yet — offer to compute on-demand
+      content.innerHTML='<div style="padding:1rem;color:#888;font-size:12px;text-align:center;">'+
+        '<div style="margin-bottom:8px;">No performance score computed yet.</div>'+
+        '<button onclick="refreshFactoryPerformanceScore()" style="padding:6px 12px;background:#1a3a8a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Compute now</button>'+
+      '</div>';
+      return;
+    }
+    renderFactoryPerformanceScore(rows[0]);
+  }catch(e){
+    content.innerHTML='<div style="padding:1rem;color:#b00;font-size:12px;">Failed to load: '+esc(e.message)+'</div>';
+  }
+}
+
+async function refreshFactoryPerformanceScore(){
+  if(!currentDrawerFactory)return;
+  var content=g('d-perf-content');
+  var btn=g('d-perf-refresh-btn');
+  if(btn){btn.disabled=true;btn.textContent='Computing...';}
+  content.innerHTML='<div style="padding:1rem;color:#bbb;font-size:12px;text-align:center;">Computing performance score (~2-5 seconds)...</div>';
+  try{
+    var r=await fetch('/api/compute-factory-performance',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({factory_id:currentDrawerFactory.id})
+    });
+    var data=await r.json();
+    if(!r.ok||!data.success){throw new Error(data.error||'HTTP '+r.status);}
+    await loadFactoryPerformanceScore(currentDrawerFactory.id);
+  }catch(e){
+    content.innerHTML='<div style="padding:1rem;color:#b00;font-size:12px;">Recompute failed: '+esc(e.message)+'</div>';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='↻ Recompute';}
+  }
+}
+
+function renderFactoryPerformanceScore(score){
+  var content=g('d-perf-content');
+  if(!content||!score)return;
+  var composite = score.composite_score!=null ? parseFloat(score.composite_score) : null;
+  var tier = score.tier||'insufficient_data';
+
+  // Header — big composite + tier badge
+  var tierBg, tierColor, tierLabel, tierEmoji;
+  if(tier==='green')      {tierBg='#edfaed'; tierColor='#1a7a1a'; tierLabel='Strong'; tierEmoji='🟢';}
+  else if(tier==='yellow'){tierBg='#fff8e0'; tierColor='#886600'; tierLabel='Mixed';  tierEmoji='🟡';}
+  else if(tier==='red')   {tierBg='#fff0f0'; tierColor='#b00';    tierLabel='Weak';   tierEmoji='🔴';}
+  else                    {tierBg='#f5f5f0'; tierColor='#888';    tierLabel='Insufficient Data'; tierEmoji='⚪';}
+
+  var headerHtml='<div style="background:'+tierBg+';border:1px solid '+tierColor+'33;border-left:4px solid '+tierColor+';border-radius:10px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">'+
+    '<div>'+
+      '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Composite Score</div>'+
+      '<div style="font-size:30px;font-weight:700;color:'+tierColor+';line-height:1;margin-top:4px;">'+(composite!=null?composite.toFixed(1):'—')+'<span style="font-size:14px;color:#888;font-weight:400;">/100</span></div>'+
+    '</div>'+
+    '<div style="text-align:right;">'+
+      '<div style="font-size:18px;">'+tierEmoji+'</div>'+
+      '<div style="font-size:13px;font-weight:600;color:'+tierColor+';">'+tierLabel+'</div>'+
+      (score.computed_at?'<div style="font-size:10px;color:#888;margin-top:3px;">'+new Date(score.computed_at).toLocaleDateString()+'</div>':'')+
+    '</div>'+
+  '</div>';
+
+  // Dimension breakdown — bars
+  var dims=[
+    { key:'responsiveness',         label:'Responsiveness',         weight:25, score:score.responsiveness_score,         dp:score.responsiveness_data_points },
+    { key:'quote_quality',          label:'Quote Quality',          weight:20, score:score.quote_quality_score,          dp:score.quote_quality_data_points },
+    { key:'sample_performance',     label:'Sample Performance',     weight:20, score:score.sample_performance_score,     dp:score.sample_performance_data_points },
+    { key:'production_reliability', label:'Production Reliability', weight:20, score:score.production_reliability_score, dp:score.production_reliability_data_points },
+    { key:'compliance_hygiene',     label:'Compliance Hygiene',     weight:10, score:score.compliance_hygiene_score,     dp:score.compliance_hygiene_data_points },
+    { key:'communication_tone',     label:'Communication Tone',     weight: 5, score:score.communication_tone_score,     dp:score.communication_tone_data_points }
+  ];
+
+  function dimRowHtml(d){
+    var s=d.score!=null?parseFloat(d.score):null;
+    var color=s==null?'#bbb':(s>=85?'#1a7a1a':s>=70?'#886600':'#b00');
+    var bg=s==null?'#f5f5f0':(s>=85?'#edfaed':s>=70?'#fff8e0':'#fff0f0');
+    var pct=s!=null?Math.max(2,Math.min(100,s)):0;
+    var valueLabel=s!=null?s.toFixed(0):'—';
+    var dpLabel=d.dp!=null && d.dp>0?d.dp+(d.dp===1?' point':' points'):'no data';
+    return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:8px;padding:9px 12px;margin-bottom:5px;cursor:pointer;" onclick="toggleDimDetail(\''+d.key+'\')">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(d.label)+'<span style="color:#888;font-weight:400;font-size:11px;"> · weight '+d.weight+'%</span></div>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+          '<span style="font-size:11px;color:#888;">'+esc(dpLabel)+'</span>'+
+          '<span style="font-size:13px;font-weight:700;color:'+color+';">'+valueLabel+(s!=null?'/100':'')+'</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="height:6px;background:'+bg+';border-radius:3px;overflow:hidden;">'+
+        (s!=null?'<div style="height:100%;width:'+pct+'%;background:'+color+';"></div>':'')+
+      '</div>'+
+      '<div id="dimdetail-'+d.key+'" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #e8e8e0;font-size:11px;color:#555;line-height:1.5;"></div>'+
+    '</div>';
+  }
+
+  // Footer with weight notes
+  var bd=score.score_breakdown||{};
+  var weightsUsed=bd.weights_used||null;
+  var weightNote = weightsUsed
+    ? '<div style="font-size:10px;color:#888;margin-top:8px;font-style:italic;">Weights renormalized across available dimensions: '+
+        Object.entries(weightsUsed).map(function(kv){return kv[0]+' '+kv[1]+'%';}).join(', ')+
+      '</div>'
+    : '';
+
+  content.innerHTML = headerHtml +
+    '<div>'+dims.map(dimRowHtml).join('')+'</div>'+
+    weightNote;
+
+  // Stash breakdown for the per-dim toggle
+  window._currentPerfBreakdown = bd;
+}
+
+function toggleDimDetail(key){
+  var el=g('dimdetail-'+key);
+  if(!el)return;
+  if(el.style.display!=='none'){el.style.display='none';return;}
+  // Fill with breakdown details
+  var bd=window._currentPerfBreakdown||{};
+  var dim=(bd.dimensions||{})[key];
+  if(!dim){
+    el.innerHTML='<em>No breakdown available.</em>';
+    el.style.display='block';
+    return;
+  }
+  var details=dim.details||{};
+  // Render whatever's there
+  var lines=[];
+  if(details.note) lines.push('<div style="color:#888;font-style:italic;">'+esc(details.note)+'</div>');
+  Object.entries(details).forEach(function(kv){
+    var k=kv[0], v=kv[1];
+    if(k==='note'||k==='sub_components'||k==='formula'||k==='weighting')return;
+    var label=k.replace(/_/g,' ');
+    var valStr = (typeof v==='object'&&v!==null) ? JSON.stringify(v) : String(v);
+    lines.push('<div><strong>'+esc(label)+':</strong> '+esc(valStr)+'</div>');
+  });
+  if(details.sub_components){
+    Object.entries(details.sub_components).forEach(function(kv){
+      var k=kv[0], v=kv[1];
+      var label=k.replace(/_/g,' ');
+      lines.push('<div style="padding-left:8px;color:#666;"><strong>'+esc(label)+':</strong> '+esc(String(v))+'</div>');
+    });
+  }
+  if(details.formula)   lines.push('<div style="margin-top:4px;color:#888;font-style:italic;">Formula: '+esc(details.formula)+'</div>');
+  if(details.weighting) lines.push('<div style="margin-top:4px;color:#888;font-style:italic;">Weighting: '+esc(details.weighting)+'</div>');
+  el.innerHTML=lines.length?lines.join(''):'<em>No detail data captured.</em>';
+  el.style.display='block';
+}
+
 async function openDrawer(id,e){
   try{
   if(e)e.stopPropagation();
   var f=allFactories.find(function(x){return x.id===id;});
   if(!f){alert('Factory not found: '+id);return;}
   currentDrawerFactory=f;
+
+  // Kick off async performance scorecard loader
+  loadFactoryPerformanceScore(id);
 
   // Header
   g('d-name').textContent=f.factory_name_english||'—';
