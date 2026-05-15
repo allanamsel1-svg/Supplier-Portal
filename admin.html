@@ -7894,6 +7894,152 @@ async function submitEvaluation(){
 }
 
 // Issue PO from approved PD item — creates PO + 6 milestone rows with calculated dates.
+// ── PO Compliance Gate ──
+// Calls /api/check-compliance-status before issuing a PO. Returns:
+//   {ok: true, override: null}        → proceed normally (green)
+//   {ok: true, override: '<justif>'}  → proceed with admin override (red flag was bypassed)
+//   {ok: false}                       → user cancelled
+async function checkPoComplianceGate(pdi) {
+  try {
+    var r = await fetch('/api/check-compliance-status', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        factory_id: pdi.factory_id,
+        rfq_id: pdi.rfq_id,
+        quote_id: pdi.accepted_quote_id
+      })
+    });
+    if (!r.ok) {
+      var msg = 'Compliance gate check failed (HTTP ' + r.status + ').\n\nProceed anyway? Recommend retrying first.';
+      return confirm(msg) ? {ok: true, override: null} : {ok: false};
+    }
+    var data = await r.json();
+    if (!data || !data.success || !data.status) {
+      return confirm('Compliance gate returned unexpected response.\n\nProceed anyway?') ? {ok: true, override: null} : {ok: false};
+    }
+    var st = data.status;
+
+    // Green path → light confirm
+    if (st.overall === 'green') {
+      var okGreen = confirm('Compliance check: ✓ Green — all required documents current.\n\nIssue Purchase Order? Milestone schedule will be locked in based on the factory\'s committed offsets. Factory will be notified.');
+      return okGreen ? {ok: true, override: null} : {ok: false};
+    }
+
+    // Yellow or red → modal
+    return await showComplianceGateModal(st);
+  } catch (e) {
+    console.log('compliance gate error:', e);
+    return confirm('Compliance gate check error: ' + (e.message || e) + '\n\nProceed anyway?') ? {ok: true, override: null} : {ok: false};
+  }
+}
+
+// Show the compliance gate modal. Returns a Promise that resolves to
+// {ok: bool, override?: string}.
+function showComplianceGateModal(status) {
+  return new Promise(function(resolve) {
+    var blocking = !!status.blocks_po;
+    var layers = status.layers || {};
+
+    // Collect flags from all layers, tagged with layer name
+    var allRed = [];
+    var allWarnings = [];
+    function pushFrom(layer, layerLabel) {
+      if (!layer) return;
+      (layer.red_flags || []).forEach(function(f) { allRed.push(Object.assign({_layer: layerLabel}, f)); });
+      (layer.warnings  || []).forEach(function(w) { allWarnings.push(Object.assign({_layer: layerLabel}, w)); });
+    }
+    pushFrom(layers.layer_1_factory, 'Factory Baseline');
+    pushFrom(layers.layer_2_rfq,     'RFQ Requirements');
+    pushFrom(layers.layer_3_product, 'Product Documentation');
+
+    var titleColor = blocking ? '#b00' : '#886600';
+    var titleIcon  = blocking ? '⛔' : '⚠';
+    var titleText  = blocking
+      ? 'Cannot issue PO — ' + allRed.length + ' blocking issue' + (allRed.length === 1 ? '' : 's')
+      : 'Compliance warnings — review before proceeding';
+
+    function renderFlags(flags, color) {
+      if (!flags.length) return '';
+      return flags.map(function(f) {
+        return '<li style="margin:6px 0;padding:10px 12px;background:'+color+'10;border-left:3px solid '+color+';border-radius:4px;list-style:none;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;font-weight:600;">'+esc(f._layer)+'</div>'+
+          '<div style="font-weight:600;color:'+color+';font-size:13px;">'+esc(f.label)+'</div>'+
+          (f.detail ? '<div style="font-size:11px;color:#666;margin-top:4px;line-height:1.4;">'+esc(f.detail)+'</div>' : '')+
+        '</li>';
+      }).join('');
+    }
+
+    var html =
+      '<div id="cg-modal-root" style="position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit;">'+
+        '<div style="background:#fff;border-radius:10px;max-width:680px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,0.25);">'+
+          // Header
+          '<div style="padding:18px 22px;border-bottom:1px solid #e8e8e0;background:'+(blocking?'#fff0f0':'#fff8e0')+';border-radius:10px 10px 0 0;">'+
+            '<div style="font-size:18px;font-weight:700;color:'+titleColor+';">'+titleIcon+' '+esc(titleText)+'</div>'+
+            '<div style="font-size:12px;color:#666;margin-top:4px;line-height:1.4;">'+
+              (blocking
+                ? 'These issues must be resolved before a PO can be issued. Overriding requires a written justification, which is logged for audit.'
+                : 'Issues below are warnings — they do not block PO issuance, but should be addressed when possible.')+
+            '</div>'+
+          '</div>'+
+          // Body
+          '<div style="padding:18px 22px;overflow-y:auto;flex:1;">'+
+            (allRed.length
+              ? '<div style="font-size:11px;font-weight:700;color:#b00;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">⛔ Blocking Issues ('+allRed.length+')</div>'+
+                '<ul style="padding:0;margin:0 0 18px 0;">'+renderFlags(allRed, '#b00')+'</ul>'
+              : '')+
+            (allWarnings.length
+              ? '<div style="font-size:11px;font-weight:700;color:#886600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">⚠ Warnings ('+allWarnings.length+')</div>'+
+                '<ul style="padding:0;margin:0;">'+renderFlags(allWarnings, '#886600')+'</ul>'
+              : '')+
+            // Override justification box (only if blocking)
+            (blocking
+              ? '<div style="margin-top:20px;padding:14px;background:#fffaf0;border:1px solid #f0d860;border-radius:6px;">'+
+                  '<div style="font-size:12px;font-weight:600;color:#886600;margin-bottom:6px;">Override Justification (required, min 20 characters)</div>'+
+                  '<textarea id="cg-justification" rows="3" placeholder="Explain why this PO must be issued despite the blocking issues above. This justification is logged permanently for audit." style="width:100%;border:1px solid #d8d8d0;border-radius:6px;padding:8px;font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical;"></textarea>'+
+                  '<div id="cg-justif-error" style="font-size:11px;color:#b00;margin-top:6px;display:none;"></div>'+
+                '</div>'
+              : '')+
+          '</div>'+
+          // Footer
+          '<div style="padding:14px 22px;border-top:1px solid #e8e8e0;background:#fafaf6;border-radius:0 0 10px 10px;display:flex;gap:10px;justify-content:flex-end;">'+
+            '<button id="cg-cancel" style="padding:9px 18px;background:#fff;color:#333;border:1px solid #d8d8d0;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Cancel</button>'+
+            '<button id="cg-proceed" style="padding:9px 18px;background:'+(blocking?'#b00':'#1a7a1a')+';color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+
+              (blocking ? '⚠ Override and Issue Anyway' : '✓ Proceed and Issue PO')+
+            '</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+
+    var wrap = document.createElement('div');
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap);
+
+    function cleanup() { try { document.body.removeChild(wrap); } catch(e) {} }
+
+    document.getElementById('cg-cancel').onclick = function() {
+      cleanup();
+      resolve({ok: false});
+    };
+    document.getElementById('cg-proceed').onclick = function() {
+      if (blocking) {
+        var j = (document.getElementById('cg-justification').value || '').trim();
+        if (j.length < 20) {
+          var err = document.getElementById('cg-justif-error');
+          err.textContent = 'Justification must be at least 20 characters. You entered ' + j.length + '.';
+          err.style.display = 'block';
+          return;
+        }
+        cleanup();
+        resolve({ok: true, override: j});
+      } else {
+        cleanup();
+        resolve({ok: true, override: null});
+      }
+    };
+  });
+}
+
 async function issuePOFromPdi(pdiId){
   var p = PDI_CURRENT_DETAIL || PDI_RECORDS.find(function(x){return x.id===pdiId;});
   if(!p){alert('PD item not loaded.');return;}
@@ -7908,7 +8054,14 @@ async function issuePOFromPdi(pdiId){
     return;
   }
 
-  if(!confirm('Issue Purchase Order? This locks in the milestone schedule based on the factory\'s committed offsets from the golden sample approval date. The factory will be notified.'))return;
+  // ── COMPLIANCE GATE ──
+  // Replaces the old simple confirm(). Calls /api/check-compliance-status and:
+  //   green  → light confirm dialog, proceed
+  //   yellow → warnings modal, can proceed
+  //   red    → blocking modal with override option (requires justification)
+  var gateResult = await checkPoComplianceGate(p);
+  if (!gateResult || !gateResult.ok) return;
+  var complianceOverride = gateResult.override || null;  // justification text if admin overrode a red gate
 
   var btn = event && event.target;
   if(btn){btn.disabled=true;btn.textContent='Issuing PO...';}
@@ -8002,6 +8155,25 @@ async function issuePOFromPdi(pdiId){
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({factory_id:p.factory_id,event_type:'po_issued',event_data:{purchase_order_id:po.id,po_number:poNumber,product_development_id:p.id},actor_type:'admin'})
     }).catch(function(){});
+
+    // Log compliance override if admin proceeded past a red flag
+    if (complianceOverride) {
+      fetch(SB+'/rest/v1/factory_events',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({
+          factory_id: p.factory_id,
+          event_type: 'po_compliance_override',
+          event_data: {
+            purchase_order_id: po.id,
+            po_number: poNumber,
+            justification: complianceOverride,
+            overridden_at: new Date().toISOString()
+          },
+          actor_type: 'admin'
+        })
+      }).catch(function(){});
+    }
 
     // Send factory notification email + generate PO PDF (non-blocking but awaited for ack)
     try{
