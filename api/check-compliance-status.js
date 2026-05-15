@@ -135,6 +135,13 @@ function flagForCertStatus(certName, coverage, blockingSeverity = 'blocker') {
 async function checkLayer1Factory(factory, factoryDocs) {
   const result = { status: 'green', red_flags: [], warnings: [] };
 
+  function finalize(r) {
+    if (r.red_flags.length)      r.status = 'red';
+    else if (r.warnings.length)  r.status = 'yellow';
+    else                         r.status = 'green';
+    return r;
+  }
+
   // Look up category rule
   const cat = factory.category || (factory.categories && factory.categories[0]) || null;
   if (!cat) {
@@ -144,7 +151,7 @@ async function checkLayer1Factory(factory, factoryDocs) {
       severity: 'warning',
       detail: 'Cannot determine which compliance baseline applies. Assign a category in factory details.'
     });
-    return result;
+    return finalize(result);
   }
 
   const rules = await sb(
@@ -157,7 +164,7 @@ async function checkLayer1Factory(factory, factoryDocs) {
       severity: 'warning',
       detail: 'Admin should configure compliance_requirements for this category.'
     });
-    return result;
+    return finalize(result);
   }
   const rule = rules[0];
 
@@ -211,9 +218,7 @@ async function checkLayer1Factory(factory, factoryDocs) {
     });
   }
 
-  if (result.red_flags.length)      result.status = 'red';
-  else if (result.warnings.length)  result.status = 'yellow';
-  return result;
+  return finalize(result);
 }
 
 // ── LAYER 2: RFQ-specific requirements ──
