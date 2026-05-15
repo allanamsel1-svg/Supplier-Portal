@@ -1143,28 +1143,92 @@ function showComplErr(msg){
   g('compl-modal-err').style.display='block';
 }
 
-function updateComplianceBanner(docs){
+async function updateComplianceBanner(docs){
   var banner=g('compl-banner');
   var badge=g('compl-badge');
   if(!banner||!badge)return;
-  var critical=(docs||[]).filter(function(d){
-    var days=daysUntil(d.expiry_date);
-    return days!==null&&days<30;
-  });
-  if(critical.length){
-    var lines=critical.map(function(d){
-      var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
-      var days=daysUntil(d.expiry_date);
-      var phrase=(days<0)?('expired '+Math.abs(days)+' days ago'):('expires in '+days+' days');
-      return '<div style="margin-top:4px;">• <strong>'+esc(typeLabel)+'</strong> — '+phrase+'</div>';
-    }).join('');
-    banner.innerHTML='<strong>⚠ Non-compliance warning:</strong> You have '+critical.length+' document'+(critical.length>1?'s':'')+' at or near expiry. Upload renewed certificate'+(critical.length>1?'s':'')+' as soon as possible to remain compliant.'+lines;
+
+  // Call the unified compliance status API for Layer 1 (factory baseline).
+  // Falls back to legacy expiry-only check if the API is unavailable.
+  if(!FACTORY_ID){banner.style.display='none';badge.style.display='none';return;}
+
+  try{
+    var r=await fetch('/api/check-compliance-status',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({factory_id:FACTORY_ID})
+    });
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var data=await r.json();
+    var L1=(data&&data.status&&data.status.layers&&data.status.layers.layer_1_factory)||null;
+    if(!L1){throw new Error('No Layer 1 in response');}
+
+    var flags=L1.red_flags||[];
+    var warns=L1.warnings||[];
+    var bg, color, border, title;
+    if(L1.status==='red'){
+      bg='#fff0f0'; color='#b00'; border='#fdd';
+      title='⛔ '+flags.length+' compliance issue'+(flags.length===1?'':'s')+' blocking new orders';
+    }else if(L1.status==='yellow'){
+      bg='#fff8e0'; color='#886600'; border='#f8e8b0';
+      title='⚠ '+warns.length+' compliance warning'+(warns.length===1?'':'s');
+    }else{
+      bg='#edfaed'; color='#1a7a1a'; border='#c0e0c0';
+      title='✓ All required compliance documents are current';
+    }
+
+    var lines='';
+    flags.forEach(function(f){
+      lines+='<div style="margin-top:6px;padding-left:14px;"><span style="color:#b00;">•</span> <strong>'+esc(f.label)+'</strong>'+
+        (f.detail?'<br/><span style="font-size:11px;color:#666;padding-left:14px;">'+esc(f.detail)+'</span>':'')+
+      '</div>';
+    });
+    warns.forEach(function(w){
+      lines+='<div style="margin-top:6px;padding-left:14px;"><span style="color:#886600;">•</span> '+esc(w.label)+
+        (w.detail?'<br/><span style="font-size:11px;color:#666;padding-left:14px;">'+esc(w.detail)+'</span>':'')+
+      '</div>';
+    });
+
+    banner.style.background=bg;
+    banner.style.color=color;
+    banner.style.border='1px solid '+border;
+    banner.style.padding='12px 14px';
+    banner.style.borderRadius='8px';
+    banner.style.fontSize='13px';
+    banner.style.lineHeight='1.4';
+    banner.innerHTML='<div style="font-weight:600;font-size:13px;">'+title+'</div>'+(lines||'<div style="margin-top:4px;font-size:11px;color:#888;">Last checked just now.</div>');
     banner.style.display='block';
-    badge.textContent=critical.length;
-    badge.style.display='inline-block';
-  }else{
-    banner.style.display='none';
-    badge.style.display='none';
+
+    var attentionCount = flags.length + warns.length;
+    if(attentionCount>0){
+      badge.textContent=attentionCount;
+      badge.style.background = (L1.status==='red'?'#b00':'#886600');
+      badge.style.display='inline-block';
+    }else{
+      badge.style.display='none';
+    }
+  }catch(apiErr){
+    // Fallback: legacy expiry-only check using already-loaded docs
+    console.log('compliance API call failed, falling back to legacy banner:', apiErr);
+    var critical=(docs||[]).filter(function(d){
+      var days=daysUntil(d.expiry_date);
+      return days!==null&&days<30;
+    });
+    if(critical.length){
+      var legLines=critical.map(function(d){
+        var typeLabel=(d.document_type==='Other'?(d.document_type_other||'Other'):d.document_type);
+        var days=daysUntil(d.expiry_date);
+        var phrase=(days<0)?('expired '+Math.abs(days)+' days ago'):('expires in '+days+' days');
+        return '<div style="margin-top:4px;">• <strong>'+esc(typeLabel)+'</strong> — '+phrase+'</div>';
+      }).join('');
+      banner.innerHTML='<strong>⚠ Non-compliance warning:</strong> You have '+critical.length+' document'+(critical.length>1?'s':'')+' at or near expiry.'+legLines;
+      banner.style.display='block';
+      badge.textContent=critical.length;
+      badge.style.display='inline-block';
+    }else{
+      banner.style.display='none';
+      badge.style.display='none';
+    }
   }
 }
 
