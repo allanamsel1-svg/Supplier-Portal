@@ -3301,6 +3301,264 @@ async function openRFQDetail(rfqId){
   }
 }
 
+// ─────────────────────────────────────────────────────────
+// RFQ VARIANTS — clone an RFQ for size/packaging variants
+// ─────────────────────────────────────────────────────────
+
+// Axis options offered in the variant creation modal. Used as a checklist for the user
+// AND stored on the new RFQ in variant_axis_changes for reference / reporting.
+var VARIANT_AXIS_OPTIONS = [
+  { key:'size',                label:'Fill Size',             hint:'e.g. 5ml → 10ml, 30g → 50g' },
+  { key:'primary_container',   label:'Primary Container',     hint:'e.g. glass bottle → plastic bottle' },
+  { key:'closure',             label:'Closure / Applicator',  hint:'e.g. screw cap → pump, glass dropper → plastic dropper' },
+  { key:'color_finish',        label:'Color / Finish',        hint:'e.g. clear → frosted, matte → gloss' },
+  { key:'secondary_packaging', label:'Secondary Packaging',   hint:'e.g. folding carton → blister pack' },
+  { key:'sustainability',      label:'Sustainability',        hint:'e.g. virgin plastic → PCR, FSC-certified board' },
+  { key:'quantity',            label:'Quantity / Pack Size',  hint:'e.g. 1,000 units → 5,000 units, inner pack changes' },
+  { key:'formulation',         label:'Formulation / Specs',   hint:'e.g. fragrance variant, active ingredient change' },
+  { key:'other',               label:'Other',                 hint:'something not in the list above' }
+];
+
+async function openVariantModal(parentRfqId){
+  // Pull the parent RFQ for display
+  var parentRfq;
+  try{
+    var r=await fetch(SB+'/rest/v1/rfqs?id=eq.'+parentRfqId+'&select=id,project_number,item_description,parent_rfq_id',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    parentRfq=rows[0];
+    if(!parentRfq){alert('Could not load the RFQ.');return;}
+  }catch(e){alert('Error loading RFQ: '+e.message);return;}
+
+  // If the source is itself a variant, set the variant's parent (not the variant) as the new parent — so all variants of an item share a single parent
+  var trueParentId = parentRfq.parent_rfq_id || parentRfq.id;
+
+  // Count existing variants under this parent so we can suggest a default label
+  var siblingCount=0;
+  try{
+    var sr=await fetch(SB+'/rest/v1/rfqs?or=(id.eq.'+trueParentId+',parent_rfq_id.eq.'+trueParentId+')&select=id',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var sibs=await sr.json();
+    siblingCount=Array.isArray(sibs)?sibs.length:0;
+  }catch(e){console.log('sibling count failed (non-fatal):',e);}
+  var suggestedLabel='Variant '+(siblingCount+1);
+
+  // Build modal
+  var overlay=document.createElement('div');
+  overlay.id='variant-modal-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick=function(e){if(e.target===overlay)closeVariantModal();};
+
+  var axisChecksHtml=VARIANT_AXIS_OPTIONS.map(function(a){
+    return '<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;cursor:pointer;background:#fafaf6;border:1px solid #e8e8e0;border-radius:6px;font-size:12px;">'+
+      '<input type="checkbox" data-variant-axis="'+a.key+'" style="margin-top:2px;flex-shrink:0;" />'+
+      '<div>'+
+        '<div style="font-weight:600;color:#1a1a2e;">'+esc(a.label)+'</div>'+
+        '<div style="font-size:11px;color:#888;margin-top:2px;">'+esc(a.hint)+'</div>'+
+      '</div>'+
+    '</label>';
+  }).join('');
+
+  overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;width:640px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;" onclick="event.stopPropagation()">'+
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'+
+      '<div>'+
+        '<div style="font-size:16px;font-weight:700;color:#1a1a2e;">&#x29C9; Duplicate as Variant</div>'+
+        '<div style="font-size:12px;color:#666;margin-top:3px;">Clones this RFQ so you can change one or more attributes (size, packaging, etc.) without re-entering everything.</div>'+
+      '</div>'+
+      '<button onclick="closeVariantModal()" style="background:none;border:none;font-size:20px;color:#888;cursor:pointer;">&times;</button>'+
+    '</div>'+
+    '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px 12px;margin-bottom:14px;">'+
+      '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.06em;">Cloning from</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-top:2px;">'+esc(parentRfq.project_number||'')+' &middot; '+esc(parentRfq.item_description||'')+'</div>'+
+      (siblingCount>1?'<div style="font-size:11px;color:#1a3a8a;margin-top:4px;">This item already has '+siblingCount+' variant'+(siblingCount>1?'s':'')+'.</div>':'')+
+    '</div>'+
+    '<div style="overflow-y:auto;flex:1;padding-right:4px;">'+
+      '<div style="font-size:12px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">What\'s different about this variant?</div>'+
+      '<div style="font-size:11px;color:#888;margin-bottom:10px;">Check all axes that will differ from the original. This is a checklist for you when editing the cloned RFQ — the system copies everything; you edit what changes.</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'+axisChecksHtml+'</div>'+
+      '<div style="margin-bottom:10px;">'+
+        '<div style="font-size:12px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Variant Label <span style="color:#888;font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;">— appears in description, project number, and quote comparisons</span></div>'+
+        '<input id="variant-label-input" type="text" placeholder="e.g. \'10ml\', \'Plastic dropper\', \'PCR bottle\'..." value="'+esc(suggestedLabel)+'" style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />'+
+      '</div>'+
+      '<div style="background:#fff8e0;border:1px solid #f0d860;border-radius:6px;padding:8px 10px;font-size:11px;color:#664400;line-height:1.5;">'+
+        '<strong>What gets copied:</strong> all specs, packaging, certs, claims, target markets, customer/brand, AND the factories invited on the original.<br>'+
+        '<strong>What you\'ll edit:</strong> the new RFQ opens in edit mode — change the axes you checked above, then save.'+
+      '</div>'+
+    '</div>'+
+    '<div id="variant-msg" style="margin-top:8px;font-size:12px;display:none;"></div>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'+
+      '<button onclick="closeVariantModal()" style="padding:8px 16px;background:#fff;color:#666;border:1px solid #ddd;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">Cancel</button>'+
+      '<button onclick="createVariantRfq(\''+parentRfqId+'\',\''+trueParentId+'\')" id="variant-create-btn" style="padding:8px 20px;background:#1a3a8a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Create Variant &rarr;</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(overlay);
+}
+
+function closeVariantModal(){
+  var o=g('variant-modal-overlay');
+  if(o)o.remove();
+}
+
+async function createVariantRfq(sourceRfqId, trueParentId){
+  // Gather inputs
+  var axisChecks=[];
+  document.querySelectorAll('[data-variant-axis]:checked').forEach(function(cb){axisChecks.push(cb.dataset.variantAxis);});
+  var label=g('variant-label-input').value.trim();
+  if(!label){
+    var msgEl=g('variant-msg');
+    msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Variant label is required.';
+    return;
+  }
+
+  var btn=g('variant-create-btn');
+  btn.disabled=true;btn.textContent='Creating...';
+  var msgEl=g('variant-msg');
+  msgEl.style.display='none';
+
+  try{
+    // 1. Fetch the SOURCE RFQ (the one we're cloning from) — pull ALL fields
+    var sr=await fetch(SB+'/rest/v1/rfqs?id=eq.'+sourceRfqId+'&select=*',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var srcRows=await sr.json();
+    var src=srcRows[0];
+    if(!src)throw new Error('Could not load the source RFQ.');
+
+    // 2. Build the new payload by copying everything, then overriding what must be unique
+    var payload={};
+    Object.keys(src).forEach(function(k){
+      // Fields to NEVER copy
+      if(['id','created_at','updated_at','submitted_at','approved_at','rejected_at','closed_at'].indexOf(k)>=0) return;
+      // Project number gets regenerated below
+      if(k==='project_number') return;
+      // Status always starts as draft
+      if(k==='status') return;
+      payload[k]=src[k];
+    });
+    // Variant-specific fields
+    payload.parent_rfq_id        = trueParentId;
+    payload.variant_label        = label;
+    payload.variant_axis_changes = axisChecks.length ? axisChecks : null;
+    payload.status               = 'draft';
+    // Append variant label to item description so it's identifiable in lists / quote comparisons
+    var baseDesc = src.item_description || '';
+    // Strip any existing trailing "(variant label)" from base description to avoid stacking
+    baseDesc = baseDesc.replace(/\s*\([^)]*\)\s*$/,'').trim();
+    payload.item_description = baseDesc + ' (' + label + ')';
+    // Project number: append -V2 / -V3 / etc based on sibling count
+    if(src.project_number){
+      var trueParentProject = src.project_number.replace(/-V\d+$/,''); // strip existing -Vn suffix if any
+      // Count existing variants so we know what V-number to use
+      var cR=await fetch(SB+'/rest/v1/rfqs?or=(id.eq.'+trueParentId+',parent_rfq_id.eq.'+trueParentId+')&select=id',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      var existing=await cR.json();
+      var nextV = (Array.isArray(existing)?existing.length:1) + 1;
+      payload.project_number = trueParentProject + '-V' + nextV;
+    }
+
+    // 3. Create the new RFQ
+    var cr=await fetch(SB+'/rest/v1/rfqs',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!cr.ok){
+      var ce=await cr.json().catch(function(){return{};});
+      throw new Error('Failed to create variant: '+(ce.message||ce.details||cr.status));
+    }
+    var created=await cr.json();
+    var newRfq=Array.isArray(created)?created[0]:created;
+    if(!newRfq||!newRfq.id)throw new Error('New RFQ was created but no ID returned.');
+
+    // 4. Copy factory invitations (factory_rfqs) from source so the same factories can quote the variant
+    try{
+      var fr=await fetch(SB+'/rest/v1/factory_rfqs?rfq_id=eq.'+sourceRfqId+'&select=factory_id,assigned_at,status',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      var assignments=await fr.json();
+      if(Array.isArray(assignments) && assignments.length){
+        var newAssignments=assignments.map(function(a){
+          return {
+            rfq_id: newRfq.id,
+            factory_id: a.factory_id,
+            status: 'invited',           // factory needs to know this is new — fresh invitation status
+            assigned_at: new Date().toISOString()
+          };
+        });
+        await fetch(SB+'/rest/v1/factory_rfqs',{
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body:JSON.stringify(newAssignments)
+        });
+      }
+    }catch(faErr){
+      console.log('Factory assignment copy failed (non-fatal):',faErr);
+    }
+
+    msgEl.style.display='block';msgEl.style.color='#1a7a1a';msgEl.textContent='✓ Variant created. Opening in edit mode...';
+    setTimeout(function(){
+      closeVariantModal();
+      // Open the new RFQ in the edit form
+      if(typeof showRFQForm==='function')showRFQForm();
+      if(typeof loadRFQById==='function')loadRFQById(newRfq.id);
+    },800);
+  }catch(e){
+    msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Error: '+(e.message||e);
+    btn.disabled=false;btn.textContent='Create Variant →';
+  }
+}
+
+// Render sibling variants section (called after RFQ detail render)
+async function loadVariantSiblings(rfq){
+  var el=g('variant-siblings-'+rfq.id);
+  if(!el)return;
+  var rootId = rfq.parent_rfq_id || rfq.id;
+  try{
+    var r=await fetch(SB+'/rest/v1/rfqs?or=(id.eq.'+rootId+',parent_rfq_id.eq.'+rootId+')&select=id,project_number,item_description,variant_label,parent_rfq_id,status&order=created_at.asc',{
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    var rows=await r.json();
+    if(!Array.isArray(rows) || rows.length<2){el.innerHTML='';return;} // No siblings = nothing to show
+
+    var statusBadge={
+      'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','on_hold':'#fff8e0','archived':'#f0f0f0'
+    };
+
+    el.innerHTML='<div style="background:#f3edff;border:1px solid #c8b8e8;border-radius:10px;padding:12px 14px;margin-bottom:1rem;">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'+
+        '<div style="font-size:12px;font-weight:700;color:#5a2db8;">&#x29C9; '+rows.length+' Variants of This Item</div>'+
+        '<button onclick="openVariantModal(\''+rfq.id+'\')" style="font-size:11px;padding:4px 10px;background:#fff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:5px;cursor:pointer;font-family:inherit;font-weight:600;">+ Add another variant</button>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:6px;">'+
+        rows.map(function(s){
+          var isCurrent = s.id===rfq.id;
+          var bg = isCurrent?'#fff':'#fafaf6';
+          var border = isCurrent?'2px solid #5a2db8':'1px solid #e0e0d8';
+          var stColor = statusBadge[s.status]||'#f0f0e8';
+          var labelText = s.variant_label || (s.parent_rfq_id ? '(no label)' : 'Original');
+          return '<div onclick="if(\''+s.id+'\'!==\''+rfq.id+'\')loadRFQDetail(\''+s.id+'\')" style="background:'+bg+';border:'+border+';border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;cursor:'+(isCurrent?'default':'pointer')+';">'+
+            '<div style="flex:1;min-width:0;">'+
+              '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'+
+                '<span style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(s.project_number||'')+'</span>'+
+                '<span style="font-size:11px;background:#5a2db8;color:#fff;padding:1px 7px;border-radius:8px;font-weight:600;">'+esc(labelText)+'</span>'+
+                '<span style="font-size:10px;background:'+stColor+';color:#666;padding:1px 7px;border-radius:8px;">'+esc(s.status||'')+'</span>'+
+                (isCurrent?'<span style="font-size:10px;color:#5a2db8;font-weight:700;">&larr; you are here</span>':'')+
+              '</div>'+
+              '<div style="font-size:11px;color:#666;margin-top:2px;">'+esc(s.item_description||'')+'</div>'+
+            '</div>'+
+          '</div>';
+        }).join('')+
+      '</div>'+
+    '</div>';
+  }catch(e){
+    console.log('loadVariantSiblings failed (non-fatal):',e);
+    el.innerHTML='';
+  }
+}
+
 function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
   var el=g('rfq-detail-pane');
   var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
@@ -3318,7 +3576,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
       '</div>'+
       '<div style="display:flex;gap:8px;align-items:center;">'+
         '<span style="font-size:12px;padding:4px 10px;border-radius:20px;background:'+(statusColors[rfq.status]||'#f0f0e8')+';color:#555;border:1px solid #ddd;">'+(statusText[rfq.status]||rfq.status)+'</span>'+
-        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x270F; Edit</button>'+'<button data-rid="'+rfq.id+'" data-st="on_hold" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#fff8e0;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x23F8; On Hold</button>'+'<button data-rid="'+rfq.id+'" data-st="archived" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#f0f0f0;color:#888;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x1F4C1; Archive</button>'+'<button data-rid="'+rfq.id+'" onclick="deleteRFQ(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x1F5D1; Delete</button>'+
+        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x270F; Edit</button>'+'<button data-rid="'+rfq.id+'" onclick="openVariantModal(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#e8eef8;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:6px;cursor:pointer;font-weight:600;" title="Duplicate this RFQ as a variant (different size, packaging, etc.)">&#x29C9; Duplicate as Variant</button>'+'<button data-rid="'+rfq.id+'" data-st="on_hold" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#fff8e0;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x23F8; On Hold</button>'+'<button data-rid="'+rfq.id+'" data-st="archived" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#f0f0f0;color:#888;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x1F4C1; Archive</button>'+'<button data-rid="'+rfq.id+'" onclick="deleteRFQ(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x1F5D1; Delete</button>'+
       '</div>'+
     '</div>'+
 
@@ -3335,6 +3593,9 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
       '</div>'+
       (rfq.detailed_specifications?'<div style="margin-top:8px;padding-top:8px;border-top:1px solid #e8e8e0;font-size:12px;color:#555;">'+rfq.detailed_specifications+'</div>':'')+
     '</div>'+
+
+    // Variant siblings (populated async by loadVariantSiblings)
+    '<div id="variant-siblings-'+rfq.id+'" data-rfq-id="'+rfq.id+'" data-parent-id="'+(rfq.parent_rfq_id||'')+'"></div>'+
 
     // Factory status summary
     '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">'+
@@ -3382,6 +3643,8 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
   '';
 
   el.innerHTML=html;
+  // Fire async loader for variant siblings (renders into the placeholder div)
+  loadVariantSiblings(rfq);
   if(quotes.length)setTimeout(function(){loadHistoricalBenchmarks(rfq,g('rfq-detail-pane'));},500);
 }
 
