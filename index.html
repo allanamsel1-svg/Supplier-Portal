@@ -1915,10 +1915,31 @@ async function loadSamples(){
   g('samples-empty').style.display='none';
   try{
     // Get PD items for this factory + their RFQ + accepted quote + sample submissions
-    var r=await fetch(SB+'/rest/v1/product_development_items?factory_id=eq.'+FACTORY_ID+'&status=in.(awaiting_initial_sample,awaiting_approval,in_revision)&select=*,rfqs(*),rfq_quotes!product_development_items_accepted_quote_id_fkey(*)&order=accepted_at.desc',{
+    // FK embed uses the column-name form (rfq_quotes!<fk_column>) for resilience
+    // across environments that may name FK constraints differently.
+    var r=await fetch(SB+'/rest/v1/product_development_items?factory_id=eq.'+FACTORY_ID+'&status=in.(awaiting_initial_sample,awaiting_approval,in_revision)&select=*,rfqs(*),rfq_quotes!accepted_quote_id(*)&order=created_at.desc',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
-    var pdItems=await r.json();
+    var pdItems;
+    if(!r.ok){
+      // Surface the error instead of silently showing the empty state
+      var errBody=await r.json().catch(function(){return{};});
+      console.error('loadSamples PD query failed:', r.status, errBody);
+      // Retry without the rfq_quotes embed (in case FK resolution is the issue)
+      var r2=await fetch(SB+'/rest/v1/product_development_items?factory_id=eq.'+FACTORY_ID+'&status=in.(awaiting_initial_sample,awaiting_approval,in_revision)&select=*,rfqs(*)&order=created_at.desc',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+      });
+      if(!r2.ok){
+        var err2=await r2.json().catch(function(){return{};});
+        console.error('loadSamples PD retry also failed:', r2.status, err2);
+        g('samples-loading').style.display='none';
+        g('samples-empty').style.display='block';
+        return;
+      }
+      pdItems=await r2.json();
+    } else {
+      pdItems=await r.json();
+    }
     g('samples-loading').style.display='none';
     if(!Array.isArray(pdItems)||!pdItems.length){
       g('samples-empty').style.display='block';
