@@ -8054,6 +8054,45 @@ async function issuePOFromPdi(pdiId){
     return;
   }
 
+  // ── SUB-BATCH 2G: LIVE SKU HARD GATE ──
+  // Before anything else, the parent PD record must be activated as a Live SKU.
+  // This is a hard block — no override, no justification accepted.
+  // Resolve PD record from the PDI (p is a PDI here).
+  try {
+    var pdLinkR = await fetch(
+      SB+'/rest/v1/product_development?id=eq.'+(p.product_development_id||'00000000-0000-0000-0000-000000000000')+'&select=id,sku_lifecycle_status,activated_sku_id,pd_number&limit=1',
+      {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+    );
+    var pdLinkRows = pdLinkR.ok ? await pdLinkR.json() : [];
+    var pdParent = pdLinkRows && pdLinkRows[0];
+
+    // If PDI is not linked to a PD record at all, find one by quote
+    if (!pdParent && p.accepted_quote_id) {
+      var fallbackR = await fetch(
+        SB+'/rest/v1/product_development?quote_id=eq.'+p.accepted_quote_id+'&select=id,sku_lifecycle_status,activated_sku_id,pd_number&limit=1',
+        {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+      );
+      var fallbackRows = fallbackR.ok ? await fallbackR.json() : [];
+      pdParent = fallbackRows && fallbackRows[0];
+    }
+
+    if (!pdParent) {
+      alert('Cannot issue PO — no Product Development record linked to this item. The PD/SKU registry record must exist before ordering.');
+      return;
+    }
+    if (pdParent.sku_lifecycle_status !== 'live') {
+      alert('🔒 Cannot issue PO — '+pdParent.pd_number+' is not yet a Live SKU.\n\n'+
+            'Current status: '+(pdParent.sku_lifecycle_status||'in_development').replace(/_/g,' ')+'\n\n'+
+            'All 8 readiness gates must pass and admin must click "Activate as Live SKU" in the PD detail before orders can be placed against this item.\n\n'+
+            'No override is available for this check.');
+      return;
+    }
+    // Stash the activated SKU id so we can attach it to the PO
+    p._activatedSkuId = pdParent.activated_sku_id || null;
+  } catch(skuGateErr) {
+    if(!confirm('Live SKU gate check failed: '+skuGateErr.message+'\n\nThis is a critical safety check. Proceed only if you are certain the item is properly activated. Continue?')) return;
+  }
+
   // ── COMPLIANCE GATE ──
   // Replaces the old simple confirm(). Calls /api/check-compliance-status and:
   //   green  → light confirm dialog, proceed
@@ -8096,6 +8135,7 @@ async function issuePOFromPdi(pdiId){
       rfq_quote_id: p.accepted_quote_id,
       rfq_id: p.rfq_id,
       factory_id: p.factory_id,
+      sku_id: p._activatedSkuId || null,
       unit_fob_price: unitPrice,
       packaging_price_per_unit: pkgPrice,
       total_units: totalUnits,
@@ -8737,6 +8777,60 @@ async function openPDDetail(pdId){
     pdCurrentDetail._freightRates=related[7]||[];
     pdCurrentDetail._certAssets=related[8]||[];
     pdCurrentDetail._assets=related[9]||[];
+
+    // ── Sub-batch 2G: load readiness gate inputs ──
+    // The 8-gate panel needs: the linked PDI sample cycle, product docs counts,
+    // and the compliance overall status. Load these in parallel.
+    try {
+      var gateInputs = await Promise.all([
+        // PDI sample cycle linked to this PD (for sample approval + carton dims gates)
+        fetch(SB+'/rest/v1/product_development_items?product_development_id=eq.'+pdCurrentDetail.id+'&order=created_at.desc&limit=1',
+          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
+        // Product images uploaded against this PD
+        fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdCurrentDetail.id+'&document_type=eq.Product%20Image&is_current=eq.true&select=id',
+          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
+        // Technical drawings uploaded against this PD
+        fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdCurrentDetail.id+'&document_type=eq.Technical%20Drawing&is_current=eq.true&select=id',
+          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
+      ]);
+      pdCurrentDetail._pdi = gateInputs[0] && gateInputs[0][0] ? gateInputs[0][0] : null;
+      pdCurrentDetail._product_images_count = (gateInputs[1]||[]).length;
+      pdCurrentDetail._technical_drawings_count = (gateInputs[2]||[]).length;
+
+      // Compliance status (Layer 1/2/3 rollup)
+      if (pdCurrentDetail.factory_id) {
+        try {
+          var cr = await fetch('/api/check-compliance-status', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              factory_id: pdCurrentDetail.factory_id,
+              rfq_id:     pdCurrentDetail.rfq_id || null,
+              quote_id:   pdCurrentDetail.quote_id || null
+            })
+          });
+          if (cr.ok) {
+            var cdata = await cr.json();
+            pdCurrentDetail._compliance_overall = (cdata && cdata.status && cdata.status.overall) || 'yellow';
+          } else {
+            pdCurrentDetail._compliance_overall = 'yellow';
+          }
+        } catch(e) {
+          pdCurrentDetail._compliance_overall = 'yellow';
+        }
+      } else {
+        pdCurrentDetail._compliance_overall = 'yellow';
+      }
+    } catch(gateErr) {
+      console.log('Gate inputs load failed (non-fatal):', gateErr);
+      pdCurrentDetail._pdi = null;
+      pdCurrentDetail._product_images_count = 0;
+      pdCurrentDetail._technical_drawings_count = 0;
+      pdCurrentDetail._compliance_overall = 'yellow';
+    }
     // If no factory sources yet but PD has a factory_id from quote, auto-create primary
     if(pdCurrentDetail._sources.length===0 && pdCurrentDetail.factory_id){
       try{
@@ -9175,24 +9269,112 @@ function renderPDDetail(){
       );
     })()+
 
-    // ── 10. APPROVAL GATES ──
-    card('✅ Approval Gates',
-      '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;">'+
-        '<label style="display:flex;align-items:center;gap:8px;font-size:12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;cursor:pointer;">'+
-          '<input type="checkbox" id="gate-dim" '+(p.gate_dimensions_ok?'checked':'')+' /> All dimensions confirmed by factory'+
-        '</label>'+
-        '<label style="display:flex;align-items:center;gap:8px;font-size:12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;cursor:pointer;">'+
-          '<input type="checkbox" id="gate-comp" '+(p.gate_compliance_ok?'checked':'')+' /> Compliance documents approved'+
-        '</label>'+
-        '<label style="display:flex;align-items:center;gap:8px;font-size:12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;cursor:pointer;">'+
-          '<input type="checkbox" id="gate-art" '+(p.gate_artwork_ok?'checked':'')+' /> Final packaging artwork approved'+
-        '</label>'+
-        '<label style="display:flex;align-items:center;gap:8px;font-size:12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;padding:9px 12px;cursor:pointer;">'+
-          '<input type="checkbox" id="gate-ast" '+(p.gate_assets_ok?'checked':'')+' /> All factory assets received'+
-        '</label>'+
-      '</div>'+
-      '<button onclick="approvePDToSKU()" '+(p.status==='approved'?'disabled ':'')+'style="width:100%;padding:12px;background:'+(p.status==='approved'?'#888':'#1a7a1a')+';color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:'+(p.status==='approved'?'not-allowed':'pointer')+';">'+(p.status==='approved'?'✓ Approved as Live SKU':'🚀 Approve as Live SKU')+'</button>'
-    )+
+    // ── 10. READINESS GATES (Sub-batch 2G) ──
+    // All 8 gates must pass before this PD can be activated as a Live SKU.
+    // 5 are auto-computed from data, 3 are admin-confirmed checkboxes with optional notes.
+    // The "Activate Live SKU" button enables only when all 8 pass.
+    (function(){
+      var isLive = (p.sku_lifecycle_status === 'live') || (p.status === 'approved');
+
+      // ── Auto-computed gates ──
+      // Gate 1: Golden sample approved (look at linked PDI status)
+      var pdi = p._pdi || null;  // populated by openPdDetail
+      var gateSampleOK = !!(pdi && (pdi.status === 'approved' || pdi.approved_at));
+      // Gate 2: Carton dimensions confirmed
+      var gateCartonsOK = !!(pdi && pdi.cartons_confirmed_at);
+      // Gate 3: Product images uploaded (≥1)
+      var gateImagesOK = !!(p._product_images_count && p._product_images_count > 0);
+      // Gate 4: Technical drawing uploaded (≥1)
+      var gateDrawingOK = !!(p._technical_drawings_count && p._technical_drawings_count > 0);
+      // Gate 5: Compliance docs current (Layer 1/2/3 not red)
+      var gateComplianceOK = (p._compliance_overall === 'green') || (p._compliance_overall === 'yellow');
+
+      // ── Manual confirmation gates ──
+      var gatePackagingOK = !!p.packaging_finalized_at;
+      var gateFreightOK   = !!p.freight_confirmed_at;
+      var gateTariffOK    = !!p.tariff_confirmed_at;
+
+      var allPass = gateSampleOK && gateCartonsOK && gateImagesOK && gateDrawingOK &&
+                    gateComplianceOK && gatePackagingOK && gateFreightOK && gateTariffOK;
+      var passCount = [gateSampleOK,gateCartonsOK,gateImagesOK,gateDrawingOK,
+                       gateComplianceOK,gatePackagingOK,gateFreightOK,gateTariffOK]
+                        .filter(function(x){return x;}).length;
+
+      function gateLine(ok, label, sublabel) {
+        var color = ok ? '#1a7a1a' : '#886600';
+        var bg    = ok ? '#edfaed' : '#fff8e0';
+        var border= ok ? '#c0e0c0' : '#f0d860';
+        var icon  = ok ? '✓' : '○';
+        return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:'+bg+';border:1px solid '+border+';border-radius:7px;">'+
+          '<div style="font-weight:700;color:'+color+';font-size:14px;line-height:1;margin-top:1px;">'+icon+'</div>'+
+          '<div style="flex:1;">'+
+            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(label)+'</div>'+
+            (sublabel ? '<div style="font-size:11px;color:#666;margin-top:2px;">'+esc(sublabel)+'</div>' : '')+
+          '</div>'+
+        '</div>';
+      }
+
+      function manualGateLine(ok, label, gateKey, valueText, notesText) {
+        var color = ok ? '#1a7a1a' : '#886600';
+        var bg    = ok ? '#edfaed' : '#fff8e0';
+        var border= ok ? '#c0e0c0' : '#f0d860';
+        var icon  = ok ? '✓' : '○';
+        return '<div style="padding:10px 12px;background:'+bg+';border:1px solid '+border+';border-radius:7px;">'+
+          '<div style="display:flex;align-items:center;gap:10px;">'+
+            '<div style="font-weight:700;color:'+color+';font-size:14px;">'+icon+'</div>'+
+            '<div style="flex:1;font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(label)+'</div>'+
+            (ok
+              ? '<button onclick="unconfirmGate(\''+gateKey+'\')" style="padding:4px 10px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Unconfirm</button>'
+              : '<button onclick="confirmGate(\''+gateKey+'\')" style="padding:5px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Confirm</button>'
+            )+
+          '</div>'+
+          (ok && valueText ? '<div style="font-size:11px;color:#444;margin-top:6px;padding-left:24px;">'+esc(valueText)+'</div>' : '')+
+          (ok && notesText ? '<div style="font-size:11px;color:#666;margin-top:2px;padding-left:24px;font-style:italic;">"'+esc(notesText)+'"</div>' : '')+
+        '</div>';
+      }
+
+      var freightValue = p.freight_cost_per_unit ? '$'+parseFloat(p.freight_cost_per_unit).toFixed(4)+' / unit' : '';
+      var tariffValue  = p.tariff_hts_code ? 'HTS: '+p.tariff_hts_code+(p.tariff_duty_rate_pct?' · '+p.tariff_duty_rate_pct+'% duty':'') : '';
+
+      var headerColor = allPass ? '#1a7a1a' : '#886600';
+      var headerBg    = allPass ? '#edfaed' : '#fff8e0';
+      var headerText  = allPass
+        ? '✓ All 8 gates passed — ready to activate as Live SKU'
+        : passCount+' of 8 gates passed';
+
+      return card('🚪 Readiness Gates — '+passCount+'/8',
+        '<div style="margin-bottom:12px;padding:10px 14px;background:'+headerBg+';border:1px solid '+(allPass?'#c0e0c0':'#f0d860')+';border-radius:8px;font-size:13px;font-weight:600;color:'+headerColor+';">'+headerText+'</div>'+
+
+        '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Auto-computed from data</div>'+
+        '<div style="display:grid;gap:6px;margin-bottom:14px;">'+
+          gateLine(gateSampleOK,    'Golden sample approved',         gateSampleOK ? '' : 'Awaiting sample evaluation from the Sample Approval Queue.')+
+          gateLine(gateCartonsOK,   'Carton dimensions confirmed',    gateCartonsOK ? '' : 'Factory must confirm master case dimensions (qty, L, W, H, weight) in their PD workspace.')+
+          gateLine(gateImagesOK,    'Product images uploaded',        gateImagesOK ? ((p._product_images_count||0) + ' image(s) on file') : 'Factory has not uploaded any product images.')+
+          gateLine(gateDrawingOK,   'Technical drawing uploaded',     gateDrawingOK ? ((p._technical_drawings_count||0) + ' drawing(s) on file') : 'Factory has not uploaded a technical drawing or dieline.')+
+          gateLine(gateComplianceOK,'Compliance docs current',        gateComplianceOK ? 'No blocking compliance flags.' : 'Compliance check has blocking flags (red). Review the Compliance section.')+
+        '</div>'+
+
+        '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Admin confirmations</div>'+
+        '<div style="display:grid;gap:6px;margin-bottom:14px;">'+
+          manualGateLine(gatePackagingOK, 'Packaging design finalized', 'packaging',
+            p.packaging_finalized_at ? 'Confirmed '+(p.packaging_finalized_at||'').slice(0,10) : '',
+            p.packaging_notes)+
+          manualGateLine(gateFreightOK,   'Freight cost confirmed',     'freight',
+            freightValue || (p.freight_confirmed_at ? 'Confirmed '+(p.freight_confirmed_at||'').slice(0,10) : ''),
+            p.freight_notes)+
+          manualGateLine(gateTariffOK,    'Tariff classification confirmed', 'tariff',
+            tariffValue || (p.tariff_confirmed_at ? 'Confirmed '+(p.tariff_confirmed_at||'').slice(0,10) : ''),
+            p.tariff_notes)+
+        '</div>'+
+
+        (isLive
+          ? '<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Activated as Live SKU '+(p.activated_at?'on '+(p.activated_at||'').slice(0,10):'')+'</button>'
+          : '<button onclick="activateAsLiveSku()" '+(!allPass?'disabled ':'')+'style="width:100%;padding:12px;background:'+(!allPass?'#bbb':'#1a7a1a')+';color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:'+(!allPass?'not-allowed':'pointer')+';">'+
+              (allPass ? '🚀 Activate as Live SKU' : '🔒 Complete all 8 gates to activate')+
+            '</button>'
+        )
+      );
+    })()+
 
   '</div>';
 
@@ -9626,13 +9808,159 @@ async function togglePDGate(gate,checked){
   }catch(e){alert('Save failed: '+e.message);}
 }
 
+// ── Sub-batch 2G: Readiness gate confirmation helpers ──
+// Manual gates (packaging / freight / tariff) are confirmed via these prompts.
+// They write to product_development.{gate}_confirmed_at, {gate}_notes, and gate-specific fields.
+
+async function confirmGate(gateKey) {
+  if (!pdCurrentDetail) return;
+  var p = pdCurrentDetail;
+  var payload = {};
+  var nowIso = new Date().toISOString();
+
+  if (gateKey === 'packaging') {
+    var pn = prompt('Confirm packaging design is finalized.\n\nOptional: add a brief note (e.g. "Artwork v3 approved by brand").', '');
+    if (pn === null) return;  // cancelled
+    payload.packaging_finalized_at = nowIso;
+    if (pn.trim()) payload.packaging_notes = pn.trim();
+  } else if (gateKey === 'freight') {
+    var fc = prompt('Confirm freight cost.\n\nEnter the freight cost per unit (USD, optional — e.g. 0.42):', p.freight_cost_per_unit || '');
+    if (fc === null) return;
+    var fn = prompt('Optional: add a brief note (e.g. "Based on FCL 40HQ Shanghai → LAX, Q3 rates").', p.freight_notes || '');
+    if (fn === null) return;
+    payload.freight_confirmed_at = nowIso;
+    var costNum = parseFloat(fc);
+    if (!isNaN(costNum)) payload.freight_cost_per_unit = costNum;
+    if (fn.trim()) payload.freight_notes = fn.trim();
+  } else if (gateKey === 'tariff') {
+    var hts = prompt('Confirm tariff classification.\n\nEnter the HTS code (e.g. 3304.99.5000):', p.tariff_hts_code || '');
+    if (hts === null) return;
+    var duty = prompt('Enter the duty rate as a percentage (e.g. 0 for duty-free, 6.5):', p.tariff_duty_rate_pct == null ? '' : p.tariff_duty_rate_pct);
+    if (duty === null) return;
+    var tn = prompt('Optional: add a brief note (e.g. "Verified with customs broker").', p.tariff_notes || '');
+    if (tn === null) return;
+    payload.tariff_confirmed_at = nowIso;
+    if (hts.trim()) payload.tariff_hts_code = hts.trim();
+    var dutyNum = parseFloat(duty);
+    if (!isNaN(dutyNum)) payload.tariff_duty_rate_pct = dutyNum;
+    if (tn.trim()) payload.tariff_notes = tn.trim();
+  } else {
+    return;
+  }
+
+  try {
+    var r = await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) {
+      var err = await r.json().catch(function(){return{};});
+      alert('Gate confirmation failed: '+(err.message||err.details||r.status));
+      return;
+    }
+    // Merge payload into local state and re-render
+    Object.assign(pdCurrentDetail, payload);
+    renderPDDetail();
+  } catch (e) {
+    alert('Gate confirmation error: '+e.message);
+  }
+}
+
+async function unconfirmGate(gateKey) {
+  if (!pdCurrentDetail) return;
+  if (!confirm('Unconfirm this gate? This will block PO issuance until re-confirmed.')) return;
+  var p = pdCurrentDetail;
+  var payload = {};
+  if (gateKey === 'packaging') {
+    payload.packaging_finalized_at = null;
+  } else if (gateKey === 'freight') {
+    payload.freight_confirmed_at = null;
+  } else if (gateKey === 'tariff') {
+    payload.tariff_confirmed_at = null;
+  } else {
+    return;
+  }
+  try {
+    var r = await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) { alert('Unconfirm failed.'); return; }
+    Object.assign(pdCurrentDetail, payload);
+    renderPDDetail();
+  } catch(e) { alert('Unconfirm error: '+e.message); }
+}
+
+// ── Activate Live SKU ──
+// Re-validates all 8 gates server-side (by reloading the PD record), then
+// delegates to the existing approvePDToSKU which creates the skus row.
+async function activateAsLiveSku() {
+  if (!pdCurrentDetail) return;
+  var p = pdCurrentDetail;
+
+  // Re-check all 8 gates from current state to prevent race conditions
+  var pdi = p._pdi || null;
+  var checks = {
+    sample:     !!(pdi && (pdi.status === 'approved' || pdi.approved_at)),
+    cartons:    !!(pdi && pdi.cartons_confirmed_at),
+    images:     !!(p._product_images_count && p._product_images_count > 0),
+    drawing:    !!(p._technical_drawings_count && p._technical_drawings_count > 0),
+    compliance: (p._compliance_overall === 'green' || p._compliance_overall === 'yellow'),
+    packaging:  !!p.packaging_finalized_at,
+    freight:    !!p.freight_confirmed_at,
+    tariff:     !!p.tariff_confirmed_at
+  };
+  var failed = Object.keys(checks).filter(function(k){return !checks[k];});
+  if (failed.length) {
+    alert('Cannot activate — these gates are not yet passed:\n\n• '+failed.join('\n• ')+'\n\nResolve them before activating.');
+    return;
+  }
+
+  if (!confirm('🚀 Activate this item as a Live SKU?\n\nAll 8 readiness gates have passed. Once activated:\n  • A SKU record will be created in the canonical registry\n  • POs can be issued against this SKU\n  • Reorders skip the PD workflow\n\nProceed?')) return;
+
+  // Mark the lifecycle status, then delegate to existing approval flow
+  // (which creates the SKU row, copies costing, and sets sku_id)
+  try {
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({
+        sku_lifecycle_status: 'live',
+        activated_at: new Date().toISOString(),
+        activated_by: 'admin'
+      })
+    });
+    pdCurrentDetail.sku_lifecycle_status = 'live';
+    pdCurrentDetail.activated_at = new Date().toISOString();
+  } catch(e) {
+    alert('Failed to mark lifecycle status: '+e.message);
+    return;
+  }
+
+  // Call the legacy approvePDToSKU to create the actual SKU registry row
+  // (it already handles SKU creation, costing copy, UPC pool linkage, etc.)
+  // We bypass its confirm prompt by setting a flag.
+  window._skipApprovalConfirm = true;
+  try {
+    await approvePDToSKU();
+  } finally {
+    window._skipApprovalConfirm = false;
+  }
+}
+
 async function approvePDToSKU(){
   if(!pdCurrentDetail)return;
   var p=pdCurrentDetail;
-  if(!(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_artwork_ok&&p.gate_assets_ok)){alert('All 4 gates must be checked first.');return;}
-  if(!p.item_number){alert('Generate the item number first.');return;}
-  if(!p.unit_upc){alert('Generate the UPCs first.');return;}
-  if(!confirm('Approve this item as a Live SKU? Once approved, orders can be placed against it.'))return;
+  // When called from activateAsLiveSku, the new 8-gate panel has already validated everything;
+  // skip the legacy 4-gate check and confirm prompt.
+  if (!window._skipApprovalConfirm) {
+    if(!(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_artwork_ok&&p.gate_assets_ok)){alert('All 4 gates must be checked first.');return;}
+    if(!p.item_number){alert('Generate the item number first.');return;}
+    if(!p.unit_upc){alert('Generate the UPCs first.');return;}
+    if(!confirm('Approve this item as a Live SKU? Once approved, orders can be placed against it.'))return;
+  }
   try{
     // Save all in-form fields first
     await savePDAll(true);
