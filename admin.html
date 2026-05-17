@@ -9182,11 +9182,23 @@ function renderPDDetail(){
         fld('Country of Origin',txtIn('cs-origin',defCountry))+
         fld('FOB Port',txtIn('cs-port',defPort,'e.g. Yantian, Shekou'))
       )+
-      // FOB costs
+      // ── Costs section ──
+      // Two blocks: read-only "From RFQ" reference (the original accepted-quote
+      // costs), then editable "Confirmed at PD Stage" inputs that drive every
+      // downstream calc (landed cost, margins). Variance pills next to each
+      // confirmed field show drift from the RFQ baseline.
+      '<div style="background:#fafaf6;border-radius:8px;padding:10px 12px;margin-bottom:8px;">'+
+        '<div style="font-size:10px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">From RFQ <span style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">— reference only (original accepted quote)</span></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'+
+          '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">RFQ Unit Cost</div><div style="font-family:monospace;font-size:13px;color:#555;">'+(fv(quoteRow,'unit_fob_price')?'$'+parseFloat(quoteRow.unit_fob_price).toFixed(4):'—')+'</div></div>'+
+          '<div><div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px;">RFQ Packaging Cost</div><div style="font-family:monospace;font-size:13px;color:#555;">'+(fv(quoteRow,'packaging_price_per_unit')?'$'+parseFloat(quoteRow.packaging_price_per_unit).toFixed(4):'—')+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="font-size:10px;font-weight:600;color:#1a1a2e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Confirmed at PD Stage <span style="font-weight:400;color:#888;text-transform:none;letter-spacing:0;">— drives landed cost &amp; margins</span></div>'+
       grid('1fr 1fr 1fr','10px',
-        fld('FOB Price (USD)',numIn('cs-fob',defFob,'0.0001','e.g. 2.8500'))+
-        fld('Packaging Cost / unit',numIn('cs-pkg',defPkg,'0.0001','e.g. 0.3500'))+
-        fld('Total FOB','<input type="text" id="cs-total-fob" readonly style="width:100%;padding:6px 8px;font-size:13px;font-weight:600;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" />')
+        fld('Confirmed Unit Cost',numIn('cs-fob',defFob,'0.0001','e.g. 2.8500')+'<div id="cs-fob-variance" style="font-size:10px;margin-top:4px;"></div>')+
+        fld('Confirmed Packaging Cost',numIn('cs-pkg',defPkg,'0.0001','e.g. 0.3500')+'<div id="cs-pkg-variance" style="font-size:10px;margin-top:4px;"></div>')+
+        fld('Total Confirmed FOB','<input type="text" id="cs-total-fob" readonly style="width:100%;padding:6px 8px;font-size:13px;font-weight:600;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:6px;font-family:monospace;" />')
       )+
       // Freight calculator (auto-lookup from freight_rates)
       '<div style="background:#f8f8f4;border-radius:8px;padding:12px;margin-bottom:10px;">'+
@@ -9229,11 +9241,14 @@ function renderPDDetail(){
         fld('Commission %',numIn('cs-commission',defComm,'0.01'))+
         fld('Royalty %',numIn('cs-royalty',defRoyalty,'0.01'))
       )+
-      // Margin summary
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+
+      // Margin summary — 4 tiles: TBG deductions, TBG gross, TBG net, plus
+      // the retailer's margin so admins can confirm everyone's economics at
+      // the final SKU activation gate.
+      '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
         '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Deductions</div><div id="cs-ded" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
-        '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Gross Margin</div><div id="cs-gross" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
-        '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Net Margin</div><div id="cs-net" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
+        '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">TBG Gross Margin</div><div id="cs-gross" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
+        '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">TBG Net Margin</div><div id="cs-net" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
+        '<div style="background:#f8f8f4;border-radius:8px;padding:10px;text-align:center;"><div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">Customer Margin</div><div id="cs-cust-margin" style="font-size:16px;font-weight:700;font-family:monospace;">—</div></div>'+
       '</div>'
     )+
 
@@ -10196,6 +10211,33 @@ function recalcPD(){
   var totalFob=fob+pkg;
   if(g('cs-total-fob'))g('cs-total-fob').value=totalFob?'$'+totalFob.toFixed(4):'';
 
+  // ── Cost variance pills (Confirmed vs RFQ baseline) ──
+  // |delta| ≤ $0.005   → green "matches RFQ"
+  // delta < 0          → green "−$X.XXXX vs RFQ (savings)"
+  // 0 < delta ≤ $0.05  → amber "+$X.XXXX vs RFQ"
+  // delta > $0.05      → red   "+$X.XXXX vs RFQ"
+  function _variancePill(confirmed,original){
+    if(!original)return '';
+    var delta=confirmed-original;
+    var abs=Math.abs(delta);
+    if(abs<0.005){
+      return '<span style="color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;padding:1px 7px;border-radius:9px;font-weight:500;">✓ matches RFQ</span>';
+    }
+    if(delta<0){
+      return '<span style="color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;padding:1px 7px;border-radius:9px;font-weight:500;">−$'+abs.toFixed(4)+' vs RFQ (savings)</span>';
+    }
+    var isHigh=delta>0.05;
+    var col=isHigh?'#b00':'#aa6600';
+    var bg=isHigh?'#fff0f0':'#fff8e0';
+    var bd=isHigh?'#fdd':'#f0d860';
+    return '<span style="color:'+col+';background:'+bg+';border:1px solid '+bd+';padding:1px 7px;border-radius:9px;font-weight:500;">+$'+delta.toFixed(4)+' vs RFQ</span>';
+  }
+  var _q=pdCurrentDetail._quote||{};
+  var rfqFob=parseFloat(_q.unit_fob_price)||0;
+  var rfqPkg=parseFloat(_q.packaging_price_per_unit)||0;
+  if(g('cs-fob-variance'))g('cs-fob-variance').innerHTML=_variancePill(fob,rfqFob);
+  if(g('cs-pkg-variance'))g('cs-pkg-variance').innerHTML=_variancePill(pkg,rfqPkg);
+
   var duty=parseFloat(g('cs-duty')&&g('cs-duty').value)||0;
   var tariff=parseFloat(g('cs-tariff')&&g('cs-tariff').value)||0;
   var dutyU=totalFob*(duty/100);
@@ -10265,6 +10307,21 @@ function recalcPD(){
   if(g('cs-net')){
     g('cs-net').textContent=wholesale>0?netMargin.toFixed(1)+'%':'—';
     g('cs-net').style.color=wholesale>0?(minNet&&netMargin<minNet?'#b00':(minNet&&netMargin<minNet+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
+  }
+
+  // ── Customer (retailer) margin ──
+  // Straight math: (retail − wholesale) / retail × 100. No target comparison.
+  // Shown so the admin can sanity-check the retailer's economics at the SKU
+  // activation gate.
+  if(g('cs-cust-margin')){
+    if(retail>0 && wholesale>0 && retail>wholesale){
+      var custMargin=((retail-wholesale)/retail)*100;
+      g('cs-cust-margin').textContent=custMargin.toFixed(1)+'%';
+      g('cs-cust-margin').style.color='#1a1a2e';
+    } else {
+      g('cs-cust-margin').textContent='—';
+      g('cs-cust-margin').style.color='#1a1a2e';
+    }
   }
 }
 
