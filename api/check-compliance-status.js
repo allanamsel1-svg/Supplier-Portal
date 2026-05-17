@@ -391,7 +391,8 @@ async function checkLayer3Product(rfq, quote, categoryRules, pdItem) {
         code: 'product_image_missing',
         label: 'No product images uploaded',
         severity: 'warning',
-        detail: 'At least one product photo is recommended for downstream use (catalog, customer presentations).'
+        detail: 'At least one product photo is recommended for downstream use (catalog, customer presentations).',
+        doc_name: 'Product Image'
       });
     }
   }
