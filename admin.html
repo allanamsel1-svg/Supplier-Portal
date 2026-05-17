@@ -8780,25 +8780,44 @@ async function openPDDetail(pdId){
 
     // ── Sub-batch 2G: load readiness gate inputs ──
     // The 8-gate panel needs: the linked PDI sample cycle, product docs counts,
-    // and the compliance overall status. Load these in parallel.
+    // and the compliance overall status.
+    //
+    // ── Sub-batch 2H FIX ──
+    // product_documents.product_development_id ACTUALLY stores the PDI id
+    // (product_development_items.id), NOT the parent PD id. Previously this
+    // block ran all 3 queries in Promise.all with pdCurrentDetail.id (the PD
+    // id) for the doc queries, so the doc counts were always 0 and the
+    // "Product images uploaded" / "Technical drawing uploaded" gates always
+    // showed missing — even when the factory had uploaded files correctly.
+    //
+    // Fix: load the PDI first, then run the doc queries against the PDI id.
+    // Also widen the technical-drawing check to accept "Die Lines" since the
+    // factory upload UI lets users tag either of those types interchangeably.
     try {
-      var gateInputs = await Promise.all([
-        // PDI sample cycle linked to this PD (for sample approval + carton dims gates)
-        fetch(SB+'/rest/v1/product_development_items?product_development_id=eq.'+pdCurrentDetail.id+'&order=created_at.desc&limit=1',
-          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
-        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
-        // Product images uploaded against this PD
-        fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdCurrentDetail.id+'&document_type=eq.Product%20Image&is_current=eq.true&select=id',
-          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
-        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
-        // Technical drawings uploaded against this PD
-        fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdCurrentDetail.id+'&document_type=eq.Technical%20Drawing&is_current=eq.true&select=id',
-          {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
-        ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
-      ]);
-      pdCurrentDetail._pdi = gateInputs[0] && gateInputs[0][0] ? gateInputs[0][0] : null;
-      pdCurrentDetail._product_images_count = (gateInputs[1]||[]).length;
-      pdCurrentDetail._technical_drawings_count = (gateInputs[2]||[]).length;
+      var pdiRes = await fetch(SB+'/rest/v1/product_development_items?product_development_id=eq.'+pdCurrentDetail.id+'&order=created_at.desc&limit=1',
+        {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+      );
+      var pdiArr = pdiRes.ok ? await pdiRes.json() : [];
+      pdCurrentDetail._pdi = pdiArr[0] || null;
+      var pdiIdForDocs = pdCurrentDetail._pdi ? pdCurrentDetail._pdi.id : null;
+
+      if (pdiIdForDocs) {
+        var docInputs = await Promise.all([
+          // Product images uploaded against this PDI
+          fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdiIdForDocs+'&document_type=eq.Product%20Image&is_current=eq.true&select=id',
+            {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+          ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];}),
+          // Technical drawings OR die lines uploaded against this PDI
+          fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdiIdForDocs+'&document_type=in.(Technical%20Drawing,Die%20Lines)&is_current=eq.true&select=id',
+            {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+          ).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];})
+        ]);
+        pdCurrentDetail._product_images_count = (docInputs[0]||[]).length;
+        pdCurrentDetail._technical_drawings_count = (docInputs[1]||[]).length;
+      } else {
+        pdCurrentDetail._product_images_count = 0;
+        pdCurrentDetail._technical_drawings_count = 0;
+      }
 
       // Compliance status (Layer 1/2/3 rollup)
       if (pdCurrentDetail.factory_id) {
