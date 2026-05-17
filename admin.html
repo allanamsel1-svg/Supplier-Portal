@@ -9848,7 +9848,11 @@ async function generatePDUpcs(){
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({is_assigned:true,assigned_to_pd_id:pdCurrentDetail.id,assigned_at:new Date().toISOString()})
     });
-    if(!assignR.ok){alert('Failed to claim UPC from pool.');return;}
+    if(!assignR.ok){
+      var errTxt=await assignR.text().catch(function(){return '';});
+      alert('Failed to claim UPC from pool (HTTP '+assignR.status+'): '+errTxt.slice(0,200));
+      return;
+    }
     // Release old UPC if any
     if(pdCurrentDetail.unit_upc){
       try{
@@ -10685,23 +10689,73 @@ function projectEmailSubject(projectNumber,itemDesc){
 // ════════════════════════════════════════
 async function aiSuggestHTSPD(){
   if(!pdCurrentDetail)return;
+  // Mirrors the RFQ-side suggestDutyTariff(): calls Anthropic directly from
+  // the browser using the API key in localStorage. No /api/ai-suggest-hts
+  // endpoint is needed — the previous version was hitting a URL that
+  // didn't exist and Safari was throwing a JSON-parse error on the 404 HTML.
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(!apiKey){alert('Please add your Anthropic API key in Settings to use AI duty suggestions.');return;}
+
   var hts=g('cs-hts')?g('cs-hts').value.trim():'';
   var country=g('cs-origin')?g('cs-origin').value.trim():'';
-  if(!hts){alert('Enter an HTS code first.');return;}
-  if(!country){alert('Enter country of origin.');return;}
+  if(!country){alert('Enter country of origin first.');return;}
+
+  var p=pdCurrentDetail;
+  var rfqRow=p.rfqs||{};
+  var desc=p.item_description||rfqRow.item_description||'';
+  var spec=p.detailed_description||rfqRow.specifications||'';
+
+  // Find category text from the loaded categories list
+  var catText='';
+  if(typeof allCategories!=='undefined'&&allCategories&&allCategories.find){
+    var catRow=allCategories.find(function(c){return c.id===p.category_id;});
+    if(catRow)catText=[catRow.category,catRow.sub_category,catRow.sub_sub_category].filter(Boolean).join(' › ');
+  }
+
+  var btn=event&&event.target;
+  var originalLabel=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.textContent='✦ Looking up…';}
+
   try{
-    var r=await fetch('/api/ai-suggest-hts',{
+    var prompt='I am importing the following product into the USA:\n'+
+      'Product description: '+desc+'\n'+
+      'Product category: '+catText+'\n'+
+      'Specifications: '+(spec||'N/A')+'\n'+
+      'Country of manufacture: '+country+'\n'+
+      (hts?'Existing HTS code (confirm or correct): '+hts+'\n':'')+
+      '\nAs of April 2026, what are the estimated:\n'+
+      '1. Most likely HTS code for this product (confirm or correct the existing one above if provided)\n'+
+      '2. Base import duty rate (%)\n'+
+      '3. Additional tariff rate (%) including Section 301 tariffs and any IEEPA tariffs currently in effect\n'+
+      '4. Total effective rate (%)\n\n'+
+      'Return ONLY a JSON object:\n'+
+      '{"hts_code": "XXXX.XX.XXXX", "duty_pct": number, "tariff_pct": number, "total_pct": number, "notes": "brief explanation"}\n'+
+      'No markdown, no extra text.';
+
+    var r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({hts:hts,country:country})
+      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})
     });
     var d=await r.json();
-    if(r.ok&&d&&!d.error){
-      if(d.duty_pct!==undefined){g('cs-duty').value=d.duty_pct;if(g('cs-duty-src'))g('cs-duty-src').textContent='(AI)';}
-      if(d.tariff_pct!==undefined){g('cs-tariff').value=d.tariff_pct;if(g('cs-tariff-src'))g('cs-tariff-src').textContent='(AI)';}
+    if(d.content&&d.content[0]){
+      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/```$/,'').trim();
+      var result=JSON.parse(raw);
+      if(result.hts_code && g('cs-hts'))g('cs-hts').value=result.hts_code;
+      if(result.duty_pct!=null && g('cs-duty'))g('cs-duty').value=result.duty_pct;
+      if(result.tariff_pct!=null && g('cs-tariff'))g('cs-tariff').value=result.tariff_pct;
       recalcPD();
-    }else{alert('AI suggestion unavailable: '+(d.error||'try again later'));}
-  }catch(e){alert('AI request failed: '+e.message);}
+      alert('AI estimate (verify before use):\n\n'+(result.notes||'No notes returned.'));
+    } else if(d.error){
+      alert('AI returned an error: '+(d.error.message||JSON.stringify(d.error)));
+    } else {
+      alert('AI returned an unexpected response. Please try again or enter rates manually.');
+    }
+  }catch(e){
+    alert('Could not get AI estimate: '+e.message+'. Please enter rates manually.');
+  } finally {
+    if(btn){btn.disabled=false;btn.innerHTML=originalLabel||'✦ AI Suggest Duty &amp; Tariff';}
+  }
 }
 
 // ════════════════════════════════════════
