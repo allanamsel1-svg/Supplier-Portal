@@ -10134,10 +10134,19 @@ async function approvePDToSKU(){
     var skus=await sr.json();
     var newSkuId=Array.isArray(skus)?(skus[0]&&skus[0].id):(skus&&skus.id);
 
+    // ─────────────────────────────────────────────────────────────────
+    // Post-create copy phase. fetch() does NOT throw on HTTP 4xx/5xx so
+    // we MUST check r.ok — the previous bare try/catch silently dropped
+    // RLS/FK/schema errors and the user saw "✓ Live SKU created" with
+    // no factory sources or costing actually copied. Collect failures
+    // into copyFailures[] and surface as a single alert at the end.
+    // ─────────────────────────────────────────────────────────────────
+    var copyFailures=[];
+
     // Copy costing → sku_costing
     if(newSkuId){
       try{
-        await fetch(SB+'/rest/v1/sku_costing',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({
+        var ccR=await fetch(SB+'/rest/v1/sku_costing',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({
           sku_id:newSkuId,
           hts_code:p.hts_code,country_of_origin:p.country_of_origin,fob_port:p.fob_port,
           fob_price:p.fob_price,packaging_price:p.packaging_price,
@@ -10145,16 +10154,113 @@ async function approvePDToSKU(){
           freight_origin:p.freight_origin,freight_mode:p.freight_mode,freight_rate:p.freight_rate,freight_container:p.freight_container,
           freight_actual:p.freight_actual
         })});
-      }catch(e){console.log('costing copy failed',e);}
+        if(!ccR.ok){
+          var ccErr=await ccR.text().catch(function(){return '';});
+          copyFailures.push('Costing copy failed (HTTP '+ccR.status+'): '+ccErr.slice(0,300));
+          console.error('sku_costing copy failed',ccR.status,ccErr);
+        }
+      }catch(e){copyFailures.push('Costing copy threw: '+e.message);console.error('costing copy threw',e);}
     }
 
-    // Copy factory sources (all of them, not just primary)
+    // ─────────────────────────────────────────────────────────────────
+    // Copy factory sources AND create a sku_factory_variants row + initial
+    // draft revision for each. The variant carries the per-factory
+    // manufacturing dossier (formulation, INCI, COA, factory certs); the
+    // initial draft is seeded with the PD's dim/weight + HTS + country
+    // values so admin can review, fill in the formulation/INCI/COA, and
+    // publish to lock as revision 1.
+    //
+    // Variant creation only proceeds if the matching sku_factory_sources
+    // POST succeeded — they're kept in lock-step.
+    // ─────────────────────────────────────────────────────────────────
+    var newVariantIds=[]; // remembered for the success summary
     if(newSkuId){
       var sources=p._sources||[];
+      if(sources.length===0){
+        copyFailures.push('WARNING: No factory sources copied — pdCurrentDetail._sources was empty at approval time. Check that pd_factory_sources rows exist for this PD and reload the detail panel.');
+        console.warn('approvePDToSKU: p._sources is empty at approval time',p.id);
+      }
       for(var si=0;si<sources.length;si++){
+        var src=sources[si];
+        var isPrimary=!!src.is_primary || si===0;
+
+        // 1. sku_factory_sources (existing relationship table)
+        var sourceOk=false;
         try{
-          await fetch(SB+'/rest/v1/sku_factory_sources',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:newSkuId,factory_id:sources[si].factory_id,status:sources[si].status||'active'})});
-        }catch(e){}
+          var fsR=await fetch(SB+'/rest/v1/sku_factory_sources',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:newSkuId,factory_id:src.factory_id,status:src.status||'active'})});
+          if(!fsR.ok){
+            var fsErr=await fsR.text().catch(function(){return '';});
+            copyFailures.push('Factory source copy failed (factory_id='+src.factory_id+', HTTP '+fsR.status+'): '+fsErr.slice(0,300));
+            console.error('sku_factory_sources copy failed',src.factory_id,fsR.status,fsErr);
+          }else{
+            sourceOk=true;
+          }
+        }catch(e){
+          copyFailures.push('Factory source copy threw (factory_id='+src.factory_id+'): '+e.message);
+          console.error('factory source copy threw',e);
+        }
+        if(!sourceOk) continue;
+
+        // 2. sku_factory_variants — one row per (SKU × factory)
+        var newVariantId=null;
+        try{
+          var vR=await fetch(SB+'/rest/v1/sku_factory_variants',{
+            method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+            body:JSON.stringify({
+              sku_id:newSkuId,
+              factory_id:src.factory_id,
+              status:'active',
+              is_primary:isPrimary,
+              created_by:'sku_activation'
+            })
+          });
+          if(!vR.ok){
+            var vErr=await vR.text().catch(function(){return '';});
+            copyFailures.push('Variant creation failed (factory_id='+src.factory_id+', HTTP '+vR.status+'): '+vErr.slice(0,300));
+            console.error('sku_factory_variants create failed',src.factory_id,vR.status,vErr);
+          }else{
+            var vRows=await vR.json();
+            newVariantId=Array.isArray(vRows)?(vRows[0]&&vRows[0].id):(vRows&&vRows.id);
+          }
+        }catch(e){
+          copyFailures.push('Variant creation threw (factory_id='+src.factory_id+'): '+e.message);
+          console.error('variant create threw',e);
+        }
+        if(!newVariantId) continue;
+        newVariantIds.push(newVariantId);
+
+        // 3. sku_factory_variant_revisions — initial draft seeded from PD
+        try{
+          var rR=await fetch(SB+'/rest/v1/sku_factory_variant_revisions',{
+            method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify({
+              variant_id:newVariantId,
+              revision_number:0,
+              state:'draft',
+              change_class:'initial',
+              change_summary:'Initial variant dossier seeded from PD '+(p.item_number||p.id)+' on SKU activation. Fill in formulation/INCI/COA/factory certs, then publish to lock as revision 1.',
+              country_of_origin:p.country_of_origin||null,
+              hts_code:p.hts_code||null,
+              unit_length_cm:p.unit_length_cm,  unit_width_cm:p.unit_width_cm,  unit_height_cm:p.unit_height_cm,  unit_weight_kg:p.unit_weight_kg,
+              inner_length_cm:p.inner_length_cm,inner_width_cm:p.inner_width_cm,inner_height_cm:p.inner_height_cm,inner_weight_kg:p.inner_weight_kg,inner_qty:p.inner_qty,
+              master_length_cm:p.master_length_cm,master_width_cm:p.master_width_cm,master_height_cm:p.master_height_cm,master_weight_kg:p.master_weight_kg,master_qty:p.master_qty,
+              pallet_qty:p.pallet_qty,
+              pallet_length_cm:p.pallet_length_cm,pallet_width_cm:p.pallet_width_cm,pallet_height_cm:p.pallet_height_cm,pallet_weight_kg:p.pallet_weight_kg,
+              draft_started_at:new Date().toISOString(),
+              draft_started_by:'sku_activation'
+            })
+          });
+          if(!rR.ok){
+            var rErr=await rR.text().catch(function(){return '';});
+            copyFailures.push('Initial revision creation failed (variant_id='+newVariantId+', HTTP '+rR.status+'): '+rErr.slice(0,300));
+            console.error('sku_factory_variant_revisions create failed',newVariantId,rR.status,rErr);
+          }
+        }catch(e){
+          copyFailures.push('Initial revision threw (variant_id='+newVariantId+'): '+e.message);
+          console.error('initial revision create threw',e);
+        }
       }
     }
 
@@ -10168,7 +10274,14 @@ async function approvePDToSKU(){
     // Update PD record → approved
     await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',sku_id:newSkuId,approved_at:new Date().toISOString(),approved_by:'admin'})});
 
-    alert('✓ Live SKU created. Orders can now be placed against this item.');
+    if(copyFailures.length){
+      alert('⚠ Live SKU created (id '+newSkuId+'), but '+copyFailures.length+' post-create copy step(s) failed:\n\n'+copyFailures.join('\n\n')+'\n\nFull errors logged to the browser console (open DevTools → Console).');
+    }else{
+      var variantNote=newVariantIds.length
+        ? '\n\n'+newVariantIds.length+' manufacturing variant'+(newVariantIds.length===1?'':'s')+' created with initial draft revision'+(newVariantIds.length===1?'':'s')+'. Fill in the manufacturing dossier (formulation, INCI, COA, factory certs) and publish to lock as revision 1.'
+        : '';
+      alert('✓ Live SKU created. Orders can now be placed against this item.'+variantNote);
+    }
     closePDDetailForce();
     loadPDList();
   }catch(e){alert('Approval failed: '+e.message);}
