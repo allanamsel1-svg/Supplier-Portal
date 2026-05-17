@@ -9584,8 +9584,14 @@ function pdAutoFillFreight(){
       var k=(r.destination_code||r.destination_name);
       if(!seen[k]){seen[k]=true;dests.push({code:r.destination_code||r.destination_name,name:r.destination_name||r.destination_code});}
     });
-    var currentDest=destSel.value;
+    // Prefer the dropdown's current value if the user already picked something
+    // this session; otherwise fall back to the value persisted on the PD record.
+    // Without this fallback the dropdown rebuilds with no selection on every
+    // reload because pdAutoFillFreight first runs before any value is set.
+    var currentDest=destSel.value||(pdCurrentDetail&&pdCurrentDetail.freight_destination)||'';
     destSel.innerHTML='<option value="">— Destination —</option>'+dests.map(function(d){return '<option value="'+d.code+'"'+(d.code===currentDest?' selected':'')+'>'+d.name+'</option>';}).join('');
+    // Sync the local variable so the rate-lookup below uses the restored value
+    dest=destSel.value;
   }
   // Find matching rate
   if(!origin||!dest){
@@ -10223,6 +10229,17 @@ function recalcPD(){
   if(g('cs-landed-est'))g('cs-landed-est').value=lEst?'$'+lEst.toFixed(4):'';
 
   // Margins
+  // ── TBG MARGIN FIX ──
+  // Margins must be computed off the WHOLESALE price (what TBG actually receives
+  // from the retailer), not retail (what the retailer charges the consumer).
+  // The RFQ-side calcMargins() already gets this right (line ~5949). The PD-side
+  // recalcPD was incorrectly using retail, producing inflated margins
+  // (e.g. 90.5% on a $0.76 landed / $7.99 retail item — that's the retailer's
+  // gross from a $0.76 cost, not TBG's gross from a $4 wholesale).
+  //
+  // Deductions (returns/dilution/ad/commission/royalty) also apply against the
+  // wholesale revenue line, not retail.
+  var wholesale=parseFloat(g('cs-wholesale')&&g('cs-wholesale').value)||0;
   var retail=parseFloat(g('cs-retail')&&g('cs-retail').value)||0;
   var ret=parseFloat(g('cs-returns')&&g('cs-returns').value)||0;
   var dil=parseFloat(g('cs-dilution')&&g('cs-dilution').value)||0;
@@ -10231,23 +10248,23 @@ function recalcPD(){
   var roy=parseFloat(g('cs-royalty')&&g('cs-royalty').value)||0;
   var landed=lEst;
   var totalDeductPct=ret+dil+ad+com+roy;
-  var deductDollars=retail*(totalDeductPct/100);
+  var deductDollars=wholesale*(totalDeductPct/100);
   var grossMargin=0,netMargin=0;
-  if(retail>0){
-    grossMargin=((retail-landed)/retail)*100;
-    netMargin=((retail-landed-deductDollars)/retail)*100;
+  if(wholesale>0){
+    grossMargin=((wholesale-landed)/wholesale)*100;
+    netMargin=((wholesale-landed-deductDollars)/wholesale)*100;
   }
   var cust=pdCurrentDetail.customers||{};
   var minGross=parseFloat(cust.min_gross_margin_pct)||0;
   var minNet=parseFloat(cust.min_net_margin_pct)||0;
-  if(g('cs-ded'))g('cs-ded').textContent=retail>0?'$'+deductDollars.toFixed(2):'—';
+  if(g('cs-ded'))g('cs-ded').textContent=wholesale>0?'$'+deductDollars.toFixed(2):'—';
   if(g('cs-gross')){
-    g('cs-gross').textContent=retail>0?grossMargin.toFixed(1)+'%':'—';
-    g('cs-gross').style.color=retail>0?(minGross&&grossMargin<minGross?'#b00':(minGross&&grossMargin<minGross+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
+    g('cs-gross').textContent=wholesale>0?grossMargin.toFixed(1)+'%':'—';
+    g('cs-gross').style.color=wholesale>0?(minGross&&grossMargin<minGross?'#b00':(minGross&&grossMargin<minGross+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
   }
   if(g('cs-net')){
-    g('cs-net').textContent=retail>0?netMargin.toFixed(1)+'%':'—';
-    g('cs-net').style.color=retail>0?(minNet&&netMargin<minNet?'#b00':(minNet&&netMargin<minNet+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
+    g('cs-net').textContent=wholesale>0?netMargin.toFixed(1)+'%':'—';
+    g('cs-net').style.color=wholesale>0?(minNet&&netMargin<minNet?'#b00':(minNet&&netMargin<minNet+5?'#aa6600':'#1a7a1a')):'#1a1a2e';
   }
 }
 
@@ -10293,7 +10310,7 @@ async function savePDAll(silent){
     hts_code:v('cs-hts'),country_of_origin:v('cs-origin'),fob_port:v('cs-port'),
     fob_price:n('cs-fob'),packaging_price:n('cs-pkg'),
     duty_pct:n('cs-duty'),tariff_pct:n('cs-tariff'),
-    freight_origin:v('cs-freight-origin'),freight_mode:v('cs-freight-mode'),freight_rate:n('cs-freight-rate'),freight_container:v('cs-freight-cont'),
+    freight_origin:v('cs-freight-origin'),freight_destination:v('cs-freight-dest'),freight_mode:v('cs-freight-mode'),freight_rate:n('cs-freight-rate'),freight_container:v('cs-freight-cont'),
     // Pricing & margin
     wholesale_price:n('cs-wholesale'),
     target_retail_price:n('cs-retail'),
