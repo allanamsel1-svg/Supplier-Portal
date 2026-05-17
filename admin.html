@@ -9836,14 +9836,16 @@ async function generatePDUpcs(){
     if(!confirm('A UPC is already assigned. Generate a new one? (Old UPC will be released back to pool)'))return;
   }
   try{
-    // Get next available UPC from pool
-    var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    // Get next available UNIT-level UPC from pool. We derive inner/master/pallet
+    // from the unit UPC via deriveItf14() so the pool row we claim must be level='unit'.
+    var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     if(!poolR.ok){alert('Could not query UPC pool.');return;}
     var avail=await poolR.json();
     if(!avail.length){alert('No UPCs available in the pool. Upload more in Setup → UPC Pool.');return;}
     var unit=avail[0];
     // Mark as assigned
-    var assignR=await fetch(SB+'/rest/v1/upc_pool?id=eq.'+unit.id,{
+    // upc_pool's primary key is upc_code (not id), so we filter by upc_code.
+    var assignR=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(unit.upc_code),{
       method:'PATCH',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({is_assigned:true,assigned_to_pd_id:pdCurrentDetail.id,assigned_at:new Date().toISOString()})
@@ -10466,11 +10468,16 @@ async function removePDVar(vid){
 async function genVariationUPCs(vid){
   var v=(pdCurrentDetail._variations||[]).find(function(x){return x.id===vid;});if(!v)return;
   try{
-    var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     var avail=poolR.ok?await poolR.json():[];
     if(!avail.length){alert('No UPCs available in pool.');return;}
     var unit=avail[0];
-    await fetch(SB+'/rest/v1/upc_pool?id=eq.'+unit.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_pd_id:pdCurrentDetail.id,assigned_at:new Date().toISOString()})});
+    var assignR=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(unit.upc_code),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_pd_id:pdCurrentDetail.id,assigned_at:new Date().toISOString()})});
+    if(!assignR.ok){
+      var errTxt=await assignR.text().catch(function(){return '';});
+      alert('Failed to claim UPC from pool (HTTP '+assignR.status+'): '+errTxt.slice(0,200));
+      return;
+    }
     var unitUpc=unit.upc_code;
     var inner=deriveItf14(unitUpc,1);
     var master=deriveItf14(unitUpc,2);
