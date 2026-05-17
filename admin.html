@@ -10067,16 +10067,66 @@ async function approvePDToSKU(){
     // Save all in-form fields first
     await savePDAll(true);
 
-    // Create SKU record
+    // ─────────────────────────────────────────────────────────────────
+    // CRITICAL UPC INTEGRITY GATE — prevents duplicate UPCs in live SKUs
+    // Re-query the pool for the unit UPC and verify ownership BEFORE
+    // creating the SKU. This guards against race conditions, stale
+    // screens, and any code path that bypassed the pool.
+    // ─────────────────────────────────────────────────────────────────
+    var validateR=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(p.unit_upc),{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!validateR.ok){
+      var verr=await validateR.text().catch(function(){return '';});
+      alert('UPC validation request failed (HTTP '+validateR.status+'): '+verr.slice(0,200));
+      return;
+    }
+    var poolRows=await validateR.json();
+    if(!poolRows.length){
+      alert('UPC integrity check FAILED: unit UPC '+p.unit_upc+' is not in the upc_pool. Cannot create SKU. Please regenerate UPCs from the pool.');
+      return;
+    }
+    var poolRow=poolRows[0];
+    if(poolRow.assigned_to_pd_id && poolRow.assigned_to_pd_id !== p.id){
+      alert('UPC integrity check FAILED: unit UPC '+p.unit_upc+' is currently claimed by a different PD (id '+poolRow.assigned_to_pd_id+'). Cannot create SKU. Regenerate UPCs.');
+      return;
+    }
+    if(poolRow.assigned_to_sku){
+      alert('UPC integrity check FAILED: unit UPC '+p.unit_upc+' is ALREADY assigned to live SKU '+poolRow.assigned_to_sku+'. Duplicate UPC across live SKUs is not permitted. Regenerate UPCs.');
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // Parse the item_number (e.g. "FH-SCF-0001" or "FH-SCF-0001-WM") into
+    // its component parts. The skus table requires brand_prefix,
+    // category_prefix, and sequence_number as separate NOT NULL columns.
+    // Customer suffix (if any) goes into its own column; model_number on
+    // SKU is the base part without the suffix.
+    // ─────────────────────────────────────────────────────────────────
+    var modelParts=(p.item_number||'').split('-');
+    if(modelParts.length<3){alert('Item number format invalid: '+p.item_number+'. Expected BRAND-CAT-####. Cannot create SKU.');return;}
+    var brandPrefix=modelParts[0];
+    var categoryPrefix=modelParts[1];
+    var seqNum=parseInt(modelParts[2],10);
+    if(isNaN(seqNum)){alert('Cannot parse sequence number from item number: '+p.item_number+'. Cannot create SKU.');return;}
+    var customerSuffix=modelParts.length>=4?modelParts.slice(3).join('-'):null;
+    var baseModelNumber=brandPrefix+'-'+categoryPrefix+'-'+modelParts[2];
+
+    // Create SKU record. Note: UPCs are NOT stored on the skus table —
+    // they live exclusively in upc_pool with assigned_to_sku linking
+    // back to this SKU. This is the architectural enforcement of "no
+    // duplicate UPCs in live SKUs" — the pool's upc_code PK makes
+    // duplicates physically impossible.
     var skuPayload={
-      model_number:p.item_number,
+      model_number:baseModelNumber,
+      brand_prefix:brandPrefix,
+      category_prefix:categoryPrefix,
+      sequence_number:seqNum,
+      customer_suffix:customerSuffix,
       description:p.item_description||'(no description)',
       brand_id:p.brand_id||null,
+      category_id:p.category_id||null,
       is_cosmetic:(p.rfqs&&p.rfqs.is_cosmetic)||false,
-      unit_upc:p.unit_upc,
-      inner_upc:p.inner_upc,
-      master_upc:p.master_upc,
-      pallet_upc:p.pallet_upc,
+      is_customer_specific:!!customerSuffix||!!p.customer_id,
+      customer_id:p.customer_id||null,
       status:'active'
     };
     var sr=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
