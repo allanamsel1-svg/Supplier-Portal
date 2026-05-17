@@ -8814,6 +8814,55 @@ async function openPDDetail(pdId){
         ]);
         pdCurrentDetail._product_images_count = (docInputs[0]||[]).length;
         pdCurrentDetail._technical_drawings_count = (docInputs[1]||[]).length;
+
+        // ── Sub-batch 2H FIX (Product Assets section) ──
+        // Factory uploads via the supplier portal land in product_documents
+        // (keyed by PDI id), NOT in product_development_assets. The Product
+        // Assets card reads from _assets which is sourced from
+        // product_development_assets, so factory uploads weren't appearing
+        // even though they're present.
+        //
+        // Pull all current product_documents for this PDI and synthesise
+        // matching slot entries so the Product Assets card can render them
+        // alongside admin-uploaded slot files. Use _opener='factory' so the
+        // rendered link uses openFactoryFile (factory-files bucket) rather
+        // than openPDAsset (pd-assets bucket).
+        try {
+          var allDocsRes = await fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdiIdForDocs+'&is_current=eq.true&select=id,document_type,file_path,file_name,file_size,uploaded_at',
+            {headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}}
+          );
+          if (allDocsRes.ok) {
+            var allDocs = await allDocsRes.json();
+            function _mapDocTypeToSlot(dt) {
+              if (!dt) return null;
+              var t = String(dt).toLowerCase().trim();
+              if (t === 'product image' || t === 'hi-resolution product image' || t === 'hi-res image' || t === 'hires image') return 'hires_image';
+              if (t === 'technical drawing' || t === 'die lines' || t === 'die line' || t === 'packaging die lines') return 'die_lines';
+              if (t === '3d step' || t === '3d step file' || t === 'step file' || t === 'step') return 'step_file';
+              if (t === 'user manual') return 'user_manual_factory';
+              return null;
+            }
+            var mappedDocs = [];
+            for (var _i = 0; _i < allDocs.length; _i++) {
+              var _d = allDocs[_i];
+              var _slot = _mapDocTypeToSlot(_d.document_type);
+              if (_slot) {
+                mappedDocs.push({
+                  id: _d.id,
+                  slot_type: _slot,
+                  file_path: _d.file_path,
+                  file_name: _d.file_name,
+                  file_size: _d.file_size,
+                  created_at: _d.uploaded_at,
+                  _opener: 'factory'
+                });
+              }
+            }
+            pdCurrentDetail._assets = (pdCurrentDetail._assets || []).concat(mappedDocs);
+          }
+        } catch(docMergeErr) {
+          console.log('product_documents → _assets merge failed (non-fatal):', docMergeErr);
+        }
       } else {
         pdCurrentDetail._product_images_count = 0;
         pdCurrentDetail._technical_drawings_count = 0;
@@ -9257,7 +9306,11 @@ function renderPDDetail(){
         var fileLinks=matching.map(function(a){
           var path=(a.file_path||a.file_url||'');
           var name=a.file_name||(path.split('/').pop());
-          return '<a href="javascript:void(0)" onclick="openPDAsset(\''+path.replace(/'/g,"\\\\'")+'\')" style="font-size:11px;color:#2266cc;text-decoration:none;display:block;margin-top:2px;">📄 '+escAttr(name)+'</a>';
+          // Factory uploads (merged from product_documents) live in the
+          // factory-files bucket; admin slot uploads live in pd-assets.
+          var openerFn=(a._opener==='factory')?'openFactoryFile':'openPDAsset';
+          var sourceTag=(a._opener==='factory')?' <span style="font-size:9px;color:#888;background:#f0f0e8;padding:1px 5px;border-radius:8px;margin-left:4px;">factory</span>':'';
+          return '<a href="javascript:void(0)" onclick="'+openerFn+'(\''+path.replace(/'/g,"\\\\'")+'\')" style="font-size:11px;color:#2266cc;text-decoration:none;display:block;margin-top:2px;">📄 '+escAttr(name)+sourceTag+'</a>';
         }).join('');
         // Admin can upload to ANY slot — even ones normally filled by factory.
         // The isAdmin flag is now informational only (whose responsibility it normally is).
