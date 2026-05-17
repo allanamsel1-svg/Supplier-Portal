@@ -2386,10 +2386,22 @@ async function loadPdOutstandingActions(pdId) {
       : '⚠ '+allWarn.length+' recommended item'+(allWarn.length===1?'':'s');
 
     function renderItem(group, color) {
-      return '<div style="padding:6px 10px;border-left:3px solid '+color+';background:'+color+'10;border-radius:4px;margin:5px 0;">'+
-        '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">'+esc(group.label)+'</div>'+
-        '<div style="font-size:12px;color:'+color+';font-weight:500;">'+esc(group.flag.label)+'</div>'+
-        (group.flag.detail?'<div style="font-size:11px;color:#666;margin-top:2px;line-height:1.3;">'+esc(group.flag.detail)+'</div>':'')+
+      var flag = group.flag;
+      // Determine if this item is uploadable (factory cert or product doc) — if yes show Upload button
+      var docKey = flag.cert_name || flag.doc_name || null;
+      var btnHtml = '';
+      if (docKey) {
+        btnHtml = '<button data-layer="'+esc(group.label)+'" data-key="'+esc(docKey)+'" '+
+          'onclick="uploadInlineFromAction(\''+pdId+'\', this)" '+
+          'style="padding:5px 12px;background:'+color+';color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">📎 Upload</button>';
+      }
+      return '<div style="padding:8px 10px;border-left:3px solid '+color+';background:'+color+'10;border-radius:4px;margin:5px 0;display:flex;gap:10px;align-items:flex-start;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;">'+esc(group.label)+'</div>'+
+          '<div style="font-size:12px;color:'+color+';font-weight:500;">'+esc(flag.label)+'</div>'+
+          (flag.detail?'<div style="font-size:11px;color:#666;margin-top:2px;line-height:1.3;">'+esc(flag.detail)+'</div>':'')+
+        '</div>'+
+        btnHtml+
       '</div>';
     }
     el.innerHTML =
@@ -2401,6 +2413,140 @@ async function loadPdOutstandingActions(pdId) {
   } catch(e) {
     el.innerHTML = '<div style="font-size:11px;color:#b00;padding:8px;">Action check error: '+esc(e.message||e)+'</div>';
   }
+}
+
+// ── PD: inline upload triggered from the Outstanding Actions panel ──
+// Reads `data-layer` and `data-key` from the button. Layer is 'Factory'|'RFQ'|'Product'.
+// For Factory/RFQ: uploads to factory_documents with the right document_type/document_type_other.
+// For Product: uploads to product_documents tagged with product_development_id (the PDI id).
+async function uploadInlineFromAction(pdId, btnEl) {
+  var layer = btnEl.getAttribute('data-layer') || '';
+  var docName = btnEl.getAttribute('data-key') || '';
+  if (!docName) return;
+
+  // Standard factory_documents document_type values (everything else gets 'Other' + document_type_other)
+  var STANDARD_TYPES = ['Health Canada','ISO 13485','ISO 14001','ISO 9001','Sedex','Organic','FDA'];
+
+  // Trigger native file picker
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,image/*';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  input.onchange = async function() {
+    try { document.body.removeChild(input); } catch(e) {}
+    if (!input.files || !input.files.length) return;
+    var file = input.files[0];
+    if (file.size > 25 * 1024 * 1024) {
+      alert('File too large. Must be under 25 MB.');
+      return;
+    }
+
+    var orig = btnEl.textContent;
+    btnEl.disabled = true;
+    btnEl.textContent = 'Uploading...';
+
+    try {
+      var ts = Date.now();
+      var safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+      var contentType = file.type || 'application/octet-stream';
+
+      if (layer === 'Factory' || layer === 'RFQ') {
+        // Factory-level cert: storage path under factory's compliance folder
+        var storagePath = FACTORY_ID + '/compliance/' + ts + '_' + safeName;
+        var sr = await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath, {
+          method:'POST',
+          headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':contentType,'x-upsert':'true'},
+          body: file
+        });
+        if (!sr.ok) throw new Error('Storage upload failed (HTTP '+sr.status+')');
+
+        var isStandard = STANDARD_TYPES.indexOf(docName) >= 0;
+        var payload = {
+          factory_id: FACTORY_ID,
+          document_type: isStandard ? docName : 'Other',
+          file_name: file.name,
+          file_path: storagePath,
+          file_size: file.size,
+          is_current: true,
+          version: 1
+        };
+        if (!isStandard) payload.document_type_other = docName;
+
+        var dr = await fetch(SB+'/rest/v1/factory_documents', {
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify(payload)
+        });
+        if (!dr.ok) {
+          var err = await dr.json().catch(function(){return{};});
+          throw new Error('factory_documents insert failed: '+(err.message||err.details||dr.status));
+        }
+
+        // Also auto-add this cert to the factory's certifications array (mirrors saveComplianceUpload behavior)
+        try {
+          var fr = await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID+'&select=certifications', {
+            headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+          });
+          if (fr.ok) {
+            var frows = await fr.json();
+            var curr = (frows && frows[0] && Array.isArray(frows[0].certifications)) ? frows[0].certifications : [];
+            if (curr.indexOf(docName) < 0) {
+              curr.push(docName);
+              await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID, {
+                method:'PATCH',
+                headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+                body: JSON.stringify({certifications: curr})
+              });
+            }
+          }
+        } catch(e2) { /* non-fatal */ }
+
+      } else if (layer === 'Product') {
+        // Product-level doc: storage path under PD assets folder
+        var storagePath = FACTORY_ID + '/pd-assets/' + pdId + '/' + ts + '_' + safeName;
+        var sr = await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath, {
+          method:'POST',
+          headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':contentType,'x-upsert':'true'},
+          body: file
+        });
+        if (!sr.ok) throw new Error('Storage upload failed (HTTP '+sr.status+')');
+
+        var dr = await fetch(SB+'/rest/v1/product_documents', {
+          method:'POST',
+          headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+          body: JSON.stringify({
+            product_development_id: pdId,
+            factory_id: FACTORY_ID,
+            document_type: docName,
+            file_name: file.name,
+            file_path: storagePath,
+            file_size: file.size,
+            uploaded_by: 'factory',
+            is_current: true,
+            version: 1
+          })
+        });
+        if (!dr.ok) {
+          var err = await dr.json().catch(function(){return{};});
+          throw new Error('product_documents insert failed: '+(err.message||err.details||dr.status));
+        }
+      } else {
+        throw new Error('Unknown layer: '+layer);
+      }
+
+      // Refresh outstanding actions + assets list — the uploaded item should disappear/check off
+      loadPdOutstandingActions(pdId);
+      loadPdAssetsList(pdId);
+    } catch(e) {
+      alert('Upload failed: '+(e.message||e));
+      btnEl.disabled = false;
+      btnEl.textContent = orig;
+    }
+  };
+
+  input.click();
 }
 
 function toggleShipDestAddress(pdId){
