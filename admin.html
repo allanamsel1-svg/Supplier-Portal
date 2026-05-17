@@ -10531,6 +10531,18 @@ async function confirmPDSlotUpload(slotType,maxFiles){
   var msg=document.getElementById('pd-slot-msg');
   if(!fileInput.files||!fileInput.files.length){msg.textContent='Choose a file.';msg.style.color='#b00';return;}
   msg.textContent='Uploading...';msg.style.color='#888';
+  // Map the new slot_type taxonomy → the legacy NOT-NULL asset_type column.
+  // The product_development_assets table predates slot_type and still requires
+  // asset_type, so we have to supply both. Without this, every slot upload was
+  // silently failing on the NOT NULL constraint.
+  var SLOT_TO_ASSET_TYPE = {
+    final_packaging:'packaging_artwork',
+    final_user_manual:'user_manual',
+    step_file:'step_file',
+    hires_image:'hi_res_image',
+    user_manual_factory:'user_manual',
+    die_lines:'tech_spec'
+  };
   try{
     var pdId=pdCurrentDetail.id;
     var files=Array.prototype.slice.call(fileInput.files,0,maxFiles||1);
@@ -10541,8 +10553,28 @@ async function confirmPDSlotUpload(slotType,maxFiles){
       var path=pdId+'/'+slotType+'_'+ts+'_'+safe;
       var ur=await fetch(SB+'/storage/v1/object/pd-assets/'+path,{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream','x-upsert':'true'},body:f});
       if(!ur.ok){msg.textContent='Upload failed for '+safe;msg.style.color='#b00';return;}
-      // Insert metadata row
-      await fetch(SB+'/rest/v1/product_development_assets',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_id:pdId,slot_type:slotType,file_path:path,file_name:safe})});
+      // Insert metadata row — now with the required asset_type, and with an
+      // explicit .ok check so DB-side failures surface instead of going silent.
+      var dbR=await fetch(SB+'/rest/v1/product_development_assets',{
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({
+          pd_id:pdId,
+          slot_type:slotType,
+          asset_type:SLOT_TO_ASSET_TYPE[slotType]||'other',
+          file_path:path,
+          file_name:safe,
+          file_size:f.size,
+          uploaded_by:'admin',
+          status:'pending_review'
+        })
+      });
+      if(!dbR.ok){
+        var errTxt=await dbR.text().catch(function(){return'';});
+        msg.textContent='DB save failed (HTTP '+dbR.status+'): '+errTxt.slice(0,180);
+        msg.style.color='#b00';
+        return;
+      }
     }
     document.getElementById('pd-slot-modal').remove();
     openPDDetail(pdId);
