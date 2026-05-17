@@ -498,9 +498,44 @@
               <label>Document Type *</label>
               <select id="compl-other-type" onchange="onOtherTypeChange()">
                 <option value="">— Select —</option>
-                <option>Business License</option>
-                <option>Insurance Certificate</option>
-                <option>Factory Profile / Capability Statement</option>
+                <optgroup label="Universal documents">
+                  <option>Business License</option>
+                  <option>Insurance Certificate</option>
+                  <option>Factory Profile / Capability Statement</option>
+                </optgroup>
+                <optgroup label="ISO standards">
+                  <option>ISO 9001</option>
+                  <option>ISO 13485</option>
+                  <option>ISO 14001</option>
+                  <option>ISO 22000</option>
+                  <option>ISO 22716</option>
+                  <option>ISO 45001</option>
+                </optgroup>
+                <optgroup label="Cosmetic / personal care">
+                  <option>GMP</option>
+                  <option>COSMOS</option>
+                  <option>ECOCERT</option>
+                  <option>MoCRA Registration</option>
+                  <option>Prop 65 Compliant</option>
+                </optgroup>
+                <optgroup label="Food / supplements">
+                  <option>HACCP</option>
+                  <option>FDA</option>
+                  <option>Health Canada</option>
+                  <option>NSF</option>
+                </optgroup>
+                <optgroup label="Textile / sustainability">
+                  <option>OEKO-TEX</option>
+                  <option>GOTS</option>
+                  <option>GRS</option>
+                  <option>FSC</option>
+                </optgroup>
+                <optgroup label="Audits">
+                  <option>BSCI Audit</option>
+                  <option>Sedex / SMETA Audit</option>
+                  <option>WRAP</option>
+                  <option>SA8000</option>
+                </optgroup>
                 <option>Other</option>
               </select>
             </div>
@@ -2109,17 +2144,41 @@ function renderPDCard(pd,subs,destinations){
   var assetsHtml =
     '<div style="margin-top:14px;padding:14px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;">'+
       '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">📸 Product Assets</div>'+
-      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">Upload images of the production product and any technical drawings or dielines. Helps us with downstream catalog and quality reference.</div>'+
+      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">Upload production-ready assets for this product. The buyer needs these for catalog, retailer setup, and tooling reference.</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">'+
-        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">Product Images <span style="color:#888;font-weight:400;font-size:10px;">(multiple)</span></div>'+
-          '<input type="file" id="pd-img-input-'+pd.id+'" accept="image/*" multiple style="font-size:11px;width:100%;" />'+
+        // Row 1: images + technical drawing
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📸 Product Images <span style="color:#888;font-weight:400;font-size:10px;">(multiple)</span></div>'+
+          '<input type="file" id="pd-img-input-'+pd.id+'" accept="image/*" multiple style="font-size:11px;width:100%;box-sizing:border-box;" />'+
           '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Product Image\', \'pd-img-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
         '</div>'+
-        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">Technical Drawing / Dieline <span style="color:#888;font-weight:400;font-size:10px;">(PDF or image)</span></div>'+
-          '<input type="file" id="pd-drw-input-'+pd.id+'" accept="application/pdf,image/*" style="font-size:11px;width:100%;" />'+
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📐 Technical Drawing <span style="color:#888;font-weight:400;font-size:10px;">(PDF or image)</span></div>'+
+          '<input type="file" id="pd-drw-input-'+pd.id+'" accept="application/pdf,image/*" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
           '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Technical Drawing\', \'pd-drw-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+        // Row 2: die lines + 3D step file
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📦 Packaging Die Lines <span style="color:#888;font-weight:400;font-size:10px;">(PDF or AI)</span></div>'+
+          '<input type="file" id="pd-die-input-'+pd.id+'" accept="application/pdf,image/*,.ai,.eps" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Die Lines\', \'pd-die-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">⚙ 3D STEP File <span style="color:#888;font-weight:400;font-size:10px;">(.step, .stp)</span></div>'+
+          '<input type="file" id="pd-step-input-'+pd.id+'" accept=".step,.stp,application/octet-stream" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'3D STEP File\', \'pd-step-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+        // Row 3: user manual + other
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📖 User Manual <span style="color:#888;font-weight:400;font-size:10px;">(where applicable)</span></div>'+
+          '<input type="file" id="pd-man-input-'+pd.id+'" accept="application/pdf" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'User Manual\', \'pd-man-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+        '</div>'+
+        '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📄 Other Document <span style="color:#888;font-weight:400;font-size:10px;">(specify type)</span></div>'+
+          '<input type="text" id="pd-oth-type-'+pd.id+'" placeholder="e.g. Tech spec, Material spec" style="font-size:11px;width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #d8d8d0;border-radius:4px;margin-bottom:4px;" />'+
+          '<input type="file" id="pd-oth-input-'+pd.id+'" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
+          '<button onclick="uploadPdAssetOther(\''+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
         '</div>'+
       '</div>'+
       '<div id="pd-assets-list-'+pd.id+'" style="margin-top:8px;font-size:12px;color:#888;">Loading uploaded assets...</div>'+
@@ -2304,7 +2363,21 @@ async function uploadPdAssets(pdId, docType, inputId) {
   loadPdOutstandingActions(pdId);
 }
 
-// ── PD: load and render the asset list for a PD card ──
+// ── PD: upload an "Other" asset where factory types the doc type ──
+async function uploadPdAssetOther(pdId) {
+  var typeEl = g('pd-oth-type-'+pdId);
+  var msg = g('pd-asset-msg-'+pdId);
+  var t = (typeEl && typeEl.value || '').trim();
+  if (!t) {
+    if(msg){msg.style.color='#b00';msg.textContent='Please specify a document type first.';}
+    return;
+  }
+  // Delegate to the standard upload helper with the typed value
+  await uploadPdAssets(pdId, t, 'pd-oth-input-'+pdId);
+  if (typeEl) typeEl.value = '';
+}
+
+
 // Queries product_documents tagged by EITHER product_development_id OR rfq_quote_id (the accepted quote),
 // so docs uploaded at quote time AND docs uploaded post-acceptance both appear.
 async function loadPdAssetsList(pdId) {

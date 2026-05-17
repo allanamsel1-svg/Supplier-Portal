@@ -8910,7 +8910,7 @@ function renderPDDetail(){
   var defPkg=pick(fv(p,'packaging_price'),fv(quoteRow,'packaging_price_per_unit'));
   var defDuty=pick(fv(p,'duty_pct'),fv(rfqRow,'est_duty_pct'));
   var defTariff=pick(fv(p,'tariff_pct'),fv(rfqRow,'est_tariff_pct'));
-  var defWholesale=fv(p,'wholesale_price');
+  var defWholesale=pick(fv(p,'wholesale_price'),fv(rfqRow,'target_wholesale_price'));
   var defRetail=pick(fv(p,'target_retail_price'),fv(rfqRow,'target_retail_price'));
   var defMoq=pick(fv(p,'moq'),fv(quoteRow,'moq_units'),fv(rfqRow,'quote_quantity'));
 
@@ -9045,17 +9045,17 @@ function renderPDDetail(){
           fld('Status',sel('pk-ist',['estimated','factory_confirmed','admin_verified'].map(function(s){return '<option value="'+s+'"'+(fv(p,'inner_dim_status','estimated')===s?' selected':'')+'>'+s.replace(/_/g,' ').replace(/\b\w/g,function(l){return l.toUpperCase();})+'</option>';}).join('')))
         )+
         '<div style="font-size:12px;color:#888;margin-bottom:8px;">CBM (estimated): <strong id="cbm-inner">—</strong></div>'+
-        // Factory-confirmed
+        // Factory-confirmed (Sub-batch 2G: reads from linked PDI's inner_* fields where factory entered them)
         '<div style="background:#e8f0ff;border:1px solid #c0d0f0;border-radius:7px;padding:9px 12px;margin-bottom:14px;">'+
-          '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed inner dimensions '+(p.inner_dim_confirmed_at?'<span style="font-weight:400;">— confirmed '+new Date(p.inner_dim_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
+          '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed inner dimensions '+((p._pdi&&p._pdi.cartons_confirmed_at)?'<span style="font-weight:400;">— confirmed '+new Date(p._pdi.cartons_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
           grid('1fr 1fr 1fr 1fr 1fr','8px',
-            fld('Qty/Inner','<input type="number" id="fpk-iq" value="'+escAttr(fv(p,'factory_inner_qty'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-            fld('L (cm)','<input type="number" id="fpk-il" value="'+escAttr(fv(p,'factory_inner_length_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-            fld('W (cm)','<input type="number" id="fpk-iw" value="'+escAttr(fv(p,'factory_inner_width_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-            fld('H (cm)','<input type="number" id="fpk-ih" value="'+escAttr(fv(p,'factory_inner_height_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-            fld('Weight (kg)','<input type="number" id="fpk-iwt" value="'+escAttr(fv(p,'factory_inner_weight_kg'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
+            fld('Qty/Inner','<input type="number" id="fpk-iq" value="'+escAttr(p._pdi?p._pdi.inner_case_pack_units:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('L (cm)','<input type="number" id="fpk-il" value="'+escAttr(p._pdi?p._pdi.inner_length_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('W (cm)','<input type="number" id="fpk-iw" value="'+escAttr(p._pdi?p._pdi.inner_width_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('H (cm)','<input type="number" id="fpk-ih" value="'+escAttr(p._pdi?p._pdi.inner_height_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+            fld('Weight (kg)','<input type="number" id="fpk-iwt" value="'+escAttr(p._pdi?p._pdi.inner_weight_kg:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
           )+
-          '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-inner">'+(function(){var fc=calcCBM(fv(p,'factory_inner_length_cm'),fv(p,'factory_inner_width_cm'),fv(p,'factory_inner_height_cm'));return fc||'—';})()+'</strong></div>'+
+          '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-inner">'+(function(){var fc=p._pdi?calcCBM(p._pdi.inner_length_cm,p._pdi.inner_width_cm,p._pdi.inner_height_cm):null;return fc||'—';})()+'</strong></div>'+
         '</div>'+
       '</div>'+
 
@@ -9070,17 +9070,17 @@ function renderPDDetail(){
         fld('Status',sel('pk-mst',['estimated','factory_confirmed','admin_verified'].map(function(s){return '<option value="'+s+'"'+(fv(p,'master_dim_status','estimated')===s?' selected':'')+'>'+s.replace(/_/g,' ').replace(/\b\w/g,function(l){return l.toUpperCase();})+'</option>';}).join('')))
       )+
       '<div style="font-size:12px;color:#888;margin-bottom:8px;">CBM (estimated): <strong id="cbm-master">—</strong></div>'+
-      // Factory-confirmed
+      // Factory-confirmed (Sub-batch 2G: reads from linked PDI's master_* fields where factory entered them)
       '<div style="background:#e8f0ff;border:1px solid #c0d0f0;border-radius:7px;padding:9px 12px;margin-bottom:14px;">'+
-        '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed master dimensions '+(p.master_dim_confirmed_at?'<span style="font-weight:400;">— confirmed '+new Date(p.master_dim_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
+        '<div style="font-size:10px;font-weight:600;color:#2244cc;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em;">Factory-confirmed master dimensions '+((p._pdi&&p._pdi.cartons_confirmed_at)?'<span style="font-weight:400;">— confirmed '+new Date(p._pdi.cartons_confirmed_at).toLocaleDateString()+'</span>':'<span style="font-weight:400;">— awaiting factory</span>')+'</div>'+
         grid('1fr 1fr 1fr 1fr 1fr','8px',
-          fld('Qty/Master','<input type="number" id="fpk-mq" value="'+escAttr(fv(p,'factory_master_qty'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-          fld('L (cm)','<input type="number" id="fpk-ml" value="'+escAttr(fv(p,'factory_master_length_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-          fld('W (cm)','<input type="number" id="fpk-mw" value="'+escAttr(fv(p,'factory_master_width_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-          fld('H (cm)','<input type="number" id="fpk-mh" value="'+escAttr(fv(p,'factory_master_height_cm'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
-          fld('Weight (kg)','<input type="number" id="fpk-mwt" value="'+escAttr(fv(p,'factory_master_weight_kg'))+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
+          fld('Qty/Master','<input type="number" id="fpk-mq" value="'+escAttr(p._pdi?p._pdi.master_case_pack_units:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('L (cm)','<input type="number" id="fpk-ml" value="'+escAttr(p._pdi?p._pdi.master_length_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('W (cm)','<input type="number" id="fpk-mw" value="'+escAttr(p._pdi?p._pdi.master_width_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('H (cm)','<input type="number" id="fpk-mh" value="'+escAttr(p._pdi?p._pdi.master_height_cm:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')+
+          fld('Weight (kg)','<input type="number" id="fpk-mwt" value="'+escAttr(p._pdi?p._pdi.master_weight_kg:'')+'" readonly style="width:100%;padding:6px 8px;font-size:13px;background:#fff;border:1px solid #c0d0f0;border-radius:6px;font-family:monospace;" />')
         )+
-        '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-master">'+(function(){var fc=calcCBM(fv(p,'factory_master_length_cm'),fv(p,'factory_master_width_cm'),fv(p,'factory_master_height_cm'));return fc||'—';})()+'</strong></div>'+
+        '<div style="font-size:11px;color:#2244cc;">CBM (factory-confirmed): <strong id="fcbm-master">'+(function(){var fc=p._pdi?calcCBM(p._pdi.master_length_cm,p._pdi.master_width_cm,p._pdi.master_height_cm):null;return fc||'—';})()+'</strong></div>'+
       '</div>'+
 
       // Pallet
@@ -9240,10 +9240,13 @@ function renderPDDetail(){
           var name=a.file_name||(path.split('/').pop());
           return '<a href="javascript:void(0)" onclick="openPDAsset(\''+path.replace(/'/g,"\\\\'")+'\')" style="font-size:11px;color:#2266cc;text-decoration:none;display:block;margin-top:2px;">📄 '+escAttr(name)+'</a>';
         }).join('');
-        var canUpload=isAdmin&&(!maxFiles||matching.length<maxFiles);
+        // Admin can upload to ANY slot — even ones normally filled by factory.
+        // The isAdmin flag is now informational only (whose responsibility it normally is).
+        var canUpload=(!maxFiles||matching.length<maxFiles);
+        var ownerLabel=isAdmin?'':'<span style="font-size:9px;color:#888;background:#f0f0e8;padding:1px 5px;border-radius:8px;margin-left:4px;">factory</span>';
         return '<div style="background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;padding:10px;margin-bottom:6px;">'+
           '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">'+
-            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+label+(maxFiles>1?' <span style="font-size:10px;color:#888;font-weight:400;">(up to '+maxFiles+')</span>':'')+'</div>'+
+            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+label+(maxFiles>1?' <span style="font-size:10px;color:#888;font-weight:400;">(up to '+maxFiles+')</span>':'')+ownerLabel+'</div>'+
             '<div style="display:flex;gap:6px;align-items:center;">'+
               '<span style="font-size:10px;color:'+statusColor+';">'+statusText+'</span>'+
               (canUpload?'<button class="btn-edit" style="font-size:10px;padding:4px 8px;" onclick="openPDSlotUpload(\''+slotKey+'\','+(maxFiles||1)+')">Upload</button>':'')+
