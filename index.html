@@ -214,9 +214,9 @@
     .quote-form-title { font-size: 13px; font-weight: 600; color: #1a1a2e; margin-bottom: 1rem; }
     .quote-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     .quote-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-    .qf { display: flex; flex-direction: column; gap: 3px; }
+    .qf { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
     .qf label { font-size: 11px; color: #556; }
-    .qf input, .qf textarea, .qf select { padding: 8px 10px; font-size: 13px; border: 1px solid #c0d8f0; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
+    .qf input, .qf textarea, .qf select { padding: 8px 10px; font-size: 13px; border: 1px solid #c0d8f0; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; width: 100%; box-sizing: border-box; max-width: 100%; }
     .qf input:focus, .qf textarea:focus { outline: none; border-color: #2244cc; }
     .qf textarea { resize: vertical; min-height: 60px; }
     .qf-full { grid-column: span 2; }
@@ -2225,9 +2225,19 @@ async function uploadPdAssets(pdId, docType, inputId) {
     if(msg){msg.style.color='#b00';msg.textContent='Please choose a file first.';}
     return;
   }
-  // Find the PD's factory_id from the card metadata (we don't have access to the JS-side pd object after render)
-  // Strategy: look it up from the URL/Supabase
   if(msg){msg.style.color='#666';msg.textContent='Uploading...';}
+
+  // Look up accepted_quote_id so assets are dual-tagged (visible from both RFQ and PD views)
+  var acceptedQuoteId = null;
+  try {
+    var pdR = await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId+'&select=accepted_quote_id&limit=1', {
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if (pdR.ok) {
+      var pdRows = await pdR.json();
+      if (Array.isArray(pdRows) && pdRows[0]) acceptedQuoteId = pdRows[0].accepted_quote_id;
+    }
+  } catch(e) { /* non-fatal */ }
 
   var files = Array.from(input.files);
   var successCount = 0, failCount = 0;
@@ -2251,21 +2261,24 @@ async function uploadPdAssets(pdId, docType, inputId) {
       });
       if(!sr.ok){ failCount++; continue; }
 
-      // product_documents row
+      // product_documents row — dual-tagged with both PD and quote so visible from both views
+      var assetPayload = {
+        product_development_id: pdId,
+        factory_id: FACTORY_ID,
+        document_type: docType,
+        file_name: file.name,
+        file_path: storagePath,
+        file_size: file.size,
+        uploaded_by: 'factory',
+        is_current: true,
+        version: 1
+      };
+      if (acceptedQuoteId) assetPayload.rfq_quote_id = acceptedQuoteId;
+
       var dr = await fetch(SB+'/rest/v1/product_documents', {
         method:'POST',
         headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body: JSON.stringify({
-          product_development_id: pdId,
-          factory_id: FACTORY_ID,
-          document_type: docType,
-          file_name: file.name,
-          file_path: storagePath,
-          file_size: file.size,
-          uploaded_by: 'factory',
-          is_current: true,
-          version: 1
-        })
+        body: JSON.stringify(assetPayload)
       });
       if(!dr.ok){ failCount++; continue; }
       successCount++;
@@ -2292,11 +2305,27 @@ async function uploadPdAssets(pdId, docType, inputId) {
 }
 
 // ── PD: load and render the asset list for a PD card ──
+// Queries product_documents tagged by EITHER product_development_id OR rfq_quote_id (the accepted quote),
+// so docs uploaded at quote time AND docs uploaded post-acceptance both appear.
 async function loadPdAssetsList(pdId) {
   var listEl = g('pd-assets-list-'+pdId);
   if(!listEl) return;
   try {
-    var r = await fetch(SB+'/rest/v1/product_documents?product_development_id=eq.'+pdId+'&is_current=eq.true&select=id,document_type,file_name,uploaded_at&order=uploaded_at.desc', {
+    // Find the accepted_quote_id for this PDI
+    var pdR = await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId+'&select=accepted_quote_id&limit=1', {
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    var acceptedQuoteId = null;
+    if (pdR.ok) {
+      var pdRows = await pdR.json();
+      if (Array.isArray(pdRows) && pdRows[0]) acceptedQuoteId = pdRows[0].accepted_quote_id;
+    }
+
+    // Build OR filter
+    var filter = 'product_development_id.eq.'+pdId;
+    if (acceptedQuoteId) filter += ',rfq_quote_id.eq.'+acceptedQuoteId;
+
+    var r = await fetch(SB+'/rest/v1/product_documents?or=('+filter+')&is_current=eq.true&select=id,document_type,file_name,uploaded_at,product_development_id,rfq_quote_id&order=uploaded_at.desc', {
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     var docs = await r.json();
@@ -2304,6 +2333,10 @@ async function loadPdAssetsList(pdId) {
       listEl.innerHTML = '<div style="font-size:11px;color:#bbb;font-style:italic;">No assets uploaded yet.</div>';
       return;
     }
+    // Deduplicate by id (in case same row matches both filters)
+    var seen = {};
+    docs = docs.filter(function(d){ if(seen[d.id]) return false; seen[d.id]=1; return true; });
+
     var byType = {};
     docs.forEach(function(d){
       var key = d.document_type || 'Other';
@@ -2314,8 +2347,10 @@ async function loadPdAssetsList(pdId) {
       return '<div style="margin-top:8px;">'+
         '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">'+esc(t)+' ('+byType[t].length+')</div>'+
         byType[t].map(function(d){
+          // Tag with source: which id this doc came in via
+          var source = d.product_development_id ? 'PD' : (d.rfq_quote_id ? 'Quote' : '');
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:5px;margin-bottom:4px;font-size:11px;">'+
-            '<span style="color:#1a1a2e;">📎 '+esc(d.file_name||'(no name)')+'</span>'+
+            '<span style="color:#1a1a2e;">📎 '+esc(d.file_name||'(no name)')+(source?' <span style="color:#aaa;font-size:10px;">· from '+source+'</span>':'')+'</span>'+
             '<span style="color:#888;">'+esc((d.uploaded_at||'').slice(0,10))+'</span>'+
           '</div>';
         }).join('')+
@@ -2443,6 +2478,19 @@ async function uploadInlineFromAction(pdId, btnEl) {
       return;
     }
 
+    // ── Look up accepted_quote_id so product docs get stamped with BOTH ids ──
+    // This means the same doc is visible from both the RFQ view and the PD view.
+    var acceptedQuoteId = null;
+    try {
+      var pdR = await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId+'&select=accepted_quote_id&limit=1', {
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+      });
+      if (pdR.ok) {
+        var pdRows = await pdR.json();
+        if (Array.isArray(pdRows) && pdRows[0]) acceptedQuoteId = pdRows[0].accepted_quote_id;
+      }
+    } catch(e) { /* non-fatal — proceed without quote link */ }
+
     var orig = btnEl.textContent;
     btnEl.disabled = true;
     btnEl.textContent = 'Uploading...';
@@ -2453,7 +2501,34 @@ async function uploadInlineFromAction(pdId, btnEl) {
       var contentType = file.type || 'application/octet-stream';
 
       if (layer === 'Factory' || layer === 'RFQ') {
-        // Factory-level cert: storage path under factory's compliance folder
+        // ── Factory-level cert ──
+        // factory_documents requires expiry_date NOT NULL — prompt for it (or default far-future for non-expiring docs).
+        btnEl.disabled = false; btnEl.textContent = orig;  // un-disable while prompting
+        var expiry = prompt(
+          docName + ' — Enter expiry date (YYYY-MM-DD).\n\n' +
+          'If this document does not expire (e.g. business license, self-declaration), leave blank to set far-future placeholder.\n\n' +
+          'Example: 2027-06-20'
+        );
+        if (expiry === null) {  // user cancelled
+          return;
+        }
+        btnEl.disabled = true; btnEl.textContent = 'Uploading...';
+
+        // Validate or default
+        var expiryDate;
+        if (expiry.trim() === '') {
+          expiryDate = '2099-12-31';  // non-expiring placeholder
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(expiry.trim())) {
+          expiryDate = expiry.trim();
+        } else {
+          throw new Error('Expiry date must be in YYYY-MM-DD format.');
+        }
+
+        var issuedBy = prompt(
+          docName + ' — Optionally enter the issuing body (e.g. SGS, Bureau Veritas, Health Canada).\n\nLeave blank to skip.'
+        );
+        if (issuedBy === null) return;  // cancelled
+
         var storagePath = FACTORY_ID + '/compliance/' + ts + '_' + safeName;
         var sr = await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath, {
           method:'POST',
@@ -2469,10 +2544,12 @@ async function uploadInlineFromAction(pdId, btnEl) {
           file_name: file.name,
           file_path: storagePath,
           file_size: file.size,
+          expiry_date: expiryDate,
           is_current: true,
           version: 1
         };
-        if (!isStandard) payload.document_type_other = docName;
+        if (!isStandard)         payload.document_type_other = docName;
+        if (issuedBy.trim())     payload.issued_by = issuedBy.trim();
 
         var dr = await fetch(SB+'/rest/v1/factory_documents', {
           method:'POST',
@@ -2484,7 +2561,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
           throw new Error('factory_documents insert failed: '+(err.message||err.details||dr.status));
         }
 
-        // Also auto-add this cert to the factory's certifications array (mirrors saveComplianceUpload behavior)
+        // Auto-add this cert to the factory's certifications array (mirrors saveComplianceUpload)
         try {
           var fr = await fetch(SB+'/rest/v1/factories?id=eq.'+FACTORY_ID+'&select=certifications', {
             headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
@@ -2504,7 +2581,8 @@ async function uploadInlineFromAction(pdId, btnEl) {
         } catch(e2) { /* non-fatal */ }
 
       } else if (layer === 'Product') {
-        // Product-level doc: storage path under PD assets folder
+        // ── Product-level doc ──
+        // Stamp BOTH product_development_id AND rfq_quote_id so the doc is visible from both views.
         var storagePath = FACTORY_ID + '/pd-assets/' + pdId + '/' + ts + '_' + safeName;
         var sr = await fetch(SB+'/storage/v1/object/factory-documents/'+storagePath, {
           method:'POST',
@@ -2513,20 +2591,23 @@ async function uploadInlineFromAction(pdId, btnEl) {
         });
         if (!sr.ok) throw new Error('Storage upload failed (HTTP '+sr.status+')');
 
+        var prodPayload = {
+          product_development_id: pdId,
+          factory_id: FACTORY_ID,
+          document_type: docName,
+          file_name: file.name,
+          file_path: storagePath,
+          file_size: file.size,
+          uploaded_by: 'factory',
+          is_current: true,
+          version: 1
+        };
+        if (acceptedQuoteId) prodPayload.rfq_quote_id = acceptedQuoteId;
+
         var dr = await fetch(SB+'/rest/v1/product_documents', {
           method:'POST',
           headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body: JSON.stringify({
-            product_development_id: pdId,
-            factory_id: FACTORY_ID,
-            document_type: docName,
-            file_name: file.name,
-            file_path: storagePath,
-            file_size: file.size,
-            uploaded_by: 'factory',
-            is_current: true,
-            version: 1
-          })
+          body: JSON.stringify(prodPayload)
         });
         if (!dr.ok) {
           var err = await dr.json().catch(function(){return{};});
