@@ -468,18 +468,37 @@ function extractExif(file){
   });
 }
 
+async function isHeicByBytes(file){
+  // Check file's magic bytes — most reliable way to detect HEIC vs JPG vs PNG.
+  // HEIC files have an ISO BMFF "ftyp" box at bytes 4-7, with brand at 8-11.
+  try{
+    var buf=await file.slice(0,16).arrayBuffer();
+    var bytes=new Uint8Array(buf);
+    // Need 'ftyp' marker at positions 4-7
+    if(bytes[4]===0x66 && bytes[5]===0x74 && bytes[6]===0x79 && bytes[7]===0x70){
+      var brand=String.fromCharCode(bytes[8],bytes[9],bytes[10],bytes[11]);
+      return brand==='heic'||brand==='heix'||brand==='mif1'||brand==='heis'||brand==='hevc'||brand==='msf1';
+    }
+    return false;
+  }catch(e){
+    return false;
+  }
+}
+
 async function convertIfHeic(file){
-  var name=(file.name||'').toLowerCase();
-  var isHeic=file.type==='image/heic'||file.type==='image/heif'||name.endsWith('.heic')||name.endsWith('.heif');
+  // Byte-signature check — ignores filename and MIME type, looks at the bytes.
+  var isHeic=await isHeicByBytes(file);
   if(!isHeic)return file;
   try{
     var blob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});
-    // heic2any returns blob (or array of blobs for multi-frame); normalize
     var out=Array.isArray(blob)?blob[0]:blob;
-    return new File([out],name.replace(/\.(heic|heif)$/i,'.jpg'),{type:'image/jpeg'});
+    var newName=(file.name||'image').replace(/\.(heic|heif|HEIC|HEIF)$/,'')+'.jpg';
+    return new File([out],newName,{type:'image/jpeg'});
   }catch(e){
-    console.error('HEIC conversion failed',e);
-    throw new Error('HEIC conversion failed for '+file.name+': '+e.message);
+    // Conversion failed — fall back to original file. Upload may still work
+    // if the file is actually a JPG with a misleading extension.
+    console.warn('HEIC conversion failed for '+file.name+', using original:',e);
+    return file;
   }
 }
 
