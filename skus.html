@@ -136,7 +136,11 @@ async function openSku(skuId){
     h(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&order=created_at.desc&limit=1').then(function(r){return r.json();}),
     h(SB+'/rest/v1/inventory_positions?sku_id=eq.'+skuId+'&select=*,warehouses(name,type,city)').then(function(r){return r.json();}),
     h(SB+'/rest/v1/production_runs?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english)&order=created_at.desc&limit=10').then(function(r){return r.json();}),
-    h(SB+'/rest/v1/customer_order_lines?sku_id=eq.'+skuId+'&select=*,customer_orders(order_number,order_date,customers(customer_name))&order=created_at.desc&limit=10').then(function(r){return r.json();})
+    h(SB+'/rest/v1/customer_order_lines?sku_id=eq.'+skuId+'&select=*,customer_orders(order_number,order_date,customers(customer_name))&order=created_at.desc&limit=10').then(function(r){return r.json();}),
+    // Manufacturing variants (new arch: one row per SKU × factory)
+    h(SB+'/rest/v1/sku_factory_variants?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english,country)&order=is_primary.desc,created_at').then(function(r){return r.ok?r.json():[];}).catch(function(){return [];}),
+    // SKU-level product documents (factory-agnostic: artwork, marketing, etc.)
+    h(SB+'/rest/v1/sku_documents?sku_id=eq.'+skuId+'&is_current=eq.true&order=uploaded_at.desc').then(function(r){return r.ok?r.json():[];}).catch(function(){return [];})
   ]);
 
   var sku=results[0][0];if(!sku)return;
@@ -147,6 +151,36 @@ async function openSku(skuId){
   var inv=results[5]||[];
   var runs=results[6]||[];
   var sales=results[7]||[];
+  var variants=results[8]||[];
+  var skuDocs=results[9]||[];
+
+  // ── Build the variants tree: revisions per variant + docs per revision ──
+  var variantsTree=[];
+  if(variants.length){
+    var variantIds=variants.map(function(v){return v.id;});
+    var revQ=variantIds.map(function(id){return 'variant_id=eq.'+id;}).join(',');
+    var revR=await h(SB+'/rest/v1/sku_factory_variant_revisions?or=('+revQ+')&order=revision_number');
+    var allRevs=revR.ok?await revR.json():[];
+
+    var docsByRev={};
+    if(allRevs.length){
+      var revIds=allRevs.map(function(r){return r.id;});
+      var docQ=revIds.map(function(id){return 'revision_id=eq.'+id;}).join(',');
+      var docR=await h(SB+'/rest/v1/variant_revision_documents?or=('+docQ+')&order=uploaded_at.desc');
+      var allDocs=docR.ok?await docR.json():[];
+      allDocs.forEach(function(d){
+        if(!docsByRev[d.revision_id])docsByRev[d.revision_id]=[];
+        docsByRev[d.revision_id].push(d);
+      });
+    }
+
+    variants.forEach(function(v){
+      var revsForV=allRevs.filter(function(r){return r.variant_id===v.id;});
+      var currentRev=revsForV.filter(function(r){return r.state==='published' && !r.effective_to;})[0];
+      var draft=revsForV.filter(function(r){return r.state==='draft';})[0];
+      variantsTree.push({v:v, currentRev:currentRev, draft:draft, allRevs:revsForV, docsByRev:docsByRev});
+    });
+  }
 
   // Load certs from sources
   var certs=[];
@@ -275,9 +309,89 @@ async function openSku(skuId){
     :'<div style="font-size:12px;color:#bbb;">No factory sources.</div>')+
   '</div>'+
 
+  // Manufacturing Variants (new arch: per-factory dossier with revision history)
+  '<div class="card">'+
+    '<div class="card-title">Manufacturing Variants <span style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(per-factory dossiers — formulation, INCI, tests, certs)</span></div>'+
+    (variantsTree.length?
+      variantsTree.map(function(t){
+        var v=t.v;
+        var f=v.factories||{};
+        var primary=v.is_primary?'<span class="badge dim-ver" style="margin-left:6px;">★ PRIMARY</span>':'';
+        var statusPill='<span class="badge '+(v.status==='active'?'dim-ver':'')+'" style="margin-left:6px;">'+v.status+'</span>';
+        var pubInfo;
+        if(t.currentRev){
+          var docsCount=(t.docsByRev[t.currentRev.id]||[]).length;
+          pubInfo='<div style="font-size:12px;color:#555;margin-top:6px;">'+
+            '<strong>Revision '+t.currentRev.revision_number+'</strong>'+
+            ' · published '+(t.currentRev.published_at||'').slice(0,10)+
+            (t.currentRev.published_by?' by '+t.currentRev.published_by:'')+
+            ' · '+(t.currentRev.change_class||'')+
+            ' · '+docsCount+' doc'+(docsCount===1?'':'s')+
+          '</div>';
+          if(t.draft){
+            pubInfo+='<div style="font-size:11px;color:#886600;margin-top:3px;">⚠ Pending draft revision (unpublished changes)</div>';
+          }
+        }else if(t.draft){
+          var draftDocs=(t.docsByRev[t.draft.id]||[]).length;
+          pubInfo='<div style="font-size:12px;color:#886600;margin-top:6px;">'+
+            '<strong>Draft (not yet published)</strong>'+
+            ' · started '+(t.draft.draft_started_at||'').slice(0,10)+
+            ' · '+draftDocs+' doc'+(draftDocs===1?'':'s')+' attached'+
+          '</div>'+
+          (t.draft.change_summary?'<div style="font-size:11px;color:#aaa;margin-top:3px;">'+t.draft.change_summary+'</div>':'');
+        }else{
+          pubInfo='<div style="font-size:12px;color:#b00;margin-top:6px;">⚠ No revisions exist for this variant.</div>';
+        }
+
+        // Document list for current revision (preferred) or draft (fallback)
+        var displayRev=t.currentRev||t.draft;
+        var docs=displayRev?(t.docsByRev[displayRev.id]||[]):[];
+        var docList=docs.length
+          ? '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">'+
+            docs.map(function(d){
+              var url=d.file_path?(d.file_path.indexOf('http')===0?d.file_path:SB+'/storage/v1/object/public/'+d.file_path):'#';
+              var expClass=d.expiry_date&&new Date(d.expiry_date)<new Date()?'color:#b00;':'color:#886600;';
+              return '<a href="'+url+'" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;background:#fff;border:1px solid #e0e0d8;border-radius:6px;font-size:11px;text-decoration:none;color:#1a1a2e;">'+
+                docIcon(d.document_type)+' '+(d.document_type||'doc')+
+                (d.file_name?'<span style="color:#aaa;font-size:10px;"> · '+d.file_name+'</span>':'')+
+                (d.expiry_date?'<span style="'+expClass+'font-size:10px;"> · exp '+d.expiry_date+'</span>':'')+
+              '</a>';
+            }).join('')+
+            '</div>'
+          : '<div style="font-size:11px;color:#bbb;margin-top:10px;">No documents on this revision yet.</div>';
+
+        return '<div style="background:#f8f8f4;border:1px solid #e0e0d8;border-radius:8px;padding:12px;margin-bottom:8px;">'+
+          '<div style="display:flex;align-items:center;flex-wrap:wrap;">'+
+            '<span style="font-weight:600;font-size:13px;">'+(f.factory_name_english||'(unknown factory)')+'</span>'+
+            primary+statusPill+
+            (f.country?'<span style="font-size:11px;color:#888;margin-left:8px;">'+f.country+'</span>':'')+
+          '</div>'+
+          pubInfo+
+          docList+
+        '</div>';
+      }).join('')
+    :'<div style="font-size:12px;color:#bbb;">No manufacturing variants for this SKU yet. <span style="color:#888;">Existing SKUs need a one-time backfill; new SKUs get variants automatically on activation.</span></div>')+
+  '</div>'+
+
+  // SKU Product Documents (factory-agnostic: artwork, marketing, customer-facing)
+  '<div class="card">'+
+    '<div class="card-title">SKU Product Documents <span style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(factory-agnostic)</span></div>'+
+    (skuDocs.length?
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;">'+
+      skuDocs.map(function(d){
+        var url=d.file_path?(d.file_path.indexOf('http')===0?d.file_path:SB+'/storage/v1/object/public/'+d.file_path):'#';
+        return '<a href="'+url+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:7px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;text-decoration:none;color:#1a1a2e;">'+
+          docIcon(d.document_type)+' '+(d.document_type||'Document')+
+          (d.file_name?'<span style="color:#aaa;font-size:10px;"> · '+d.file_name+'</span>':'')+
+        '</a>';
+      }).join('')+
+      '</div>'
+    :'<div style="font-size:12px;color:#bbb;">No SKU-level product documents yet. <span style="color:#888;">Artwork, marketing assets, and user manuals belong here.</span></div>')+
+  '</div>'+
+
   // Certifications
   '<div class="card">'+
-    '<div class="card-title">Certifications & Documents</div>'+
+    '<div class="card-title">Certifications &amp; Documents <span style="font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">(legacy — RFQ-era uploads)</span></div>'+
     (certs.length?
       '<div style="display:flex;flex-wrap:wrap;gap:8px;">'+
       certs.map(function(c){
@@ -332,6 +446,18 @@ async function openSku(skuId){
   '</div>';
 
   det.innerHTML=html;
+}
+
+function docIcon(t){
+  t=(t||'').toLowerCase();
+  if(t.indexOf('inci')>=0)return '🧴';
+  if(t.indexOf('coa')>=0||t.indexOf('test')>=0||t.indexOf('lab')>=0||t.indexOf('stability')>=0||t.indexOf('micro')>=0||t.indexOf('heavy')>=0||t.indexOf('allergen')>=0)return '🧪';
+  if(t.indexOf('cert')>=0||t.indexOf('gmp')>=0||t.indexOf('iso')>=0||t.indexOf('brc')>=0||t.indexOf('fda')>=0)return '🏅';
+  if(t.indexOf('formula')>=0||t.indexOf('spec')>=0)return '📋';
+  if(t.indexOf('image')>=0||t.indexOf('art')>=0||t.indexOf('photo')>=0)return '🖼️';
+  if(t.indexOf('die')>=0||t.indexOf('drawing')>=0||t.indexOf('step')>=0)return '📐';
+  if(t.indexOf('manual')>=0)return '📖';
+  return '📄';
 }
 
 // ── Shared container calculator ──
