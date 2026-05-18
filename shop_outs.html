@@ -338,7 +338,11 @@ function renderDetail(s,photos,observations){
   html+='<div class="card"><div class="card-title">AI Extraction</div>';
   if(observations.length===0){
     html+='<div style="color:#888;font-size:13px;margin-bottom:1rem;">No observations yet. Run AI extraction to pair photos and pull product data from each item.</div>';
-    html+='<button class="btn btn-primary" onclick="alert(\'AI processing endpoint coming in next build — schema and storage are ready, photos are uploaded. The /api/process-shop-out-pair endpoint and the loop that pairs photos and extracts data is the next deliverable.\')">Run AI Extraction</button>';
+    html+='<button class="btn btn-primary" id="run-ai-btn" onclick="runAiExtraction()">Run AI Extraction</button>'+
+      '<div id="ai-progress-wrap" style="display:none;margin-top:12px;">'+
+        '<div class="progress"><div class="progress-bar" id="ai-progress-bar" style="width:0%"></div></div>'+
+        '<div class="progress-text" id="ai-progress-text"></div>'+
+      '</div>';
   } else {
     html+='<div style="color:#888;font-size:13px;margin-bottom:1rem;">'+observations.length+' observation'+(observations.length===1?'':'s')+' extracted.</div>';
     html+=renderObservationsTable(observations);
@@ -615,6 +619,99 @@ async function submitNewShopOut(){
     g('submit-btn').disabled=false;
     g('progress-container').style.display='none';
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// AI EXTRACTION — loops through photo pairs and calls /api/process-shop-out-pair
+// ─────────────────────────────────────────────────────────────────────
+async function runAiExtraction(){
+  if(!currentId)return;
+
+  // Fetch shop-out + photos
+  var soR=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId+'&select=*,customers(customer_name,country)');
+  var so=(await soR.json())[0];
+  var photosR=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+currentId+'&select=id,photo_sequence_number,file_path,photo_type,ai_processed_at&order=photo_sequence_number');
+  var allPhotos=await photosR.json();
+
+  // Exclude storefront and any photos already processed
+  var items=allPhotos.filter(function(p){return p.photo_type!=='storefront' && !p.ai_processed_at;});
+
+  if(items.length===0){
+    alert('No unprocessed item photos found. (Storefront is skipped automatically.)');
+    return;
+  }
+
+  // Pair sequentially: i+i+1 = front+back
+  var pairs=[];
+  for(var i=0;i<items.length;i+=2){
+    pairs.push({front:items[i],back:items[i+1]||null});
+  }
+
+  if(!confirm('Run AI extraction on '+pairs.length+' item pair(s)? Uses Anthropic API credits (~$0.02 per pair).')){return;}
+
+  var btn=g('run-ai-btn');
+  if(btn)btn.disabled=true;
+  g('ai-progress-wrap').style.display='block';
+
+  // Mark shop-out as processing
+  await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({status:'processing'})
+  });
+
+  var completed=0,failed=0,errors=[];
+
+  for(var p=0;p<pairs.length;p++){
+    var pair=pairs[p];
+    g('ai-progress-bar').style.width=Math.round((completed/pairs.length)*100)+'%';
+    g('ai-progress-text').textContent='Processing pair '+(completed+1)+' of '+pairs.length+'...';
+
+    try{
+      var r=await fetch('/api/process-shop-out-pair',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          shopOutId:currentId,
+          frontPhotoId:pair.front.id,
+          backPhotoId:pair.back?pair.back.id:null,
+          frontPath:pair.front.file_path,
+          backPath:pair.back?pair.back.file_path:null,
+          retailerName:so.customers&&so.customers.customer_name,
+          retailerCountry:so.customers&&so.customers.country
+        })
+      });
+      if(!r.ok){
+        var errText=await r.text();
+        console.warn('Pair '+(p+1)+' failed:',errText);
+        errors.push('Pair '+(p+1)+': '+errText.substring(0,140));
+        failed++;
+      }
+    }catch(err){
+      console.warn('Pair '+(p+1)+' error:',err);
+      errors.push('Pair '+(p+1)+': '+err.message);
+      failed++;
+    }
+    completed++;
+  }
+
+  // Final status update
+  await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      status:'reviewing',
+      total_observations:completed-failed
+    })
+  });
+
+  g('ai-progress-bar').style.width='100%';
+  g('ai-progress-text').textContent='Done. '+(completed-failed)+' extracted, '+failed+' failed.'+(errors.length?' See console for errors.':'');
+
+  if(errors.length)console.warn('AI extraction errors:',errors);
+
+  // Reload the detail view to show new observations
+  setTimeout(function(){selectShopOut(currentId);},1500);
 }
 
 // Kick off
