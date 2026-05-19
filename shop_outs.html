@@ -5,7 +5,6 @@
 <title>Shop Outs — TBG Retail Intelligence</title>
 <link rel="stylesheet" href="ri_shared.css">
 <style>
-/* Page-specific styles */
 .layout{display:flex;height:calc(100vh - 52px - 49px);overflow:hidden;}
 .list{width:380px;flex-shrink:0;overflow-y:auto;border-right:1px solid #e0e0d8;background:#fff;}
 .filters{padding:10px 14px;border-bottom:1px solid #e0e0d8;display:flex;flex-direction:column;gap:6px;}
@@ -75,15 +74,19 @@
 .obs-dept{text-align:center;font-size:10px;background:#eef2ff;color:#003366;padding:2px 6px;border-radius:8px;display:inline-block;}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:100;}
 .overlay.show{display:flex;}
-.modal{background:#fff;border-radius:12px;width:460px;max-width:95vw;}
-.modal-head{padding:1rem 1.25rem;border-bottom:1px solid #e0e0d8;font-weight:700;}
-.modal-body{padding:1.25rem;font-size:13px;line-height:1.6;color:#444;}
+.modal{background:#fff;border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-head{padding:1rem 1.25rem;border-bottom:1px solid #e0e0d8;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
+.modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer;line-height:1;}
+.modal-body{padding:1.25rem;}
 .modal-foot{padding:0.75rem 1.25rem;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:8px;}
+.modal-body label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 6px;}
+.modal-body label:first-child{margin-top:0;}
+.modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
+.modal-body textarea{resize:vertical;min-height:60px;}
 </style>
 </head>
 <body>
 
-<!-- Top bar -->
 <div class="ri-top">
   <div class="ri-top-title">🎯 Retail Intelligence</div>
   <div class="ri-top-actions">
@@ -92,7 +95,6 @@
   </div>
 </div>
 
-<!-- Tab strip -->
 <div class="ri-tabs">
   <a href="shop_outs.html" class="ri-tab active"><span class="ri-tab-icon">🛒</span> Shop Outs <span class="ri-tab-badge live">LIVE</span></a>
   <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
@@ -102,7 +104,6 @@
   <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Intelligence Hub <span class="ri-tab-badge soon">SOON</span></a>
 </div>
 
-<!-- Main content -->
 <div class="layout">
   <div class="list" id="shop-list-pane">
     <div class="filters">
@@ -122,12 +123,41 @@
   <div class="detail" id="shop-detail">
     <div class="empty">
       <div style="font-size:48px;">🛒</div>
-      <div>Select a shop-out or start a new one</div>
+      <div>Select a shop-out or click "+ New Shop Out" above</div>
     </div>
   </div>
 </div>
 
-<!-- Photo viewer overlay -->
+<!-- New Shop Out modal -->
+<div class="overlay" id="new-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>New Shop Out</div>
+      <button class="modal-close" onclick="closeNewModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <label>Retailer *</label>
+      <select id="new-customer">
+        <option value="">— Choose a retailer —</option>
+      </select>
+
+      <label>Date *</label>
+      <input type="date" id="new-date" />
+
+      <label>Store location (optional)</label>
+      <input type="text" id="new-location" placeholder="e.g. East Brunswick, NJ" />
+
+      <label>Notes (optional)</label>
+      <textarea id="new-notes" placeholder="Anything worth remembering about this visit..."></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeNewModal()">Cancel</button>
+      <button class="btn btn-primary" id="new-create" onclick="createShopOut()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Photo viewer -->
 <div class="viewer" id="viewer">
   <button class="viewer-close" onclick="closeViewer()">×</button>
   <button class="viewer-nav prev" onclick="navViewer(-1)">‹</button>
@@ -142,11 +172,11 @@
 <!-- Confirm modal -->
 <div class="overlay" id="confirm-modal">
   <div class="modal">
-    <div class="modal-head" id="confirm-title">Confirm</div>
-    <div class="modal-body" id="confirm-body"></div>
+    <div class="modal-head"><div id="confirm-title">Confirm</div></div>
+    <div class="modal-body" id="confirm-body" style="font-size:13px;line-height:1.6;color:#444;"></div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
-      <button class="btn btn-danger" id="confirm-go" onclick="runConfirm()">Confirm</button>
+      <button class="btn btn-danger" onclick="runConfirm()">Confirm</button>
     </div>
   </div>
 </div>
@@ -154,7 +184,6 @@
 <input type="file" id="file-input" multiple accept="image/*,.heic,.heif" style="display:none;" />
 
 <script>
-// ─── CONFIG ─────────────────────────────────────────────────────────
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var BUCKET='shop-out-photos';
@@ -162,7 +191,6 @@ var UPLOAD_CONCURRENCY=6;
 var MAX_UPLOAD_ATTEMPTS=3;
 var COST_PER_PHOTO_EST=0.04;
 
-// ─── HELPERS ────────────────────────────────────────────────────────
 function g(id){return document.getElementById(id);}
 function h(url,opts){
   opts=opts||{};
@@ -173,43 +201,39 @@ function h(url,opts){
 }
 function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
 
-// ─── STATE ──────────────────────────────────────────────────────────
-var allShops=[],customerMap={},currentId=null,confirmFn=null;
+var allShops=[],customerMap={},customerList=[],currentId=null,confirmFn=null;
 var currentPhotos=[],viewerIdx=0;
 
 // ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
-  console.log('[shop_outs] init starting');
+  console.log('[shop_outs] init');
 
-  // 1. Load customers map (for retailer name lookup — no embedded select)
+  // Load customers
   try {
-    var cr=await h(SB+'/rest/v1/customers?select=id,name&limit=2000');
+    var cr=await h(SB+'/rest/v1/customers?select=id,name&order=name&limit=2000');
     if(cr.ok){
-      var customers=await cr.json();
-      customers.forEach(function(c){customerMap[c.id]=c.name;});
-      console.log('[shop_outs] loaded '+customers.length+' customers');
-    } else {
-      console.warn('[shop_outs] customers fetch failed:',cr.status);
+      customerList=await cr.json();
+      customerMap={};
+      customerList.forEach(function(c){customerMap[c.id]=c.name;});
+      // Populate modal dropdown
+      var sel=g('new-customer');
+      sel.innerHTML='<option value="">— Choose a retailer —</option>'+
+        customerList.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
+      console.log('[shop_outs] '+customerList.length+' customers loaded');
     }
-  } catch(e) {
-    console.error('[shop_outs] customers fetch error:',e);
-  }
+  } catch(e) { console.error('customers fetch:',e); }
 
-  // 2. Load shop-outs (no embedded select)
+  // Load shop-outs
   try {
     var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
     if(r.ok){
       allShops=await r.json();
-      console.log('[shop_outs] loaded '+allShops.length+' shop-outs');
+      console.log('[shop_outs] '+allShops.length+' shop-outs loaded');
     } else {
-      var errText=await r.text();
-      console.error('[shop_outs] shop_outs fetch failed:',r.status,errText);
+      console.error('[shop_outs] fetch failed:',r.status,await r.text());
       allShops=[];
     }
-  } catch(e) {
-    console.error('[shop_outs] shop_outs fetch error:',e);
-    allShops=[];
-  }
+  } catch(e) { console.error('shop_outs fetch:',e); allShops=[]; }
 
   renderList();
 
@@ -218,7 +242,7 @@ async function init(){
   if(pre)selectShop(pre);
 }
 
-// ─── LIST RENDERING ─────────────────────────────────────────────────
+// ─── LIST ───────────────────────────────────────────────────────────
 function renderList(){
   var q=(g('q-search').value||'').toLowerCase();
   var stat=g('q-status').value;
@@ -227,7 +251,7 @@ function renderList(){
   var filtered=allShops.filter(function(s){
     if(s.deleted_at)return false;
     if(!showArch && s.archived_at)return false;
-    if(stat && s.processing_status!==stat)return false;
+    if(stat && (s.processing_status||'pending')!==stat)return false;
     if(q){
       var rname=customerMap[s.customer_id]||'';
       var hay=rname+' '+(s.store_location_text||'')+' '+(s.notes||'');
@@ -240,11 +264,10 @@ function renderList(){
     var sel=s.id===currentId?' sel':'';
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
-    var retailer=customerMap[s.customer_id]||'(retailer pending)';
-    var dateStr=s.shop_date||'no date';
+    var retailer=customerMap[s.customer_id]||'(unknown retailer)';
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
-      '<div class="li-date">'+esc(dateStr)+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
+      '<div class="li-date">'+esc(s.shop_date||'no date')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
       '<div class="li-meta">'+
         '<span class="badge '+statClass+'">'+esc(s.processing_status||'pending')+'</span>'+
         '<span>📸 '+(s.total_photos||0)+'</span>'+
@@ -257,58 +280,61 @@ function renderList(){
   g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet.<br><br>Click "+ New Shop Out" above to start.</div>';
 }
 
-// ─── NEW SHOP OUT ───────────────────────────────────────────────────
-async function startNewShopOut(){
-  console.log('[shop_outs] startNewShopOut clicked');
-  var btn=g('new-btn');
-  btn.disabled=true;
+// ─── NEW SHOP OUT MODAL ─────────────────────────────────────────────
+function openNewModal(){
+  console.log('[shop_outs] opening new modal');
+  g('new-customer').value='';
+  g('new-date').value=new Date().toISOString().substring(0,10);
+  g('new-location').value='';
+  g('new-notes').value='';
+  g('new-create').disabled=false;
+  g('new-modal').classList.add('show');
+}
+function closeNewModal(){g('new-modal').classList.remove('show');}
+
+async function createShopOut(){
+  var customerId=g('new-customer').value;
+  var date=g('new-date').value;
+  if(!customerId){alert('Please choose a retailer.');return;}
+  if(!date){alert('Please pick a date.');return;}
+
+  var payload={
+    customer_id:customerId,
+    shop_date:date,
+    store_location_text:g('new-location').value.trim()||null,
+    notes:g('new-notes').value.trim()||null,
+    processing_status:'pending',
+    captured_by:'admin',
+    total_photos:0,
+    total_observations:0
+  };
+  console.log('[shop_outs] create payload:',payload);
+
+  g('new-create').disabled=true;
 
   try {
-    var payload={
-      processing_status:'pending',
-      captured_by:'admin',
-      total_photos:0,
-      total_observations:0
-    };
-    console.log('[shop_outs] POST payload:',payload);
-
     var r=await h(SB+'/rest/v1/shop_outs',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Prefer':'return=representation'
-      },
+      headers:{'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
-
     var bodyText=await r.text();
-    console.log('[shop_outs] POST response:',r.status,bodyText);
+    console.log('[shop_outs] create response:',r.status,bodyText);
 
     if(!r.ok){
       alert('Failed to create shop-out (status '+r.status+'):\n\n'+bodyText);
-      btn.disabled=false;
+      g('new-create').disabled=false;
       return;
     }
-
-    var rows;
-    try { rows=JSON.parse(bodyText); } catch(e){ rows=[]; }
-
-    if(!rows || rows.length===0){
-      alert('Shop-out created but server returned no row. Refresh the page to see it.');
-      btn.disabled=false;
-      await init();
-      return;
-    }
-
+    var rows=JSON.parse(bodyText);
     var newId=rows[0].id;
-    console.log('[shop_outs] created id:',newId);
+    closeNewModal();
     await init();
     selectShop(newId);
-    btn.disabled=false;
   } catch(err) {
-    console.error('[shop_outs] startNewShopOut error:',err);
+    console.error('createShopOut error:',err);
     alert('Error creating shop-out: '+err.message);
-    btn.disabled=false;
+    g('new-create').disabled=false;
   }
 }
 
@@ -323,15 +349,14 @@ async function renderDetail(){
   var s=allShops.find(function(x){return x.id===currentId;});
   if(!s){g('shop-detail').innerHTML='<div class="empty">Not found</div>';return;}
 
-  var retailer=customerMap[s.customer_id]||'(retailer not yet detected)';
+  var retailer=customerMap[s.customer_id]||'(unknown retailer)';
   var stat=s.processing_status||'pending';
 
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
       '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
       '<div style="font-size:12px;color:#888;margin-top:4px;">'+
-        esc(s.shop_date||'date pending')+
-        (s.store_location_text?' · '+esc(s.store_location_text):'')+
+        esc(s.shop_date||'no date')+(s.store_location_text?' · '+esc(s.store_location_text):'')+
       '</div>'+
     '</div>'+
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
@@ -341,22 +366,22 @@ async function renderDetail(){
     html+='<div class="dropzone" id="dropzone" onclick="document.getElementById(\'file-input\').click()">'+
       '<div class="dropzone-icon">📥</div>'+
       '<div class="dropzone-text">Drop photos here, or click to select</div>'+
-      '<div class="dropzone-hint">Any number — JPEG, HEIC, PNG. AI will figure out the retailer, date, and group products automatically.</div>'+
+      '<div class="dropzone-hint">Any number — JPEG, HEIC, PNG. AI will group products and extract data after upload.</div>'+
     '</div>';
   } else if(stat==='pending' && (s.total_photos||0)>0){
     var estCost=((s.total_photos||0)*COST_PER_PHOTO_EST).toFixed(2);
     html+='<div class="card">'+
       '<div class="card-title">Ready to process</div>'+
-      '<div style="font-size:14px;margin-bottom:1rem;">'+(s.total_photos||0)+' photos uploaded. Estimated AI cost: <strong>~$'+estCost+'</strong></div>'+
+      '<div style="font-size:14px;margin-bottom:1rem;">'+(s.total_photos||0)+' photos uploaded. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
       '<button class="btn btn-primary" onclick="triggerProcessing(\''+s.id+'\')">🧠 Process with AI</button>'+
       '<button class="btn btn-secondary" style="margin-left:8px;" onclick="document.getElementById(\'file-input\').click()">+ Add more photos</button>'+
     '</div>';
   } else if(stat==='grouping' || stat==='extracting'){
     html+='<div class="card">'+
-      '<div class="card-title">AI processing in progress</div>'+
+      '<div class="card-title">AI processing</div>'+
       '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;">Status: <strong>'+stat+'</strong></div>'+
       '<div class="progress-bar"><div class="progress-fill" style="width:'+(stat==='grouping'?'40%':'80%')+';"></div></div>'+
-      '<div style="font-size:11px;color:#888;margin-top:6px;">This page auto-refreshes. Typical processing time: 1-4 minutes per 100 photos.</div>'+
+      '<div style="font-size:11px;color:#888;margin-top:6px;">Auto-refreshes. Typical: 1-4 min per 100 photos.</div>'+
     '</div>';
     setTimeout(function(){if(currentId===s.id){refreshShop(s.id);}},8000);
   } else {
@@ -364,18 +389,18 @@ async function renderDetail(){
       html+='<div class="card" style="border-color:#fce8e8;">'+
         '<div class="card-title" style="color:#a22;">Processing failed</div>'+
         '<div style="font-size:13px;">'+esc(s.processing_error||'Unknown error')+'</div>'+
-        '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry processing</button>'+
+        '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry</button>'+
       '</div>';
     }
 
     html+='<div class="card">'+
-      '<div class="card-title">Detected Metadata</div>'+
-      '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div class="confidence">'+(s.retailer_detected_via?esc(s.retailer_detected_via):'')+'</div></div>'+
-      '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div class="confidence">'+(s.date_detected_via?esc(s.date_detected_via):'')+'</div></div>'+
-      '<div class="detect-row"><div class="detect-label">GPS</div><div class="detect-val">'+(s.gps_lat?Number(s.gps_lat).toFixed(4)+', '+Number(s.gps_lng).toFixed(4):'—')+'</div><div></div></div>'+
+      '<div class="card-title">Summary</div>'+
+      '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Total photos</div><div class="detect-val">'+(s.total_photos||0)+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">Est. AI cost</div><div class="detect-val">$'+(s.estimated_cost_usd?Number(s.estimated_cost_usd).toFixed(2):'—')+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">AI cost</div><div class="detect-val">$'+(s.estimated_cost_usd?Number(s.estimated_cost_usd).toFixed(2):'—')+'</div><div></div></div>'+
     '</div>';
 
     html+='<div class="card">'+
@@ -421,11 +446,19 @@ async function refreshShop(id){
   if(currentId===id)renderDetail();
 }
 
-// ─── UPLOAD ────────────────────────────────────────────────────────
+// ─── UPLOAD ─────────────────────────────────────────────────────────
 async function handleFiles(fileList){
-  if(!currentId){alert('No active shop-out. Create one first.');return;}
+  if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
   if(files.length===0)return;
+
+  // Get current photo count to start sequence numbering from there
+  var startSeq=1;
+  try {
+    var sr=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId+'&select=total_photos');
+    var existing=(await sr.json())[0];
+    startSeq=(existing.total_photos||0)+1;
+  } catch(e) {}
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
@@ -438,8 +471,10 @@ async function handleFiles(fileList){
 
   for(var i=0;i<files.length;i+=UPLOAD_CONCURRENCY){
     var batch=files.slice(i,i+UPLOAD_CONCURRENCY);
-    await Promise.all(batch.map(async function(file){
-      var result=await uploadOneWithRetry(file);
+    var batchStartSeq=startSeq+i;
+    await Promise.all(batch.map(async function(file,bi){
+      var seq=batchStartSeq+bi;
+      var result=await uploadOneWithRetry(file,seq);
       if(result.success){
         uploaded++;
       }else{
@@ -454,6 +489,7 @@ async function handleFiles(fileList){
     }));
   }
 
+  // Update shop_outs.total_photos
   var rs=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId+'&select=total_photos');
   var existing=(await rs.json())[0];
   var newTotal=(existing.total_photos||0)+uploaded;
@@ -467,11 +503,12 @@ async function handleFiles(fileList){
   selectShop(currentId);
 }
 
-async function uploadOneWithRetry(file){
+async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
     try{
-      return await uploadOne(file,attempt);
+      return await uploadOne(file,seq,attempt);
     }catch(err){
+      console.warn('Upload attempt '+attempt+' failed for '+file.name+':',err.message);
       if(attempt===MAX_UPLOAD_ATTEMPTS){
         return {success:false,error:err.message};
       }
@@ -480,9 +517,11 @@ async function uploadOneWithRetry(file){
   }
 }
 
-async function uploadOne(file,attempt){
+async function uploadOne(file,seq,attempt){
   var uploadBlob=file;
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+
+  // HEIC detection by byte signature
   var bytes=await file.slice(0,12).arrayBuffer();
   var arr=new Uint8Array(bytes);
   var isHeic=(arr[4]===0x66 && arr[5]===0x74 && arr[6]===0x79 && arr[7]===0x70)
@@ -493,20 +532,16 @@ async function uploadOne(file,attempt){
     try{
       uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});
       ext='jpg';
-    }catch(e){}
+    }catch(e){console.warn('HEIC convert failed:',e);}
   }
 
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
-  var r=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
+  var sr=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
     method:'POST',
-    headers:{
-      apikey:KEY,
-      Authorization:'Bearer '+KEY,
-      'Content-Type':uploadBlob.type||'image/jpeg'
-    },
+    headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':uploadBlob.type||'image/jpeg'},
     body:uploadBlob
   });
-  if(!r.ok)throw new Error('Storage upload failed: '+r.status);
+  if(!sr.ok)throw new Error('Storage '+sr.status+': '+await sr.text());
 
   var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
   var dbR=await h(SB+'/rest/v1/shop_out_photos',{
@@ -516,32 +551,33 @@ async function uploadOne(file,attempt){
       shop_out_id:currentId,
       file_path:path,
       file_name:file.name,
+      photo_sequence_number:seq,
       exif_timestamp:ts,
       upload_status:'uploaded',
       upload_attempts:attempt
     })
   });
-  if(!dbR.ok)throw new Error('DB insert failed: '+dbR.status);
+  if(!dbR.ok){
+    var errBody=await dbR.text();
+    throw new Error('DB '+dbR.status+': '+errBody);
+  }
   return {success:true};
 }
 
-// ─── PROCESS WITH AI ────────────────────────────────────────────────
+// ─── PROCESS ────────────────────────────────────────────────────────
 async function triggerProcessing(id){
   var r=await fetch('/api/process-shop-out-v2',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({shop_out_id:id})
   });
-  if(!r.ok){
-    alert('Processing failed to start: '+await r.text());
-    return;
-  }
+  if(!r.ok){alert('Processing failed: '+await r.text());return;}
   await refreshShop(id);
 }
 
 // ─── PHOTOS + VIEWER ───────────────────────────────────────────────
 async function loadPhotos(id){
-  var r=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=created_at.asc&select=*');
+  var r=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=*');
   if(!r.ok)return;
   currentPhotos=await r.json();
 
@@ -563,23 +599,16 @@ async function loadPhotos(id){
     currentPhotos.map(function(p,i){
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
         '<img src="'+(p.signed_url||'')+'" loading="lazy" />'+
-        '<span class="photo-num">'+(i+1)+'</span>'+
+        '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
         (p.group_role?'<span class="photo-role '+esc(p.group_role)+'">'+esc(p.group_role)+'</span>':'')+
       '</div>';
     }).join('')+'</div>';
   container.innerHTML=html;
 }
 
-function openViewer(idx){
-  viewerIdx=idx;
-  showCurrentPhoto();
-  g('viewer').classList.add('show');
-}
+function openViewer(idx){viewerIdx=idx;showCurrentPhoto();g('viewer').classList.add('show');}
 function closeViewer(){g('viewer').classList.remove('show');}
-function navViewer(dir){
-  viewerIdx=Math.max(0,Math.min(currentPhotos.length-1,viewerIdx+dir));
-  showCurrentPhoto();
-}
+function navViewer(dir){viewerIdx=Math.max(0,Math.min(currentPhotos.length-1,viewerIdx+dir));showCurrentPhoto();}
 function showCurrentPhoto(){
   var p=currentPhotos[viewerIdx];
   if(!p)return;
@@ -587,20 +616,16 @@ function showCurrentPhoto(){
   g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length+
     '<br><span style="font-size:11px;color:#bbb;">'+esc(p.file_name||'')+
     (p.group_role?' · '+esc(p.group_role):'')+
-    (p.exif_timestamp?' · '+esc(p.exif_timestamp.substring(0,10)):'')+
-    '</span>';
+    (p.exif_timestamp?' · '+esc(p.exif_timestamp.substring(0,10)):'')+'</span>';
 }
 async function deleteCurrentPhoto(){
   var p=currentPhotos[viewerIdx];
-  if(!p)return;
-  if(!confirm('Delete this photo? This cannot be undone.'))return;
+  if(!p||!confirm('Delete this photo?'))return;
   await h(SB+'/storage/v1/object/'+BUCKET+'/'+p.file_path,{method:'DELETE'});
   await h(SB+'/rest/v1/shop_out_photos?id=eq.'+p.id,{method:'DELETE'});
   closeViewer();
-  await refreshShop(currentId);
-  selectShop(currentId);
+  await refreshShop(currentId);selectShop(currentId);
 }
-
 document.addEventListener('keydown',function(e){
   if(!g('viewer').classList.contains('show'))return;
   if(e.key==='Escape')closeViewer();
@@ -615,11 +640,8 @@ async function loadObservations(id){
   var obs=await r.json();
   var c=g('obs-container');
   if(!c)return;
-  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations extracted yet.</div>';return;}
-
-  var html='<div class="obs-row head">'+
-    '<div>#</div><div>Brand · Product</div><div style="text-align:center;">Department</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div>'+
-  '</div>';
+  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations yet.</div>';return;}
+  var html='<div class="obs-row head"><div>#</div><div>Brand · Product</div><div style="text-align:center;">Department</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
   obs.forEach(function(o,i){
     html+='<div class="obs-row">'+
       '<div style="color:#888;">'+(i+1)+'</div>'+
@@ -634,25 +656,21 @@ async function loadObservations(id){
 
 // ─── ARCHIVE + DELETE ──────────────────────────────────────────────
 async function toggleArchive(id,isArchived){
-  var payload=isArchived?{archived_at:null}:{archived_at:new Date().toISOString()};
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
+    body:JSON.stringify(isArchived?{archived_at:null}:{archived_at:new Date().toISOString()})
   });
-  await init();
-  selectShop(id);
+  await init();selectShop(id);
 }
-
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This permanently deletes the shop-out, all its photos, and all extracted observations. Consider archiving instead.';
+  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations. Consider archiving instead.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
 function closeConfirm(){g('confirm-modal').classList.remove('show');confirmFn=null;}
 function runConfirm(){if(confirmFn){confirmFn();}closeConfirm();}
-
 async function deleteShopOut(id){
   var rp=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=file_path');
   var paths=rp.ok?(await rp.json()).map(function(p){return p.file_path;}):[];
@@ -669,16 +687,12 @@ async function deleteShopOut(id){
   g('shop-detail').innerHTML='<div class="empty"><div style="font-size:48px;">🛒</div><div>Shop-out deleted</div></div>';
 }
 
-// ─── BIND BUTTON + STARTUP ──────────────────────────────────────────
+// ─── BIND BUTTON ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
-  console.log('[shop_outs] DOM ready, binding new-btn handler');
+  console.log('[shop_outs] DOM ready');
   var btn=g('new-btn');
-  if(btn){
-    btn.addEventListener('click',startNewShopOut);
-    console.log('[shop_outs] handler bound');
-  } else {
-    console.error('[shop_outs] new-btn not found in DOM');
-  }
+  if(btn)btn.addEventListener('click',openNewModal);
+  else console.error('new-btn missing');
 });
 
 // HEIC support (loaded async)
