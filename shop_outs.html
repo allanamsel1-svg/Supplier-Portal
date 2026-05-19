@@ -19,7 +19,7 @@
 .li-meta{font-size:11px;color:#666;margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .badge{font-size:10px;padding:2px 8px;border-radius:10px;display:inline-block;font-weight:600;}
 .b-pending{background:#f0f0e8;color:#888;}
-.b-grouping,.b-extracting{background:#fff8e0;color:#664400;}
+.b-processing{background:#fff8e0;color:#664400;}
 .b-complete{background:#edfaed;color:#1a7a1a;}
 .b-failed{background:#fce8e8;color:#a22;}
 .b-archived{background:#e8e8e0;color:#888;}
@@ -54,6 +54,7 @@
 .photo-thumb{position:relative;aspect-ratio:1;background:#f0f0e8;border-radius:6px;overflow:hidden;cursor:pointer;}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;}
 .photo-num{position:absolute;top:4px;left:4px;background:rgba(26,26,46,0.85);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600;}
+.photo-role{position:absolute;bottom:4px;left:4px;background:rgba(255,255,255,0.92);color:#333;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;}
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;z-index:200;}
 .viewer.show{display:flex;}
 .viewer img{max-width:90vw;max-height:85vh;object-fit:contain;}
@@ -79,12 +80,8 @@
 .modal-hint{font-size:12px;color:#888;line-height:1.5;margin-top:14px;padding:10px 12px;background:#fafaf8;border-radius:6px;}
 .modal-error{font-size:12px;color:#a22;margin-top:8px;}
 
-body.uploading .ri-tab,
-body.uploading .ri-top a,
-body.uploading #new-btn,
-body.processing .ri-tab,
-body.processing .ri-top a,
-body.processing #new-btn { pointer-events: none; opacity: 0.4; }
+body.uploading .ri-tab,body.uploading .ri-top a,body.uploading #new-btn,
+body.processing .ri-tab,body.processing .ri-top a,body.processing #new-btn { pointer-events: none; opacity: 0.4; }
 
 .insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
 .insights-block-title{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;font-weight:600;}
@@ -93,9 +90,7 @@ body.processing #new-btn { pointer-events: none; opacity: 0.4; }
 .dept-bar{height:6px;background:#f0f0e8;border-radius:3px;overflow:hidden;}
 .dept-bar-fill{height:100%;background:#2244cc;}
 .brand-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:0.5px solid #f8f8f4;}
-.brand-row:last-child{border-bottom:none;}
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #f0f0e8;}
-.stat-block{text-align:left;}
 .stat-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;}
 .stat-val{font-size:20px;font-weight:700;margin-top:4px;}
 </style>
@@ -126,8 +121,7 @@ body.processing #new-btn { pointer-events: none; opacity: 0.4; }
       <select id="q-status" onchange="renderList()">
         <option value="">All Statuses</option>
         <option value="pending">Pending</option>
-        <option value="grouping">Grouping</option>
-        <option value="extracting">Extracting</option>
+        <option value="processing">Processing</option>
         <option value="complete">Complete</option>
         <option value="failed">Failed</option>
       </select>
@@ -150,7 +144,7 @@ body.processing #new-btn { pointer-events: none; opacity: 0.4; }
       <label>Which retailer?</label>
       <select id="new-customer"><option value="">Loading retailers...</option></select>
       <div class="modal-error" id="new-error" style="display:none;"></div>
-      <div class="modal-hint">AI will detect the date (from photo EXIF), GPS location, and group products automatically after upload.</div>
+      <div class="modal-hint">After choosing retailer, upload photos in pairs: <strong>FRONT then BACK</strong> of each product. AI processes 2 photos per SKU. Date is auto-detected from EXIF, location is detected from storefront photos.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewModal()">Cancel</button>
@@ -186,7 +180,7 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var BUCKET='shop-out-photos';
 var UPLOAD_CONCURRENCY=4;
 var MAX_UPLOAD_ATTEMPTS=3;
-var CHUNK_SIZE=20;
+var PAIR_CONCURRENCY=3;  // Process 3 pairs in parallel
 
 function g(id){return document.getElementById(id);}
 function h(url,opts){
@@ -200,10 +194,8 @@ function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(
 
 var allShops=[],photoCounts={},customerMap={},customerList=[],currentId=null,confirmFn=null;
 var currentPhotos=[],viewerIdx=0;
-var uploadCancelled=false,uploadInProgress=false;
-var processingInProgress=false;
+var uploadCancelled=false,uploadInProgress=false,processingInProgress=false;
 
-// ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
   await Promise.all([loadCustomers(),loadShops(),loadPhotoCounts()]);
   renderList();
@@ -213,12 +205,12 @@ async function init(){
 
 async function loadCustomers(){
   try {
-    var r=await h(SB+'/rest/v1/customers?select=id,customer_name&order=customer_name&limit=2000');
+    var r=await h(SB+'/rest/v1/customers?select=id,customer_name,country&order=customer_name&limit=2000');
     if(r.ok){
       customerList=await r.json();
       customerMap={};
-      customerList.forEach(function(c){customerMap[c.id]=c.customer_name;});
-    } else { console.error('customers:',r.status,await r.text()); }
+      customerList.forEach(function(c){customerMap[c.id]={name:c.customer_name,country:c.country};});
+    }
   } catch(e) { console.error(e); }
 }
 
@@ -226,7 +218,7 @@ async function loadShops(){
   try {
     var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
     if(r.ok)allShops=await r.json();
-    else { console.error('shops:',r.status); allShops=[]; }
+    else allShops=[];
   } catch(e) { allShops=[]; }
 }
 
@@ -242,8 +234,8 @@ async function loadPhotoCounts(){
 }
 
 function getPhotoCount(shopId){return photoCounts[shopId]||0;}
+function getRetailerName(shop){var c=customerMap[shop.customer_id];return c?c.name:'(unknown)';}
 
-// ─── LIST ───────────────────────────────────────────────────────────
 function renderList(){
   var q=(g('q-search').value||'').toLowerCase();
   var stat=g('q-status').value;
@@ -254,7 +246,7 @@ function renderList(){
     if(!showArch && s.archived_at)return false;
     if(stat && (s.processing_status||'pending')!==stat)return false;
     if(q){
-      var rname=customerMap[s.customer_id]||'';
+      var rname=getRetailerName(s);
       var hay=rname+' '+(s.store_location_text||'')+' '+(s.notes||'');
       if(hay.toLowerCase().indexOf(q)===-1)return false;
     }
@@ -265,7 +257,7 @@ function renderList(){
     var sel=s.id===currentId?' sel':'';
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
-    var retailer=customerMap[s.customer_id]||'(unknown retailer)';
+    var retailer=getRetailerName(s);
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
       '<div class="li-date">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
@@ -278,20 +270,19 @@ function renderList(){
     '</div>';
   }).join('');
 
-  g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet.<br><br>Click "+ New Shop Out" above to start.</div>';
+  g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet.</div>';
 }
 
-// ─── NEW SHOP OUT ──────────────────────────────────────────────────
 async function openNewModal(){
   g('new-modal').classList.add('show');
   g('new-error').style.display='none';
   g('new-create').disabled=true;
   var sel=g('new-customer');
-  sel.innerHTML='<option value="">Loading retailers...</option>';
+  sel.innerHTML='<option value="">Loading...</option>';
   if(customerList.length===0)await loadCustomers();
   if(customerList.length===0){
-    sel.innerHTML='<option value="">No retailers found</option>';
-    g('new-error').textContent='No retailers in database. Check Supabase.';
+    sel.innerHTML='<option value="">No retailers</option>';
+    g('new-error').textContent='No retailers in database.';
     g('new-error').style.display='block';
     return;
   }
@@ -303,7 +294,7 @@ function closeNewModal(){g('new-modal').classList.remove('show');}
 
 async function createShopOut(){
   var customerId=g('new-customer').value;
-  if(!customerId){g('new-error').textContent='Please choose a retailer.';g('new-error').style.display='block';return;}
+  if(!customerId){g('new-error').textContent='Choose a retailer.';g('new-error').style.display='block';return;}
   g('new-create').disabled=true;
   try {
     var r=await h(SB+'/rest/v1/shop_outs',{
@@ -317,22 +308,13 @@ async function createShopOut(){
         total_observations:0
       })
     });
-    if(!r.ok){
-      g('new-error').textContent='Failed: '+await r.text();
-      g('new-error').style.display='block';
-      g('new-create').disabled=false;
-      return;
-    }
+    if(!r.ok){g('new-error').textContent='Failed: '+await r.text();g('new-error').style.display='block';g('new-create').disabled=false;return;}
     var rows=await r.json();
     closeNewModal();
     await init();
     selectShop(rows[0].id);
     setTimeout(function(){g('file-input').click();},200);
-  } catch(err) {
-    g('new-error').textContent='Error: '+err.message;
-    g('new-error').style.display='block';
-    g('new-create').disabled=false;
-  }
+  } catch(err) { g('new-error').textContent='Error: '+err.message;g('new-error').style.display='block';g('new-create').disabled=false; }
 }
 
 function selectShop(id){
@@ -346,12 +328,11 @@ function selectShop(id){
   renderDetail();
 }
 
-// ─── DETAIL ─────────────────────────────────────────────────────────
 async function renderDetail(){
   var s=allShops.find(function(x){return x.id===currentId;});
   if(!s){g('shop-detail').innerHTML='<div class="empty">Not found</div>';return;}
 
-  var retailer=customerMap[s.customer_id]||'(unknown retailer)';
+  var retailer=getRetailerName(s);
   var stat=s.processing_status||'pending';
   var photoCount=getPhotoCount(s.id);
 
@@ -367,29 +348,28 @@ async function renderDetail(){
     html+='<div class="dropzone" id="dropzone" onclick="document.getElementById(\'file-input\').click()">'+
       '<div class="dropzone-icon">📥</div>'+
       '<div class="dropzone-text">Drop photos here, or click to select</div>'+
-      '<div class="dropzone-hint">Any number. AI groups products and extracts data after upload.</div>'+
+      '<div class="dropzone-hint">Upload as pairs: FRONT then BACK of each product. Any number.</div>'+
     '</div>';
   } else if(stat==='pending' && photoCount>0){
-    var estCost=(photoCount*0.04).toFixed(2);
+    var pairs=Math.ceil(photoCount/2);
+    var estCost=(pairs*0.06).toFixed(2);
     html+='<div class="card">'+
       '<div class="card-title">Ready to process</div>'+
-      '<div style="font-size:14px;margin-bottom:1rem;">'+photoCount+' photos uploaded. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
+      '<div style="font-size:14px;margin-bottom:1rem;">'+photoCount+' photos uploaded → <strong>'+pairs+' SKU pairs</strong>. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
       '<button class="btn btn-primary" onclick="triggerProcessing(\''+s.id+'\')">🧠 Process with AI</button>'+
       '<button class="btn btn-secondary" style="margin-left:8px;" onclick="document.getElementById(\'file-input\').click()">+ Add more photos</button>'+
     '</div>';
-  } else if(stat==='grouping' || stat==='extracting'){
+  } else if(stat==='processing'){
     html+='<div class="card">'+
       '<div class="card-title">AI processing</div>'+
-      '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;">Status: <strong>'+stat+'</strong></div>'+
-      '<div class="progress-bar"><div class="progress-fill" style="width:'+(stat==='grouping'?'40%':'80%')+';"></div></div>'+
-      '<div style="font-size:11px;color:#888;margin-top:6px;">Click Process with AI again if this has been stuck for 20+ minutes.</div>'+
+      '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;">In progress…</div>'+
       '<button class="btn btn-secondary" style="margin-top:10px;" onclick="resetToProcessable(\''+s.id+'\')">Reset to pending</button>'+
     '</div>';
   } else {
     if(stat==='failed'){
       html+='<div class="card" style="border-color:#fce8e8;">'+
         '<div class="card-title" style="color:#a22;">Processing failed</div>'+
-        '<div style="font-size:13px;">'+esc(s.processing_error||'Unknown error')+'</div>'+
+        '<div style="font-size:13px;">'+esc(s.processing_error||'Unknown')+'</div>'+
         '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry</button>'+
       '</div>';
     }
@@ -397,15 +377,15 @@ async function renderDetail(){
       '<div class="card-title">Summary</div>'+
       '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div>'+(!s.store_location_text?'<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="detectLocationFor(\''+s.id+'\')">🤖 Detect</button>':'')+'</div></div>'+
+      '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div><button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="detectLocationFor(\''+s.id+'\')">🤖 '+(s.store_location_text?'Re-detect':'Detect')+'</button></div></div>'+
       '<div class="detect-row"><div class="detect-label">Photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
     '</div>';
     if(stat==='complete'){
       html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
     }
-    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading photos...</div></div>';
-    html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading observations...</div></div>';
+    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
+    html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
   }
 
   html+='<div class="card">'+
@@ -426,10 +406,7 @@ async function renderDetail(){
 
   if(stat==='complete'||stat==='failed'||photoCount>0){
     loadPhotos(s.id);
-    if(stat==='complete'){
-      loadObservations(s.id);
-      loadInsights(s.id);
-    }
+    if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);}
   }
 }
 
@@ -445,10 +422,9 @@ async function refreshShop(id){
 }
 
 async function resetToProcessable(id){
-  if(!confirm('Reset this shop-out to pending so you can re-process it?'))return;
+  if(!confirm('Reset to pending?'))return;
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
+    method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({processing_status:'pending',processing_started_at:null,processing_error:null})
   });
   await refreshShop(id);
@@ -457,22 +433,17 @@ async function resetToProcessable(id){
 // ─── UPLOAD ─────────────────────────────────────────────────────────
 function setUploadInProgress(active){
   uploadInProgress=active;
-  if(active){
-    document.body.classList.add('uploading');
-    window.addEventListener('beforeunload',preventUnload);
-  } else {
-    document.body.classList.remove('uploading');
-    window.removeEventListener('beforeunload',preventUnload);
-  }
+  if(active){document.body.classList.add('uploading');window.addEventListener('beforeunload',preventUnload);}
+  else{document.body.classList.remove('uploading');window.removeEventListener('beforeunload',preventUnload);}
 }
-function preventUnload(e){e.preventDefault();e.returnValue='Work in progress. Leave anyway?';return e.returnValue;}
+function preventUnload(e){e.preventDefault();e.returnValue='Work in progress. Leave?';return e.returnValue;}
 
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
   if(files.length===0)return;
 
-  // Dedup against already-uploaded photos by file_name
+  // Dedup against already-uploaded photos
   var existingNames={};
   try {
     var er=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+currentId+'&select=file_name&limit=10000');
@@ -484,19 +455,19 @@ async function handleFiles(fileList){
   var originalCount=files.length;
   files=files.filter(function(f){return !existingNames[f.name];});
   var skipped=originalCount-files.length;
-  if(files.length===0){alert('All '+originalCount+' photos already uploaded. Nothing to add.');return;}
+  if(files.length===0){alert('All '+originalCount+' already uploaded.');return;}
 
   var startSeq=getPhotoCount(currentId)+1;
   uploadCancelled=false;
   setUploadInProgress(true);
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
-    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong> Photos save one-by-one.</div>'+
+    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong></div>'+
     (skipped>0?'<div style="background:#edfaed;color:#1a5a1a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;">✓ '+skipped+' duplicates skipped. Uploading '+files.length+' new.</div>':'')+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="up-fill" style="width:0%;"></div></div>'+
     '<div id="up-counter" style="font-size:12px;color:#666;margin-top:6px;">0 of '+files.length+'</div>'+
-    '<button class="btn btn-secondary" style="margin-top:12px;" onclick="cancelUpload()">Stop Upload</button>'+
+    '<button class="btn btn-secondary" style="margin-top:12px;" onclick="cancelUpload()">Stop</button>'+
     '<div id="up-failed" class="failed-list"></div>'+
   '</div>';
 
@@ -508,24 +479,18 @@ async function handleFiles(fileList){
     await Promise.all(batch.map(async function(file,bi){
       if(uploadCancelled)return;
       var result=await uploadOneWithRetry(file,batchStart+bi);
-      if(result.success){
-        uploaded++;
-        photoCounts[currentId]=(photoCounts[currentId]||0)+1;
-      } else failed.push({name:file.name,err:result.error});
+      if(result.success){uploaded++;photoCounts[currentId]=(photoCounts[currentId]||0)+1;}
+      else failed.push({name:file.name,err:result.error});
       var totalDone=uploaded+failed.length;
       var fill=g('up-fill');if(fill)fill.style.width=((totalDone/files.length)*100)+'%';
       var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
-      if(failed.length>0){
-        var fl=g('up-failed');
-        if(fl)fl.innerHTML='<strong>Failed:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';
-      }
+      if(failed.length>0){var fl=g('up-failed');if(fl)fl.innerHTML='<strong>Failed:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';}
     }));
   }
 
   try {
     await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
+      method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({total_photos:photoCounts[currentId]||0,updated_at:new Date().toISOString()})
     });
   } catch(e) {}
@@ -535,16 +500,13 @@ async function handleFiles(fileList){
   selectShop(currentId);
 }
 
-function cancelUpload(){if(confirm('Stop upload? Photos already saved kept.'))uploadCancelled=true;}
+function cancelUpload(){if(confirm('Stop upload?'))uploadCancelled=true;}
 
 async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
     if(uploadCancelled)return {success:false,error:'cancelled'};
     try{return await uploadOne(file,seq,attempt);}
-    catch(err){
-      if(attempt===MAX_UPLOAD_ATTEMPTS)return {success:false,error:err.message};
-      await new Promise(function(r){setTimeout(r,300*attempt);});
-    }
+    catch(err){if(attempt===MAX_UPLOAD_ATTEMPTS)return {success:false,error:err.message};await new Promise(function(r){setTimeout(r,300*attempt);});}
   }
 }
 
@@ -553,13 +515,11 @@ async function uploadOne(file,seq,attempt){
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   var bytes=await file.slice(0,12).arrayBuffer();
   var arr=new Uint8Array(bytes);
-  var isHeic=(arr[4]===0x66 && arr[5]===0x74 && arr[6]===0x79 && arr[7]===0x70)
-    && ((arr[8]===0x68 && arr[9]===0x65 && (arr[10]===0x69 || arr[10]===0x76))
-        || (arr[8]===0x6d && arr[9]===0x69 && arr[10]===0x66));
-  if(isHeic && typeof heic2any!=='undefined'){
+  var isHeic=(arr[4]===0x66&&arr[5]===0x74&&arr[6]===0x79&&arr[7]===0x70)
+    &&((arr[8]===0x68&&arr[9]===0x65&&(arr[10]===0x69||arr[10]===0x76))||(arr[8]===0x6d&&arr[9]===0x69&&arr[10]===0x66));
+  if(isHeic&&typeof heic2any!=='undefined'){
     try{uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});ext='jpg';}catch(e){}
   }
-
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
   var sr=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
     method:'POST',
@@ -567,11 +527,9 @@ async function uploadOne(file,seq,attempt){
     body:uploadBlob
   });
   if(!sr.ok)throw new Error('Storage '+sr.status);
-
   var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
   var dbR=await h(SB+'/rest/v1/shop_out_photos',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       shop_out_id:currentId,file_path:path,file_name:file.name,
       photo_sequence_number:seq,exif_timestamp:ts,
@@ -582,107 +540,118 @@ async function uploadOne(file,seq,attempt){
   return {success:true};
 }
 
-// ─── CHUNKED PROCESSING ─────────────────────────────────────────────
+// ─── PAIR PROCESSING ────────────────────────────────────────────────
 function setProcessing(active){
   processingInProgress=active;
-  if(active){
-    document.body.classList.add('processing');
-    window.addEventListener('beforeunload',preventUnload);
-  } else {
-    document.body.classList.remove('processing');
-    window.removeEventListener('beforeunload',preventUnload);
-  }
+  if(active){document.body.classList.add('processing');window.addEventListener('beforeunload',preventUnload);}
+  else{document.body.classList.remove('processing');window.removeEventListener('beforeunload',preventUnload);}
 }
 
 async function triggerProcessing(id){
   console.log('[shop_outs] triggerProcessing:',id);
 
-  var pr=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=id');
+  // Get all photos in sequence order
+  var pr=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=*');
   if(!pr.ok){alert('Failed to load photos: '+await pr.text());return;}
-  var allPhotos=await pr.json();
-  if(allPhotos.length===0){alert('No photos to process.');return;}
+  var photos=await pr.json();
+  if(photos.length===0){alert('No photos.');return;}
 
-  var photoIds=allPhotos.map(function(p){return p.id;});
-  var totalChunks=Math.ceil(photoIds.length/CHUNK_SIZE);
+  // Get retailer info
+  var s=allShops.find(function(x){return x.id===id;});
+  var retailerName=getRetailerName(s);
+  var retailerCountry=customerMap[s.customer_id]?customerMap[s.customer_id].country:null;
 
+  // Build pairs: photos[0]+photos[1], photos[2]+photos[3], etc.
+  // If odd number, last one is solo (back=null)
+  var pairs=[];
+  for(var i=0;i<photos.length;i+=2){
+    pairs.push({
+      front:photos[i],
+      back:photos[i+1]||null,
+      index:Math.floor(i/2)
+    });
+  }
+
+  console.log('[shop_outs] '+pairs.length+' pairs to process');
+
+  // Mark processing
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({processing_status:'grouping',processing_started_at:new Date().toISOString(),processing_error:null})
+    method:'PATCH',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({processing_status:'processing',processing_started_at:new Date().toISOString(),processing_error:null})
   });
 
-  // EXIF date detection
-  try {
-    var exifR=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=exif_timestamp');
-    if(exifR.ok){
-      var photos=await exifR.json();
-      var timestamps=photos.map(function(p){return p.exif_timestamp;}).filter(Boolean).map(function(t){return new Date(t).getTime();}).filter(function(t){return !isNaN(t);}).sort(function(a,b){return a-b;});
-      if(timestamps.length>0){
-        var median=timestamps[Math.floor(timestamps.length/2)];
-        var detectedDate=new Date(median).toISOString().substring(0,10);
-        await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-          method:'PATCH',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({shop_date:detectedDate,date_detected_via:'exif_median'})
-        });
-      }
-    }
-  } catch(e) {}
+  // Detect date from EXIF
+  var timestamps=photos.map(function(p){return p.exif_timestamp;}).filter(Boolean).map(function(t){return new Date(t).getTime();}).filter(function(t){return !isNaN(t);}).sort(function(a,b){return a-b;});
+  if(timestamps.length>0){
+    var median=timestamps[Math.floor(timestamps.length/2)];
+    var detectedDate=new Date(median).toISOString().substring(0,10);
+    await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({shop_date:detectedDate,date_detected_via:'exif_median'})
+    });
+  }
 
   setProcessing(true);
-  renderChunkProgress(id,0,totalChunks,0,null,null);
+  renderPairProgress(id,0,pairs.length,0,0);
 
-  var totalObservations=0;
-  var anyFailed=false;
-  var firstError=null;
+  var completed=0,failed=0,obsCount=0;
+  var failedDetails=[];
 
-  for(var i=0;i<totalChunks;i++){
-    var chunkIds=photoIds.slice(i*CHUNK_SIZE,(i+1)*CHUNK_SIZE);
-    renderChunkProgress(id,i,totalChunks,totalObservations,null,null);
-
-    try {
-      var r=await fetch('/api/process-chunk',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({shop_out_id:id,photo_ids:chunkIds})
-      });
-      if(!r.ok){
-        var errText=await r.text();
-        console.error('[chunk '+(i+1)+'] failed:',errText);
-        anyFailed=true;
-        if(!firstError)firstError=errText.substring(0,200);
-        continue;
+  // Process pairs in parallel batches
+  for(var i=0;i<pairs.length;i+=PAIR_CONCURRENCY){
+    var batch=pairs.slice(i,i+PAIR_CONCURRENCY);
+    await Promise.all(batch.map(async function(pair){
+      try {
+        var resp=await fetch('/api/process-shop-out-pair',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({
+            shopOutId:id,
+            frontPhotoId:pair.front.id,
+            backPhotoId:pair.back?pair.back.id:null,
+            frontPath:pair.front.file_path,
+            backPath:pair.back?pair.back.file_path:null,
+            retailerName:retailerName,
+            retailerCountry:retailerCountry
+          })
+        });
+        if(resp.ok){
+          completed++;
+          obsCount++;
+          console.log('[pair '+(pair.index+1)+'/'+pairs.length+'] ok');
+        } else {
+          failed++;
+          var errText=await resp.text();
+          failedDetails.push('pair '+(pair.index+1)+': '+errText.substring(0,150));
+          console.error('[pair '+(pair.index+1)+'] failed:',errText);
+        }
+      } catch(err){
+        failed++;
+        failedDetails.push('pair '+(pair.index+1)+': '+err.message);
+        console.error('[pair '+(pair.index+1)+'] err:',err);
       }
-      var data=await r.json();
-      console.log('[chunk '+(i+1)+'/'+totalChunks+']',data);
-      totalObservations=data.observations_total||totalObservations+(data.observations_inserted||0);
-    } catch(err) {
-      console.error('[chunk '+(i+1)+'] network error:',err);
-      anyFailed=true;
-      if(!firstError)firstError=err.message;
-    }
+      renderPairProgress(id,completed+failed,pairs.length,obsCount,failed);
+    }));
   }
 
   // Mark complete
-  var cost=(photoIds.length*0.04).toFixed(2);
+  var cost=(pairs.length*0.06).toFixed(2);
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
+    method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
       processing_status:'complete',
       processing_completed_at:new Date().toISOString(),
       estimated_cost_usd:cost,
-      total_observations:totalObservations,
-      processing_error:firstError
+      total_observations:obsCount,
+      processing_error:failed>0?(failedDetails.slice(0,3).join(' | ')):null
     })
   });
 
   // Auto-detect location
-  renderChunkProgress(id,totalChunks,totalChunks,totalObservations,null,'Detecting location...');
+  renderPairProgress(id,pairs.length,pairs.length,obsCount,failed,'Detecting location...');
   try {
     var lr=await fetch('/api/detect-location',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({shop_out_id:id})
     });
     if(lr.ok)console.log('[location]',await lr.json());
@@ -692,81 +661,64 @@ async function triggerProcessing(id){
   await refreshShop(id);
 }
 
-function renderChunkProgress(id,currentChunk,totalChunks,obsCount,errorMsg,customStatus){
-  var pct=((currentChunk/totalChunks)*100).toFixed(0);
-  var statusLine=customStatus?customStatus:'Chunk <strong>'+currentChunk+' of '+totalChunks+'</strong> ('+pct+'%)';
+function renderPairProgress(id,done,total,obsCount,failedCount,customStatus){
+  var pct=((done/total)*100).toFixed(0);
+  var statusLine=customStatus?customStatus:'Pair <strong>'+done+' of '+total+'</strong> ('+pct+'%)';
   var html='<div class="card">'+
     '<div class="card-title">AI processing</div>'+
     '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">'+statusLine+'</div>'+
     '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;transition:width 0.4s;"></div></div>'+
-    '<div style="font-size:11px;color:#888;margin-top:6px;">'+(obsCount||0)+' observations extracted so far. Each chunk takes ~60-120 sec.</div>'+
-    (errorMsg?'<div style="font-size:11px;color:#a22;margin-top:8px;">'+esc(errorMsg)+'</div>':'')+
-    '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — chunks process here in the browser.</div>'+
+    '<div style="font-size:11px;color:#888;margin-top:6px;">'+obsCount+' observations extracted'+(failedCount>0?' · '+failedCount+' failed':'')+' · ~5-10 sec per pair</div>'+
+    '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — pairs process here in the browser.</div>'+
   '</div>';
   g('shop-detail').innerHTML=html;
 }
 
-// ─── DETECT LOCATION (manual) ───────────────────────────────────────
+// ─── DETECT LOCATION ───────────────────────────────────────────────
 async function detectLocationFor(id){
   var btn=event.target;
   btn.disabled=true;
   btn.textContent='Detecting...';
   try {
     var r=await fetch('/api/detect-location',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({shop_out_id:id})
     });
-    if(!r.ok){
-      alert('Detection failed: '+await r.text());
-      btn.disabled=false;btn.textContent='🤖 Detect';return;
-    }
+    if(!r.ok){alert('Detection failed: '+await r.text());btn.disabled=false;btn.textContent='🤖 Detect';return;}
     var data=await r.json();
-    if(data.location){
-      alert('Detected: '+data.location+(data.confidence?' ('+(data.confidence*100).toFixed(0)+'% confidence)':''));
-    } else alert('No location markers found in storefront photos.');
+    if(data.location)alert('Detected: '+data.location+(data.confidence?' ('+(data.confidence*100).toFixed(0)+'%)':''));
+    else alert('No location markers found.');
     await refreshShop(id);
-  } catch(err){
-    alert('Error: '+err.message);
-    btn.disabled=false;btn.textContent='🤖 Detect';
-  }
+  } catch(err){alert('Error: '+err.message);btn.disabled=false;btn.textContent='🤖 Detect';}
 }
 
 // ─── INSIGHTS ───────────────────────────────────────────────────────
 async function loadInsights(id){
   var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&select=brand,department,retail_price,ai_suggested_category');
-  if(!r.ok){console.error('insights:',await r.text());return;}
+  if(!r.ok)return;
   var obs=await r.json();
   var c=g('insights-container');
   if(!c)return;
-  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations to summarize.</div>';return;}
+  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations.</div>';return;}
 
-  // Department breakdown
   var deptCounts={};
-  obs.forEach(function(o){
-    var d=o.department||'Uncategorized';
-    deptCounts[d]=(deptCounts[d]||0)+1;
-  });
+  obs.forEach(function(o){var d=o.department||'Uncategorized';deptCounts[d]=(deptCounts[d]||0)+1;});
   var deptSorted=Object.keys(deptCounts).map(function(k){return {name:k,count:deptCounts[k]};}).sort(function(a,b){return b.count-a.count;});
 
-  // Top brands
   var brandCounts={};
   obs.forEach(function(o){if(o.brand)brandCounts[o.brand]=(brandCounts[o.brand]||0)+1;});
   var brandSorted=Object.keys(brandCounts).map(function(k){return {name:k,count:brandCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,10);
 
-  // Top categories
   var catCounts={};
   obs.forEach(function(o){if(o.ai_suggested_category)catCounts[o.ai_suggested_category]=(catCounts[o.ai_suggested_category]||0)+1;});
   var catSorted=Object.keys(catCounts).map(function(k){return {name:k,count:catCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,10);
 
-  // Price stats
   var prices=obs.map(function(o){return o.retail_price;}).filter(function(p){return p!=null && p>0;});
   var priceMin=prices.length?Math.min.apply(null,prices):null;
   var priceMax=prices.length?Math.max.apply(null,prices):null;
   var priceAvg=prices.length?(prices.reduce(function(a,b){return a+b;},0)/prices.length):null;
 
   var html='<div class="insights-grid">';
-  // Department column
   html+='<div><div class="insights-block-title">By Department</div>';
   deptSorted.forEach(function(d){
     var pct=Math.round((d.count/obs.length)*100);
@@ -774,35 +726,27 @@ async function loadInsights(id){
   });
   html+='</div>';
 
-  // Top brands column
   html+='<div><div class="insights-block-title">Top Brands</div>';
-  if(brandSorted.length===0)html+='<div style="font-size:12px;color:#888;">No brands extracted</div>';
-  else brandSorted.forEach(function(b){
-    html+='<div class="brand-row"><span>'+esc(b.name)+'</span><span style="color:#888;font-weight:600;">'+b.count+'</span></div>';
-  });
+  if(brandSorted.length===0)html+='<div style="font-size:12px;color:#888;">No brands</div>';
+  else brandSorted.forEach(function(b){html+='<div class="brand-row"><span>'+esc(b.name)+'</span><span style="color:#888;font-weight:600;">'+b.count+'</span></div>';});
   html+='</div>';
   html+='</div>';
 
-  // Top categories below
   if(catSorted.length>0){
     html+='<div style="margin-top:1.5rem;"><div class="insights-block-title">Top Categories</div>';
     html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">';
-    catSorted.forEach(function(c){
-      html+='<div class="brand-row"><span>'+esc(c.name)+'</span><span style="color:#888;font-weight:600;">'+c.count+'</span></div>';
-    });
+    catSorted.forEach(function(c){html+='<div class="brand-row"><span>'+esc(c.name)+'</span><span style="color:#888;font-weight:600;">'+c.count+'</span></div>';});
     html+='</div></div>';
   }
 
-  // Price stats
   if(prices.length>0){
     html+='<div class="stat-grid">'+
-      '<div class="stat-block"><div class="stat-label">Products with Price</div><div class="stat-val">'+prices.length+'</div></div>'+
-      '<div class="stat-block"><div class="stat-label">Min Price</div><div class="stat-val">$'+priceMin.toFixed(2)+'</div></div>'+
-      '<div class="stat-block"><div class="stat-label">Avg Price</div><div class="stat-val">$'+priceAvg.toFixed(2)+'</div></div>'+
-      '<div class="stat-block"><div class="stat-label">Max Price</div><div class="stat-val">$'+priceMax.toFixed(2)+'</div></div>'+
+      '<div><div class="stat-label">With Price</div><div class="stat-val">'+prices.length+'</div></div>'+
+      '<div><div class="stat-label">Min</div><div class="stat-val">$'+priceMin.toFixed(2)+'</div></div>'+
+      '<div><div class="stat-label">Avg</div><div class="stat-val">$'+priceAvg.toFixed(2)+'</div></div>'+
+      '<div><div class="stat-label">Max</div><div class="stat-val">$'+priceMax.toFixed(2)+'</div></div>'+
     '</div>';
   }
-
   c.innerHTML=html;
 }
 
@@ -821,9 +765,11 @@ async function loadPhotos(id){
   var container=g('photos-container');if(!container)return;
   container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
+      var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':'');
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
         '<img src="'+(p.signed_url||'')+'" loading="lazy" />'+
         '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
+        (role?'<span class="photo-role">'+role+'</span>':'')+
       '</div>';
     }).join('')+'</div>';
 }
@@ -849,7 +795,7 @@ async function loadObservations(id){
   if(!r.ok)return;
   var obs=await r.json();
   var c=g('obs-container');if(!c)return;
-  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations yet.</div>';return;}
+  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations.</div>';return;}
   var html='<div class="obs-row head"><div>#</div><div>Brand · Product</div><div style="text-align:center;">Dept</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
   obs.forEach(function(o,i){
     html+='<div class="obs-row">'+
@@ -873,7 +819,7 @@ async function toggleArchive(id,isArchived){
 }
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations.';
+  g('confirm-body').textContent='Permanently deletes everything.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
@@ -891,7 +837,7 @@ async function deleteShopOut(id){
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{method:'DELETE'});
   currentId=null;
   await init();
-  g('shop-detail').innerHTML='<div class="empty"><div style="font-size:48px;">🛒</div><div>Shop-out deleted</div></div>';
+  g('shop-detail').innerHTML='<div class="empty"><div style="font-size:48px;">🛒</div><div>Deleted</div></div>';
 }
 
 document.addEventListener('DOMContentLoaded',function(){
