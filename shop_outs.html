@@ -188,7 +188,7 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var BUCKET='shop-out-photos';
 var UPLOAD_CONCURRENCY=4;
 var MAX_UPLOAD_ATTEMPTS=3;
-var PAIR_CONCURRENCY=1;  // Sequential — avoids Anthropic rate limits
+var PAIR_CONCURRENCY=5;  // Parallel with 429-retry — fast & safe
 
 function g(id){return document.getElementById(id);}
 function h(url,opts){
@@ -703,8 +703,6 @@ async function triggerProcessing(id){
         }
       }
       renderPairProgress(id,completed+failed,pairs.length,obsCount,failed);
-      // Small inter-pair delay to stay under rate limits (Anthropic Tier 1 = ~50 RPM)
-      await new Promise(function(r){setTimeout(r,1200);});
     }));
   }
 
