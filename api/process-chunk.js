@@ -19,7 +19,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const BUCKET = 'shop-out-photos';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
 
 const GROUP_BATCH_SIZE = 8;          // photos per grouping call (smaller = safer payload)
 const EXTRACT_CONCURRENCY = 3;
