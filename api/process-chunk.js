@@ -41,7 +41,10 @@ async function sb(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function signUrl(filePath) {
+async function signUrl(filePath, options = {}) {
+  // options.transform can include { width, height, resize, quality }
+  const body = { expiresIn: 3600 };
+  if (options.transform) body.transform = options.transform;
   const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${BUCKET}/${filePath}`, {
     method: 'POST',
     headers: {
@@ -49,9 +52,9 @@ async function signUrl(filePath) {
       Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ expiresIn: 3600 })
+    body: JSON.stringify(body)
   });
-  if (!r.ok) throw new Error(`Sign URL ${r.status}`);
+  if (!r.ok) throw new Error(`Sign URL ${r.status}: ${await r.text()}`);
   const data = await r.json();
   return `${SUPABASE_URL}/storage/v1${data.signedURL}`;
 }
@@ -61,31 +64,30 @@ async function signUrl(filePath) {
 // Anthropic's URL-based image source which lets them fetch directly
 // (they handle resizing). For under-limit images, send as base64.
 async function fetchImageForClaude(filePath) {
-  const url = await signUrl(filePath);
+  // Always request a resized version from Supabase image transform.
+  // This brings even 12MP HEIC photos down to ~300-800KB, well under
+  // Anthropic's 5MB limit. width:1568 matches Anthropic's recommended max.
+  const url = await signUrl(filePath, {
+    transform: { width: 1568, height: 1568, resize: 'contain', quality: 85 }
+  });
+
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`Image fetch ${r.status}`);
+  if (!r.ok) throw new Error(`Image fetch ${r.status}: ${await r.text()}`);
   const buf = await r.arrayBuffer();
   const bytes = buf.byteLength;
 
-  if (bytes <= MAX_IMAGE_BYTES) {
-    // Small enough — send as base64
-    return {
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: 'image/jpeg',
-        data: Buffer.from(buf).toString('base64')
-      }
-    };
+  if (bytes > MAX_IMAGE_BYTES) {
+    // Shouldn't happen with the transform, but guard anyway
+    console.warn(`[image] post-resize still ${bytes} bytes, skipping`);
+    throw new Error(`Image too large even after resize: ${bytes} bytes`);
   }
 
-  // Too large for base64 — use URL-based source (Anthropic fetches it directly)
-  // Anthropic supports image URLs and handles resizing on their end
   return {
     type: 'image',
     source: {
-      type: 'url',
-      url: url
+      type: 'base64',
+      media_type: 'image/jpeg',
+      data: Buffer.from(buf).toString('base64')
     }
   };
 }

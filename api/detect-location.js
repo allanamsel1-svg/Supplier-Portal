@@ -31,7 +31,9 @@ async function sb(path, opts = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function signUrl(filePath) {
+async function signUrl(filePath, options = {}) {
+  const body = { expiresIn: 3600 };
+  if (options.transform) body.transform = options.transform;
   const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/${BUCKET}/${filePath}`, {
     method: 'POST',
     headers: {
@@ -39,41 +41,28 @@ async function signUrl(filePath) {
       Authorization: `Bearer ${SUPABASE_KEY}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ expiresIn: 3600 })
+    body: JSON.stringify(body)
   });
-  if (!r.ok) throw new Error(`Sign URL ${r.status}`);
+  if (!r.ok) throw new Error(`Sign URL ${r.status}: ${await r.text()}`);
   const data = await r.json();
   return `${SUPABASE_URL}/storage/v1${data.signedURL}`;
 }
 
 async function fetchImageForClaude(filePath) {
-  const url = await signUrl(filePath);
-  // Check size first
-  try {
-    const head = await fetch(url, { method: 'HEAD' });
-    const sizeHeader = head.headers.get('content-length');
-    const size = sizeHeader ? parseInt(sizeHeader, 10) : null;
-    if (size && size <= MAX_IMAGE_BYTES) {
-      // Small — fetch and send as base64
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`Image fetch ${r.status}`);
-      const buf = await r.arrayBuffer();
-      return {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: 'image/jpeg',
-          data: Buffer.from(buf).toString('base64')
-        }
-      };
-    }
-  } catch (e) {
-    // Fall through to URL mode
-  }
-  // Large or HEAD failed — let Anthropic fetch via URL (they auto-resize)
+  // Use Supabase image transform to resize before fetching
+  const url = await signUrl(filePath, {
+    transform: { width: 1568, height: 1568, resize: 'contain', quality: 85 }
+  });
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Image fetch ${r.status}: ${await r.text()}`);
+  const buf = await r.arrayBuffer();
   return {
     type: 'image',
-    source: { type: 'url', url: url }
+    source: {
+      type: 'base64',
+      media_type: 'image/jpeg',
+      data: Buffer.from(buf).toString('base64')
+    }
   };
 }
 
