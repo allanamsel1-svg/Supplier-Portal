@@ -152,8 +152,8 @@ async function extractObservation(group, photosById, retailerName) {
   content.push({
     type: 'text',
     text: `Product at ${retailerName || 'retailer'}. Extract details, return ONLY JSON:
-{"brand":"...","product_name":"...","pack_size":"...","retail_price":12.99,"list_price":null,"upc":"...","department":"Beauty|HBC|Apparel|Home|Food|Toys|Electronics|Other","sub_category":"...","promo_text":"...","confidence":0.85}
-Use null for missing fields.`
+{"brand":"...","sub_brand":"...","product_name":"...","pack_size":"3.4","pack_size_unit":"fl oz","retail_price":12.99,"compare_at_price":null,"upc":"...","department":"Beauty|HBC|Apparel|Home|Food|Toys|Electronics|Other","ai_suggested_category":"e.g. Mascara, Body Lotion, Pasta Sauce","retailer_vendor_code":"vendor code if visible on tag","retailer_class_code":"class code if visible","country_of_origin":"country if visible","confidence":0.85}
+Use null for missing fields. retail_price and compare_at_price are numbers without dollar sign.`
   });
 
   try {
@@ -238,20 +238,34 @@ export default async function handler(req, res) {
       }
     }
 
-    const obsRows = observations.map(({ group, obs }) => ({
-      shop_out_id,
-      brand: obs.brand || null,
-      product_name: obs.product_name || null,
-      pack_size: obs.pack_size || null,
-      retail_price: obs.retail_price || null,
-      list_price: obs.list_price || null,
-      upc: obs.upc || null,
-      department: obs.department || null,
-      sub_category: obs.sub_category || null,
-      promo_text: obs.promo_text || null,
-      ai_confidence: obs.confidence || null,
-      photo_group_id: group.id
-    }));
+    const obsRows = observations.map(({ group, obs }) => {
+      // Find front and back photo IDs from the group
+      const photoIds = group.photoIds || [];
+      const row = {
+        shop_out_id,
+        brand: obs.brand || null,
+        sub_brand: obs.sub_brand || null,
+        product_name: obs.product_name || null,
+        pack_size: obs.pack_size ? String(obs.pack_size) : null,
+        pack_size_unit: obs.pack_size_unit || null,
+        retail_price: obs.retail_price || null,
+        compare_at_price: obs.compare_at_price || null,
+        upc: obs.upc || null,
+        department: obs.department || null,
+        ai_suggested_category: obs.ai_suggested_category || null,
+        retailer_vendor_code: obs.retailer_vendor_code || null,
+        retailer_class_code: obs.retailer_class_code || null,
+        country_of_origin: obs.country_of_origin || null,
+        ai_confidence: obs.confidence || null,
+        ai_extraction_json: obs,  // full raw extraction as safety net
+        photo_group_id: group.id,
+        source_photo_count: photoIds.length
+      };
+      if (photoIds[0]) row.front_photo_id = photoIds[0];
+      if (photoIds[1]) row.back_photo_id = photoIds[1];
+      if (photoIds.length > 2) row.supplemental_photo_ids = photoIds.slice(2);
+      return row;
+    });
 
     if (obsRows.length > 0) {
       await sb(`/rest/v1/shop_out_observations`, {
