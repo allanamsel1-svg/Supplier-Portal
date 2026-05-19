@@ -1,8 +1,9 @@
 // ════════════════════════════════════════════════════════════════════
 // /api/detect-location.js
 //
-// Uses Claude vision on storefront photos to detect store location.
-// Reads visible signs, street names, mall names, addresses.
+// Reads storefront photos to detect store location.
+// Uses URL-based image source so Anthropic fetches directly — works for
+// images of any size including HEIC.
 // ════════════════════════════════════════════════════════════════════
 
 export const config = { runtime: 'nodejs' };
@@ -13,6 +14,8 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const BUCKET = 'shop-out-photos';
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 async function sb(path, opts = {}) {
   const headers = {
@@ -43,11 +46,35 @@ async function signUrl(filePath) {
   return `${SUPABASE_URL}/storage/v1${data.signedURL}`;
 }
 
-async function imgUrlToBase64(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`Image fetch ${r.status}`);
-  const buf = await r.arrayBuffer();
-  return Buffer.from(buf).toString('base64');
+async function fetchImageForClaude(filePath) {
+  const url = await signUrl(filePath);
+  // Check size first
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    const sizeHeader = head.headers.get('content-length');
+    const size = sizeHeader ? parseInt(sizeHeader, 10) : null;
+    if (size && size <= MAX_IMAGE_BYTES) {
+      // Small — fetch and send as base64
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Image fetch ${r.status}`);
+      const buf = await r.arrayBuffer();
+      return {
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: 'image/jpeg',
+          data: Buffer.from(buf).toString('base64')
+        }
+      };
+    }
+  } catch (e) {
+    // Fall through to URL mode
+  }
+  // Large or HEAD failed — let Anthropic fetch via URL (they auto-resize)
+  return {
+    type: 'image',
+    source: { type: 'url', url: url }
+  };
 }
 
 async function claudeMessage(messages, maxTokens = 800) {
@@ -70,8 +97,7 @@ function extractJson(text) {
   if (firstBrace === -1) throw new Error('No JSON');
   cleaned = cleaned.substring(firstBrace);
   const lastBrace = cleaned.lastIndexOf('}');
-  cleaned = cleaned.substring(0, lastBrace + 1);
-  return JSON.parse(cleaned);
+  return JSON.parse(cleaned.substring(0, lastBrace + 1));
 }
 
 export default async function handler(req, res) {
@@ -89,7 +115,6 @@ export default async function handler(req, res) {
   if (!shop_out_id) return res.status(400).json({ error: 'shop_out_id required' });
 
   try {
-    // Get retailer name
     const shops = await sb(`/rest/v1/shop_outs?id=eq.${shop_out_id}&select=customer_id`);
     if (!shops || shops.length === 0) return res.status(404).json({ error: 'Not found' });
 
@@ -99,43 +124,32 @@ export default async function handler(req, res) {
       if (cust && cust.length > 0) retailerName = cust[0].customer_name;
     }
 
-    // Get up to 5 storefront photos
+    // Prefer storefront-tagged photos; if none, use first 5 photos
     let photos = await sb(`/rest/v1/shop_out_photos?shop_out_id=eq.${shop_out_id}&group_role=eq.storefront&limit=5&select=*`);
-
-    // Fallback: if no storefront photos, use first 3 photos (might catch a sign in product shots)
     if (!photos || photos.length === 0) {
-      photos = await sb(`/rest/v1/shop_out_photos?shop_out_id=eq.${shop_out_id}&order=photo_sequence_number.asc&limit=3&select=*`);
+      photos = await sb(`/rest/v1/shop_out_photos?shop_out_id=eq.${shop_out_id}&order=photo_sequence_number.asc&limit=5&select=*`);
     }
 
-    if (!photos || photos.length === 0) {
-      return res.status(200).json({ message: 'No photos to analyze' });
-    }
+    if (!photos || photos.length === 0) return res.status(200).json({ error: 'No photos' });
 
-    // Build vision request
     const content = [];
     for (const p of photos) {
       try {
-        const url = await signUrl(p.file_path);
-        const base64 = await imgUrlToBase64(url);
-        content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } });
-      } catch (err) { console.warn(`Skip photo: ${err.message}`); }
+        const imgBlock = await fetchImageForClaude(p.file_path);
+        content.push(imgBlock);
+      } catch (err) { console.warn(`Skip: ${err.message}`); }
     }
-
-    if (content.length === 0) return res.status(200).json({ message: 'No images could be loaded' });
+    if (content.length === 0) return res.status(200).json({ error: 'No loadable images' });
 
     content.push({
       type: 'text',
-      text: `These are storefront/exterior/aisle photos from a ${retailerName || 'retail'} store visit.
-
-Look carefully for: visible store address, street name, mall name, plaza name, neighborhood, city, state, or any geographic markers in signs or storefront text.
-
-Also identify and confirm the retailer name visible in signage.
+      text: `These are photos from a ${retailerName || 'retail'} store visit. Look for visible: store address, street name, mall/plaza name, neighborhood, city, state, ZIP code, or geographic markers on signs, receipts, or fixtures. Also confirm the retailer name visible in signage.
 
 Return ONLY JSON:
 {
-  "location": "Best location description, e.g. 'East Brunswick, NJ' or 'Garden State Plaza, Paramus NJ' or 'NYC' — null if no location markers visible",
+  "location": "Best location string, e.g. 'East Brunswick, NJ' or 'Garden State Plaza, Paramus NJ' — null if no markers visible",
   "address": "Full street address if visible, else null",
-  "retailer_confirmed": "Confirmed retailer name from signage, or null if not visible",
+  "retailer_confirmed": "Retailer name from signage if visible, else null",
   "confidence": 0.0 to 1.0
 }`
     });
@@ -143,28 +157,15 @@ Return ONLY JSON:
     const resp = await claudeMessage([{ role: 'user', content }], 600);
     const parsed = extractJson(resp.content[0].text);
 
-    // Update shop_outs row
     const updates = {};
     if (parsed.location) updates.store_location_text = parsed.location;
-    if (parsed.address) updates.store_address = parsed.address;
     if (parsed.retailer_confirmed) updates.retailer_detected_via = 'storefront_ai';
 
     if (Object.keys(updates).length > 0) {
-      try {
-        await sb(`/rest/v1/shop_outs?id=eq.${shop_out_id}`, {
-          method: 'PATCH',
-          body: JSON.stringify(updates)
-        });
-      } catch (err) {
-        // store_address column might not exist; retry without it
-        delete updates.store_address;
-        if (Object.keys(updates).length > 0) {
-          await sb(`/rest/v1/shop_outs?id=eq.${shop_out_id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(updates)
-          });
-        }
-      }
+      await sb(`/rest/v1/shop_outs?id=eq.${shop_out_id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      });
     }
 
     return res.status(200).json({
