@@ -2,21 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Shop Outs — TBG Sourcing</title>
+<title>Shop Outs — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a2e;font-size:14px;}
-.top{background:#1a1a2e;color:#fff;padding:0 1.5rem;height:52px;display:flex;align-items:center;justify-content:space-between;}
-.top-title{font-size:15px;font-weight:700;}
-.top a,.top button{color:#aaa;font-size:12px;text-decoration:none;margin-left:16px;background:none;border:none;cursor:pointer;font-family:inherit;}
-.top a:hover,.top button:hover{color:#fff;}
-.top .primary{background:#2244cc;color:#fff;padding:6px 12px;border-radius:6px;font-weight:600;}
-.top .primary:hover{background:#3355dd;color:#fff;}
-.filters{background:#fff;border-bottom:1px solid #e0e0d8;padding:8px 1.5rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.filters select,.filters input{padding:6px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;}
-.filters label.toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#666;cursor:pointer;}
-.main{display:flex;height:calc(100vh - 93px);overflow:hidden;}
+/* Page-specific styles */
+.layout{display:flex;height:calc(100vh - 52px - 49px);overflow:hidden;}
 .list{width:380px;flex-shrink:0;overflow-y:auto;border-right:1px solid #e0e0d8;background:#fff;}
+.filters{padding:10px 14px;border-bottom:1px solid #e0e0d8;display:flex;flex-direction:column;gap:6px;}
+.filters input,.filters select{padding:6px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;width:100%;}
+.filters .toggle{display:flex;align-items:center;gap:6px;font-size:11px;color:#666;cursor:pointer;}
 .list-item{padding:12px 14px;border-bottom:0.5px solid #f0f0e8;cursor:pointer;}
 .list-item:hover{background:#fafaf8;}
 .list-item.sel{background:#eef2ff;border-left:3px solid #2244cc;}
@@ -34,13 +28,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
 .card-title{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:0.75rem;}
 .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#bbb;gap:10px;text-align:center;padding:2rem;}
-
 .dropzone{border:2px dashed #c0c0b8;border-radius:14px;padding:3rem 2rem;text-align:center;background:#fff;cursor:pointer;transition:all 0.2s;}
 .dropzone:hover,.dropzone.dragover{border-color:#2244cc;background:#fafbff;}
 .dropzone-icon{font-size:48px;margin-bottom:1rem;}
 .dropzone-text{font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:6px;}
 .dropzone-hint{font-size:12px;color:#888;}
-
 .upload-status{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
 .progress-bar{height:8px;background:#f0f0e8;border-radius:4px;overflow:hidden;margin:8px 0;}
 .progress-fill{height:100%;background:#2244cc;transition:width 0.3s;}
@@ -54,13 +46,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn-secondary:hover{background:#e0e0d8;}
 .btn-danger{background:#fce8e8;color:#a22;}
 .btn-danger:hover{background:#f8d4d4;}
-
 .detect-row{display:grid;grid-template-columns:140px 1fr auto;gap:12px;padding:10px 0;border-bottom:0.5px solid #f8f8f4;align-items:center;}
 .detect-row:last-child{border-bottom:none;}
 .detect-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;}
 .detect-val{font-size:14px;color:#1a1a2e;}
 .confidence{font-size:10px;color:#888;}
-
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
 .photo-thumb{position:relative;aspect-ratio:1;background:#f0f0e8;border-radius:6px;overflow:hidden;cursor:pointer;}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;}
@@ -68,7 +58,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .photo-role{position:absolute;bottom:4px;left:4px;background:rgba(255,255,255,0.92);color:#333;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;}
 .photo-role.hero{background:#fff8e0;color:#664400;}
 .photo-role.storefront{background:#eef2ff;color:#003366;}
-
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;z-index:200;}
 .viewer.show{display:flex;}
 .viewer img{max-width:90vw;max-height:85vh;object-fit:contain;}
@@ -78,14 +67,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .viewer-nav.prev{left:20px;}
 .viewer-nav.next{right:20px;}
 .viewer-actions{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:10px;}
-
 .obs-row{display:grid;grid-template-columns:60px 2fr 1fr 80px 80px;gap:10px;padding:8px 0;border-bottom:0.5px solid #f8f8f4;font-size:13px;align-items:center;}
 .obs-row.head{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:6px 0;border-bottom:1px solid #e0e0d8;}
 .obs-brand{font-weight:600;}
 .obs-product{color:#666;font-size:11px;margin-top:2px;}
 .obs-price{text-align:right;font-weight:600;}
 .obs-dept{text-align:center;font-size:10px;background:#eef2ff;color:#003366;padding:2px 6px;border-radius:8px;display:inline-block;}
-
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:100;}
 .overlay.show{display:flex;}
 .modal{background:#fff;border-radius:12px;width:460px;max-width:95vw;}
@@ -95,31 +82,43 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </style>
 </head>
 <body>
-<div class="top">
-  <div class="top-title">🛒 Shop Outs</div>
-  <div>
-    <button class="primary" onclick="startNewShopOut()">+ New Shop Out</button>
+
+<!-- Top bar -->
+<div class="ri-top">
+  <div class="ri-top-title">🎯 Retail Intelligence</div>
+  <div class="ri-top-actions">
+    <button id="new-btn" class="primary">+ New Shop Out</button>
     <a href="admin.html">← Admin</a>
   </div>
 </div>
-<div class="filters">
-  <input type="text" id="q-search" placeholder="Search retailer, location..." oninput="renderList()" />
-  <select id="q-status" onchange="renderList()">
-    <option value="">All Statuses</option>
-    <option value="pending">Pending</option>
-    <option value="grouping">Grouping</option>
-    <option value="extracting">Extracting</option>
-    <option value="complete">Complete</option>
-    <option value="failed">Failed</option>
-  </select>
-  <label class="toggle">
-    <input type="checkbox" id="show-archived" onchange="renderList()" />
-    Show archived
-  </label>
-  <span id="q-count" style="font-size:11px;color:#888;margin-left:auto;"></span>
+
+<!-- Tab strip -->
+<div class="ri-tabs">
+  <a href="shop_outs.html" class="ri-tab active"><span class="ri-tab-icon">🛒</span> Shop Outs <span class="ri-tab-badge live">LIVE</span></a>
+  <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Intelligence Hub <span class="ri-tab-badge soon">SOON</span></a>
 </div>
-<div class="main">
-  <div class="list" id="shop-list"><div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">Loading...</div></div>
+
+<!-- Main content -->
+<div class="layout">
+  <div class="list" id="shop-list-pane">
+    <div class="filters">
+      <input type="text" id="q-search" placeholder="Search retailer, location..." oninput="renderList()" />
+      <select id="q-status" onchange="renderList()">
+        <option value="">All Statuses</option>
+        <option value="pending">Pending</option>
+        <option value="grouping">Grouping</option>
+        <option value="extracting">Extracting</option>
+        <option value="complete">Complete</option>
+        <option value="failed">Failed</option>
+      </select>
+      <label class="toggle"><input type="checkbox" id="show-archived" onchange="renderList()" />Show archived</label>
+    </div>
+    <div id="shop-list"><div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">Loading...</div></div>
+  </div>
   <div class="detail" id="shop-detail">
     <div class="empty">
       <div style="font-size:48px;">🛒</div>
@@ -128,6 +127,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Photo viewer overlay -->
 <div class="viewer" id="viewer">
   <button class="viewer-close" onclick="closeViewer()">×</button>
   <button class="viewer-nav prev" onclick="navViewer(-1)">‹</button>
@@ -139,6 +139,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
+<!-- Confirm modal -->
 <div class="overlay" id="confirm-modal">
   <div class="modal">
     <div class="modal-head" id="confirm-title">Confirm</div>
@@ -153,6 +154,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <input type="file" id="file-input" multiple accept="image/*,.heic,.heif" style="display:none;" />
 
 <script>
+// ─── CONFIG ─────────────────────────────────────────────────────────
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var BUCKET='shop-out-photos';
@@ -160,6 +162,7 @@ var UPLOAD_CONCURRENCY=6;
 var MAX_UPLOAD_ATTEMPTS=3;
 var COST_PER_PHOTO_EST=0.04;
 
+// ─── HELPERS ────────────────────────────────────────────────────────
 function g(id){return document.getElementById(id);}
 function h(url,opts){
   opts=opts||{};
@@ -170,12 +173,44 @@ function h(url,opts){
 }
 function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
 
-var allShops=[],currentId=null,confirmFn=null;
+// ─── STATE ──────────────────────────────────────────────────────────
+var allShops=[],customerMap={},currentId=null,confirmFn=null;
 var currentPhotos=[],viewerIdx=0;
 
+// ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
-  var r=await h(SB+'/rest/v1/shop_outs?select=*,customers(name)&order=created_at.desc&limit=500');
-  allShops=r.ok?await r.json():[];
+  console.log('[shop_outs] init starting');
+
+  // 1. Load customers map (for retailer name lookup — no embedded select)
+  try {
+    var cr=await h(SB+'/rest/v1/customers?select=id,name&limit=2000');
+    if(cr.ok){
+      var customers=await cr.json();
+      customers.forEach(function(c){customerMap[c.id]=c.name;});
+      console.log('[shop_outs] loaded '+customers.length+' customers');
+    } else {
+      console.warn('[shop_outs] customers fetch failed:',cr.status);
+    }
+  } catch(e) {
+    console.error('[shop_outs] customers fetch error:',e);
+  }
+
+  // 2. Load shop-outs (no embedded select)
+  try {
+    var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
+    if(r.ok){
+      allShops=await r.json();
+      console.log('[shop_outs] loaded '+allShops.length+' shop-outs');
+    } else {
+      var errText=await r.text();
+      console.error('[shop_outs] shop_outs fetch failed:',r.status,errText);
+      allShops=[];
+    }
+  } catch(e) {
+    console.error('[shop_outs] shop_outs fetch error:',e);
+    allShops=[];
+  }
+
   renderList();
 
   var params=new URLSearchParams(window.location.search);
@@ -183,6 +218,7 @@ async function init(){
   if(pre)selectShop(pre);
 }
 
+// ─── LIST RENDERING ─────────────────────────────────────────────────
 function renderList(){
   var q=(g('q-search').value||'').toLowerCase();
   var stat=g('q-status').value;
@@ -193,19 +229,18 @@ function renderList(){
     if(!showArch && s.archived_at)return false;
     if(stat && s.processing_status!==stat)return false;
     if(q){
-      var hay=((s.customers&&s.customers.name)||'')+' '+(s.store_location_text||'')+' '+(s.notes||'');
+      var rname=customerMap[s.customer_id]||'';
+      var hay=rname+' '+(s.store_location_text||'')+' '+(s.notes||'');
       if(hay.toLowerCase().indexOf(q)===-1)return false;
     }
     return true;
   });
 
-  g('q-count').textContent=filtered.length+' of '+allShops.filter(function(s){return !s.deleted_at;}).length;
-
   var html=filtered.map(function(s){
     var sel=s.id===currentId?' sel':'';
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
-    var retailer=(s.customers&&s.customers.name)||'(retailer pending)';
+    var retailer=customerMap[s.customer_id]||'(retailer pending)';
     var dateStr=s.shop_date||'no date';
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
@@ -219,24 +254,62 @@ function renderList(){
     '</div>';
   }).join('');
 
-  g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet. Click "+ New Shop Out" to start.</div>';
+  g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet.<br><br>Click "+ New Shop Out" above to start.</div>';
 }
 
+// ─── NEW SHOP OUT ───────────────────────────────────────────────────
 async function startNewShopOut(){
-  var r=await h(SB+'/rest/v1/shop_outs',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Prefer':'return=representation'},
-    body:JSON.stringify({
+  console.log('[shop_outs] startNewShopOut clicked');
+  var btn=g('new-btn');
+  btn.disabled=true;
+
+  try {
+    var payload={
       processing_status:'pending',
       captured_by:'admin',
-      total_photos:0,total_observations:0
-    })
-  });
-  if(!r.ok){alert('Failed to create shop-out: '+await r.text());return;}
-  var rows=await r.json();
-  var id=rows[0].id;
-  await init();
-  selectShop(id);
+      total_photos:0,
+      total_observations:0
+    };
+    console.log('[shop_outs] POST payload:',payload);
+
+    var r=await h(SB+'/rest/v1/shop_outs',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Prefer':'return=representation'
+      },
+      body:JSON.stringify(payload)
+    });
+
+    var bodyText=await r.text();
+    console.log('[shop_outs] POST response:',r.status,bodyText);
+
+    if(!r.ok){
+      alert('Failed to create shop-out (status '+r.status+'):\n\n'+bodyText);
+      btn.disabled=false;
+      return;
+    }
+
+    var rows;
+    try { rows=JSON.parse(bodyText); } catch(e){ rows=[]; }
+
+    if(!rows || rows.length===0){
+      alert('Shop-out created but server returned no row. Refresh the page to see it.');
+      btn.disabled=false;
+      await init();
+      return;
+    }
+
+    var newId=rows[0].id;
+    console.log('[shop_outs] created id:',newId);
+    await init();
+    selectShop(newId);
+    btn.disabled=false;
+  } catch(err) {
+    console.error('[shop_outs] startNewShopOut error:',err);
+    alert('Error creating shop-out: '+err.message);
+    btn.disabled=false;
+  }
 }
 
 function selectShop(id){
@@ -250,7 +323,7 @@ async function renderDetail(){
   var s=allShops.find(function(x){return x.id===currentId;});
   if(!s){g('shop-detail').innerHTML='<div class="empty">Not found</div>';return;}
 
-  var retailer=(s.customers&&s.customers.name)||'(retailer not yet detected)';
+  var retailer=customerMap[s.customer_id]||'(retailer not yet detected)';
   var stat=s.processing_status||'pending';
 
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
@@ -339,7 +412,7 @@ async function renderDetail(){
 }
 
 async function refreshShop(id){
-  var r=await h(SB+'/rest/v1/shop_outs?id=eq.'+id+'&select=*,customers(name)');
+  var r=await h(SB+'/rest/v1/shop_outs?id=eq.'+id+'&select=*');
   if(!r.ok)return;
   var rows=await r.json();
   if(rows.length===0)return;
@@ -348,6 +421,7 @@ async function refreshShop(id){
   if(currentId===id)renderDetail();
 }
 
+// ─── UPLOAD ────────────────────────────────────────────────────────
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out. Create one first.');return;}
   var files=Array.from(fileList);
@@ -407,10 +481,8 @@ async function uploadOneWithRetry(file){
 }
 
 async function uploadOne(file,attempt){
-  var exif=await extractExif(file);
-
   var uploadBlob=file;
-  var ext=file.name.split('.').pop().toLowerCase();
+  var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   var bytes=await file.slice(0,12).arrayBuffer();
   var arr=new Uint8Array(bytes);
   var isHeic=(arr[4]===0x66 && arr[5]===0x74 && arr[6]===0x79 && arr[7]===0x70)
@@ -436,6 +508,7 @@ async function uploadOne(file,attempt){
   });
   if(!r.ok)throw new Error('Storage upload failed: '+r.status);
 
+  var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
   var dbR=await h(SB+'/rest/v1/shop_out_photos',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -443,25 +516,16 @@ async function uploadOne(file,attempt){
       shop_out_id:currentId,
       file_path:path,
       file_name:file.name,
-      exif_timestamp:exif.timestamp,
-      exif_lat:exif.lat,
-      exif_lng:exif.lng,
+      exif_timestamp:ts,
       upload_status:'uploaded',
       upload_attempts:attempt
     })
   });
   if(!dbR.ok)throw new Error('DB insert failed: '+dbR.status);
-
   return {success:true};
 }
 
-async function extractExif(file){
-  return new Promise(function(resolve){
-    var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
-    resolve({timestamp:ts,lat:null,lng:null});
-  });
-}
-
+// ─── PROCESS WITH AI ────────────────────────────────────────────────
 async function triggerProcessing(id){
   var r=await fetch('/api/process-shop-out-v2',{
     method:'POST',
@@ -475,6 +539,7 @@ async function triggerProcessing(id){
   await refreshShop(id);
 }
 
+// ─── PHOTOS + VIEWER ───────────────────────────────────────────────
 async function loadPhotos(id){
   var r=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=created_at.asc&select=*');
   if(!r.ok)return;
@@ -529,10 +594,8 @@ async function deleteCurrentPhoto(){
   var p=currentPhotos[viewerIdx];
   if(!p)return;
   if(!confirm('Delete this photo? This cannot be undone.'))return;
-
   await h(SB+'/storage/v1/object/'+BUCKET+'/'+p.file_path,{method:'DELETE'});
   await h(SB+'/rest/v1/shop_out_photos?id=eq.'+p.id,{method:'DELETE'});
-
   closeViewer();
   await refreshShop(currentId);
   selectShop(currentId);
@@ -545,6 +608,7 @@ document.addEventListener('keydown',function(e){
   if(e.key==='ArrowRight')navViewer(1);
 });
 
+// ─── OBSERVATIONS ───────────────────────────────────────────────────
 async function loadObservations(id){
   var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&order=created_at.asc');
   if(!r.ok)return;
@@ -568,6 +632,7 @@ async function loadObservations(id){
   c.innerHTML=html;
 }
 
+// ─── ARCHIVE + DELETE ──────────────────────────────────────────────
 async function toggleArchive(id,isArchived){
   var payload=isArchived?{archived_at:null}:{archived_at:new Date().toISOString()};
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
@@ -581,7 +646,7 @@ async function toggleArchive(id,isArchived){
 
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This will permanently delete the shop-out, all its photos, and all extracted observations. This cannot be undone. Consider archiving instead.';
+  g('confirm-body').textContent='This permanently deletes the shop-out, all its photos, and all extracted observations. Consider archiving instead.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
@@ -591,7 +656,6 @@ function runConfirm(){if(confirmFn){confirmFn();}closeConfirm();}
 async function deleteShopOut(id){
   var rp=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=file_path');
   var paths=rp.ok?(await rp.json()).map(function(p){return p.file_path;}):[];
-
   if(paths.length>0){
     await h(SB+'/storage/v1/object/'+BUCKET,{
       method:'DELETE',
@@ -599,14 +663,25 @@ async function deleteShopOut(id){
       body:JSON.stringify({prefixes:paths})
     });
   }
-
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{method:'DELETE'});
-
   currentId=null;
   await init();
   g('shop-detail').innerHTML='<div class="empty"><div style="font-size:48px;">🛒</div><div>Shop-out deleted</div></div>';
 }
 
+// ─── BIND BUTTON + STARTUP ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',function(){
+  console.log('[shop_outs] DOM ready, binding new-btn handler');
+  var btn=g('new-btn');
+  if(btn){
+    btn.addEventListener('click',startNewShopOut);
+    console.log('[shop_outs] handler bound');
+  } else {
+    console.error('[shop_outs] new-btn not found in DOM');
+  }
+});
+
+// HEIC support (loaded async)
 var s=document.createElement('script');
 s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 document.head.appendChild(s);

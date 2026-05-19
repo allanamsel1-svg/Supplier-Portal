@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Factory Intel — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+.layout{display:flex;height:calc(100vh - 52px - 49px - 49px);overflow:hidden;}
+.subbar{background:#fff;border-bottom:1px solid #e0e0d8;padding:8px 1.5rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.subbar input,.subbar select{padding:6px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;}
+.subbar input{width:220px;}
+.list{width:380px;flex-shrink:0;overflow-y:auto;border-right:1px solid #e0e0d8;background:#fff;}
+.list-item{padding:12px 14px;border-bottom:0.5px solid #f0f0e8;cursor:pointer;}
+.list-item:hover{background:#fafaf8;}
+.list-item.sel{background:#eef2ff;border-left:3px solid #2244cc;}
+.li-name{font-weight:700;font-size:13px;}
+.li-loc{font-size:11px;color:#888;margin-top:2px;}
+.li-meta{font-size:11px;color:#666;margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.detail{flex:1;overflow-y:auto;padding:1.5rem;background:#f5f5f0;}
+.card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
+.card-title{font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:1rem;padding-bottom:8px;border-bottom:0.5px solid #f0f0e8;}
+.field-row{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:8px 0;border-bottom:0.5px solid #f8f8f4;align-items:center;}
+.field-row:last-child{border-bottom:none;}
+.field-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;}
+.field-val{font-size:13px;color:#1a1a2e;}
+.field-val input,.field-val select,.field-val textarea{width:100%;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;}
+.field-val textarea{resize:vertical;min-height:50px;}
+.badge{font-size:10px;padding:2px 8px;border-radius:10px;display:inline-block;font-weight:600;}
+.b-new{background:#eef2ff;color:#003366;}
+.b-outreach_sent{background:#fff8e0;color:#664400;}
+.b-responded{background:#e8f5e0;color:#2a5a00;}
+.b-qualified{background:#edfaed;color:#1a7a1a;}
+.b-rejected{background:#fce8e8;color:#a22;}
+.b-promoted{background:#f0e8ff;color:#440088;}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#bbb;gap:10px;}
+.coming-soon{background:#fff8e0;border:1px solid #ffd54a;color:#664400;padding:14px 16px;border-radius:8px;margin-bottom:1rem;font-size:12px;line-height:1.6;}
+.coming-soon strong{font-size:13px;display:block;margin-bottom:4px;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:100;}
+.overlay.show{display:flex;}
+.modal{background:#fff;border-radius:12px;width:680px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #e0e0d8;display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:20px;color:#888;cursor:pointer;}
+.modal-body{padding:1.5rem;}
+.modal-foot{padding:1rem 1.5rem;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:10px;}
+.btn{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;}
+.btn-primary{background:#2244cc;color:#fff;}
+.btn-primary:hover{background:#3355dd;}
+.btn-primary:disabled{background:#aaa;cursor:not-allowed;}
+.btn-secondary{background:#f0f0e8;color:#444;}
+.btn-secondary:hover{background:#e0e0d8;}
+.btn-danger{background:#fce8e8;color:#a22;}
+label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin:14px 0 6px;}
+input[type=text],input[type=email],input[type=tel],input[type=date],input[type=number],input[type=url],select,textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
+textarea{resize:vertical;min-height:60px;}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.csv-textarea{width:100%;min-height:180px;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:12px;padding:10px;border:1px solid #e0e0d8;border-radius:7px;resize:vertical;}
+.csv-help{background:#fafaf8;border:1px solid #e0e0d8;border-radius:7px;padding:10px 12px;font-size:11px;color:#666;line-height:1.6;margin-bottom:12px;}
+.csv-help code{background:#fff;border:0.5px solid #e0e0d8;padding:1px 6px;border-radius:4px;font-size:11px;}
+.csv-preview{max-height:200px;overflow-y:auto;border:1px solid #e0e0d8;border-radius:7px;margin-top:12px;}
+.csv-preview table{width:100%;border-collapse:collapse;font-size:11px;}
+.csv-preview th{position:sticky;top:0;background:#f8f8f4;text-align:left;padding:6px 8px;font-size:10px;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;}
+.csv-preview td{padding:5px 8px;border-top:0.5px solid #f0f0e8;}
+.csv-preview td.bad{color:#c33;}
+</style>
+</head>
+<body>
+
+<div class="ri-top">
+  <div class="ri-top-title">🎯 Retail Intelligence</div>
+  <div class="ri-top-actions">
+    <button class="primary" onclick="openImportModal()">⬆ Import CSV</button>
+    <button class="primary" onclick="openAddModal()">+ Add Prospect</button>
+    <a href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="ri-tabs">
+  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs <span class="ri-tab-badge live">LIVE</span></a>
+  <a href="factory_prospects.html" class="ri-tab active"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Intelligence Hub <span class="ri-tab-badge soon">SOON</span></a>
+</div>
+
+<div class="subbar">
+  <input type="text" id="q-search" placeholder="Search name, contact, country..." oninput="filterList()" />
+  <select id="q-status" onchange="filterList()">
+    <option value="">All Statuses</option>
+    <option value="new">New</option>
+    <option value="outreach_sent">Outreach Sent</option>
+    <option value="responded">Responded</option>
+    <option value="qualified">Qualified</option>
+    <option value="rejected">Rejected</option>
+    <option value="promoted">Promoted</option>
+  </select>
+  <select id="q-country" onchange="filterList()"><option value="">All Countries</option></select>
+  <select id="q-source" onchange="filterList()"><option value="">All Sources</option></select>
+  <span id="q-count" style="font-size:11px;color:#888;margin-left:auto;"></span>
+</div>
+
+<div class="layout">
+  <div class="list" id="prospect-list"><div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">Loading...</div></div>
+  <div class="detail" id="prospect-detail">
+    <div class="empty">
+      <div style="font-size:40px;">🏭</div>
+      <div>Select a prospect or import your contact list</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Add Factory Prospect</div>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <label>Factory name *</label>
+      <input type="text" id="add-name" placeholder="Acme Cosmetics Co., Ltd." />
+      <div class="row-2">
+        <div><label>Country</label><input type="text" id="add-country" placeholder="China" /></div>
+        <div><label>City</label><input type="text" id="add-city" placeholder="Shanghai" /></div>
+      </div>
+      <label>Categories (comma-separated)</label>
+      <input type="text" id="add-categories" placeholder="skincare, haircare, color" />
+      <div class="row-2">
+        <div><label>Discovery source</label>
+          <select id="add-source">
+            <option value="">— Select —</option>
+            <option value="canton_fair">Canton Fair</option>
+            <option value="cosmoprof_na">Cosmoprof North America</option>
+            <option value="cosmoprof_bologna">Cosmoprof Bologna</option>
+            <option value="cosmoprof_asia">Cosmoprof Asia</option>
+            <option value="cosmoprof_mumbai">Cosmoprof Mumbai</option>
+            <option value="hba_global">HBA Global Expo</option>
+            <option value="ny_now">NY NOW</option>
+            <option value="indie_beauty_expo">Indie Beauty Expo</option>
+            <option value="referral">Referral</option>
+            <option value="trade_pub">Trade Publication</option>
+            <option value="cold_outreach">Cold Outreach</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div><label>Discovery date</label><input type="date" id="add-date" /></div>
+      </div>
+      <label>Primary contact name</label>
+      <input type="text" id="add-contact-name" placeholder="Wang Wei" />
+      <div class="row-2">
+        <div><label>Contact title</label><input type="text" id="add-contact-title" placeholder="Sales Manager" /></div>
+        <div><label>Contact email</label><input type="email" id="add-contact-email" placeholder="wang.wei@acme.cn" /></div>
+      </div>
+      <label>Phone</label>
+      <input type="tel" id="add-contact-phone" />
+      <div class="row-2">
+        <div><label>Website</label><input type="url" id="add-website" placeholder="https://" /></div>
+        <div><label>Alibaba URL</label><input type="url" id="add-alibaba" placeholder="https://" /></div>
+      </div>
+      <label>Discovery / contact notes</label>
+      <textarea id="add-notes" placeholder="Met at booth A12. Said new color cosmetics line dropping Q1."></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" id="add-submit" onclick="submitAdd()">Add Prospect</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Import Factory Prospects from CSV</div>
+      <button class="modal-close" onclick="closeImportModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="csv-help">
+        Paste CSV data below. First row must be headers. Expected columns (any order, extras ignored):<br>
+        <code>factory_name</code> <code>country</code> <code>city</code> <code>contact_name</code> <code>contact_title</code> <code>contact_email</code> <code>contact_phone</code> <code>discovery_source</code> <code>discovery_date</code> <code>categories</code> <code>website_url</code> <code>notes</code><br><br>
+        Only <code>factory_name</code> is required.
+      </div>
+      <textarea class="csv-textarea" id="csv-input" placeholder="factory_name,country,city,contact_name,contact_email,discovery_source,discovery_date
+Acme Cosmetics Co.,China,Shanghai,Wang Wei,wang@acme.cn,cosmoprof_na,2024-07-15
+Beta Beauty Mfg.,India,Mumbai,Priya Sharma,priya@betabeauty.in,cosmoprof_mumbai,2024-11-08"></textarea>
+      <div id="csv-preview-wrap" style="display:none;">
+        <div style="font-size:11px;color:#666;margin-top:14px;margin-bottom:6px;">PREVIEW <span id="csv-preview-count"></span></div>
+        <div class="csv-preview" id="csv-preview"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-secondary" onclick="parseAndPreview()">Parse Preview</button>
+      <button class="btn btn-primary" id="csv-import-btn" onclick="submitImport()" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function h(url,opts){
+  opts=opts||{};
+  opts.headers=opts.headers||{};
+  opts.headers.apikey=KEY;
+  opts.headers.Authorization='Bearer '+KEY;
+  return fetch(url,opts);
+}
+function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
+
+var allProspects=[],currentId=null,parsedRows=[];
+
+async function init(){
+  var r=await h(SB+'/rest/v1/factory_prospects?select=*&order=created_at.desc&limit=500');
+  allProspects=r.ok?await r.json():[];
+
+  var countries={};
+  allProspects.forEach(function(p){if(p.country)countries[p.country]=true;});
+  var cSel=g('q-country');
+  Object.keys(countries).sort().forEach(function(c){
+    var o=document.createElement('option');o.value=c;o.textContent=c;cSel.appendChild(o);
+  });
+
+  var sources={};
+  allProspects.forEach(function(p){if(p.discovery_source)sources[p.discovery_source]=true;});
+  var sSel=g('q-source');
+  Object.keys(sources).sort().forEach(function(s){
+    var o=document.createElement('option');o.value=s;o.textContent=s.replace(/_/g,' ');sSel.appendChild(o);
+  });
+
+  renderList();
+
+  var params=new URLSearchParams(window.location.search);
+  var pre=params.get('id');
+  if(pre)selectProspect(pre);
+}
+
+function renderList(){
+  var q=(g('q-search').value||'').toLowerCase();
+  var stat=g('q-status').value;
+  var country=g('q-country').value;
+  var source=g('q-source').value;
+
+  var filtered=allProspects.filter(function(p){
+    if(stat && p.status!==stat)return false;
+    if(country && p.country!==country)return false;
+    if(source && p.discovery_source!==source)return false;
+    if(q){
+      var hay=(p.factory_name||'')+' '+(p.primary_contact_name||'')+' '+(p.primary_contact_email||'')+' '+(p.country||'')+' '+(p.city||'')+' '+(p.internal_notes||'');
+      if(hay.toLowerCase().indexOf(q)===-1)return false;
+    }
+    return true;
+  });
+
+  g('q-count').textContent=filtered.length+' of '+allProspects.length;
+
+  var html=filtered.map(function(p){
+    var loc=[p.city,p.country].filter(Boolean).join(', ');
+    var sel=p.id===currentId?' sel':'';
+    var statClass='b-'+p.status;
+    var contact=p.primary_contact_name?'· '+esc(p.primary_contact_name):'';
+    return '<div class="list-item'+sel+'" onclick="selectProspect(\''+p.id+'\')">'+
+      '<div class="li-name">'+esc(p.factory_name)+'</div>'+
+      '<div class="li-loc">'+esc(loc)+' '+contact+'</div>'+
+      '<div class="li-meta">'+
+        '<span class="badge '+statClass+'">'+esc(p.status||'new')+'</span>'+
+        (p.discovery_source?'<span>📍 '+esc(p.discovery_source.replace(/_/g,' '))+'</span>':'')+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  g('prospect-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No prospects yet. Use "Import CSV" or "+ Add Prospect".</div>';
+}
+
+function filterList(){renderList();}
+
+async function selectProspect(id){
+  currentId=id;
+  renderList();
+  window.history.replaceState(null,'','?id='+id);
+
+  var p=allProspects.find(function(x){return x.id===id;});
+  if(!p){g('prospect-detail').innerHTML='<div class="empty">Not found</div>';return;}
+
+  var statClass='b-'+p.status;
+
+  var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
+    '<div>'+
+      '<div style="font-size:22px;font-weight:700;">'+esc(p.factory_name)+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:4px;">'+
+        [p.city,p.region,p.country].filter(Boolean).map(esc).join(', ')+
+      '</div>'+
+    '</div>'+
+    '<span class="badge '+statClass+'" style="font-size:11px;padding:4px 12px;">'+esc(p.status)+'</span>'+
+  '</div>';
+
+  html+='<div class="coming-soon">'+
+    '<strong>🚀 Coming Soon: Outreach Campaigns</strong>'+
+    'Sub-modules 4c (Campaign Manager) and 4d (Response Handler) are in the build queue. Once shipped, you can launch Sarah Lindberg outreach campaigns directly from this prospect record.'+
+  '</div>';
+
+  html+='<div class="card"><div class="card-title">Identity &amp; Location</div>';
+  html+=field('Factory name','factory_name',p.factory_name,'text');
+  html+=field('Legal name','factory_legal_name',p.factory_legal_name,'text');
+  html+=field('Country','country',p.country,'text');
+  html+=field('Region','region',p.region,'text');
+  html+=field('City','city',p.city,'text');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Categories</div>';
+  html+=field('Primary categories','primary_categories',(p.primary_categories||[]).join(', '),'text','Comma-separated');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Discovery</div>';
+  html+=field('Source','discovery_source',p.discovery_source,'text');
+  html+=field('Discovery date','discovery_date',p.discovery_date,'date');
+  html+=field('Notes','discovery_notes',p.discovery_notes,'textarea');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Primary Contact</div>';
+  html+=field('Name','primary_contact_name',p.primary_contact_name,'text');
+  html+=field('Title','primary_contact_title',p.primary_contact_title,'text');
+  html+=field('Email','primary_contact_email',p.primary_contact_email,'email');
+  html+=field('Phone','primary_contact_phone',p.primary_contact_phone,'tel');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Web Presence</div>';
+  html+=field('Website','website_url',p.website_url,'url');
+  html+=field('LinkedIn','linkedin_url',p.linkedin_url,'url');
+  html+=field('Alibaba','alibaba_url',p.alibaba_url,'url');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Credentials (claimed)</div>';
+  html+=field('Years in business','years_in_business',p.years_in_business,'number');
+  html+=field('Employee count','employee_count_range',p.employee_count_range,'text');
+  html+=field('Factory size (sqm)','factory_size_sqm',p.factory_size_sqm,'number');
+  html+=field('Certifications','certifications',(p.certifications||[]).join(', '),'text','Comma-separated');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Status &amp; Outreach</div>';
+  html+=fieldSelect('Status','status',p.status,['new','outreach_sent','responded','qualified','rejected','promoted']);
+  html+=field('Outreach count','outreach_count',p.outreach_count||0,'readonly');
+  html+=field('Response count','response_count',p.response_count||0,'readonly');
+  html+=field('Last outreach','last_outreach_at',p.last_outreach_at?p.last_outreach_at.substring(0,10):'','readonly');
+  html+=field('Last response','last_response_at',p.last_response_at?p.last_response_at.substring(0,10):'','readonly');
+  html+='</div>';
+
+  html+='<div class="card"><div class="card-title">Internal Notes</div>';
+  html+=field('Notes','internal_notes',p.internal_notes,'textarea');
+  html+='</div>';
+
+  html+='<div style="display:flex;gap:10px;margin-bottom:1rem;">'+
+    '<button class="btn btn-primary" onclick="saveProspect()">💾 Save Changes</button>'+
+    '<button class="btn btn-secondary" onclick="if(confirm(\'Delete this prospect?\'))deleteProspect()">Delete Prospect</button>'+
+  '</div>';
+
+  g('prospect-detail').innerHTML=html;
+}
+
+function field(label,key,value,type,hint){
+  var input;
+  if(type==='readonly'){
+    input='<span style="color:#888;">'+esc(value||'—')+'</span>';
+  }else if(type==='textarea'){
+    input='<textarea data-key="'+key+'">'+esc(value||'')+'</textarea>';
+  }else{
+    input='<input type="'+type+'" data-key="'+key+'" value="'+esc(value||'')+'" />';
+  }
+  return '<div class="field-row"><div class="field-label">'+esc(label)+'</div><div class="field-val">'+input+
+    (hint?'<div style="font-size:10px;color:#aaa;margin-top:3px;">'+esc(hint)+'</div>':'')+
+    '</div></div>';
+}
+
+function fieldSelect(label,key,value,options){
+  var opts=options.map(function(o){
+    return '<option value="'+o+'"'+(o===value?' selected':'')+'>'+esc(o)+'</option>';
+  }).join('');
+  return '<div class="field-row"><div class="field-label">'+esc(label)+'</div><div class="field-val"><select data-key="'+key+'">'+opts+'</select></div></div>';
+}
+
+async function saveProspect(){
+  if(!currentId)return;
+  var inputs=document.querySelectorAll('[data-key]');
+  var payload={};
+  inputs.forEach(function(el){
+    var k=el.getAttribute('data-key');
+    var v=el.value;
+    if(k==='primary_categories'||k==='certifications'){
+      payload[k]=v?v.split(',').map(function(x){return x.trim();}).filter(Boolean):[];
+    }else if(k==='years_in_business'||k==='factory_size_sqm'){
+      payload[k]=v?Number(v):null;
+    }else if(k==='discovery_date'){
+      payload[k]=v||null;
+    }else{
+      payload[k]=v||null;
+    }
+  });
+  payload.updated_at=new Date().toISOString();
+
+  var r=await h(SB+'/rest/v1/factory_prospects?id=eq.'+currentId,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  if(!r.ok){alert('Save failed: '+await r.text());return;}
+  await init();
+  selectProspect(currentId);
+}
+
+async function deleteProspect(){
+  if(!currentId)return;
+  var r=await h(SB+'/rest/v1/factory_prospects?id=eq.'+currentId,{method:'DELETE'});
+  if(!r.ok){alert('Delete failed: '+await r.text());return;}
+  currentId=null;
+  await init();
+  g('prospect-detail').innerHTML='<div class="empty"><div style="font-size:40px;">🏭</div><div>Prospect deleted</div></div>';
+}
+
+function openAddModal(){
+  g('add-modal').classList.add('show');
+  ['add-name','add-country','add-city','add-categories','add-source','add-date','add-contact-name','add-contact-title','add-contact-email','add-contact-phone','add-website','add-alibaba','add-notes'].forEach(function(id){
+    var el=g(id);if(el)el.value='';
+  });
+}
+function closeAddModal(){g('add-modal').classList.remove('show');}
+
+async function submitAdd(){
+  var name=g('add-name').value.trim();
+  if(!name){alert('Factory name is required.');return;}
+  var categories=g('add-categories').value.trim();
+  var payload={
+    factory_name:name,
+    country:g('add-country').value.trim()||null,
+    city:g('add-city').value.trim()||null,
+    primary_categories:categories?categories.split(',').map(function(x){return x.trim();}).filter(Boolean):[],
+    discovery_source:g('add-source').value||null,
+    discovery_date:g('add-date').value||null,
+    primary_contact_name:g('add-contact-name').value.trim()||null,
+    primary_contact_title:g('add-contact-title').value.trim()||null,
+    primary_contact_email:g('add-contact-email').value.trim()||null,
+    primary_contact_phone:g('add-contact-phone').value.trim()||null,
+    website_url:g('add-website').value.trim()||null,
+    alibaba_url:g('add-alibaba').value.trim()||null,
+    discovery_notes:g('add-notes').value.trim()||null,
+    status:'new'
+  };
+  g('add-submit').disabled=true;
+  var r=await h(SB+'/rest/v1/factory_prospects',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(payload)
+  });
+  if(!r.ok){
+    alert('Failed: '+await r.text());
+    g('add-submit').disabled=false;
+    return;
+  }
+  var rows=await r.json();
+  closeAddModal();
+  await init();
+  selectProspect(rows[0].id);
+}
+
+function openImportModal(){
+  g('import-modal').classList.add('show');
+  g('csv-input').value='';
+  g('csv-preview-wrap').style.display='none';
+  g('csv-import-btn').disabled=true;
+  parsedRows=[];
+}
+function closeImportModal(){g('import-modal').classList.remove('show');}
+
+function parseCSVLine(line){
+  var result=[],cur='',inQuotes=false;
+  for(var i=0;i<line.length;i++){
+    var ch=line[i];
+    if(ch==='"'){
+      if(inQuotes && line[i+1]==='"'){cur+='"';i++;}
+      else inQuotes=!inQuotes;
+    }else if(ch===',' && !inQuotes){
+      result.push(cur);cur='';
+    }else{
+      cur+=ch;
+    }
+  }
+  result.push(cur);
+  return result;
+}
+
+function parseAndPreview(){
+  var text=g('csv-input').value.trim();
+  if(!text){alert('Paste CSV data first.');return;}
+  var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(lines.length<2){alert('Need a header row plus at least one data row.');return;}
+
+  var headers=parseCSVLine(lines[0]).map(function(h){return h.trim().toLowerCase();});
+  parsedRows=[];
+
+  for(var i=1;i<lines.length;i++){
+    var fields=parseCSVLine(lines[i]);
+    var row={};
+    headers.forEach(function(h,idx){row[h]=(fields[idx]||'').trim();});
+    var name=row.factory_name||row.name||row.company||row['factory name'];
+    if(!name){
+      parsedRows.push({_invalid:'No factory_name',_raw:row});
+      continue;
+    }
+    var cats=row.categories||row.category||'';
+    var rec={
+      factory_name:name,
+      country:row.country||null,
+      city:row.city||null,
+      region:row.region||row.state||null,
+      primary_categories:cats?cats.split(/[,;]/).map(function(x){return x.trim();}).filter(Boolean):[],
+      discovery_source:row.discovery_source||row.source||null,
+      discovery_date:row.discovery_date||row.date||null,
+      primary_contact_name:row.contact_name||row['contact name']||row.contact||null,
+      primary_contact_title:row.contact_title||row.title||null,
+      primary_contact_email:row.contact_email||row.email||null,
+      primary_contact_phone:row.contact_phone||row.phone||null,
+      website_url:row.website_url||row.website||null,
+      discovery_notes:row.notes||row.note||null,
+      status:'new'
+    };
+    parsedRows.push(rec);
+  }
+
+  var validCount=parsedRows.filter(function(r){return !r._invalid;}).length;
+  var invalidCount=parsedRows.length-validCount;
+  g('csv-preview-count').textContent='— '+validCount+' valid'+(invalidCount?', '+invalidCount+' skipped':'');
+
+  var html='<table><thead><tr><th>Name</th><th>Country</th><th>City</th><th>Contact</th><th>Email</th><th>Source</th></tr></thead><tbody>';
+  parsedRows.slice(0,50).forEach(function(r){
+    if(r._invalid){
+      html+='<tr><td colspan="6" class="bad">⚠ Skipped: '+esc(r._invalid)+'</td></tr>';
+    }else{
+      html+='<tr>'+
+        '<td>'+esc(r.factory_name)+'</td>'+
+        '<td>'+esc(r.country||'')+'</td>'+
+        '<td>'+esc(r.city||'')+'</td>'+
+        '<td>'+esc(r.primary_contact_name||'')+'</td>'+
+        '<td>'+esc(r.primary_contact_email||'')+'</td>'+
+        '<td>'+esc(r.discovery_source||'')+'</td>'+
+      '</tr>';
+    }
+  });
+  if(parsedRows.length>50){
+    html+='<tr><td colspan="6" style="text-align:center;color:#888;font-size:11px;">… '+(parsedRows.length-50)+' more rows not shown</td></tr>';
+  }
+  html+='</tbody></table>';
+  g('csv-preview').innerHTML=html;
+  g('csv-preview-wrap').style.display='block';
+  g('csv-import-btn').disabled=validCount===0;
+}
+
+async function submitImport(){
+  var validRows=parsedRows.filter(function(r){return !r._invalid;});
+  if(validRows.length===0){alert('No valid rows to import.');return;}
+  g('csv-import-btn').disabled=true;
+  g('csv-import-btn').textContent='Importing '+validRows.length+'...';
+  var inserted=0,failed=0;
+  for(var i=0;i<validRows.length;i+=50){
+    var batch=validRows.slice(i,i+50);
+    var r=await h(SB+'/rest/v1/factory_prospects',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(batch)
+    });
+    if(r.ok)inserted+=batch.length;
+    else failed+=batch.length;
+    g('csv-import-btn').textContent='Importing '+(i+batch.length)+' of '+validRows.length+'...';
+  }
+  g('csv-import-btn').textContent='Import';
+  closeImportModal();
+  alert(failed>0?'Imported '+inserted+' / '+validRows.length+'. '+failed+' failed.':'Imported '+inserted+' prospects.');
+  await init();
+}
+
+init();
+</script>
+</body>
+</html>
