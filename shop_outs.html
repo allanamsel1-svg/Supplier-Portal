@@ -595,57 +595,112 @@ async function uploadOne(file,seq,attempt){
   return {success:true};
 }
 
-// ─── PROCESS — fire and forget; UI polls for status changes ─────────
+// ─── PROCESS — chunked: front-end orchestrates the loop ─────────────
+var CHUNK_SIZE=20;
+
 async function triggerProcessing(id){
-  console.log('[shop_outs] triggerProcessing clicked:',id);
+  console.log('[shop_outs] triggerProcessing:',id);
 
-  // 1. Immediately mark as grouping so UI switches to processing view
-  try {
-    var pr=await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        processing_status:'grouping',
-        processing_started_at:new Date().toISOString(),
-        processing_error:null
-      })
-    });
-    console.log('[shop_outs] status->grouping:',pr.status);
-  } catch(e) { console.error('[shop_outs] status update failed:',e); }
+  // Fetch all photo IDs for this shop-out
+  var pr=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=id');
+  if(!pr.ok){alert('Failed to load photos: '+await pr.text());return;}
+  var allPhotos=await pr.json();
+  if(allPhotos.length===0){alert('No photos to process.');return;}
 
-  // 2. Re-render so user sees processing state immediately
-  await refreshShop(id);
+  var photoIds=allPhotos.map(function(p){return p.id;});
+  var totalChunks=Math.ceil(photoIds.length/CHUNK_SIZE);
+  console.log('[shop_outs] '+photoIds.length+' photos in '+totalChunks+' chunks');
 
-  // 3. Fire API call — DO NOT await (would block UI for 2-3 min)
-  console.log('[shop_outs] POST /api/process-shop-out-v2');
-  fetch('/api/process-shop-out-v2',{
-    method:'POST',
+  // Mark as grouping
+  await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+    method:'PATCH',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({shop_out_id:id})
-  }).then(async function(r){
-    console.log('[shop_outs] API responded:',r.status);
-    if(!r.ok){
-      var errText=await r.text();
-      console.error('[shop_outs] API error body:',errText);
-      // Mark as failed so user sees it in UI
+    body:JSON.stringify({
+      processing_status:'grouping',
+      processing_started_at:new Date().toISOString(),
+      processing_error:null
+    })
+  });
+
+  // Detect date from EXIF on the first chunk's photos
+  var exifR=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=exif_timestamp');
+  if(exifR.ok){
+    var photos=await exifR.json();
+    var timestamps=photos.map(function(p){return p.exif_timestamp;}).filter(Boolean).map(function(t){return new Date(t).getTime();}).filter(function(t){return !isNaN(t);}).sort(function(a,b){return a-b;});
+    if(timestamps.length>0){
+      var median=timestamps[Math.floor(timestamps.length/2)];
+      var detectedDate=new Date(median).toISOString().substring(0,10);
       await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
         method:'PATCH',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          processing_status:'failed',
-          processing_error:errText.substring(0,500)
-        })
+        body:JSON.stringify({shop_date:detectedDate,date_detected_via:'exif_median'})
       });
-    } else {
-      var data=await r.json();
-      console.log('[shop_outs] API success:',data);
     }
-    await refreshShop(id);
-  }).catch(function(err){
-    console.error('[shop_outs] fetch network error:',err);
+  }
+
+  // Render chunked progress UI
+  renderChunkedProgress(id,0,totalChunks,0);
+
+  // Process chunks sequentially
+  var totalObservations=0;
+  var anyChunkFailed=false;
+  for(var i=0;i<totalChunks;i++){
+    var chunkIds=photoIds.slice(i*CHUNK_SIZE,(i+1)*CHUNK_SIZE);
+    console.log('[shop_outs] processing chunk '+(i+1)+'/'+totalChunks+' ('+chunkIds.length+' photos)');
+    renderChunkedProgress(id,i,totalChunks,totalObservations);
+
+    try {
+      var r=await fetch('/api/process-chunk',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({shop_out_id:id,photo_ids:chunkIds})
+      });
+      if(!r.ok){
+        var errText=await r.text();
+        console.error('[shop_outs] chunk '+(i+1)+' failed:',errText);
+        anyChunkFailed=true;
+        renderChunkedProgress(id,i,totalChunks,totalObservations,'Chunk '+(i+1)+' failed: '+errText.substring(0,200));
+        // Continue with next chunk anyway
+        continue;
+      }
+      var data=await r.json();
+      console.log('[shop_outs] chunk '+(i+1)+' done:',data);
+      totalObservations=data.observations_total||totalObservations+data.observations_added;
+    } catch(err) {
+      console.error('[shop_outs] chunk '+(i+1)+' network error:',err);
+      anyChunkFailed=true;
+    }
+  }
+
+  // Mark complete
+  var photoCount=photoIds.length;
+  var cost=(photoCount*0.04).toFixed(2);
+  await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      processing_status:anyChunkFailed?'complete':'complete',
+      processing_completed_at:new Date().toISOString(),
+      estimated_cost_usd:cost,
+      total_observations:totalObservations
+    })
   });
 
-  console.log('[shop_outs] triggerProcessing returned (API runs in background)');
+  console.log('[shop_outs] all chunks done. Total observations:',totalObservations);
+  await refreshShop(id);
+}
+
+function renderChunkedProgress(id,currentChunk,totalChunks,obsCount,errorMsg){
+  var pct=((currentChunk/totalChunks)*100).toFixed(0);
+  var html='<div class="card">'+
+    '<div class="card-title">AI processing</div>'+
+    '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">Chunk <strong>'+currentChunk+' of '+totalChunks+'</strong> ('+pct+'%)</div>'+
+    '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;transition:width 0.4s;"></div></div>'+
+    '<div style="font-size:11px;color:#888;margin-top:6px;">'+(obsCount||0)+' observations extracted so far. Each chunk takes ~60-90 seconds.</div>'+
+    (errorMsg?'<div style="font-size:11px;color:#a22;margin-top:8px;">'+esc(errorMsg)+'</div>':'')+
+    '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — chunks process here in the browser.</div>'+
+  '</div>';
+  g('shop-detail').innerHTML=html;
 }
 
 // ─── PHOTOS + VIEWER ───────────────────────────────────────────────
