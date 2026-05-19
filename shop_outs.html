@@ -32,7 +32,8 @@
 .dropzone-icon{font-size:48px;margin-bottom:1rem;}
 .dropzone-text{font-size:16px;font-weight:600;color:#1a1a2e;margin-bottom:6px;}
 .dropzone-hint{font-size:12px;color:#888;}
-.upload-status{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
+.upload-status{background:#fff;border:2px solid #2244cc;border-radius:10px;padding:1.25rem;margin-bottom:1rem;}
+.upload-warning{background:#fff8e0;border:1px solid #ffd54a;color:#664400;padding:10px 14px;border-radius:6px;font-size:12px;font-weight:600;margin-bottom:12px;}
 .progress-bar{height:8px;background:#f0f0e8;border-radius:4px;overflow:hidden;margin:8px 0;}
 .progress-fill{height:100%;background:#2244cc;transition:width 0.3s;}
 .failed-list{margin-top:10px;font-size:11px;color:#a22;max-height:140px;overflow-y:auto;}
@@ -49,7 +50,6 @@
 .detect-row:last-child{border-bottom:none;}
 .detect-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.04em;}
 .detect-val{font-size:14px;color:#1a1a2e;}
-.confidence{font-size:10px;color:#888;}
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;}
 .photo-thumb{position:relative;aspect-ratio:1;background:#f0f0e8;border-radius:6px;overflow:hidden;cursor:pointer;}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;}
@@ -83,6 +83,11 @@
 .modal-body label:first-child{margin-top:0;}
 .modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
 .modal-body textarea{resize:vertical;min-height:60px;}
+
+/* Disable tabs during upload */
+body.uploading .ri-tab,
+body.uploading .ri-top a,
+body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
 </style>
 </head>
 <body>
@@ -105,7 +110,7 @@
 </div>
 
 <div class="layout">
-  <div class="list" id="shop-list-pane">
+  <div class="list">
     <div class="filters">
       <input type="text" id="q-search" placeholder="Search retailer, location..." oninput="renderList()" />
       <select id="q-status" onchange="renderList()">
@@ -128,27 +133,18 @@
   </div>
 </div>
 
-<!-- New Shop Out modal -->
 <div class="overlay" id="new-modal">
   <div class="modal">
-    <div class="modal-head">
-      <div>New Shop Out</div>
-      <button class="modal-close" onclick="closeNewModal()">×</button>
-    </div>
+    <div class="modal-head"><div>New Shop Out</div><button class="modal-close" onclick="closeNewModal()">×</button></div>
     <div class="modal-body">
       <label>Retailer *</label>
-      <select id="new-customer">
-        <option value="">— Choose a retailer —</option>
-      </select>
-
+      <select id="new-customer"><option value="">— Choose a retailer —</option></select>
       <label>Date *</label>
       <input type="date" id="new-date" />
-
       <label>Store location (optional)</label>
       <input type="text" id="new-location" placeholder="e.g. East Brunswick, NJ" />
-
       <label>Notes (optional)</label>
-      <textarea id="new-notes" placeholder="Anything worth remembering about this visit..."></textarea>
+      <textarea id="new-notes" placeholder="Anything worth remembering..."></textarea>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewModal()">Cancel</button>
@@ -157,7 +153,6 @@
   </div>
 </div>
 
-<!-- Photo viewer -->
 <div class="viewer" id="viewer">
   <button class="viewer-close" onclick="closeViewer()">×</button>
   <button class="viewer-nav prev" onclick="navViewer(-1)">‹</button>
@@ -169,7 +164,6 @@
   </div>
 </div>
 
-<!-- Confirm modal -->
 <div class="overlay" id="confirm-modal">
   <div class="modal">
     <div class="modal-head"><div id="confirm-title">Confirm</div></div>
@@ -187,7 +181,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var BUCKET='shop-out-photos';
-var UPLOAD_CONCURRENCY=6;
+var UPLOAD_CONCURRENCY=4;
 var MAX_UPLOAD_ATTEMPTS=3;
 var COST_PER_PHOTO_EST=0.04;
 
@@ -201,8 +195,9 @@ function h(url,opts){
 }
 function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
 
-var allShops=[],customerMap={},customerList=[],currentId=null,confirmFn=null;
+var allShops=[],photoCounts={},customerMap={},customerList=[],currentId=null,confirmFn=null;
 var currentPhotos=[],viewerIdx=0;
+var uploadCancelled=false,uploadInProgress=false;
 
 // ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
@@ -215,31 +210,46 @@ async function init(){
       customerList=await cr.json();
       customerMap={};
       customerList.forEach(function(c){customerMap[c.id]=c.name;});
-      // Populate modal dropdown
       var sel=g('new-customer');
       sel.innerHTML='<option value="">— Choose a retailer —</option>'+
         customerList.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
-      console.log('[shop_outs] '+customerList.length+' customers loaded');
     }
-  } catch(e) { console.error('customers fetch:',e); }
+  } catch(e) { console.error('customers:',e); }
 
   // Load shop-outs
   try {
     var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
-    if(r.ok){
-      allShops=await r.json();
-      console.log('[shop_outs] '+allShops.length+' shop-outs loaded');
-    } else {
-      console.error('[shop_outs] fetch failed:',r.status,await r.text());
-      allShops=[];
-    }
-  } catch(e) { console.error('shop_outs fetch:',e); allShops=[]; }
+    if(r.ok)allShops=await r.json();
+    else { console.error('shop_outs fetch:',r.status,await r.text()); allShops=[]; }
+  } catch(e) { console.error('fetch:',e); allShops=[]; }
+
+  // Load actual photo counts (source of truth — not total_photos column)
+  await loadPhotoCounts();
 
   renderList();
 
   var params=new URLSearchParams(window.location.search);
   var pre=params.get('id');
   if(pre)selectShop(pre);
+}
+
+async function loadPhotoCounts(){
+  // Get count of photos per shop_out_id via aggregated query
+  // Use a different approach: fetch all photo records grouped
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_photos?select=shop_out_id&limit=10000');
+    if(r.ok){
+      var photos=await r.json();
+      photoCounts={};
+      photos.forEach(function(p){
+        photoCounts[p.shop_out_id]=(photoCounts[p.shop_out_id]||0)+1;
+      });
+    }
+  } catch(e) { console.warn('photo counts:',e); }
+}
+
+function getPhotoCount(shopId){
+  return photoCounts[shopId]||0;
 }
 
 // ─── LIST ───────────────────────────────────────────────────────────
@@ -265,12 +275,13 @@ function renderList(){
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
     var retailer=customerMap[s.customer_id]||'(unknown retailer)';
+    var photoCount=getPhotoCount(s.id);
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
       '<div class="li-date">'+esc(s.shop_date||'no date')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
       '<div class="li-meta">'+
         '<span class="badge '+statClass+'">'+esc(s.processing_status||'pending')+'</span>'+
-        '<span>📸 '+(s.total_photos||0)+'</span>'+
+        '<span>📸 '+photoCount+'</span>'+
         '<span>🏷 '+(s.total_observations||0)+'</span>'+
         (s.archived_at?'<span class="badge b-archived">archived</span>':'')+
       '</div>'+
@@ -282,7 +293,6 @@ function renderList(){
 
 // ─── NEW SHOP OUT MODAL ─────────────────────────────────────────────
 function openNewModal(){
-  console.log('[shop_outs] opening new modal');
   g('new-customer').value='';
   g('new-date').value=new Date().toISOString().substring(0,10);
   g('new-location').value='';
@@ -308,8 +318,6 @@ async function createShopOut(){
     total_photos:0,
     total_observations:0
   };
-  console.log('[shop_outs] create payload:',payload);
-
   g('new-create').disabled=true;
 
   try {
@@ -318,27 +326,27 @@ async function createShopOut(){
       headers:{'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
-    var bodyText=await r.text();
-    console.log('[shop_outs] create response:',r.status,bodyText);
-
     if(!r.ok){
-      alert('Failed to create shop-out (status '+r.status+'):\n\n'+bodyText);
+      alert('Failed to create shop-out:\n\n'+await r.text());
       g('new-create').disabled=false;
       return;
     }
-    var rows=JSON.parse(bodyText);
+    var rows=await r.json();
     var newId=rows[0].id;
     closeNewModal();
     await init();
     selectShop(newId);
   } catch(err) {
-    console.error('createShopOut error:',err);
-    alert('Error creating shop-out: '+err.message);
+    alert('Error: '+err.message);
     g('new-create').disabled=false;
   }
 }
 
 function selectShop(id){
+  if(uploadInProgress && id!==currentId){
+    if(!confirm('Upload is in progress. Switching shop-outs will stop the current upload. Continue?'))return;
+    uploadCancelled=true;
+  }
   currentId=id;
   renderList();
   window.history.replaceState(null,'','?id='+id);
@@ -351,6 +359,7 @@ async function renderDetail(){
 
   var retailer=customerMap[s.customer_id]||'(unknown retailer)';
   var stat=s.processing_status||'pending';
+  var photoCount=getPhotoCount(s.id);
 
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
@@ -362,17 +371,17 @@ async function renderDetail(){
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
   '</div>';
 
-  if(stat==='pending' && (s.total_photos||0)===0){
+  if(stat==='pending' && photoCount===0){
     html+='<div class="dropzone" id="dropzone" onclick="document.getElementById(\'file-input\').click()">'+
       '<div class="dropzone-icon">📥</div>'+
       '<div class="dropzone-text">Drop photos here, or click to select</div>'+
       '<div class="dropzone-hint">Any number — JPEG, HEIC, PNG. AI will group products and extract data after upload.</div>'+
     '</div>';
-  } else if(stat==='pending' && (s.total_photos||0)>0){
-    var estCost=((s.total_photos||0)*COST_PER_PHOTO_EST).toFixed(2);
+  } else if(stat==='pending' && photoCount>0){
+    var estCost=(photoCount*COST_PER_PHOTO_EST).toFixed(2);
     html+='<div class="card">'+
       '<div class="card-title">Ready to process</div>'+
-      '<div style="font-size:14px;margin-bottom:1rem;">'+(s.total_photos||0)+' photos uploaded. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
+      '<div style="font-size:14px;margin-bottom:1rem;">'+photoCount+' photos uploaded. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
       '<button class="btn btn-primary" onclick="triggerProcessing(\''+s.id+'\')">🧠 Process with AI</button>'+
       '<button class="btn btn-secondary" style="margin-left:8px;" onclick="document.getElementById(\'file-input\').click()">+ Add more photos</button>'+
     '</div>';
@@ -392,26 +401,16 @@ async function renderDetail(){
         '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry</button>'+
       '</div>';
     }
-
     html+='<div class="card">'+
       '<div class="card-title">Summary</div>'+
       '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">Total photos</div><div class="detect-val">'+(s.total_photos||0)+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">Total photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">AI cost</div><div class="detect-val">$'+(s.estimated_cost_usd?Number(s.estimated_cost_usd).toFixed(2):'—')+'</div><div></div></div>'+
     '</div>';
-
-    html+='<div class="card">'+
-      '<div class="card-title">Photos</div>'+
-      '<div id="photos-container">Loading photos...</div>'+
-    '</div>';
-
-    html+='<div class="card">'+
-      '<div class="card-title">Extracted Observations</div>'+
-      '<div id="obs-container">Loading observations...</div>'+
-    '</div>';
+    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading photos...</div></div>';
+    html+='<div class="card"><div class="card-title">Extracted Observations</div><div id="obs-container">Loading observations...</div></div>';
   }
 
   html+='<div class="card">'+
@@ -430,7 +429,7 @@ async function renderDetail(){
   }
   g('file-input').onchange=function(e){handleFiles(e.target.files);};
 
-  if(stat==='complete'||stat==='failed' || (s.total_photos||0)>0){
+  if(stat==='complete'||stat==='failed' || photoCount>0){
     loadPhotos(s.id);
     if(stat==='complete')loadObservations(s.id);
   }
@@ -443,75 +442,100 @@ async function refreshShop(id){
   if(rows.length===0)return;
   var idx=allShops.findIndex(function(x){return x.id===id;});
   if(idx>=0)allShops[idx]=rows[0];
+  await loadPhotoCounts();
   if(currentId===id)renderDetail();
 }
 
-// ─── UPLOAD ─────────────────────────────────────────────────────────
+// ─── UPLOAD — with navigation guards + per-photo counts ─────────────
+function setUploadInProgress(active){
+  uploadInProgress=active;
+  if(active){
+    document.body.classList.add('uploading');
+    window.addEventListener('beforeunload',preventUnload);
+  } else {
+    document.body.classList.remove('uploading');
+    window.removeEventListener('beforeunload',preventUnload);
+  }
+}
+
+function preventUnload(e){
+  e.preventDefault();
+  e.returnValue='Upload still in progress. Photos that completed will be saved; those still uploading will be lost. Leave anyway?';
+  return e.returnValue;
+}
+
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
   if(files.length===0)return;
 
-  // Get current photo count to start sequence numbering from there
-  var startSeq=1;
-  try {
-    var sr=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId+'&select=total_photos');
-    var existing=(await sr.json())[0];
-    startSeq=(existing.total_photos||0)+1;
-  } catch(e) {}
+  // Get current count to start sequence numbering
+  var startSeq=getPhotoCount(currentId)+1;
+
+  uploadCancelled=false;
+  setUploadInProgress(true);
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
+    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs or close this page.</strong> Photos finish saving one-by-one — interrupting will keep what\'s done but lose the rest.</div>'+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="up-fill" style="width:0%;"></div></div>'+
     '<div id="up-counter" style="font-size:12px;color:#666;margin-top:6px;">0 of '+files.length+'</div>'+
+    '<button class="btn btn-secondary" style="margin-top:12px;" onclick="cancelUpload()">Stop Upload</button>'+
     '<div id="up-failed" class="failed-list"></div>'+
   '</div>';
 
   var uploaded=0,failed=[];
 
   for(var i=0;i<files.length;i+=UPLOAD_CONCURRENCY){
+    if(uploadCancelled)break;
     var batch=files.slice(i,i+UPLOAD_CONCURRENCY);
-    var batchStartSeq=startSeq+i;
+    var batchStart=startSeq+i;
     await Promise.all(batch.map(async function(file,bi){
-      var seq=batchStartSeq+bi;
+      if(uploadCancelled)return;
+      var seq=batchStart+bi;
       var result=await uploadOneWithRetry(file,seq);
       if(result.success){
         uploaded++;
+        // Increment photoCounts immediately so the count stays accurate even if interrupted
+        photoCounts[currentId]=(photoCounts[currentId]||0)+1;
       }else{
         failed.push({name:file.name,err:result.error});
       }
       var totalDone=uploaded+failed.length;
-      g('up-fill').style.width=((totalDone/files.length)*100)+'%';
-      g('up-counter').textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
+      var fill=g('up-fill');if(fill)fill.style.width=((totalDone/files.length)*100)+'%';
+      var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
       if(failed.length>0){
-        g('up-failed').innerHTML='<strong>Failed uploads:</strong><ul>'+failed.map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';
+        var fl=g('up-failed');
+        if(fl)fl.innerHTML='<strong>Failed uploads:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';
       }
     }));
   }
 
-  // Update shop_outs.total_photos
-  var rs=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId+'&select=total_photos');
-  var existing=(await rs.json())[0];
-  var newTotal=(existing.total_photos||0)+uploaded;
-  await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({total_photos:newTotal,updated_at:new Date().toISOString()})
-  });
+  // Final total_photos update (best-effort; the photoCounts source-of-truth is the DB)
+  try {
+    await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({total_photos:photoCounts[currentId]||0,updated_at:new Date().toISOString()})
+    });
+  } catch(e) {}
 
+  setUploadInProgress(false);
   await init();
   selectShop(currentId);
 }
 
+function cancelUpload(){
+  if(confirm('Stop upload? Photos already uploaded will be kept.'))uploadCancelled=true;
+}
+
 async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
+    if(uploadCancelled)return {success:false,error:'cancelled'};
     try{
       return await uploadOne(file,seq,attempt);
     }catch(err){
-      console.warn('Upload attempt '+attempt+' failed for '+file.name+':',err.message);
-      if(attempt===MAX_UPLOAD_ATTEMPTS){
-        return {success:false,error:err.message};
-      }
+      if(attempt===MAX_UPLOAD_ATTEMPTS)return {success:false,error:err.message};
       await new Promise(function(r){setTimeout(r,300*attempt);});
     }
   }
@@ -520,19 +544,13 @@ async function uploadOneWithRetry(file,seq){
 async function uploadOne(file,seq,attempt){
   var uploadBlob=file;
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-
-  // HEIC detection by byte signature
   var bytes=await file.slice(0,12).arrayBuffer();
   var arr=new Uint8Array(bytes);
   var isHeic=(arr[4]===0x66 && arr[5]===0x74 && arr[6]===0x79 && arr[7]===0x70)
     && ((arr[8]===0x68 && arr[9]===0x65 && (arr[10]===0x69 || arr[10]===0x76))
         || (arr[8]===0x6d && arr[9]===0x69 && arr[10]===0x66));
-
   if(isHeic && typeof heic2any!=='undefined'){
-    try{
-      uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});
-      ext='jpg';
-    }catch(e){console.warn('HEIC convert failed:',e);}
+    try{uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});ext='jpg';}catch(e){}
   }
 
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
@@ -541,26 +559,19 @@ async function uploadOne(file,seq,attempt){
     headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':uploadBlob.type||'image/jpeg'},
     body:uploadBlob
   });
-  if(!sr.ok)throw new Error('Storage '+sr.status+': '+await sr.text());
+  if(!sr.ok)throw new Error('Storage '+sr.status);
 
   var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
   var dbR=await h(SB+'/rest/v1/shop_out_photos',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
-      shop_out_id:currentId,
-      file_path:path,
-      file_name:file.name,
-      photo_sequence_number:seq,
-      exif_timestamp:ts,
-      upload_status:'uploaded',
-      upload_attempts:attempt
+      shop_out_id:currentId,file_path:path,file_name:file.name,
+      photo_sequence_number:seq,exif_timestamp:ts,
+      upload_status:'uploaded',upload_attempts:attempt
     })
   });
-  if(!dbR.ok){
-    var errBody=await dbR.text();
-    throw new Error('DB '+dbR.status+': '+errBody);
-  }
+  if(!dbR.ok){var errBody=await dbR.text();throw new Error('DB '+dbR.status+': '+errBody);}
   return {success:true};
 }
 
@@ -580,21 +591,15 @@ async function loadPhotos(id){
   var r=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=*');
   if(!r.ok)return;
   currentPhotos=await r.json();
-
   await Promise.all(currentPhotos.map(async function(p){
     var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({expiresIn:3600})
     });
-    if(sr.ok){
-      var sd=await sr.json();
-      p.signed_url=SB+'/storage/v1'+sd.signedURL;
-    }
+    if(sr.ok){var sd=await sr.json();p.signed_url=SB+'/storage/v1'+sd.signedURL;}
   }));
-
-  var container=g('photos-container');
-  if(!container)return;
+  var container=g('photos-container');if(!container)return;
   var html='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
@@ -610,17 +615,13 @@ function openViewer(idx){viewerIdx=idx;showCurrentPhoto();g('viewer').classList.
 function closeViewer(){g('viewer').classList.remove('show');}
 function navViewer(dir){viewerIdx=Math.max(0,Math.min(currentPhotos.length-1,viewerIdx+dir));showCurrentPhoto();}
 function showCurrentPhoto(){
-  var p=currentPhotos[viewerIdx];
-  if(!p)return;
+  var p=currentPhotos[viewerIdx];if(!p)return;
   g('viewer-img').src=p.signed_url||'';
   g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length+
-    '<br><span style="font-size:11px;color:#bbb;">'+esc(p.file_name||'')+
-    (p.group_role?' · '+esc(p.group_role):'')+
-    (p.exif_timestamp?' · '+esc(p.exif_timestamp.substring(0,10)):'')+'</span>';
+    '<br><span style="font-size:11px;color:#bbb;">'+esc(p.file_name||'')+'</span>';
 }
 async function deleteCurrentPhoto(){
-  var p=currentPhotos[viewerIdx];
-  if(!p||!confirm('Delete this photo?'))return;
+  var p=currentPhotos[viewerIdx];if(!p||!confirm('Delete this photo?'))return;
   await h(SB+'/storage/v1/object/'+BUCKET+'/'+p.file_path,{method:'DELETE'});
   await h(SB+'/rest/v1/shop_out_photos?id=eq.'+p.id,{method:'DELETE'});
   closeViewer();
@@ -638,8 +639,7 @@ async function loadObservations(id){
   var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&order=created_at.asc');
   if(!r.ok)return;
   var obs=await r.json();
-  var c=g('obs-container');
-  if(!c)return;
+  var c=g('obs-container');if(!c)return;
   if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations yet.</div>';return;}
   var html='<div class="obs-row head"><div>#</div><div>Brand · Product</div><div style="text-align:center;">Department</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
   obs.forEach(function(o,i){
@@ -665,7 +665,7 @@ async function toggleArchive(id,isArchived){
 }
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations. Consider archiving instead.';
+  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
@@ -689,13 +689,11 @@ async function deleteShopOut(id){
 
 // ─── BIND BUTTON ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
-  console.log('[shop_outs] DOM ready');
   var btn=g('new-btn');
   if(btn)btn.addEventListener('click',openNewModal);
-  else console.error('new-btn missing');
 });
 
-// HEIC support (loaded async)
+// HEIC support
 var s=document.createElement('script');
 s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 document.head.appendChild(s);
