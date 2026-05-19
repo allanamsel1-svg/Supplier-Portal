@@ -595,14 +595,57 @@ async function uploadOne(file,seq,attempt){
   return {success:true};
 }
 
-// ─── PROCESS ────────────────────────────────────────────────────────
+// ─── PROCESS — fire and forget; UI polls for status changes ─────────
 async function triggerProcessing(id){
-  var r=await fetch('/api/process-shop-out-v2',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({shop_out_id:id})
-  });
-  if(!r.ok){alert('Processing failed: '+await r.text());return;}
+  console.log('[shop_outs] triggerProcessing clicked:',id);
+
+  // 1. Immediately mark as grouping so UI switches to processing view
+  try {
+    var pr=await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        processing_status:'grouping',
+        processing_started_at:new Date().toISOString(),
+        processing_error:null
+      })
+    });
+    console.log('[shop_outs] status->grouping:',pr.status);
+  } catch(e) { console.error('[shop_outs] status update failed:',e); }
+
+  // 2. Re-render so user sees processing state immediately
   await refreshShop(id);
+
+  // 3. Fire API call — DO NOT await (would block UI for 2-3 min)
+  console.log('[shop_outs] POST /api/process-shop-out-v2');
+  fetch('/api/process-shop-out-v2',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({shop_out_id:id})
+  }).then(async function(r){
+    console.log('[shop_outs] API responded:',r.status);
+    if(!r.ok){
+      var errText=await r.text();
+      console.error('[shop_outs] API error body:',errText);
+      // Mark as failed so user sees it in UI
+      await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+        method:'PATCH',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          processing_status:'failed',
+          processing_error:errText.substring(0,500)
+        })
+      });
+    } else {
+      var data=await r.json();
+      console.log('[shop_outs] API success:',data);
+    }
+    await refreshShop(id);
+  }).catch(function(err){
+    console.error('[shop_outs] fetch network error:',err);
+  });
+
+  console.log('[shop_outs] triggerProcessing returned (API runs in background)');
 }
 
 // ─── PHOTOS + VIEWER ───────────────────────────────────────────────
