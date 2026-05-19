@@ -54,37 +54,31 @@
 .photo-thumb{position:relative;aspect-ratio:1;background:#f0f0e8;border-radius:6px;overflow:hidden;cursor:pointer;}
 .photo-thumb img{width:100%;height:100%;object-fit:cover;}
 .photo-num{position:absolute;top:4px;left:4px;background:rgba(26,26,46,0.85);color:#fff;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:600;}
-.photo-role{position:absolute;bottom:4px;left:4px;background:rgba(255,255,255,0.92);color:#333;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;}
-.photo-role.hero{background:#fff8e0;color:#664400;}
-.photo-role.storefront{background:#eef2ff;color:#003366;}
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;z-index:200;}
 .viewer.show{display:flex;}
 .viewer img{max-width:90vw;max-height:85vh;object-fit:contain;}
-.viewer-meta{position:absolute;top:20px;left:20px;color:#fff;font-size:13px;background:rgba(0,0,0,0.6);padding:10px 14px;border-radius:8px;max-width:340px;}
+.viewer-meta{position:absolute;top:20px;left:20px;color:#fff;font-size:13px;background:rgba(0,0,0,0.6);padding:10px 14px;border-radius:8px;}
 .viewer-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:24px;width:40px;height:40px;border-radius:20px;cursor:pointer;}
 .viewer-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:24px;width:50px;height:50px;border-radius:25px;cursor:pointer;}
 .viewer-nav.prev{left:20px;}
 .viewer-nav.next{right:20px;}
-.viewer-actions{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:10px;}
 .obs-row{display:grid;grid-template-columns:60px 2fr 1fr 80px 80px;gap:10px;padding:8px 0;border-bottom:0.5px solid #f8f8f4;font-size:13px;align-items:center;}
 .obs-row.head{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:6px 0;border-bottom:1px solid #e0e0d8;}
 .obs-brand{font-weight:600;}
 .obs-product{color:#666;font-size:11px;margin-top:2px;}
-.obs-price{text-align:right;font-weight:600;}
 .obs-dept{text-align:center;font-size:10px;background:#eef2ff;color:#003366;padding:2px 6px;border-radius:8px;display:inline-block;}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:100;}
 .overlay.show{display:flex;}
-.modal{background:#fff;border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal{background:#fff;border-radius:12px;width:480px;max-width:95vw;}
 .modal-head{padding:1rem 1.25rem;border-bottom:1px solid #e0e0d8;font-weight:700;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
 .modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer;line-height:1;}
-.modal-body{padding:1.25rem;}
+.modal-body{padding:1.5rem;}
 .modal-foot{padding:0.75rem 1.25rem;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:8px;}
-.modal-body label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 6px;}
-.modal-body label:first-child{margin-top:0;}
-.modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
-.modal-body textarea{resize:vertical;min-height:60px;}
+.modal-body label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+.modal-body select{width:100%;padding:10px 12px;font-size:14px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
+.modal-hint{font-size:12px;color:#888;line-height:1.5;margin-top:14px;padding:10px 12px;background:#fafaf8;border-radius:6px;}
+.modal-error{font-size:12px;color:#a22;margin-top:8px;}
 
-/* Disable tabs during upload */
 body.uploading .ri-tab,
 body.uploading .ri-top a,
 body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
@@ -112,7 +106,7 @@ body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
 <div class="layout">
   <div class="list">
     <div class="filters">
-      <input type="text" id="q-search" placeholder="Search retailer, location..." oninput="renderList()" />
+      <input type="text" id="q-search" placeholder="Search retailer..." oninput="renderList()" />
       <select id="q-status" onchange="renderList()">
         <option value="">All Statuses</option>
         <option value="pending">Pending</option>
@@ -137,18 +131,18 @@ body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
   <div class="modal">
     <div class="modal-head"><div>New Shop Out</div><button class="modal-close" onclick="closeNewModal()">×</button></div>
     <div class="modal-body">
-      <label>Retailer *</label>
-      <select id="new-customer"><option value="">— Choose a retailer —</option></select>
-      <label>Date *</label>
-      <input type="date" id="new-date" />
-      <label>Store location (optional)</label>
-      <input type="text" id="new-location" placeholder="e.g. East Brunswick, NJ" />
-      <label>Notes (optional)</label>
-      <textarea id="new-notes" placeholder="Anything worth remembering..."></textarea>
+      <label>Which retailer?</label>
+      <select id="new-customer">
+        <option value="">Loading retailers...</option>
+      </select>
+      <div class="modal-error" id="new-error" style="display:none;"></div>
+      <div class="modal-hint">
+        That's it. AI will detect the date (from photo EXIF), GPS location, and group products automatically after you upload.
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewModal()">Cancel</button>
-      <button class="btn btn-primary" id="new-create" onclick="createShopOut()">Create</button>
+      <button class="btn btn-primary" id="new-create" onclick="createShopOut()">Create &amp; Upload Photos</button>
     </div>
   </div>
 </div>
@@ -159,9 +153,6 @@ body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
   <button class="viewer-nav next" onclick="navViewer(1)">›</button>
   <div class="viewer-meta" id="viewer-meta"></div>
   <img id="viewer-img" />
-  <div class="viewer-actions">
-    <button class="btn btn-danger" onclick="deleteCurrentPhoto()">Delete this photo</button>
-  </div>
 </div>
 
 <div class="overlay" id="confirm-modal">
@@ -183,7 +174,6 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var BUCKET='shop-out-photos';
 var UPLOAD_CONCURRENCY=4;
 var MAX_UPLOAD_ATTEMPTS=3;
-var COST_PER_PHOTO_EST=0.04;
 
 function g(id){return document.getElementById(id);}
 function h(url,opts){
@@ -202,55 +192,46 @@ var uploadCancelled=false,uploadInProgress=false;
 // ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
   console.log('[shop_outs] init');
-
-  // Load customers
-  try {
-    var cr=await h(SB+'/rest/v1/customers?select=id,name&order=name&limit=2000');
-    if(cr.ok){
-      customerList=await cr.json();
-      customerMap={};
-      customerList.forEach(function(c){customerMap[c.id]=c.name;});
-      var sel=g('new-customer');
-      sel.innerHTML='<option value="">— Choose a retailer —</option>'+
-        customerList.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
-    }
-  } catch(e) { console.error('customers:',e); }
-
-  // Load shop-outs
-  try {
-    var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
-    if(r.ok)allShops=await r.json();
-    else { console.error('shop_outs fetch:',r.status,await r.text()); allShops=[]; }
-  } catch(e) { console.error('fetch:',e); allShops=[]; }
-
-  // Load actual photo counts (source of truth — not total_photos column)
-  await loadPhotoCounts();
-
+  await Promise.all([loadCustomers(),loadShops(),loadPhotoCounts()]);
   renderList();
-
-  var params=new URLSearchParams(window.location.search);
-  var pre=params.get('id');
+  var pre=new URLSearchParams(window.location.search).get('id');
   if(pre)selectShop(pre);
 }
 
+async function loadCustomers(){
+  try {
+    var r=await h(SB+'/rest/v1/customers?select=id,name&order=name&limit=2000');
+    if(r.ok){
+      customerList=await r.json();
+      customerMap={};
+      customerList.forEach(function(c){customerMap[c.id]=c.name;});
+      console.log('[shop_outs] loaded '+customerList.length+' customers');
+    } else {
+      console.error('[shop_outs] customers fetch:',r.status,await r.text());
+    }
+  } catch(e) { console.error('[shop_outs] customers err:',e); }
+}
+
+async function loadShops(){
+  try {
+    var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
+    if(r.ok){allShops=await r.json();console.log('[shop_outs] loaded '+allShops.length+' shops');}
+    else {console.error('[shop_outs] shops fetch:',r.status,await r.text());allShops=[];}
+  } catch(e) { console.error('[shop_outs] shops err:',e); allShops=[]; }
+}
+
 async function loadPhotoCounts(){
-  // Get count of photos per shop_out_id via aggregated query
-  // Use a different approach: fetch all photo records grouped
   try {
     var r=await h(SB+'/rest/v1/shop_out_photos?select=shop_out_id&limit=10000');
     if(r.ok){
       var photos=await r.json();
       photoCounts={};
-      photos.forEach(function(p){
-        photoCounts[p.shop_out_id]=(photoCounts[p.shop_out_id]||0)+1;
-      });
+      photos.forEach(function(p){photoCounts[p.shop_out_id]=(photoCounts[p.shop_out_id]||0)+1;});
     }
   } catch(e) { console.warn('photo counts:',e); }
 }
 
-function getPhotoCount(shopId){
-  return photoCounts[shopId]||0;
-}
+function getPhotoCount(shopId){return photoCounts[shopId]||0;}
 
 // ─── LIST ───────────────────────────────────────────────────────────
 function renderList(){
@@ -278,7 +259,7 @@ function renderList(){
     var photoCount=getPhotoCount(s.id);
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
-      '<div class="li-date">'+esc(s.shop_date||'no date')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
+      '<div class="li-date">'+esc(s.shop_date||'date will be detected')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
       '<div class="li-meta">'+
         '<span class="badge '+statClass+'">'+esc(s.processing_status||'pending')+'</span>'+
         '<span>📸 '+photoCount+'</span>'+
@@ -292,59 +273,92 @@ function renderList(){
 }
 
 // ─── NEW SHOP OUT MODAL ─────────────────────────────────────────────
-function openNewModal(){
-  g('new-customer').value='';
-  g('new-date').value=new Date().toISOString().substring(0,10);
-  g('new-location').value='';
-  g('new-notes').value='';
-  g('new-create').disabled=false;
+// Populates dropdown fresh every time modal opens — defensive
+async function openNewModal(){
+  console.log('[shop_outs] opening modal');
   g('new-modal').classList.add('show');
+  g('new-error').style.display='none';
+  g('new-create').disabled=true;
+
+  var sel=g('new-customer');
+  sel.innerHTML='<option value="">Loading retailers...</option>';
+  sel.disabled=true;
+
+  // Reload customers if list is empty (defensive)
+  if(customerList.length===0){
+    console.log('[shop_outs] customer list empty, reloading');
+    await loadCustomers();
+  }
+
+  if(customerList.length===0){
+    sel.innerHTML='<option value="">No retailers found in database</option>';
+    g('new-error').textContent='No retailers in the customers table. Check Supabase connection.';
+    g('new-error').style.display='block';
+    return;
+  }
+
+  // Populate
+  var opts='<option value="">— Choose a retailer —</option>';
+  customerList.forEach(function(c){
+    opts+='<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>';
+  });
+  sel.innerHTML=opts;
+  sel.disabled=false;
+  g('new-create').disabled=false;
+  console.log('[shop_outs] dropdown populated with '+customerList.length+' retailers');
 }
+
 function closeNewModal(){g('new-modal').classList.remove('show');}
 
 async function createShopOut(){
   var customerId=g('new-customer').value;
-  var date=g('new-date').value;
-  if(!customerId){alert('Please choose a retailer.');return;}
-  if(!date){alert('Please pick a date.');return;}
+  if(!customerId){
+    g('new-error').textContent='Please choose a retailer.';
+    g('new-error').style.display='block';
+    return;
+  }
 
+  // Only required field — customer_id. Everything else auto-detected.
   var payload={
     customer_id:customerId,
-    shop_date:date,
-    store_location_text:g('new-location').value.trim()||null,
-    notes:g('new-notes').value.trim()||null,
     processing_status:'pending',
     captured_by:'admin',
     total_photos:0,
     total_observations:0
   };
-  g('new-create').disabled=true;
+  console.log('[shop_outs] create payload:',payload);
 
+  g('new-create').disabled=true;
   try {
     var r=await h(SB+'/rest/v1/shop_outs',{
       method:'POST',
       headers:{'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
+    var body=await r.text();
+    console.log('[shop_outs] create response:',r.status,body);
     if(!r.ok){
-      alert('Failed to create shop-out:\n\n'+await r.text());
+      g('new-error').textContent='Failed: '+body;
+      g('new-error').style.display='block';
       g('new-create').disabled=false;
       return;
     }
-    var rows=await r.json();
-    var newId=rows[0].id;
+    var rows=JSON.parse(body);
     closeNewModal();
     await init();
-    selectShop(newId);
+    selectShop(rows[0].id);
+    // Auto-open file picker right after
+    setTimeout(function(){g('file-input').click();},200);
   } catch(err) {
-    alert('Error: '+err.message);
+    g('new-error').textContent='Error: '+err.message;
+    g('new-error').style.display='block';
     g('new-create').disabled=false;
   }
 }
 
 function selectShop(id){
   if(uploadInProgress && id!==currentId){
-    if(!confirm('Upload is in progress. Switching shop-outs will stop the current upload. Continue?'))return;
+    if(!confirm('Upload in progress. Switching will stop it. Continue?'))return;
     uploadCancelled=true;
   }
   currentId=id;
@@ -364,9 +378,7 @@ async function renderDetail(){
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
       '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
-      '<div style="font-size:12px;color:#888;margin-top:4px;">'+
-        esc(s.shop_date||'no date')+(s.store_location_text?' · '+esc(s.store_location_text):'')+
-      '</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:4px;">'+esc(s.shop_date||'date pending AI detection')+'</div>'+
     '</div>'+
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
   '</div>';
@@ -375,10 +387,10 @@ async function renderDetail(){
     html+='<div class="dropzone" id="dropzone" onclick="document.getElementById(\'file-input\').click()">'+
       '<div class="dropzone-icon">📥</div>'+
       '<div class="dropzone-text">Drop photos here, or click to select</div>'+
-      '<div class="dropzone-hint">Any number — JPEG, HEIC, PNG. AI will group products and extract data after upload.</div>'+
+      '<div class="dropzone-hint">Any number. AI will detect date, GPS, and group products after upload.</div>'+
     '</div>';
   } else if(stat==='pending' && photoCount>0){
-    var estCost=(photoCount*COST_PER_PHOTO_EST).toFixed(2);
+    var estCost=(photoCount*0.04).toFixed(2);
     html+='<div class="card">'+
       '<div class="card-title">Ready to process</div>'+
       '<div style="font-size:14px;margin-bottom:1rem;">'+photoCount+' photos uploaded. Est. AI cost: <strong>~$'+estCost+'</strong></div>'+
@@ -406,16 +418,16 @@ async function renderDetail(){
       '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">Total photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">Photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
     '</div>';
-    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading photos...</div></div>';
-    html+='<div class="card"><div class="card-title">Extracted Observations</div><div id="obs-container">Loading observations...</div></div>';
+    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
+    html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
   }
 
   html+='<div class="card">'+
     '<div class="card-title">Actions</div>'+
-    '<button class="btn btn-secondary" onclick="toggleArchive(\''+s.id+'\','+(s.archived_at?'true':'false')+')">'+(s.archived_at?'Restore from archive':'Archive shop-out')+'</button> '+
+    '<button class="btn btn-secondary" onclick="toggleArchive(\''+s.id+'\','+(s.archived_at?'true':'false')+')">'+(s.archived_at?'Restore':'Archive')+'</button> '+
     '<button class="btn btn-danger" onclick="confirmDeleteShopOut(\''+s.id+'\')">Delete shop-out</button>'+
   '</div>';
 
@@ -446,7 +458,7 @@ async function refreshShop(id){
   if(currentId===id)renderDetail();
 }
 
-// ─── UPLOAD — with navigation guards + per-photo counts ─────────────
+// ─── UPLOAD ─────────────────────────────────────────────────────────
 function setUploadInProgress(active){
   uploadInProgress=active;
   if(active){
@@ -457,26 +469,19 @@ function setUploadInProgress(active){
     window.removeEventListener('beforeunload',preventUnload);
   }
 }
-
-function preventUnload(e){
-  e.preventDefault();
-  e.returnValue='Upload still in progress. Photos that completed will be saved; those still uploading will be lost. Leave anyway?';
-  return e.returnValue;
-}
+function preventUnload(e){e.preventDefault();e.returnValue='Upload in progress. Leave anyway?';return e.returnValue;}
 
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
   if(files.length===0)return;
-
-  // Get current count to start sequence numbering
   var startSeq=getPhotoCount(currentId)+1;
 
   uploadCancelled=false;
   setUploadInProgress(true);
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
-    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs or close this page.</strong> Photos finish saving one-by-one — interrupting will keep what\'s done but lose the rest.</div>'+
+    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong> Photos finish saving one-by-one — interrupting keeps what\'s done but loses the rest.</div>'+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="up-fill" style="width:0%;"></div></div>'+
     '<div id="up-counter" style="font-size:12px;color:#666;margin-top:6px;">0 of '+files.length+'</div>'+
@@ -496,7 +501,6 @@ async function handleFiles(fileList){
       var result=await uploadOneWithRetry(file,seq);
       if(result.success){
         uploaded++;
-        // Increment photoCounts immediately so the count stays accurate even if interrupted
         photoCounts[currentId]=(photoCounts[currentId]||0)+1;
       }else{
         failed.push({name:file.name,err:result.error});
@@ -506,12 +510,11 @@ async function handleFiles(fileList){
       var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
       if(failed.length>0){
         var fl=g('up-failed');
-        if(fl)fl.innerHTML='<strong>Failed uploads:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';
+        if(fl)fl.innerHTML='<strong>Failed:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';
       }
     }));
   }
 
-  // Final total_photos update (best-effort; the photoCounts source-of-truth is the DB)
   try {
     await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
       method:'PATCH',
@@ -525,16 +528,13 @@ async function handleFiles(fileList){
   selectShop(currentId);
 }
 
-function cancelUpload(){
-  if(confirm('Stop upload? Photos already uploaded will be kept.'))uploadCancelled=true;
-}
+function cancelUpload(){if(confirm('Stop upload? Photos already saved will be kept.'))uploadCancelled=true;}
 
 async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
     if(uploadCancelled)return {success:false,error:'cancelled'};
-    try{
-      return await uploadOne(file,seq,attempt);
-    }catch(err){
+    try{return await uploadOne(file,seq,attempt);}
+    catch(err){
       if(attempt===MAX_UPLOAD_ATTEMPTS)return {success:false,error:err.message};
       await new Promise(function(r){setTimeout(r,300*attempt);});
     }
@@ -571,15 +571,14 @@ async function uploadOne(file,seq,attempt){
       upload_status:'uploaded',upload_attempts:attempt
     })
   });
-  if(!dbR.ok){var errBody=await dbR.text();throw new Error('DB '+dbR.status+': '+errBody);}
+  if(!dbR.ok){throw new Error('DB '+dbR.status+': '+await dbR.text());}
   return {success:true};
 }
 
 // ─── PROCESS ────────────────────────────────────────────────────────
 async function triggerProcessing(id){
   var r=await fetch('/api/process-shop-out-v2',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({shop_out_id:id})
   });
   if(!r.ok){alert('Processing failed: '+await r.text());return;}
@@ -593,22 +592,19 @@ async function loadPhotos(id){
   currentPhotos=await r.json();
   await Promise.all(currentPhotos.map(async function(p){
     var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
+      method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({expiresIn:3600})
     });
     if(sr.ok){var sd=await sr.json();p.signed_url=SB+'/storage/v1'+sd.signedURL;}
   }));
   var container=g('photos-container');if(!container)return;
-  var html='<div class="photo-grid">'+
+  container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
         '<img src="'+(p.signed_url||'')+'" loading="lazy" />'+
         '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
-        (p.group_role?'<span class="photo-role '+esc(p.group_role)+'">'+esc(p.group_role)+'</span>':'')+
       '</div>';
     }).join('')+'</div>';
-  container.innerHTML=html;
 }
 
 function openViewer(idx){viewerIdx=idx;showCurrentPhoto();g('viewer').classList.add('show');}
@@ -617,15 +613,7 @@ function navViewer(dir){viewerIdx=Math.max(0,Math.min(currentPhotos.length-1,vie
 function showCurrentPhoto(){
   var p=currentPhotos[viewerIdx];if(!p)return;
   g('viewer-img').src=p.signed_url||'';
-  g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length+
-    '<br><span style="font-size:11px;color:#bbb;">'+esc(p.file_name||'')+'</span>';
-}
-async function deleteCurrentPhoto(){
-  var p=currentPhotos[viewerIdx];if(!p||!confirm('Delete this photo?'))return;
-  await h(SB+'/storage/v1/object/'+BUCKET+'/'+p.file_path,{method:'DELETE'});
-  await h(SB+'/rest/v1/shop_out_photos?id=eq.'+p.id,{method:'DELETE'});
-  closeViewer();
-  await refreshShop(currentId);selectShop(currentId);
+  g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length;
 }
 document.addEventListener('keydown',function(e){
   if(!g('viewer').classList.contains('show'))return;
@@ -641,13 +629,13 @@ async function loadObservations(id){
   var obs=await r.json();
   var c=g('obs-container');if(!c)return;
   if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations yet.</div>';return;}
-  var html='<div class="obs-row head"><div>#</div><div>Brand · Product</div><div style="text-align:center;">Department</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
+  var html='<div class="obs-row head"><div>#</div><div>Brand · Product</div><div style="text-align:center;">Dept</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
   obs.forEach(function(o,i){
     html+='<div class="obs-row">'+
       '<div style="color:#888;">'+(i+1)+'</div>'+
-      '<div><div class="obs-brand">'+esc(o.brand||'—')+'</div><div class="obs-product">'+esc(o.product_name||'')+(o.pack_size?' · '+esc(o.pack_size):'')+'</div></div>'+
+      '<div><div class="obs-brand">'+esc(o.brand||'—')+'</div><div class="obs-product">'+esc(o.product_name||'')+'</div></div>'+
       '<div style="text-align:center;"><span class="obs-dept">'+esc(o.department||'—')+'</span></div>'+
-      '<div class="obs-price">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
+      '<div style="text-align:right;font-weight:600;">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
       '<div style="text-align:right;font-size:11px;color:#888;">'+(o.ai_confidence?Number(o.ai_confidence).toFixed(2):'—')+'</div>'+
     '</div>';
   });
@@ -657,15 +645,14 @@ async function loadObservations(id){
 // ─── ARCHIVE + DELETE ──────────────────────────────────────────────
 async function toggleArchive(id,isArchived){
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-    method:'PATCH',
-    headers:{'Content-Type':'application/json'},
+    method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify(isArchived?{archived_at:null}:{archived_at:new Date().toISOString()})
   });
   await init();selectShop(id);
 }
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations.';
+  g('confirm-body').textContent='This permanently deletes everything.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
@@ -676,8 +663,7 @@ async function deleteShopOut(id){
   var paths=rp.ok?(await rp.json()).map(function(p){return p.file_path;}):[];
   if(paths.length>0){
     await h(SB+'/storage/v1/object/'+BUCKET,{
-      method:'DELETE',
-      headers:{'Content-Type':'application/json'},
+      method:'DELETE',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({prefixes:paths})
     });
   }
@@ -687,13 +673,11 @@ async function deleteShopOut(id){
   g('shop-detail').innerHTML='<div class="empty"><div style="font-size:48px;">🛒</div><div>Shop-out deleted</div></div>';
 }
 
-// ─── BIND BUTTON ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
   var btn=g('new-btn');
   if(btn)btn.addEventListener('click',openNewModal);
 });
 
-// HEIC support
 var s=document.createElement('script');
 s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 document.head.appendChild(s);
