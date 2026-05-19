@@ -62,7 +62,7 @@
 .viewer-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:24px;width:50px;height:50px;border-radius:25px;cursor:pointer;}
 .viewer-nav.prev{left:20px;}
 .viewer-nav.next{right:20px;}
-.obs-row{display:grid;grid-template-columns:60px 2fr 1fr 80px 80px;gap:10px;padding:8px 0;border-bottom:0.5px solid #f8f8f4;font-size:13px;align-items:center;}
+.obs-row{display:grid;grid-template-columns:50px 2fr 1fr 80px 60px;gap:10px;padding:8px 0;border-bottom:0.5px solid #f8f8f4;font-size:13px;align-items:center;}
 .obs-row.head{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;font-weight:600;padding:6px 0;border-bottom:1px solid #e0e0d8;}
 .obs-brand{font-weight:600;}
 .obs-product{color:#666;font-size:11px;margin-top:2px;}
@@ -81,7 +81,23 @@
 
 body.uploading .ri-tab,
 body.uploading .ri-top a,
-body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
+body.uploading #new-btn,
+body.processing .ri-tab,
+body.processing .ri-top a,
+body.processing #new-btn { pointer-events: none; opacity: 0.4; }
+
+.insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;}
+.insights-block-title{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;font-weight:600;}
+.dept-row{margin-bottom:8px;}
+.dept-row-head{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+.dept-bar{height:6px;background:#f0f0e8;border-radius:3px;overflow:hidden;}
+.dept-bar-fill{height:100%;background:#2244cc;}
+.brand-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:0.5px solid #f8f8f4;}
+.brand-row:last-child{border-bottom:none;}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.5rem;padding-top:1rem;border-top:1px solid #f0f0e8;}
+.stat-block{text-align:left;}
+.stat-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;}
+.stat-val{font-size:20px;font-weight:700;margin-top:4px;}
 </style>
 </head>
 <body>
@@ -132,13 +148,9 @@ body.uploading #new-btn { pointer-events: none; opacity: 0.4; }
     <div class="modal-head"><div>New Shop Out</div><button class="modal-close" onclick="closeNewModal()">×</button></div>
     <div class="modal-body">
       <label>Which retailer?</label>
-      <select id="new-customer">
-        <option value="">Loading retailers...</option>
-      </select>
+      <select id="new-customer"><option value="">Loading retailers...</option></select>
       <div class="modal-error" id="new-error" style="display:none;"></div>
-      <div class="modal-hint">
-        That's it. AI will detect the date (from photo EXIF), GPS location, and group products automatically after you upload.
-      </div>
+      <div class="modal-hint">AI will detect the date (from photo EXIF), GPS location, and group products automatically after upload.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeNewModal()">Cancel</button>
@@ -174,6 +186,7 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var BUCKET='shop-out-photos';
 var UPLOAD_CONCURRENCY=4;
 var MAX_UPLOAD_ATTEMPTS=3;
+var CHUNK_SIZE=20;
 
 function g(id){return document.getElementById(id);}
 function h(url,opts){
@@ -188,10 +201,10 @@ function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(
 var allShops=[],photoCounts={},customerMap={},customerList=[],currentId=null,confirmFn=null;
 var currentPhotos=[],viewerIdx=0;
 var uploadCancelled=false,uploadInProgress=false;
+var processingInProgress=false;
 
 // ─── INIT ───────────────────────────────────────────────────────────
 async function init(){
-  console.log('[shop_outs] init');
   await Promise.all([loadCustomers(),loadShops(),loadPhotoCounts()]);
   renderList();
   var pre=new URLSearchParams(window.location.search).get('id');
@@ -205,19 +218,16 @@ async function loadCustomers(){
       customerList=await r.json();
       customerMap={};
       customerList.forEach(function(c){customerMap[c.id]=c.customer_name;});
-      console.log('[shop_outs] loaded '+customerList.length+' customers');
-    } else {
-      console.error('[shop_outs] customers fetch:',r.status,await r.text());
-    }
-  } catch(e) { console.error('[shop_outs] customers err:',e); }
+    } else { console.error('customers:',r.status,await r.text()); }
+  } catch(e) { console.error(e); }
 }
 
 async function loadShops(){
   try {
     var r=await h(SB+'/rest/v1/shop_outs?select=*&order=created_at.desc&limit=500');
-    if(r.ok){allShops=await r.json();console.log('[shop_outs] loaded '+allShops.length+' shops');}
-    else {console.error('[shop_outs] shops fetch:',r.status,await r.text());allShops=[];}
-  } catch(e) { console.error('[shop_outs] shops err:',e); allShops=[]; }
+    if(r.ok)allShops=await r.json();
+    else { console.error('shops:',r.status); allShops=[]; }
+  } catch(e) { allShops=[]; }
 }
 
 async function loadPhotoCounts(){
@@ -228,7 +238,7 @@ async function loadPhotoCounts(){
       photoCounts={};
       photos.forEach(function(p){photoCounts[p.shop_out_id]=(photoCounts[p.shop_out_id]||0)+1;});
     }
-  } catch(e) { console.warn('photo counts:',e); }
+  } catch(e) {}
 }
 
 function getPhotoCount(shopId){return photoCounts[shopId]||0;}
@@ -256,13 +266,12 @@ function renderList(){
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
     var retailer=customerMap[s.customer_id]||'(unknown retailer)';
-    var photoCount=getPhotoCount(s.id);
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
       '<div class="li-retailer">'+esc(retailer)+'</div>'+
-      '<div class="li-date">'+esc(s.shop_date||'date will be detected')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
+      '<div class="li-date">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
       '<div class="li-meta">'+
         '<span class="badge '+statClass+'">'+esc(s.processing_status||'pending')+'</span>'+
-        '<span>📸 '+photoCount+'</span>'+
+        '<span>📸 '+getPhotoCount(s.id)+'</span>'+
         '<span>🏷 '+(s.total_observations||0)+'</span>'+
         (s.archived_at?'<span class="badge b-archived">archived</span>':'')+
       '</div>'+
@@ -272,82 +281,52 @@ function renderList(){
   g('shop-list').innerHTML=html||'<div style="padding:2rem;text-align:center;color:#bbb;font-size:12px;">No shop-outs yet.<br><br>Click "+ New Shop Out" above to start.</div>';
 }
 
-// ─── NEW SHOP OUT MODAL ─────────────────────────────────────────────
-// Populates dropdown fresh every time modal opens — defensive
+// ─── NEW SHOP OUT ──────────────────────────────────────────────────
 async function openNewModal(){
-  console.log('[shop_outs] opening modal');
   g('new-modal').classList.add('show');
   g('new-error').style.display='none';
   g('new-create').disabled=true;
-
   var sel=g('new-customer');
   sel.innerHTML='<option value="">Loading retailers...</option>';
-  sel.disabled=true;
-
-  // Reload customers if list is empty (defensive)
+  if(customerList.length===0)await loadCustomers();
   if(customerList.length===0){
-    console.log('[shop_outs] customer list empty, reloading');
-    await loadCustomers();
-  }
-
-  if(customerList.length===0){
-    sel.innerHTML='<option value="">No retailers found in database</option>';
-    g('new-error').textContent='No retailers in the customers table. Check Supabase connection.';
+    sel.innerHTML='<option value="">No retailers found</option>';
+    g('new-error').textContent='No retailers in database. Check Supabase.';
     g('new-error').style.display='block';
     return;
   }
-
-  // Populate
-  var opts='<option value="">— Choose a retailer —</option>';
-  customerList.forEach(function(c){
-    opts+='<option value="'+esc(c.id)+'">'+esc(c.customer_name)+'</option>';
-  });
-  sel.innerHTML=opts;
-  sel.disabled=false;
+  sel.innerHTML='<option value="">— Choose a retailer —</option>'+
+    customerList.map(function(c){return '<option value="'+esc(c.id)+'">'+esc(c.customer_name)+'</option>';}).join('');
   g('new-create').disabled=false;
-  console.log('[shop_outs] dropdown populated with '+customerList.length+' retailers');
 }
-
 function closeNewModal(){g('new-modal').classList.remove('show');}
 
 async function createShopOut(){
   var customerId=g('new-customer').value;
-  if(!customerId){
-    g('new-error').textContent='Please choose a retailer.';
-    g('new-error').style.display='block';
-    return;
-  }
-
-  // Only required field — customer_id. Everything else auto-detected.
-  var payload={
-    customer_id:customerId,
-    processing_status:'pending',
-    captured_by:'admin',
-    total_photos:0,
-    total_observations:0
-  };
-  console.log('[shop_outs] create payload:',payload);
-
+  if(!customerId){g('new-error').textContent='Please choose a retailer.';g('new-error').style.display='block';return;}
   g('new-create').disabled=true;
   try {
     var r=await h(SB+'/rest/v1/shop_outs',{
       method:'POST',
       headers:{'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify(payload)
+      body:JSON.stringify({
+        customer_id:customerId,
+        processing_status:'pending',
+        captured_by:'admin',
+        total_photos:0,
+        total_observations:0
+      })
     });
-    var body=await r.text();
-    console.log('[shop_outs] create response:',r.status,body);
     if(!r.ok){
-      g('new-error').textContent='Failed: '+body;
+      g('new-error').textContent='Failed: '+await r.text();
       g('new-error').style.display='block';
       g('new-create').disabled=false;
       return;
     }
-    var rows=JSON.parse(body);
+    var rows=await r.json();
     closeNewModal();
     await init();
     selectShop(rows[0].id);
-    // Auto-open file picker right after
     setTimeout(function(){g('file-input').click();},200);
   } catch(err) {
     g('new-error').textContent='Error: '+err.message;
@@ -357,8 +336,8 @@ async function createShopOut(){
 }
 
 function selectShop(id){
-  if(uploadInProgress && id!==currentId){
-    if(!confirm('Upload in progress. Switching will stop it. Continue?'))return;
+  if((uploadInProgress||processingInProgress) && id!==currentId){
+    if(!confirm('Work in progress. Switching will stop it. Continue?'))return;
     uploadCancelled=true;
   }
   currentId=id;
@@ -367,6 +346,7 @@ function selectShop(id){
   renderDetail();
 }
 
+// ─── DETAIL ─────────────────────────────────────────────────────────
 async function renderDetail(){
   var s=allShops.find(function(x){return x.id===currentId;});
   if(!s){g('shop-detail').innerHTML='<div class="empty">Not found</div>';return;}
@@ -378,7 +358,7 @@ async function renderDetail(){
   var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
       '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
-      '<div style="font-size:12px;color:#888;margin-top:4px;">'+esc(s.shop_date||'date pending AI detection')+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:4px;">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
     '</div>'+
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
   '</div>';
@@ -387,7 +367,7 @@ async function renderDetail(){
     html+='<div class="dropzone" id="dropzone" onclick="document.getElementById(\'file-input\').click()">'+
       '<div class="dropzone-icon">📥</div>'+
       '<div class="dropzone-text">Drop photos here, or click to select</div>'+
-      '<div class="dropzone-hint">Any number. AI will detect date, GPS, and group products after upload.</div>'+
+      '<div class="dropzone-hint">Any number. AI groups products and extracts data after upload.</div>'+
     '</div>';
   } else if(stat==='pending' && photoCount>0){
     var estCost=(photoCount*0.04).toFixed(2);
@@ -402,9 +382,9 @@ async function renderDetail(){
       '<div class="card-title">AI processing</div>'+
       '<div style="font-size:13px;color:#666;margin-bottom:0.5rem;">Status: <strong>'+stat+'</strong></div>'+
       '<div class="progress-bar"><div class="progress-fill" style="width:'+(stat==='grouping'?'40%':'80%')+';"></div></div>'+
-      '<div style="font-size:11px;color:#888;margin-top:6px;">Auto-refreshes. Typical: 1-4 min per 100 photos.</div>'+
+      '<div style="font-size:11px;color:#888;margin-top:6px;">Click Process with AI again if this has been stuck for 20+ minutes.</div>'+
+      '<button class="btn btn-secondary" style="margin-top:10px;" onclick="resetToProcessable(\''+s.id+'\')">Reset to pending</button>'+
     '</div>';
-    setTimeout(function(){if(currentId===s.id){refreshShop(s.id);}},8000);
   } else {
     if(stat==='failed'){
       html+='<div class="card" style="border-color:#fce8e8;">'+
@@ -421,9 +401,11 @@ async function renderDetail(){
       '<div class="detect-row"><div class="detect-label">Photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
     '</div>';
-    html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
-    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
-    html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
+    if(stat==='complete'){
+      html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
+    }
+    html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading photos...</div></div>';
+    html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading observations...</div></div>';
   }
 
   html+='<div class="card">'+
@@ -442,115 +424,13 @@ async function renderDetail(){
   }
   g('file-input').onchange=function(e){handleFiles(e.target.files);};
 
-  if(stat==='complete'||stat==='failed' || photoCount>0){
+  if(stat==='complete'||stat==='failed'||photoCount>0){
     loadPhotos(s.id);
     if(stat==='complete'){
       loadObservations(s.id);
       loadInsights(s.id);
     }
   }
-}
-
-// ─── DETECT LOCATION (manual trigger) ───────────────────────────────
-async function detectLocationFor(id){
-  console.log('[shop_outs] manual location detection for',id);
-  var btn=event.target;
-  btn.disabled=true;
-  btn.textContent='Detecting...';
-  try {
-    var r=await fetch('/api/detect-location',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({shop_out_id:id})
-    });
-    if(!r.ok){
-      alert('Location detection failed: '+await r.text());
-      btn.disabled=false;
-      btn.textContent='🤖 Detect';
-      return;
-    }
-    var data=await r.json();
-    console.log('[shop_outs] location result:',data);
-    if(data.location){
-      alert('Detected: '+data.location+(data.confidence?' (confidence: '+(data.confidence*100).toFixed(0)+'%)':''));
-    } else {
-      alert('No location markers found in storefront photos.');
-    }
-    await refreshShop(id);
-  } catch(err){
-    alert('Error: '+err.message);
-    btn.disabled=false;
-    btn.textContent='🤖 Detect';
-  }
-}
-
-// ─── INSIGHTS ───────────────────────────────────────────────────────
-async function loadInsights(id){
-  var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&select=brand,department,retail_price,ai_suggested_category');
-  if(!r.ok)return;
-  var obs=await r.json();
-  var c=g('insights-container');
-  if(!c)return;
-  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations to summarize.</div>';return;}
-
-  // Department breakdown
-  var deptCounts={};
-  obs.forEach(function(o){
-    var d=o.department||'Uncategorized';
-    deptCounts[d]=(deptCounts[d]||0)+1;
-  });
-  var deptSorted=Object.keys(deptCounts).map(function(k){return {name:k,count:deptCounts[k]};}).sort(function(a,b){return b.count-a.count;});
-
-  // Top brands
-  var brandCounts={};
-  obs.forEach(function(o){
-    if(o.brand){brandCounts[o.brand]=(brandCounts[o.brand]||0)+1;}
-  });
-  var brandSorted=Object.keys(brandCounts).map(function(k){return {name:k,count:brandCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,8);
-
-  // Price stats
-  var prices=obs.map(function(o){return o.retail_price;}).filter(function(p){return p!=null && p>0;});
-  var priceMin=prices.length?Math.min.apply(null,prices):null;
-  var priceMax=prices.length?Math.max.apply(null,prices):null;
-  var priceAvg=prices.length?(prices.reduce(function(a,b){return a+b;},0)/prices.length):null;
-
-  var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">';
-
-  // Department block
-  html+='<div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:600;">By Department</div>';
-  deptSorted.forEach(function(d){
-    var pct=Math.round((d.count/obs.length)*100);
-    html+='<div style="margin-bottom:6px;">'+
-      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>'+esc(d.name)+'</span><span style="color:#888;">'+d.count+' ('+pct+'%)</span></div>'+
-      '<div style="height:6px;background:#f0f0e8;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:#2244cc;"></div></div>'+
-    '</div>';
-  });
-  html+='</div>';
-
-  // Top brands block
-  html+='<div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:600;">Top Brands</div>';
-  if(brandSorted.length===0){
-    html+='<div style="font-size:12px;color:#888;">No brands identified</div>';
-  } else {
-    brandSorted.forEach(function(b){
-      html+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:0.5px solid #f8f8f4;"><span>'+esc(b.name)+'</span><span style="color:#888;font-weight:600;">'+b.count+'</span></div>';
-    });
-  }
-  html+='</div>';
-
-  html+='</div>';
-
-  // Price stats row
-  if(prices.length>0){
-    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.25rem;padding-top:1rem;border-top:1px solid #f0f0e8;">';
-    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Products with Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">'+prices.length+'</div></div>';
-    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Min Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceMin.toFixed(2)+'</div></div>';
-    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Avg Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceAvg.toFixed(2)+'</div></div>';
-    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Max Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceMax.toFixed(2)+'</div></div>';
-    html+='</div>';
-  }
-
-  c.innerHTML=html;
 }
 
 async function refreshShop(id){
@@ -564,6 +444,16 @@ async function refreshShop(id){
   if(currentId===id)renderDetail();
 }
 
+async function resetToProcessable(id){
+  if(!confirm('Reset this shop-out to pending so you can re-process it?'))return;
+  await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+    method:'PATCH',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({processing_status:'pending',processing_started_at:null,processing_error:null})
+  });
+  await refreshShop(id);
+}
+
 // ─── UPLOAD ─────────────────────────────────────────────────────────
 function setUploadInProgress(active){
   uploadInProgress=active;
@@ -575,14 +465,14 @@ function setUploadInProgress(active){
     window.removeEventListener('beforeunload',preventUnload);
   }
 }
-function preventUnload(e){e.preventDefault();e.returnValue='Upload in progress. Leave anyway?';return e.returnValue;}
+function preventUnload(e){e.preventDefault();e.returnValue='Work in progress. Leave anyway?';return e.returnValue;}
 
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
   if(files.length===0)return;
 
-  // ── Dedup: skip files whose names already exist in this shop-out ──
+  // Dedup against already-uploaded photos by file_name
   var existingNames={};
   try {
     var er=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+currentId+'&select=file_name&limit=10000');
@@ -594,20 +484,15 @@ async function handleFiles(fileList){
   var originalCount=files.length;
   files=files.filter(function(f){return !existingNames[f.name];});
   var skipped=originalCount-files.length;
-  if(skipped>0)console.log('[shop_outs] skipped '+skipped+' already-uploaded photos');
-  if(files.length===0){
-    alert('All '+originalCount+' photos already uploaded to this shop-out. Nothing to add.');
-    return;
-  }
+  if(files.length===0){alert('All '+originalCount+' photos already uploaded. Nothing to add.');return;}
 
   var startSeq=getPhotoCount(currentId)+1;
-
   uploadCancelled=false;
   setUploadInProgress(true);
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
-    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong> Photos finish saving one-by-one — interrupting keeps what\'s done but loses the rest.</div>'+
-    (skipped>0?'<div style="background:#edfaed;color:#1a5a1a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;">✓ '+skipped+' photos already uploaded (skipped). Uploading '+files.length+' new ones.</div>':'')+
+    '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong> Photos save one-by-one.</div>'+
+    (skipped>0?'<div style="background:#edfaed;color:#1a5a1a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;">✓ '+skipped+' duplicates skipped. Uploading '+files.length+' new.</div>':'')+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="up-fill" style="width:0%;"></div></div>'+
     '<div id="up-counter" style="font-size:12px;color:#666;margin-top:6px;">0 of '+files.length+'</div>'+
@@ -616,21 +501,17 @@ async function handleFiles(fileList){
   '</div>';
 
   var uploaded=0,failed=[];
-
   for(var i=0;i<files.length;i+=UPLOAD_CONCURRENCY){
     if(uploadCancelled)break;
     var batch=files.slice(i,i+UPLOAD_CONCURRENCY);
     var batchStart=startSeq+i;
     await Promise.all(batch.map(async function(file,bi){
       if(uploadCancelled)return;
-      var seq=batchStart+bi;
-      var result=await uploadOneWithRetry(file,seq);
+      var result=await uploadOneWithRetry(file,batchStart+bi);
       if(result.success){
         uploaded++;
         photoCounts[currentId]=(photoCounts[currentId]||0)+1;
-      }else{
-        failed.push({name:file.name,err:result.error});
-      }
+      } else failed.push({name:file.name,err:result.error});
       var totalDone=uploaded+failed.length;
       var fill=g('up-fill');if(fill)fill.style.width=((totalDone/files.length)*100)+'%';
       var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
@@ -654,7 +535,7 @@ async function handleFiles(fileList){
   selectShop(currentId);
 }
 
-function cancelUpload(){if(confirm('Stop upload? Photos already saved will be kept.'))uploadCancelled=true;}
+function cancelUpload(){if(confirm('Stop upload? Photos already saved kept.'))uploadCancelled=true;}
 
 async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
@@ -697,17 +578,25 @@ async function uploadOne(file,seq,attempt){
       upload_status:'uploaded',upload_attempts:attempt
     })
   });
-  if(!dbR.ok){throw new Error('DB '+dbR.status+': '+await dbR.text());}
+  if(!dbR.ok)throw new Error('DB '+dbR.status+': '+await dbR.text());
   return {success:true};
 }
 
-// ─── PROCESS — chunked: front-end orchestrates the loop ─────────────
-var CHUNK_SIZE=20;
+// ─── CHUNKED PROCESSING ─────────────────────────────────────────────
+function setProcessing(active){
+  processingInProgress=active;
+  if(active){
+    document.body.classList.add('processing');
+    window.addEventListener('beforeunload',preventUnload);
+  } else {
+    document.body.classList.remove('processing');
+    window.removeEventListener('beforeunload',preventUnload);
+  }
+}
 
 async function triggerProcessing(id){
   console.log('[shop_outs] triggerProcessing:',id);
 
-  // Fetch all photo IDs for this shop-out
   var pr=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=id');
   if(!pr.ok){alert('Failed to load photos: '+await pr.text());return;}
   var allPhotos=await pr.json();
@@ -715,45 +604,41 @@ async function triggerProcessing(id){
 
   var photoIds=allPhotos.map(function(p){return p.id;});
   var totalChunks=Math.ceil(photoIds.length/CHUNK_SIZE);
-  console.log('[shop_outs] '+photoIds.length+' photos in '+totalChunks+' chunks');
 
-  // Mark as grouping
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      processing_status:'grouping',
-      processing_started_at:new Date().toISOString(),
-      processing_error:null
-    })
+    body:JSON.stringify({processing_status:'grouping',processing_started_at:new Date().toISOString(),processing_error:null})
   });
 
-  // Detect date from EXIF on the first chunk's photos
-  var exifR=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=exif_timestamp');
-  if(exifR.ok){
-    var photos=await exifR.json();
-    var timestamps=photos.map(function(p){return p.exif_timestamp;}).filter(Boolean).map(function(t){return new Date(t).getTime();}).filter(function(t){return !isNaN(t);}).sort(function(a,b){return a-b;});
-    if(timestamps.length>0){
-      var median=timestamps[Math.floor(timestamps.length/2)];
-      var detectedDate=new Date(median).toISOString().substring(0,10);
-      await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
-        method:'PATCH',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({shop_date:detectedDate,date_detected_via:'exif_median'})
-      });
+  // EXIF date detection
+  try {
+    var exifR=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&select=exif_timestamp');
+    if(exifR.ok){
+      var photos=await exifR.json();
+      var timestamps=photos.map(function(p){return p.exif_timestamp;}).filter(Boolean).map(function(t){return new Date(t).getTime();}).filter(function(t){return !isNaN(t);}).sort(function(a,b){return a-b;});
+      if(timestamps.length>0){
+        var median=timestamps[Math.floor(timestamps.length/2)];
+        var detectedDate=new Date(median).toISOString().substring(0,10);
+        await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+          method:'PATCH',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({shop_date:detectedDate,date_detected_via:'exif_median'})
+        });
+      }
     }
-  }
+  } catch(e) {}
 
-  // Render chunked progress UI
-  renderChunkedProgress(id,0,totalChunks,0);
+  setProcessing(true);
+  renderChunkProgress(id,0,totalChunks,0,null,null);
 
-  // Process chunks sequentially
   var totalObservations=0;
-  var anyChunkFailed=false;
+  var anyFailed=false;
+  var firstError=null;
+
   for(var i=0;i<totalChunks;i++){
     var chunkIds=photoIds.slice(i*CHUNK_SIZE,(i+1)*CHUNK_SIZE);
-    console.log('[shop_outs] processing chunk '+(i+1)+'/'+totalChunks+' ('+chunkIds.length+' photos)');
-    renderChunkedProgress(id,i,totalChunks,totalObservations);
+    renderChunkProgress(id,i,totalChunks,totalObservations,null,null);
 
     try {
       var r=await fetch('/api/process-chunk',{
@@ -763,24 +648,23 @@ async function triggerProcessing(id){
       });
       if(!r.ok){
         var errText=await r.text();
-        console.error('[shop_outs] chunk '+(i+1)+' failed:',errText);
-        anyChunkFailed=true;
-        renderChunkedProgress(id,i,totalChunks,totalObservations,'Chunk '+(i+1)+' failed: '+errText.substring(0,200));
-        // Continue with next chunk anyway
+        console.error('[chunk '+(i+1)+'] failed:',errText);
+        anyFailed=true;
+        if(!firstError)firstError=errText.substring(0,200);
         continue;
       }
       var data=await r.json();
-      console.log('[shop_outs] chunk '+(i+1)+' done:',data);
-      totalObservations=data.observations_total||totalObservations+data.observations_added;
+      console.log('[chunk '+(i+1)+'/'+totalChunks+']',data);
+      totalObservations=data.observations_total||totalObservations+(data.observations_inserted||0);
     } catch(err) {
-      console.error('[shop_outs] chunk '+(i+1)+' network error:',err);
-      anyChunkFailed=true;
+      console.error('[chunk '+(i+1)+'] network error:',err);
+      anyFailed=true;
+      if(!firstError)firstError=err.message;
     }
   }
 
   // Mark complete
-  var photoCount=photoIds.length;
-  var cost=(photoCount*0.04).toFixed(2);
+  var cost=(photoIds.length*0.04).toFixed(2);
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
@@ -788,43 +672,138 @@ async function triggerProcessing(id){
       processing_status:'complete',
       processing_completed_at:new Date().toISOString(),
       estimated_cost_usd:cost,
-      total_observations:totalObservations
+      total_observations:totalObservations,
+      processing_error:firstError
     })
   });
 
-  console.log('[shop_outs] all chunks done. Total observations:',totalObservations);
-
-  // Auto-detect location from storefront photos
-  renderChunkedProgress(id,totalChunks,totalChunks,totalObservations,null,'Detecting store location...');
+  // Auto-detect location
+  renderChunkProgress(id,totalChunks,totalChunks,totalObservations,null,'Detecting location...');
   try {
     var lr=await fetch('/api/detect-location',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({shop_out_id:id})
     });
-    if(lr.ok){
-      var ld=await lr.json();
-      console.log('[shop_outs] location detected:',ld);
-    } else {
-      console.warn('[shop_outs] location detection failed:',await lr.text());
-    }
-  } catch(err) { console.error('[shop_outs] location err:',err); }
+    if(lr.ok)console.log('[location]',await lr.json());
+  } catch(e) { console.warn('location:',e); }
 
+  setProcessing(false);
   await refreshShop(id);
 }
 
-function renderChunkedProgress(id,currentChunk,totalChunks,obsCount,errorMsg,customStatus){
+function renderChunkProgress(id,currentChunk,totalChunks,obsCount,errorMsg,customStatus){
   var pct=((currentChunk/totalChunks)*100).toFixed(0);
   var statusLine=customStatus?customStatus:'Chunk <strong>'+currentChunk+' of '+totalChunks+'</strong> ('+pct+'%)';
   var html='<div class="card">'+
     '<div class="card-title">AI processing</div>'+
     '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">'+statusLine+'</div>'+
     '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;transition:width 0.4s;"></div></div>'+
-    '<div style="font-size:11px;color:#888;margin-top:6px;">'+(obsCount||0)+' observations extracted so far. Each chunk takes ~60-90 seconds.</div>'+
+    '<div style="font-size:11px;color:#888;margin-top:6px;">'+(obsCount||0)+' observations extracted so far. Each chunk takes ~60-120 sec.</div>'+
     (errorMsg?'<div style="font-size:11px;color:#a22;margin-top:8px;">'+esc(errorMsg)+'</div>':'')+
     '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — chunks process here in the browser.</div>'+
   '</div>';
   g('shop-detail').innerHTML=html;
+}
+
+// ─── DETECT LOCATION (manual) ───────────────────────────────────────
+async function detectLocationFor(id){
+  var btn=event.target;
+  btn.disabled=true;
+  btn.textContent='Detecting...';
+  try {
+    var r=await fetch('/api/detect-location',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({shop_out_id:id})
+    });
+    if(!r.ok){
+      alert('Detection failed: '+await r.text());
+      btn.disabled=false;btn.textContent='🤖 Detect';return;
+    }
+    var data=await r.json();
+    if(data.location){
+      alert('Detected: '+data.location+(data.confidence?' ('+(data.confidence*100).toFixed(0)+'% confidence)':''));
+    } else alert('No location markers found in storefront photos.');
+    await refreshShop(id);
+  } catch(err){
+    alert('Error: '+err.message);
+    btn.disabled=false;btn.textContent='🤖 Detect';
+  }
+}
+
+// ─── INSIGHTS ───────────────────────────────────────────────────────
+async function loadInsights(id){
+  var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&select=brand,department,retail_price,ai_suggested_category');
+  if(!r.ok){console.error('insights:',await r.text());return;}
+  var obs=await r.json();
+  var c=g('insights-container');
+  if(!c)return;
+  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations to summarize.</div>';return;}
+
+  // Department breakdown
+  var deptCounts={};
+  obs.forEach(function(o){
+    var d=o.department||'Uncategorized';
+    deptCounts[d]=(deptCounts[d]||0)+1;
+  });
+  var deptSorted=Object.keys(deptCounts).map(function(k){return {name:k,count:deptCounts[k]};}).sort(function(a,b){return b.count-a.count;});
+
+  // Top brands
+  var brandCounts={};
+  obs.forEach(function(o){if(o.brand)brandCounts[o.brand]=(brandCounts[o.brand]||0)+1;});
+  var brandSorted=Object.keys(brandCounts).map(function(k){return {name:k,count:brandCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,10);
+
+  // Top categories
+  var catCounts={};
+  obs.forEach(function(o){if(o.ai_suggested_category)catCounts[o.ai_suggested_category]=(catCounts[o.ai_suggested_category]||0)+1;});
+  var catSorted=Object.keys(catCounts).map(function(k){return {name:k,count:catCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,10);
+
+  // Price stats
+  var prices=obs.map(function(o){return o.retail_price;}).filter(function(p){return p!=null && p>0;});
+  var priceMin=prices.length?Math.min.apply(null,prices):null;
+  var priceMax=prices.length?Math.max.apply(null,prices):null;
+  var priceAvg=prices.length?(prices.reduce(function(a,b){return a+b;},0)/prices.length):null;
+
+  var html='<div class="insights-grid">';
+  // Department column
+  html+='<div><div class="insights-block-title">By Department</div>';
+  deptSorted.forEach(function(d){
+    var pct=Math.round((d.count/obs.length)*100);
+    html+='<div class="dept-row"><div class="dept-row-head"><span>'+esc(d.name)+'</span><span style="color:#888;">'+d.count+' ('+pct+'%)</span></div><div class="dept-bar"><div class="dept-bar-fill" style="width:'+pct+'%;"></div></div></div>';
+  });
+  html+='</div>';
+
+  // Top brands column
+  html+='<div><div class="insights-block-title">Top Brands</div>';
+  if(brandSorted.length===0)html+='<div style="font-size:12px;color:#888;">No brands extracted</div>';
+  else brandSorted.forEach(function(b){
+    html+='<div class="brand-row"><span>'+esc(b.name)+'</span><span style="color:#888;font-weight:600;">'+b.count+'</span></div>';
+  });
+  html+='</div>';
+  html+='</div>';
+
+  // Top categories below
+  if(catSorted.length>0){
+    html+='<div style="margin-top:1.5rem;"><div class="insights-block-title">Top Categories</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 1.5rem;">';
+    catSorted.forEach(function(c){
+      html+='<div class="brand-row"><span>'+esc(c.name)+'</span><span style="color:#888;font-weight:600;">'+c.count+'</span></div>';
+    });
+    html+='</div></div>';
+  }
+
+  // Price stats
+  if(prices.length>0){
+    html+='<div class="stat-grid">'+
+      '<div class="stat-block"><div class="stat-label">Products with Price</div><div class="stat-val">'+prices.length+'</div></div>'+
+      '<div class="stat-block"><div class="stat-label">Min Price</div><div class="stat-val">$'+priceMin.toFixed(2)+'</div></div>'+
+      '<div class="stat-block"><div class="stat-label">Avg Price</div><div class="stat-val">$'+priceAvg.toFixed(2)+'</div></div>'+
+      '<div class="stat-block"><div class="stat-label">Max Price</div><div class="stat-val">$'+priceMax.toFixed(2)+'</div></div>'+
+    '</div>';
+  }
+
+  c.innerHTML=html;
 }
 
 // ─── PHOTOS + VIEWER ───────────────────────────────────────────────
@@ -894,7 +873,7 @@ async function toggleArchive(id,isArchived){
 }
 function confirmDeleteShopOut(id){
   g('confirm-title').textContent='Delete shop-out?';
-  g('confirm-body').textContent='This permanently deletes everything.';
+  g('confirm-body').textContent='This permanently deletes the shop-out, all photos, and observations.';
   confirmFn=function(){deleteShopOut(id);};
   g('confirm-modal').classList.add('show');
 }
