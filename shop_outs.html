@@ -417,10 +417,11 @@ async function renderDetail(){
       '<div class="card-title">Summary</div>'+
       '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Date</div><div class="detect-val">'+esc(s.shop_date||'—')+'</div><div></div></div>'+
-      '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div></div></div>'+
+      '<div class="detect-row"><div class="detect-label">Location</div><div class="detect-val">'+esc(s.store_location_text||'—')+'</div><div>'+(!s.store_location_text?'<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;" onclick="detectLocationFor(\''+s.id+'\')">🤖 Detect</button>':'')+'</div></div>'+
       '<div class="detect-row"><div class="detect-label">Photos</div><div class="detect-val">'+photoCount+'</div><div></div></div>'+
       '<div class="detect-row"><div class="detect-label">Observations</div><div class="detect-val">'+(s.total_observations||0)+'</div><div></div></div>'+
     '</div>';
+    html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
     html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
     html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
   }
@@ -443,8 +444,113 @@ async function renderDetail(){
 
   if(stat==='complete'||stat==='failed' || photoCount>0){
     loadPhotos(s.id);
-    if(stat==='complete')loadObservations(s.id);
+    if(stat==='complete'){
+      loadObservations(s.id);
+      loadInsights(s.id);
+    }
   }
+}
+
+// ─── DETECT LOCATION (manual trigger) ───────────────────────────────
+async function detectLocationFor(id){
+  console.log('[shop_outs] manual location detection for',id);
+  var btn=event.target;
+  btn.disabled=true;
+  btn.textContent='Detecting...';
+  try {
+    var r=await fetch('/api/detect-location',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({shop_out_id:id})
+    });
+    if(!r.ok){
+      alert('Location detection failed: '+await r.text());
+      btn.disabled=false;
+      btn.textContent='🤖 Detect';
+      return;
+    }
+    var data=await r.json();
+    console.log('[shop_outs] location result:',data);
+    if(data.location){
+      alert('Detected: '+data.location+(data.confidence?' (confidence: '+(data.confidence*100).toFixed(0)+'%)':''));
+    } else {
+      alert('No location markers found in storefront photos.');
+    }
+    await refreshShop(id);
+  } catch(err){
+    alert('Error: '+err.message);
+    btn.disabled=false;
+    btn.textContent='🤖 Detect';
+  }
+}
+
+// ─── INSIGHTS ───────────────────────────────────────────────────────
+async function loadInsights(id){
+  var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&select=brand,department,retail_price,sub_category');
+  if(!r.ok)return;
+  var obs=await r.json();
+  var c=g('insights-container');
+  if(!c)return;
+  if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations to summarize.</div>';return;}
+
+  // Department breakdown
+  var deptCounts={};
+  obs.forEach(function(o){
+    var d=o.department||'Uncategorized';
+    deptCounts[d]=(deptCounts[d]||0)+1;
+  });
+  var deptSorted=Object.keys(deptCounts).map(function(k){return {name:k,count:deptCounts[k]};}).sort(function(a,b){return b.count-a.count;});
+
+  // Top brands
+  var brandCounts={};
+  obs.forEach(function(o){
+    if(o.brand){brandCounts[o.brand]=(brandCounts[o.brand]||0)+1;}
+  });
+  var brandSorted=Object.keys(brandCounts).map(function(k){return {name:k,count:brandCounts[k]};}).sort(function(a,b){return b.count-a.count;}).slice(0,8);
+
+  // Price stats
+  var prices=obs.map(function(o){return o.retail_price;}).filter(function(p){return p!=null && p>0;});
+  var priceMin=prices.length?Math.min.apply(null,prices):null;
+  var priceMax=prices.length?Math.max.apply(null,prices):null;
+  var priceAvg=prices.length?(prices.reduce(function(a,b){return a+b;},0)/prices.length):null;
+
+  var html='<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">';
+
+  // Department block
+  html+='<div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:600;">By Department</div>';
+  deptSorted.forEach(function(d){
+    var pct=Math.round((d.count/obs.length)*100);
+    html+='<div style="margin-bottom:6px;">'+
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;"><span>'+esc(d.name)+'</span><span style="color:#888;">'+d.count+' ('+pct+'%)</span></div>'+
+      '<div style="height:6px;background:#f0f0e8;border-radius:3px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:#2244cc;"></div></div>'+
+    '</div>';
+  });
+  html+='</div>';
+
+  // Top brands block
+  html+='<div><div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;font-weight:600;">Top Brands</div>';
+  if(brandSorted.length===0){
+    html+='<div style="font-size:12px;color:#888;">No brands identified</div>';
+  } else {
+    brandSorted.forEach(function(b){
+      html+='<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:0.5px solid #f8f8f4;"><span>'+esc(b.name)+'</span><span style="color:#888;font-weight:600;">'+b.count+'</span></div>';
+    });
+  }
+  html+='</div>';
+
+  html+='</div>';
+
+  // Price stats row
+  if(prices.length>0){
+    html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1.25rem;padding-top:1rem;border-top:1px solid #f0f0e8;">';
+    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Products with Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">'+prices.length+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Min Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceMin.toFixed(2)+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Avg Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceAvg.toFixed(2)+'</div></div>';
+    html+='<div><div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Max Price</div><div style="font-size:18px;font-weight:700;margin-top:2px;">$'+priceMax.toFixed(2)+'</div></div>';
+    html+='</div>';
+  }
+
+  c.innerHTML=html;
 }
 
 async function refreshShop(id){
@@ -679,7 +785,7 @@ async function triggerProcessing(id){
     method:'PATCH',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
-      processing_status:anyChunkFailed?'complete':'complete',
+      processing_status:'complete',
       processing_completed_at:new Date().toISOString(),
       estimated_cost_usd:cost,
       total_observations:totalObservations
@@ -687,14 +793,32 @@ async function triggerProcessing(id){
   });
 
   console.log('[shop_outs] all chunks done. Total observations:',totalObservations);
+
+  // Auto-detect location from storefront photos
+  renderChunkedProgress(id,totalChunks,totalChunks,totalObservations,null,'Detecting store location...');
+  try {
+    var lr=await fetch('/api/detect-location',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({shop_out_id:id})
+    });
+    if(lr.ok){
+      var ld=await lr.json();
+      console.log('[shop_outs] location detected:',ld);
+    } else {
+      console.warn('[shop_outs] location detection failed:',await lr.text());
+    }
+  } catch(err) { console.error('[shop_outs] location err:',err); }
+
   await refreshShop(id);
 }
 
-function renderChunkedProgress(id,currentChunk,totalChunks,obsCount,errorMsg){
+function renderChunkedProgress(id,currentChunk,totalChunks,obsCount,errorMsg,customStatus){
   var pct=((currentChunk/totalChunks)*100).toFixed(0);
+  var statusLine=customStatus?customStatus:'Chunk <strong>'+currentChunk+' of '+totalChunks+'</strong> ('+pct+'%)';
   var html='<div class="card">'+
     '<div class="card-title">AI processing</div>'+
-    '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">Chunk <strong>'+currentChunk+' of '+totalChunks+'</strong> ('+pct+'%)</div>'+
+    '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">'+statusLine+'</div>'+
     '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;transition:width 0.4s;"></div></div>'+
     '<div style="font-size:11px;color:#888;margin-top:6px;">'+(obsCount||0)+' observations extracted so far. Each chunk takes ~60-90 seconds.</div>'+
     (errorMsg?'<div style="font-size:11px;color:#a22;margin-top:8px;">'+esc(errorMsg)+'</div>':'')+
