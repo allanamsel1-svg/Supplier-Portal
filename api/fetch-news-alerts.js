@@ -1,12 +1,6 @@
 // ════════════════════════════════════════════════════════════════════
-// /api/fetch-news-alerts.js
-//
-// Daily ingestion: queries Google News RSS for beauty/HBA topics,
-// runs each article through Claude for highlight + signal/fluff
-// classification + entity extraction. Writes to news_articles.
-//
-// Triggered by Vercel cron (daily) OR by manual refresh from UI.
-// POST body (optional): { queries: [...] } to override default list.
+// /api/fetch-news-alerts.js  — v2
+// Fix: properly strip HTML/URLs from RSS snippets before storing
 // ════════════════════════════════════════════════════════════════════
 
 export const config = { runtime: 'nodejs' };
@@ -84,6 +78,35 @@ async function sha256(text) {
   return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── HTML/entity decoding (run twice for double-encoded) ──────────────
+function decodeEntities(s) {
+  if (!s) return s;
+  for (let i = 0; i < 2; i++) {
+    s = s.replace(/&amp;/g, '&')
+         .replace(/&lt;/g, '<')
+         .replace(/&gt;/g, '>')
+         .replace(/&quot;/g, '"')
+         .replace(/&#39;/g, "'")
+         .replace(/&apos;/g, "'")
+         .replace(/&nbsp;/g, ' ')
+         .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+         .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
+  }
+  return s;
+}
+
+function stripHtml(s) {
+  if (!s) return '';
+  let cleaned = decodeEntities(s);
+  cleaned = cleaned.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+  cleaned = cleaned.replace(/<[^>]+>/g, ' ');
+  cleaned = decodeEntities(cleaned);
+  // Strip Google News tracking URLs that often leak through
+  cleaned = cleaned.replace(/https?:\/\/news\.google\.com\/[^\s]+/g, '');
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
 function parseRssXml(xml) {
   const items = [];
   const itemRegex = /<item>([\s\S]*?)<\/item>/g;
@@ -93,10 +116,7 @@ function parseRssXml(xml) {
     const get = (tag) => {
       const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
       if (!m) return null;
-      let val = m[1].trim();
-      val = val.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
-      val = val.replace(/<[^>]+>/g, '');
-      return val.trim();
+      return stripHtml(m[1]);
     };
     const title = get('title');
     const link = get('link');
@@ -130,51 +150,43 @@ Return ONLY valid JSON in this exact format:
 {
   "is_fluff": true or false,
   "fluff_reason": "if fluff, brief reason; else null",
-  "highlight": "1-2 sentence summary of what this article actually says (in your own words, max 240 chars)",
+  "highlight": "1-2 sentence summary in YOUR OWN WORDS, max 240 chars. Do NOT echo raw URLs or HTML.",
   "signal_types": ["one or more of: brand_launch, product_launch, acquisition, executive_move, retail_partnership, category_trend, ingredient_trend, controversy, earnings, funding"],
   "mentioned_brands": ["brand names mentioned"],
   "mentioned_products": ["specific product names mentioned"],
   "mentioned_ingredients": ["ingredients mentioned"],
   "mentioned_celebrities": ["celebrity names mentioned"],
-  "mentioned_retailers": ["retailer names mentioned, e.g. Sephora, Ulta, Target"]
+  "mentioned_retailers": ["retailer names mentioned"]
 }
 
-Fluff = generic listicles ("10 best lipsticks"), pure ad copy, celebrity gossip without product attachment, broad seasonal roundups.
-Signal = launches, M&A, ingredient trends, specific products selling out, celebrity-product attachments, category shifts, retail partnerships.
-Use empty arrays [] for fields with nothing to extract. Do not invent.`;
+Fluff = generic listicles ("10 best lipsticks"), pure ad copy, "how to shop X sale", celebrity gossip without product attachment, broad seasonal roundups.
+Signal = launches, M&A, ingredient trends, products selling out, celebrity-product attachments, category shifts, retail partnerships.
+Use empty arrays [] when nothing to extract. Do not invent.`;
 
   try {
     const resp = await claudeMessage([{ role: 'user', content: prompt }], 1000);
-    return extractJson(resp.content[0].text);
+    const parsed = extractJson(resp.content[0].text);
+    // Defensive: drop highlight if it contains URL fragments
+    if (parsed.highlight && /href=|https?:\/\/news\.google/i.test(parsed.highlight)) {
+      parsed.highlight = null;
+    }
+    return parsed;
   } catch (err) {
     console.warn(`Classify failed for "${article.title}": ${err.message}`);
     return {
-      is_fluff: false,
-      fluff_reason: null,
-      highlight: article.description ? article.description.substring(0, 240) : null,
-      signal_types: [],
-      mentioned_brands: [],
-      mentioned_products: [],
-      mentioned_ingredients: [],
-      mentioned_celebrities: [],
-      mentioned_retailers: []
+      is_fluff: false, fluff_reason: null, highlight: null,
+      signal_types: [], mentioned_brands: [], mentioned_products: [],
+      mentioned_ingredients: [], mentioned_celebrities: [], mentioned_retailers: []
     };
   }
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST' && req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!SUPABASE_URL || !SUPABASE_KEY || !ANTHROPIC_KEY) {
-    return res.status(500).json({ error: 'Missing env vars' });
-  }
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (!SUPABASE_URL || !SUPABASE_KEY || !ANTHROPIC_KEY) return res.status(500).json({ error: 'Missing env vars' });
 
   let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch { body = {}; }
-  }
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   const queries = (body && body.queries) || DEFAULT_QUERIES;
 
   try {
@@ -215,12 +227,13 @@ export default async function handler(req, res) {
       const classified = await Promise.all(batch.map(a => classifyArticle(a)));
       batch.forEach((a, idx) => {
         const c = classified[idx];
+        const cleanSnippet = a.description ? stripHtml(a.description).substring(0, 1000) : null;
         toInsert.push({
           external_url: a.link,
           url_hash: a.url_hash,
           source_name: a.source || null,
           headline: a.title,
-          snippet: a.description ? a.description.substring(0, 1000) : null,
+          snippet: cleanSnippet,
           ai_highlight: c.highlight,
           published_at: a.pubDate ? new Date(a.pubDate).toISOString() : null,
           query_used: a.query_used,
@@ -246,12 +259,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // After ingestion, regenerate today's summary
-    try {
-      await regenerateDailySummary();
-    } catch (e) {
-      console.warn(`Summary regen failed: ${e.message}`);
-    }
+    try { await regenerateDailySummary(); } catch (e) { console.warn(`Summary regen failed: ${e.message}`); }
 
     return res.status(200).json({
       success: true,
@@ -276,12 +284,7 @@ async function regenerateDailySummary() {
 
   if (!articles || articles.length === 0) return;
 
-  const condensed = articles.map(a => ({
-    h: a.headline,
-    s: a.ai_highlight,
-    t: a.signal_types,
-    b: a.mentioned_brands
-  }));
+  const condensed = articles.map(a => ({ h: a.headline, s: a.ai_highlight, t: a.signal_types, b: a.mentioned_brands }));
 
   const prompt = `You are writing a daily trend summary for a beauty/HBA sourcing platform.
 
