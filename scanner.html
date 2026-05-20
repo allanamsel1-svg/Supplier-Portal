@@ -19,7 +19,6 @@
     .main { max-width: 800px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
     .page-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
     .page-sub { font-size: 13px; color: #999; margin-bottom: 1.5rem; }
-    .api-warn { background: #fffbea; border: 1px solid #f0d840; border-radius: 9px; padding: 12px 14px; font-size: 13px; color: #7a6000; margin-bottom: 1.25rem; display: none; }
     .top-banner { background: #edfaed; border: 1px solid #a0d8a0; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #1a6a1a; margin-bottom: 1rem; display: none; }
 
     /* Upload zone */
@@ -63,6 +62,13 @@
     .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid #c0d0f0; border-top-color: #2266cc; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 4px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* Confidence flag — fields where Claude was uncertain */
+    .confidence-banner { background: #fffbea; border: 1px solid #f0d840; border-radius: 8px; padding: 9px 12px; font-size: 12px; color: #7a6000; margin-bottom: 12px; display: none; }
+    .confidence-banner.show { display: block; }
+    .confidence-banner b { font-weight: 700; }
+    .rf input.low-conf, .rf select.low-conf, .rf textarea.low-conf { background: #fffbea; border-color: #f0d840; }
+    .rf .conf-pct { font-size: 10px; color: #b08800; margin-left: 6px; }
+
     /* Review form */
     .ci-review { padding: 0 14px 14px; border-top: 1px solid #f0f0e8; }
     .section-title { font-size: 11px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.07em; padding: 12px 0 8px; border-bottom: 1px solid #f5f5f0; margin-bottom: 10px; }
@@ -75,6 +81,11 @@
     .rg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
     .rg4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
     @media(max-width:560px) { .rg2,.rg3,.rg4 { grid-template-columns: 1fr; } }
+
+    /* Secondary contacts */
+    .sec-contact { background: #fafaf8; border: 1px solid #e8e8e0; border-radius: 7px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; }
+    .sec-contact-name { font-weight: 600; color: #1a1a2e; }
+    .sec-contact-meta { font-size: 11px; color: #888; margin-top: 2px; }
 
     /* Category checkboxes */
     .cat-list { display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto; border: 1px solid #e8e8e0; border-radius: 8px; padding: 8px; background: #fafaf8; }
@@ -105,6 +116,9 @@
     .cert-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; }
     .cert-cb { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #555; cursor: pointer; }
     .cert-cb input { width: 13px; height: 13px; }
+
+    /* Intel badge */
+    .intel-badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 6px; font-weight: 600; background: #eef2ff; color: #003366; margin-left: 6px; vertical-align: middle; }
   </style>
 </head>
 <body>
@@ -119,18 +133,8 @@
 
 <div class="main">
   <div class="page-title">Business Card Scanner</div>
-  <div class="page-sub">Upload or photograph business cards. Claude extracts contact details — then complete the full factory profile before saving.</div>
+  <div class="page-sub">Upload or photograph business cards. AI extracts contact details, flags uncertain fields for review, then saves the factory as an active intel asset.</div>
 
-  <div class="api-warn" id="api-warn">
-    <div style="margin-bottom:10px;font-weight:600;">⚠ No Anthropic API key found</div>
-    <div style="margin-bottom:10px;font-size:12px;font-weight:400;">Paste your key below — it will be saved to this browser only.</div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <input type="password" id="scan-apikey" placeholder="sk-ant-..." style="flex:1;padding:8px 10px;border:1px solid #d0c890;border-radius:6px;font-size:12px;font-family:monospace;outline:none;" />
-      <button onclick="saveScanKey()" style="padding:8px 16px;background:#7a6000;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Save</button>
-    </div>
-    <div id="scan-apikey-msg" style="margin-top:6px;font-size:11px;color:#5a4500;display:none;">✓ Key saved — you can now scan cards.</div>
-    <div style="margin-top:10px;font-size:11px;color:#a08840;">Or <a href="admin.html" style="color:#7a6000;font-weight:600;">add it in Admin Settings</a> if you prefer.</div>
-  </div>
   <div class="top-banner" id="top-banner"></div>
 
   <div class="upload-card">
@@ -163,7 +167,6 @@ function g(id){return document.getElementById(id);}
 
 // ── Init ──
 window.addEventListener('load',function(){
-  if(!localStorage.getItem('anthropic_key'))g('api-warn').style.display='block';
   g('file-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
   g('cam-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
   g('lib-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
@@ -173,18 +176,6 @@ window.addEventListener('load',function(){
   dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files);});
   loadCategories();
 });
-
-function saveScanKey(){
-  var input=g('scan-apikey');
-  var k=(input.value||'').trim();
-  if(!k){alert('Please paste your Anthropic API key first.');return;}
-  if(!k.startsWith('sk-ant-')){
-    if(!confirm('That key doesn\'t look like an Anthropic key (should start with "sk-ant-"). Save it anyway?'))return;
-  }
-  localStorage.setItem('anthropic_key',k);
-  var msg=g('scan-apikey-msg');msg.style.display='block';
-  setTimeout(function(){g('api-warn').style.display='none';},1500);
-}
 
 async function loadCategories(){
   try{
@@ -198,7 +189,7 @@ function handleFiles(files){
   if(!files||!files.length)return;
   Array.from(files).forEach(function(file){
     var id='c'+(++counter);
-    var card={id:id,file:file,dataUrl:null,status:'pending',data:null,errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null};
+    var card={id:id,file:file,dataUrl:null,status:'pending',data:null,confidence:{},flagged:[],errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null};
     cards.push(card);
     renderCard(card);updateBar();
     var url=URL.createObjectURL(file);
@@ -250,32 +241,49 @@ function renderCard(card){
   var review='';
   if((card.status==='done'||card.status==='done_err')&&card.data){
     var d=card.data;
+
+    var flaggedBanner='';
+    if(card.flagged && card.flagged.length){
+      flaggedBanner='<div class="confidence-banner show"><b>⚠ Review these fields:</b> '+card.flagged.map(function(f){return f.replace(/_/g,' ');}).join(', ')+'. Highlighted in yellow below.</div>';
+    }
+
+    var secContactsHtml='';
+    if(d.secondary_contacts && d.secondary_contacts.length){
+      secContactsHtml='<div class="section-title">Additional Contacts on Card <span class="intel-badge">'+d.secondary_contacts.length+'</span></div>';
+      d.secondary_contacts.forEach(function(sc){
+        secContactsHtml+='<div class="sec-contact"><div class="sec-contact-name">'+esc(sc.name||'')+(sc.title?' — '+esc(sc.title):'')+'</div><div class="sec-contact-meta">'+[sc.email,sc.phone].filter(Boolean).map(esc).join(' · ')+'</div></div>';
+      });
+    }
+
     review='<div class="ci-review">'+
+    flaggedBanner+
 
     // ── SECTION 1: Company ──
     '<div class="section-title">Company Information</div>'+
-    '<div class="rg2">'+fi(card.id,'name_en','Company Name (English)',d.factory_name_english)+fi(card.id,'name_local','Company Name (Local Language)',d.factory_name_local)+'</div>'+
+    '<div class="rg2">'+fi(card,'name_en','Company Name (English)',d.factory_name_english,'factory_name_english')+fi(card,'name_local','Company Name (Local Language)',d.factory_name_local,'factory_name_local')+'</div>'+
     '<div class="rg3">'+
-      fi(card.id,'years','Years in Business','')+
-      '<div class="rf"><label>Annual Revenue (USD)</label><select id="'+card.id+'_revenue"><option value="">— Select —</option><option>Under $1M</option><option>$1M–$5M</option><option>$5M–$10M</option><option>$10M–$50M</option><option>$50M–$100M</option><option>Over $100M</option></select></div>'+
-      fi(card.id,'export','Export %','')+
+      fi(card,'founded','Founded Year',d.founded_year,'founded_year')+
+      fi(card,'size','Factory Size (from card)',d.factory_size,'factory_size')+
+      fi(card,'tagline','Tagline / Positioning',d.company_tagline_positioning,'company_tagline_positioning')+
     '</div>'+
 
     // ── SECTION 2: Contact ──
     '<div class="section-title">Primary Sales Contact</div>'+
-    '<div class="rg3">'+fi(card.id,'contact','Contact Name',d.sales_contact_name)+fi(card.id,'title','Title / Position',d.contact_title)+fi(card.id,'email','Email',d.sales_email,'email')+'</div>'+
-    '<div class="rg3">'+fi(card.id,'mobile','Mobile',d.sales_mobile,'tel')+fi(card.id,'telephone','Telephone',d.telephone,'tel')+fi(card.id,'wechat','WeChat / QR Code',d.sales_wechat)+'</div>'+
-    '<div class="rg2">'+fi(card.id,'whatsapp','WhatsApp',d.sales_whatsapp,'tel')+fi(card.id,'website','Website',d.website)+'</div>'+
+    '<div class="rg3">'+fi(card,'contact','Contact Name',d.sales_contact_name,'sales_contact_name')+fi(card,'title','Title / Position',d.contact_title,'contact_title')+fi(card,'email','Email',d.sales_email,'sales_email','email')+'</div>'+
+    '<div class="rg3">'+fi(card,'mobile','Mobile',d.sales_mobile,'sales_mobile','tel')+fi(card,'telephone','Telephone',d.telephone,'telephone','tel')+fi(card,'wechat','WeChat',d.sales_wechat,'sales_wechat')+'</div>'+
+    '<div class="rg2">'+fi(card,'whatsapp','WhatsApp',d.sales_whatsapp,'sales_whatsapp','tel')+fi(card,'website','Website',d.website,'website')+'</div>'+
+
+    secContactsHtml+
 
     // ── SECTION 3: Address ──
     '<div class="section-title">Factory Address</div>'+
-    '<div class="rg2">'+fi(card.id,'address','Street Address',d.address)+fi(card.id,'city','City',d.city)+'</div>'+
-    '<div class="rg3">'+fi(card.id,'state','State / Province','')+fi(card.id,'postal','Postal Code','')+fi(card.id,'country','Country',d.country)+'</div>'+
+    '<div class="rg2">'+fi(card,'address','Street Address',d.address,'address')+fi(card,'city','City',d.city,'city')+'</div>'+
+    '<div class="rg3">'+fi(card,'state','State / Province',d.state_province||'','state_province')+fi(card,'postal','Postal Code',d.postal_code||'','postal_code')+fi(card,'country','Country',d.country,'country')+'</div>'+
 
-    // ── SECTION 4: Capacity ──
-    '<div class="section-title">Factory Capacity</div>'+
-    '<div class="rg4">'+fi(card.id,'emp','Total Employees','')+fi(card.id,'eng','Engineers / R&D','')+fi(card.id,'qc','QC Staff','')+fi(card.id,'lines','Production Lines','')+'</div>'+
-    '<div class="rg3">'+fi(card.id,'sqm','Floor Space (m²)','')+fi(card.id,'inj','Injection Machines','')+fi(card.id,'cap','Monthly Capacity (units)','')+'</div>'+
+    // ── SECTION 4: Capacity (manual entry, not from card usually) ──
+    '<div class="section-title">Factory Capacity (you fill in)</div>'+
+    '<div class="rg4">'+fiPlain(card.id,'emp','Total Employees','')+fiPlain(card.id,'eng','Engineers / R&D','')+fiPlain(card.id,'qc','QC Staff','')+fiPlain(card.id,'lines','Production Lines','')+'</div>'+
+    '<div class="rg3">'+fiPlain(card.id,'sqm','Floor Space (m²)','')+fiPlain(card.id,'inj','Injection Machines','')+fiPlain(card.id,'cap','Monthly Capacity (units)','')+'</div>'+
     '<div class="rf"><label>Capacity Notes</label><textarea id="'+card.id+'_capnotes" rows="2"></textarea></div>'+
 
     // ── SECTION 5: Products ──
@@ -287,10 +295,12 @@ function renderCard(card){
     buildCatCheckboxes(card.id)+
 
     // ── SECTION 7: Certifications ──
-    '<div class="section-title">Certifications</div>'+
+    '<div class="section-title">Certifications'+(d.listed_certifications && d.listed_certifications.length?' <span class="intel-badge">'+d.listed_certifications.length+' found on card</span>':'')+'</div>'+
+    (d.listed_certifications && d.listed_certifications.length?'<div style="font-size:11px;color:#7a6000;background:#fffbea;border:1px solid #f0d840;border-radius:6px;padding:6px 10px;margin-bottom:8px;">From card: '+d.listed_certifications.map(esc).join(', ')+'</div>':'')+
     '<div class="cert-grid">'+
     ['ISO 9001','ISO 14001','ISO 45001','ISO 13485','BSCI','Sedex','SA8000','ETL','UL','CE','FCC','FDA','RoHS','REACH','GRS','OEKO-TEX','FSC','GOTS','HACCP','BRC','GMP','Leaping Bunny','Cruelty Free','Vegan','Organic','CCC','KC','PSE','BIS','COSMOS'].map(function(c){
-      return '<label class="cert-cb"><input type="checkbox" class="scanner-cert" data-cardid="'+card.id+'" value="'+c+'" /> '+c+'</label>';
+      var checked=(d.listed_certifications||[]).some(function(lc){return lc && lc.toUpperCase().indexOf(c.toUpperCase())!==-1;})?' checked':'';
+      return '<label class="cert-cb"><input type="checkbox" class="scanner-cert" data-cardid="'+card.id+'" value="'+c+'"'+checked+' /> '+c+'</label>';
     }).join('')+
     '</div>'+
     '<div class="rf" style="margin-top:8px;"><label>Other Certifications</label><input type="text" id="'+card.id+'_cert_other" placeholder="e.g. TS16949, Kosher..." /></div>'+
@@ -342,7 +352,17 @@ function renderCard(card){
   g('queue').appendChild(el);
 }
 
-function fi(cid,key,label,val,type){
+// Field with confidence highlighting
+function fi(card,key,label,val,confKey,type){
+  var conf=card.confidence?card.confidence[confKey]:null;
+  var lowConf=(conf!=null && conf<0.85);
+  var cls=lowConf?' low-conf':'';
+  var confLabel=lowConf?' <span class="conf-pct">'+Math.round(conf*100)+'% conf</span>':'';
+  return '<div class="rf"><label>'+label+confLabel+'</label><input type="'+(type||'text')+'" id="'+card.id+'_'+key+'" value="'+esc(val||'')+'" class="'+cls.trim()+'" /></div>';
+}
+
+// Plain field with no confidence (for fields we don't extract from card)
+function fiPlain(cid,key,label,val,type){
   return '<div class="rf"><label>'+label+'</label><input type="'+(type||'text')+'" id="'+cid+'_'+key+'" value="'+esc(val||'')+'" /></div>';
 }
 
@@ -403,66 +423,40 @@ function quoteChosen(cardId,input){
 
 // ── Scan all ──
 async function scanAll(){
-  var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){g('api-warn').style.display='block';window.scrollTo(0,0);return;}
   var pending=cards.filter(function(c){return c.status==='pending';});
   g('scan-btn').disabled=true;
-  for(var i=0;i<pending.length;i++){await scanCard(pending[i],apiKey);}
-  updateBar();
+  for(var i=0;i<pending.length;i++){await scanCard(pending[i]);}
 }
 
-async function scanCard(card,apiKey){
+async function scanCard(card){
   card.status='processing';renderCard(card);
   try{
-    var resized=await resizeImg(card.dataUrl,2400,0.95);
-    var base64=resized.split(',')[1];
-    var prompt='You are extracting business card data for an importer\'s supplier database. Accuracy matters more than speed. The cards are often Asian-manufacturer cards with English + Chinese/Japanese/Korean text, sometimes multi-panel/folded/bilingual.\n\n'+
-'STEP 1 — READ EVERYTHING FIRST:\n'+
-'Look at the image carefully. Read every piece of visible text — Latin characters, Chinese/Japanese/Korean characters, numbers, symbols. Do not skip small text. Do not infer or guess text that isn\'t clearly visible. If text is partially obscured or unreadable, mark that field empty rather than guessing.\n\n'+
-'STEP 2 — IDENTIFY HOW MANY CARDS:\n'+
-'Multiple SEPARATE cards (different people, different companies, different designs, different angles) → return each as its own record.\n'+
-'ONE card with MULTIPLE PANELS (same company logo/colors, same person, often bilingual or folded; visible fold line; or complementary info like title on one side and mobile on the other) → return ONE merged record.\n'+
-'When uncertain, treat as separate records. Better to over-split than to mix data between different companies.\n\n'+
-'STEP 3 — MAP TEXT TO FIELDS:\n'+
-'- factory_name_english: company name in Latin script (e.g. "Shenzhen Jiahua Cosmetics Co., Ltd."). Do NOT include the person\'s name here.\n'+
-'- factory_name_local: company name in local script (Chinese/Japanese/Korean/Thai/Vietnamese characters). Empty if none.\n'+
-'- sales_contact_name: the person\'s full name as printed. If both English and local versions appear, use the English version. Do NOT include title/role here.\n'+
-'- contact_title: job title (e.g. "Sales Manager", "Export Director", "International Sales").\n'+
-'- sales_email: the email address. If multiple emails appear, use the one closest to the person\'s name.\n'+
-'- sales_mobile: mobile/cell number. Often labeled "M:", "Mobile:", "Cell:", "手机", or shows the country code with no landline format. Include the country code if shown (e.g. "+86 138 1234 5678").\n'+
-'- telephone: landline number. Labeled "T:", "Tel:", "Phone:", "电话", "Office:". Include the country code if shown.\n'+
-'- sales_wechat: WeChat ID (often labeled "WeChat:", "微信:", or shown next to a WeChat icon). Read the actual ID, not "Scan QR".\n'+
-'- sales_whatsapp: WhatsApp number if explicitly shown. If only mobile is shown, leave WhatsApp empty.\n'+
-'- website: company website URL (e.g. "www.example.com"). Do NOT put email in this field.\n'+
-'- address: full street address as printed.\n'+
-'- city: city name only.\n'+
-'- country: country name (e.g. "China", "Vietnam"). If only a city is shown, infer the country if it\'s unambiguous (Shenzhen → China, Ho Chi Minh → Vietnam).\n'+
-'- product_categories: what the company makes, in their own words from the card (e.g. "cosmetics packaging", "hair care OEM", "LED lighting"). Empty if not stated.\n'+
-'- notes: anything else useful — slogans, certifications listed on the card (ISO, BSCI, GMP), founded year, factory size.\n\n'+
-'STRICT RULES:\n'+
-'- IGNORE all fax numbers entirely. Do not put fax in telephone.\n'+
-'- IGNORE QR codes for now (decoding QR from a photo is unreliable). Leave wechat/whatsapp empty unless the ID/number is printed in readable text.\n'+
-'- NEVER put a person\'s name in the company field, even if the card style is minimal.\n'+
-'- NEVER mix data between different cards/companies in the same image.\n'+
-'- If you\'re uncertain about a number, prefer leaving it empty over guessing wrong digits.\n'+
-'- Preserve spacing in phone numbers as printed.\n\n'+
-'OUTPUT:\n'+
-'Return ONLY a JSON array — no prose, no markdown, no code fences. Empty string for any field not found:\n'+
-'[{"factory_name_english":"","factory_name_local":"","sales_contact_name":"","contact_title":"","sales_email":"","sales_mobile":"","telephone":"","sales_wechat":"","sales_whatsapp":"","website":"","address":"","city":"","country":"","product_categories":"","notes":""}]';
-    var resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-opus-4-7',max_tokens:2500,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:base64}},{type:'text',text:prompt}]}]})});
+    var base64=card.dataUrl.split(',')[1];
+    var resp=await fetch('/api/scan-business-card',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({imageBase64:base64})
+    });
     var d=await resp.json();
-    if(d.error){card.status='error';card.errorMsg='API error: '+d.error.message+' ('+d.error.type+')';}
-    else if(d.content&&d.content[0]&&d.content[0].text){
-      var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
-      var dataArr=null;
-      try{var p=JSON.parse(raw);dataArr=Array.isArray(p)?p:[p];}catch(e){}
-      if(!dataArr){try{var m=raw.match(/\[[\s\S]*\]/);if(m){var p2=JSON.parse(m[0]);dataArr=Array.isArray(p2)?p2:[p2];}}catch(e){}}
-      if(!dataArr){try{var objs=[],re=/\{[\s\S]+?\}/g,om;while((om=re.exec(raw))!==null){try{var ob=JSON.parse(om[0]);if('factory_name_english'in ob)objs.push(ob);}catch(e){}}if(objs.length)dataArr=objs;}catch(e){}}
-      if(dataArr&&dataArr.length){
-        card.data=dataArr[0];card.status='done';
-        if(dataArr.length>1){card.multiCount=dataArr.length;for(var mi=1;mi<dataArr.length;mi++){var nid='c'+(++counter);var nc={id:nid,file:card.file,dataUrl:card.dataUrl,status:'done',data:dataArr[mi],errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null,quoteFile:null};cards.push(nc);renderCard(nc);}}
-      }else{card.data={notes:raw};card.status='done_err';}
-    }else{card.status='error';card.errorMsg='Unexpected API response';}
+    if(!resp.ok){card.status='error';card.errorMsg=d.error||('HTTP '+resp.status);renderCard(card);return;}
+    if(!d.cards||!d.cards.length){card.status='done_err';card.data={notes:'No card data extracted'};renderCard(card);return;}
+
+    // First card -> this entry
+    var first=d.cards[0];
+    card.data=first;
+    card.confidence=first._confidence||{};
+    card.flagged=first._flagged||[];
+    card.status='done';
+
+    // Additional cards in same photo -> new entries
+    if(d.cards.length>1){
+      card.multiCount=d.cards.length;
+      for(var mi=1;mi<d.cards.length;mi++){
+        var nid='c'+(++counter);
+        var nc={id:nid,file:card.file,dataUrl:card.dataUrl,status:'done',data:d.cards[mi],confidence:d.cards[mi]._confidence||{},flagged:d.cards[mi]._flagged||[],errorMsg:'',multiCount:0,factoryPhotos:[],catalogFile:null};
+        cards.push(nc);renderCard(nc);
+      }
+    }
   }catch(e){card.status='error';card.errorMsg='Connection error: '+e.message;}
   renderCard(card);
 }
@@ -491,9 +485,7 @@ async function saveDraft(id){
 
   var gv=function(k){var el=g(id+'_'+k);return el?el.value.trim():'';};
 
-  // ── DUPLICATE CHECK: email is the unique key per person at Chinese factories ──
-  // If this email already exists in factories, skip the save silently and surface the existing record.
-  // No "save anyway" — clean and unambiguous.
+  // DUPLICATE CHECK
   var email=gv('email');
   var dupSlot=g(id+'_dup');
   if(dupSlot){dupSlot.style.display='none';dupSlot.innerHTML='';}
@@ -523,17 +515,25 @@ async function saveDraft(id){
 
   if(btn)btn.textContent='Saving...';
 
-  // Required: company name
   var nameEn=gv('name_en')||gv('name_local')||gv('contact')||'Unknown Factory';
   var nameEl=g(id+'_name_en');if(nameEl&&!nameEl.value.trim())nameEl.value=nameEn;
 
-  // Certifications
   var certs=[];
   document.querySelectorAll('.scanner-cert[data-cardid="'+id+'"]:checked').forEach(function(cb){certs.push(cb.value);});
   var certOther=gv('cert_other');if(certOther)certs.push(certOther);
 
-  // Build notes from title + website + notes
-  var extras=[gv('title')?'Title: '+gv('title'):'',gv('website')?'Website: '+gv('website'):'',gv('notes')||''].filter(Boolean).join(' | ');
+  // Build notes — include extra intel from card
+  var extras=[
+    gv('title')?'Title: '+gv('title'):'',
+    gv('website')?'Website: '+gv('website'):'',
+    gv('founded')?'Founded: '+gv('founded'):'',
+    gv('size')?'Factory size on card: '+gv('size'):'',
+    gv('tagline')?'Tagline: '+gv('tagline'):'',
+    card.data && card.data.secondary_contacts && card.data.secondary_contacts.length?'Additional contacts on card: '+card.data.secondary_contacts.map(function(sc){return (sc.name||'')+(sc.title?' ('+sc.title+')':'')+(sc.email?' '+sc.email:'');}).join('; '):'',
+    card.data && card.data.card_quality_indicator?'Card quality: '+card.data.card_quality_indicator:'',
+    card.data && card.data.languages_on_card && card.data.languages_on_card.length?'Languages on card: '+card.data.languages_on_card.join(', '):'',
+    gv('notes')||''
+  ].filter(Boolean).join(' | ');
 
   var payload={
     factory_name_english:nameEn,
@@ -549,9 +549,7 @@ async function saveDraft(id){
     state_province:gv('state')||null,
     postal_code:gv('postal')||null,
     country:gv('country')||null,
-    years_in_business:parseInt(gv('years'))||null,
-    annual_revenue_usd:gv('revenue')||null,
-    export_percentage:parseInt(gv('export'))||null,
+    years_in_business:gv('founded')?(new Date().getFullYear()-parseInt(gv('founded'))):null,
     product_categories:gv('categories')?[gv('categories')]:[],
     certifications:certs,
     internal_notes:extras||null,
@@ -559,7 +557,6 @@ async function saveDraft(id){
   };
 
   try{
-    // Step 1: Save factory record — use return=representation to get factory ID back
     var r=await fetch(SB+'/rest/v1/factories',{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=representation'},
@@ -583,7 +580,7 @@ async function saveDraft(id){
       return;
     }
 
-    // Step 2: Save manufacturing categories
+    // Categories
     var catChecked=[];
     document.querySelectorAll('.scanner-cat-cb[data-cardid="'+id+'"]:checked').forEach(function(cb){
       catChecked.push({factory_id:factoryId,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false});
@@ -596,7 +593,7 @@ async function saveDraft(id){
       });
     }
 
-    // Step 3: Save capacity to factory_locations
+    // Capacity
     var emp=parseInt(gv('emp')),eng=parseInt(gv('eng')),qc=parseInt(gv('qc')),lines=parseInt(gv('lines')),sqm=parseInt(gv('sqm')),inj=parseInt(gv('inj')),cap=parseInt(gv('cap')),capnotes=gv('capnotes');
     if(emp||eng||qc||lines||sqm||inj||cap||capnotes){
       await fetch(SB+'/rest/v1/factory_locations',{
@@ -606,7 +603,7 @@ async function saveDraft(id){
       });
     }
 
-    // Step 4: Upload original business card image
+    // Business card image
     if(card.dataUrl){
       try{
         var bcResized=await resizeImg(card.dataUrl,2000,0.92);
@@ -620,7 +617,7 @@ async function saveDraft(id){
       }catch(e){console.log('Business card upload error:',e.message);}
     }
 
-    // Step 5: Upload factory photos
+    // Factory photos
     for(var pi=0;pi<card.factoryPhotos.length;pi++){
       var photo=card.factoryPhotos[pi];
       try{
@@ -635,7 +632,7 @@ async function saveDraft(id){
       }catch(e){alert('Photo upload error: '+e.message);}
     }
 
-    // Step 6: Upload catalog
+    // Catalog
     if(card.catalogFile){
       if(card.catalogFile.size>50*1024*1024){
         alert('Catalog file is too large ('+(card.catalogFile.size/1024/1024).toFixed(1)+'MB). Max is 50MB. Please compress and re-upload from the factory detail page.');
@@ -650,7 +647,7 @@ async function saveDraft(id){
       }catch(e){alert('Catalog upload error: '+e.message);}
     }
 
-    // Step 7: Upload quote sheet
+    // Quote sheet
     if(card.quoteFile){
       try{
         var qtPath=factoryId+'/quotes/'+nameEn.replace(/[^a-zA-Z0-9\s]/g,'').trim()+'_Quote Sheet_'+dateStamp()+'.'+card.quoteFile.name.split('.').pop();
@@ -659,7 +656,6 @@ async function saveDraft(id){
       }catch(e){alert('Quote upload error: '+e.message);}
     }
 
-    // Success
     card.status='saved';
     showMsg(id,'ok','✓ '+nameEn+' saved with all details, categories, and files!');
     if(btn){btn.disabled=true;btn.textContent='✓ Saved';}
@@ -688,18 +684,6 @@ function dateStamp(){var d=new Date();return String(d.getMonth()+1).padStart(2,'
 function showMsg(id,type,text){var el=g(id+'_'+type);if(el){el.textContent=text;el.style.display='block';}}
 
 function escapeHtml(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-// ── SendGrid Email ──
-
-async function sendEmail(toEmail,toName,subject,body,replyTo){
-  var r=await fetch('/api/send-email',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({to:toEmail,toName:toName||'',subject:subject,body:body,replyTo:replyTo||'sourcing@tbgsourcing.net'})
-  });
-  var d=await r.json().catch(function(){return{};});
-  if(!r.ok){throw new Error(d.error||r.status);}
-  return true;
-}
 
 </script>
 </body>
