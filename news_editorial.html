@@ -19,17 +19,16 @@
 .ne-refresh:hover{background:#3355dd;}
 .ne-refresh:disabled{background:#aaa;cursor:not-allowed;}
 .ne-feed{display:flex;flex-direction:column;gap:10px;}
-.ne-article{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1rem 1.25rem;transition:all 0.15s;}
+.ne-article{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1rem 1.25rem;transition:all 0.15s;word-break:break-word;overflow-wrap:anywhere;}
 .ne-article:hover{border-color:#2244cc;}
 .ne-article.fluff{opacity:0.55;}
-.ne-art-meta{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11px;color:#888;}
+.ne-art-meta{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11px;color:#888;flex-wrap:wrap;}
 .ne-art-source{font-weight:700;color:#2244cc;}
-.ne-art-time{}
 .ne-art-fluff-badge{font-size:9px;padding:1px 6px;background:#f0f0e8;color:#888;border-radius:5px;font-weight:700;letter-spacing:0.04em;}
-.ne-art-headline{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:6px;line-height:1.35;}
+.ne-art-headline{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:6px;line-height:1.35;overflow-wrap:anywhere;}
 .ne-art-headline a{color:inherit;text-decoration:none;}
 .ne-art-headline a:hover{color:#2244cc;}
-.ne-art-highlight{font-size:13px;line-height:1.55;color:#444;margin-bottom:8px;}
+.ne-art-highlight{font-size:13px;line-height:1.55;color:#444;margin-bottom:8px;overflow-wrap:anywhere;}
 .ne-art-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
 .ne-tag{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:600;}
 .ne-tag-brand{background:#fff0f8;color:#aa2266;}
@@ -51,13 +50,13 @@
 </div>
 
 <div class="ri-tabs">
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
   <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
   <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
   <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
   <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
   <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
   <a href="news_editorial.html" class="ri-tab active"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
-  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
 </div>
 
 <div class="ne">
@@ -91,7 +90,19 @@ function sb(path){
 
 var allArticles=[];
 
-function escapeHtml(s){if(!s)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// Defensive: even if backend stored raw HTML in snippet, strip it before display
+function cleanText(s){
+  if(!s)return '';
+  // Strip HTML tags
+  s=String(s).replace(/<[^>]+>/g,' ');
+  // Decode common entities
+  s=s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
+  // Strip Google News URLs that leak through
+  s=s.replace(/https?:\/\/news\.google\.com\/[^\s]+/g,'');
+  return s.replace(/\s+/g,' ').trim();
+}
 
 function timeAgo(iso){
   if(!iso)return '';
@@ -139,14 +150,15 @@ function renderFeed(){
     (a.mentioned_ingredients||[]).slice(0,3).forEach(function(i){tags+='<span class="ne-tag ne-tag-ingredient">'+escapeHtml(i)+'</span>';});
     (a.mentioned_retailers||[]).slice(0,3).forEach(function(r){tags+='<span class="ne-tag ne-tag-retailer">'+escapeHtml(r)+'</span>';});
     (a.signal_types||[]).forEach(function(s){tags+='<span class="ne-tag ne-tag-signal">'+escapeHtml(s)+'</span>';});
+    var highlight=a.ai_highlight?cleanText(a.ai_highlight):'';
     return '<div class="ne-article '+(a.is_fluff?'fluff':'')+'">'+
       '<div class="ne-art-meta">'+
         '<span class="ne-art-source">'+escapeHtml(a.source_name||'Source')+'</span>'+
-        '<span class="ne-art-time">'+timeAgo(a.published_at||a.ingested_at)+'</span>'+
+        '<span>'+timeAgo(a.published_at||a.ingested_at)+'</span>'+
         (a.is_fluff?'<span class="ne-art-fluff-badge">FLUFF</span>':'')+
       '</div>'+
-      '<div class="ne-art-headline"><a href="'+escapeHtml(a.external_url)+'" target="_blank">'+escapeHtml(a.headline)+'</a></div>'+
-      (a.ai_highlight?'<div class="ne-art-highlight">'+escapeHtml(a.ai_highlight)+'</div>':'')+
+      '<div class="ne-art-headline"><a href="'+escapeHtml(a.external_url)+'" target="_blank">'+escapeHtml(cleanText(a.headline))+'</a></div>'+
+      (highlight?'<div class="ne-art-highlight">'+escapeHtml(highlight)+'</div>':'')+
       (tags?'<div class="ne-art-tags">'+tags+'</div>':'')+
     '</div>';
   }).join('');
