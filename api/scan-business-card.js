@@ -15,7 +15,7 @@ export const config = { runtime: 'nodejs' };
 export const maxDuration = 60;
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 async function claudeMessage(messages, maxTokens = 4000) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
