@@ -4,6 +4,42 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>News &amp; Editorial — TBG Retail Intelligence</title>
 <link rel="stylesheet" href="ri_shared.css">
+<style>
+.ne{max-width:1100px;margin:0 auto;padding:1.5rem 2rem;}
+.ne-summary{background:linear-gradient(135deg,#1a1a2e 0%,#4a2266 100%);color:#fff;border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;}
+.ne-s-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;}
+.ne-s-date{font-size:11px;opacity:0.55;margin-bottom:14px;}
+.ne-s-text{font-size:14px;line-height:1.65;color:#f0e8ff;}
+.ne-s-empty{font-size:13px;opacity:0.7;font-style:italic;}
+.ne-controls{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:14px 18px;margin-bottom:1rem;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.ne-ctl-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;}
+.ne-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#1a1a2e;font-weight:600;}
+.ne-count{font-size:12px;color:#888;margin-left:auto;}
+.ne-refresh{padding:7px 14px;font-size:12px;font-weight:600;background:#2244cc;color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit;}
+.ne-refresh:hover{background:#3355dd;}
+.ne-refresh:disabled{background:#aaa;cursor:not-allowed;}
+.ne-feed{display:flex;flex-direction:column;gap:10px;}
+.ne-article{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1rem 1.25rem;transition:all 0.15s;}
+.ne-article:hover{border-color:#2244cc;}
+.ne-article.fluff{opacity:0.55;}
+.ne-art-meta{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11px;color:#888;}
+.ne-art-source{font-weight:700;color:#2244cc;}
+.ne-art-time{}
+.ne-art-fluff-badge{font-size:9px;padding:1px 6px;background:#f0f0e8;color:#888;border-radius:5px;font-weight:700;letter-spacing:0.04em;}
+.ne-art-headline{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:6px;line-height:1.35;}
+.ne-art-headline a{color:inherit;text-decoration:none;}
+.ne-art-headline a:hover{color:#2244cc;}
+.ne-art-highlight{font-size:13px;line-height:1.55;color:#444;margin-bottom:8px;}
+.ne-art-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.ne-tag{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:600;}
+.ne-tag-brand{background:#fff0f8;color:#aa2266;}
+.ne-tag-ingredient{background:#f0faf0;color:#1a7a1a;}
+.ne-tag-celebrity{background:#eef2ff;color:#003366;}
+.ne-tag-retailer{background:#fff8e0;color:#664400;}
+.ne-tag-signal{background:#1a1a2e;color:#fff;}
+.ne-empty{padding:3rem;text-align:center;color:#888;font-size:14px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;}
+.ne-loading{padding:2rem;text-align:center;color:#888;}
+</style>
 </head>
 <body>
 
@@ -15,68 +51,131 @@
 </div>
 
 <div class="ri-tabs">
-  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs <span class="ri-tab-badge live">LIVE</span></a>
+  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
   <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
   <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
   <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
-  <a href="news_editorial.html" class="ri-tab active"><span class="ri-tab-icon">📰</span> News &amp; Editorial <span class="ri-tab-badge soon">SOON</span></a>
-  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Intelligence Hub <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab active"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
 </div>
 
-<div class="ri-stub">
-  <div class="ri-stub-banner">🚧 Coming Soon — Module 5 in the Retail Intelligence build queue</div>
-  <h1>News &amp; Editorial</h1>
-  <div class="ri-stub-subtitle">Editorial signal capture across six tiers of publication</div>
+<div class="ne">
 
-  <div class="ri-section">
-    <div class="ri-section-title">What this will do</div>
-    <p>Most beauty and HBC publications publish RSS feeds. The platform polls them daily, sends each new article through Claude for entity extraction, and stores structured mentions of brands, products, ingredients, retailers, and factories — linked into the same cross-source canonical registry as the other intelligence modules.</p>
-    <p>Result: a queryable, time-stamped feed of every relevant mention across the editorial landscape, automatically tied to TBG's existing brand, product, and factory records.</p>
+  <div class="ne-summary">
+    <div class="ne-s-label">Daily Trend Summary</div>
+    <div class="ne-s-date" id="ne-s-date">—</div>
+    <div class="ne-s-text" id="ne-s-text"><span class="ne-s-empty">Generating today's trend summary…</span></div>
   </div>
 
-  <div class="ri-section">
-    <div class="ri-section-title">Six tiers of source</div>
-    <table>
-      <thead><tr><th>T</th><th>Type</th><th>Sources</th><th>Weight</th><th>Signal</th></tr></thead>
-      <tbody>
-        <tr><td><strong>1</strong></td><td>Trade B2B</td><td>Beauty Independent, Cosmetics Business, Happi, GCI, Cosmetics Design, WWD beauty</td><td>1.0</td><td>Industry / factory / M&amp;A</td></tr>
-        <tr><td><strong>2</strong></td><td>Beauty editorial</td><td>Allure, Glossy, Byrdie, Refinery29, The Cut, Vogue beauty</td><td>0.7</td><td>Trend narrative</td></tr>
-        <tr><td><strong>3</strong></td><td>Women's lifestyle</td><td>Cosmopolitan, Glamour, Marie Claire, Elle, Real Simple, Good Housekeeping</td><td>0.5</td><td>Mass beauty trends</td></tr>
-        <tr><td><strong>4</strong></td><td>Celebrity / gossip</td><td>People, InTouch, Us Weekly, Page Six, Daily Mail, TMZ, Hollywood Life, E! News</td><td>0.3</td><td>Consumer demand</td></tr>
-        <tr><td><strong>5</strong></td><td>PR wires</td><td>PRNewswire, BusinessWire, GlobeNewswire</td><td>0.4</td><td>Formal announcements</td></tr>
-        <tr><td><strong>6</strong></td><td>Mainstream business</td><td>WSJ, Bloomberg, Forbes beauty</td><td>0.6</td><td>M&amp;A, major launches</td></tr>
-      </tbody>
-    </table>
+  <div class="ne-controls">
+    <div class="ne-ctl-label">Filters</div>
+    <label class="ne-toggle"><input type="checkbox" id="hide-fluff" checked onchange="renderFeed()"> Hide fluff</label>
+    <span class="ne-count" id="ne-count">—</span>
+    <button class="ne-refresh" id="refresh-btn" onclick="refresh()">↻ Refresh Feed</button>
   </div>
 
-  <div class="ri-section">
-    <div class="ri-section-title">Why celebrity press despite low authority weight</div>
-    <p>Authority weight measures factual reliability. Celebrity press carries a different signal: <strong>mass consumer demand</strong>. When People features an $8 drugstore mascara "selling out everywhere," that product will appear in TBG's shop-outs within weeks. Leading indicator of shelf demand — especially relevant for HBC sourcing that skews drugstore and mass tier.</p>
+  <div class="ne-feed" id="ne-feed">
+    <div class="ne-loading">Loading articles…</div>
   </div>
 
-  <div class="ri-section">
-    <div class="ri-section-title">Cross-source queries this enables</div>
-    <ul class="ri-query-list">
-      <li>Brands mentioned in Beauty Independent in last 30 days that are also in TBG's factory pipeline — sourcing opportunities</li>
-      <li>Ingredients trending up over 6 months in editorial coverage — formulation roadmap</li>
-      <li>Trends spotted in factory intel that later get editorial validation — confirmation signal</li>
-      <li>M&amp;A and supplier consolidation affecting TBG's competitive set or supply base</li>
-      <li>Brand crises (recalls, ingredient controversies) on competitors TBG sources against — opportunistic positioning</li>
-    </ul>
-  </div>
-
-  <div class="ri-section">
-    <div class="ri-section-title">Cost &amp; build</div>
-    <div class="ri-cost-block">
-      <strong>RSS aggregation:</strong> free<br>
-      <strong>NewsAPI fallback for non-RSS sources:</strong> $50–200/month<br>
-      <strong>Claude extraction:</strong> $40–180/month<br>
-      <strong>Total monthly:</strong> ~$70–280<br>
-      <strong>Build effort:</strong> 4–5 cycles<br>
-      <strong>Ships after:</strong> Factory Intelligence (Module 4)
-    </div>
-  </div>
 </div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function sb(path){
+  return fetch(SB+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}).then(function(r){return r.json();});
+}
+
+var allArticles=[];
+
+function escapeHtml(s){if(!s)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+function timeAgo(iso){
+  if(!iso)return '';
+  var diff=Date.now()-new Date(iso).getTime();
+  var hrs=Math.floor(diff/3600000);
+  if(hrs<1)return Math.floor(diff/60000)+'m ago';
+  if(hrs<24)return hrs+'h ago';
+  return Math.floor(hrs/24)+'d ago';
+}
+
+function loadSummary(){
+  sb('news_daily_summaries?order=summary_date.desc&limit=1').then(function(rows){
+    if(rows && rows.length){
+      var d=new Date(rows[0].summary_date);
+      document.getElementById('ne-s-date').textContent=d.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+' · '+(rows[0].article_count||0)+' articles';
+      document.getElementById('ne-s-text').textContent=rows[0].summary_text;
+    } else {
+      var today=new Date();
+      document.getElementById('ne-s-date').textContent=today.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+      document.getElementById('ne-s-text').innerHTML='<span class="ne-s-empty">No summary yet. Trigger a refresh to ingest today\'s news.</span>';
+    }
+  });
+}
+
+function loadArticles(){
+  sb('news_articles?order=published_at.desc.nullslast,ingested_at.desc&limit=200').then(function(rows){
+    allArticles=rows||[];
+    renderFeed();
+  });
+}
+
+function renderFeed(){
+  var hideFluff=document.getElementById('hide-fluff').checked;
+  var filtered=hideFluff?allArticles.filter(function(a){return !a.is_fluff;}):allArticles;
+  var feed=document.getElementById('ne-feed');
+  document.getElementById('ne-count').textContent=filtered.length+' of '+allArticles.length+' articles';
+  if(!filtered.length){
+    feed.innerHTML='<div class="ne-empty">No articles yet. Click <strong>Refresh Feed</strong> to fetch today\'s news.</div>';
+    return;
+  }
+  feed.innerHTML=filtered.map(function(a){
+    var tags='';
+    (a.mentioned_brands||[]).slice(0,4).forEach(function(b){tags+='<span class="ne-tag ne-tag-brand">'+escapeHtml(b)+'</span>';});
+    (a.mentioned_celebrities||[]).slice(0,3).forEach(function(c){tags+='<span class="ne-tag ne-tag-celebrity">'+escapeHtml(c)+'</span>';});
+    (a.mentioned_ingredients||[]).slice(0,3).forEach(function(i){tags+='<span class="ne-tag ne-tag-ingredient">'+escapeHtml(i)+'</span>';});
+    (a.mentioned_retailers||[]).slice(0,3).forEach(function(r){tags+='<span class="ne-tag ne-tag-retailer">'+escapeHtml(r)+'</span>';});
+    (a.signal_types||[]).forEach(function(s){tags+='<span class="ne-tag ne-tag-signal">'+escapeHtml(s)+'</span>';});
+    return '<div class="ne-article '+(a.is_fluff?'fluff':'')+'">'+
+      '<div class="ne-art-meta">'+
+        '<span class="ne-art-source">'+escapeHtml(a.source_name||'Source')+'</span>'+
+        '<span class="ne-art-time">'+timeAgo(a.published_at||a.ingested_at)+'</span>'+
+        (a.is_fluff?'<span class="ne-art-fluff-badge">FLUFF</span>':'')+
+      '</div>'+
+      '<div class="ne-art-headline"><a href="'+escapeHtml(a.external_url)+'" target="_blank">'+escapeHtml(a.headline)+'</a></div>'+
+      (a.ai_highlight?'<div class="ne-art-highlight">'+escapeHtml(a.ai_highlight)+'</div>':'')+
+      (tags?'<div class="ne-art-tags">'+tags+'</div>':'')+
+    '</div>';
+  }).join('');
+}
+
+function refresh(){
+  var btn=document.getElementById('refresh-btn');
+  btn.disabled=true;btn.textContent='Fetching…';
+  fetch('/api/fetch-news-alerts',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(function(r){return r.json();}).then(function(d){
+    if(d.success){
+      btn.textContent='✓ '+d.new_articles+' new';
+      setTimeout(function(){
+        loadSummary();
+        loadArticles();
+        btn.disabled=false;btn.textContent='↻ Refresh Feed';
+      },500);
+    } else {
+      btn.disabled=false;btn.textContent='↻ Refresh Feed';
+      alert('Refresh failed: '+(d.error||'unknown'));
+    }
+  }).catch(function(e){
+    btn.disabled=false;btn.textContent='↻ Refresh Feed';
+    alert('Error: '+e.message);
+  });
+}
+
+loadSummary();
+loadArticles();
+</script>
 
 </body>
 </html>
