@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Retailer Intel — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+.ri{display:flex;height:calc(100vh - 52px - 49px);overflow:hidden;}
+.ri-list{flex:1;overflow-y:auto;padding:1.5rem 2rem;background:#f5f5f0;}
+.ri-detail{width:600px;flex-shrink:0;border-left:1px solid #e0e0d8;background:#fff;overflow-y:auto;}
+.ri-tier-section{margin-bottom:2rem;}
+.ri-tier-head{display:flex;align-items:baseline;gap:10px;margin-bottom:0.75rem;padding-bottom:8px;border-bottom:1px solid #e0e0d8;}
+.ri-tier-name{font-size:13px;font-weight:700;color:#1a1a2e;letter-spacing:0.02em;}
+.ri-tier-count{font-size:11px;color:#888;}
+.ri-tier-desc{font-size:11px;color:#888;font-style:italic;margin-left:auto;}
+.ri-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;}
+.r-card{background:#fff;border:1px solid #e0e0d8;border-radius:9px;padding:14px;cursor:pointer;transition:all 0.15s;}
+.r-card:hover{border-color:#2244cc;box-shadow:0 2px 6px rgba(34,68,204,0.08);}
+.r-card.sel{border-color:#2244cc;background:#f5f7ff;}
+.r-card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+.r-card-name{font-size:13px;font-weight:700;color:#1a1a2e;}
+.r-card-ticker{font-size:10px;background:#eef2ff;color:#003366;padding:2px 6px;border-radius:5px;font-weight:600;font-family:'SF Mono',Monaco,monospace;}
+.r-card-loc{font-size:10px;color:#888;margin-bottom:8px;}
+.r-card-counts{display:flex;gap:10px;font-size:10px;color:#666;}
+.r-card-count-num{font-weight:700;color:#1a1a2e;}
+.r-status{font-size:9px;font-weight:700;padding:2px 7px;border-radius:7px;letter-spacing:0.04em;white-space:nowrap;margin-top:6px;display:inline-block;}
+.r-status.live{background:#edfaed;color:#1a7a1a;}
+.r-status.awaiting{background:#f0f0e8;color:#888;}
+.r-status.failed{background:#fce8e8;color:#a22;}
+
+.r-detail-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#bbb;padding:2rem;text-align:center;gap:10px;}
+.r-detail-head{padding:1.5rem;border-bottom:1px solid #e0e0d8;}
+.r-detail-name{font-size:22px;font-weight:700;color:#1a1a2e;}
+.r-detail-ticker{display:inline-block;font-size:11px;background:#eef2ff;color:#003366;padding:3px 9px;border-radius:6px;font-weight:600;font-family:'SF Mono',Monaco,monospace;margin-left:10px;vertical-align:middle;}
+.r-detail-meta{font-size:12px;color:#888;margin-top:8px;}
+.r-detail-meta a{color:#2244cc;text-decoration:none;}
+.r-detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px;}
+.r-detail-stat{background:#fafaf8;border-radius:7px;padding:10px 12px;}
+.r-detail-stat-label{font-size:9px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#888;}
+.r-detail-stat-val{font-size:18px;font-weight:700;color:#1a1a2e;margin-top:3px;}
+.r-detail-action{padding:1rem 1.5rem;border-bottom:1px solid #e0e0d8;display:flex;gap:8px;flex-wrap:wrap;}
+.r-btn{padding:9px 16px;font-size:12px;font-weight:600;border:none;border-radius:7px;cursor:pointer;font-family:inherit;}
+.r-btn-primary{background:#2244cc;color:#fff;}
+.r-btn-primary:hover{background:#3355dd;}
+.r-btn-primary:disabled{background:#aaa;cursor:not-allowed;}
+.r-btn-secondary{background:#f0f0e8;color:#444;}
+
+.r-tabs{display:flex;gap:0;border-bottom:1px solid #e0e0d8;background:#fafaf8;}
+.r-tabbtn{flex:1;padding:11px 14px;background:none;border:none;border-bottom:2px solid transparent;font-size:12px;font-weight:600;color:#888;cursor:pointer;font-family:inherit;}
+.r-tabbtn.active{color:#2244cc;border-bottom-color:#2244cc;background:#fff;}
+.r-tabbtn:hover:not(.active){color:#444;background:#f0f0e8;}
+
+.r-content{padding:1rem 1.5rem;}
+.r-filing,.r-news{background:#fff;border:1px solid #e0e0d8;border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+.r-filing:hover,.r-news:hover{border-color:#2244cc;}
+.r-filing-meta,.r-news-meta{display:flex;gap:10px;align-items:center;margin-bottom:6px;font-size:10px;flex-wrap:wrap;}
+.r-filing-form{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:#1a1a2e;color:#fff;font-family:'SF Mono',Monaco,monospace;letter-spacing:0.05em;}
+.r-filing-form.k{background:#aa2266;}
+.r-filing-form.q{background:#003366;}
+.r-filing-form.k8{background:#664400;}
+.r-filing-date,.r-news-date{font-size:10px;color:#888;}
+.r-filing-title{font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;}
+.r-filing-summary{font-size:12px;color:#444;line-height:1.55;margin-bottom:8px;overflow-wrap:anywhere;}
+.r-filing-signals{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.r-tag{font-size:10px;padding:2px 7px;border-radius:5px;font-weight:600;background:#eef2ff;color:#003366;}
+.r-tag.inv-rising{background:#fce8e8;color:#a22;}
+.r-tag.inv-falling{background:#edfaed;color:#1a7a1a;}
+.r-tag.margin-high{background:#fce8e8;color:#a22;}
+.r-tag.private-label{background:#fff0f8;color:#aa2266;}
+.r-quotes{margin-top:8px;border-left:3px solid #e0e0d8;padding:4px 10px;}
+.r-quote{font-size:11px;color:#666;font-style:italic;margin-bottom:3px;}
+.r-filing-link{font-size:10px;color:#2244cc;text-decoration:none;margin-left:auto;}
+
+.r-news-source{font-weight:700;color:#2244cc;font-size:10px;}
+.r-news-headline{font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;overflow-wrap:anywhere;}
+.r-news-headline a{color:inherit;text-decoration:none;}
+.r-news-headline a:hover{color:#2244cc;}
+.r-news-highlight{font-size:12px;color:#666;line-height:1.5;overflow-wrap:anywhere;}
+.r-empty{padding:2rem;text-align:center;color:#888;font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="ri-top">
+  <div class="ri-top-title">🎯 Retail Intelligence</div>
+  <div class="ri-top-actions">
+    <a href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="ri-tabs">
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
+  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
+  <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="retailer_intel.html" class="ri-tab active"><span class="ri-tab-icon">🏬</span> Retailer Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
+</div>
+
+<div class="ri">
+
+  <div class="ri-list">
+    <div id="tier-1" class="ri-tier-section">
+      <div class="ri-tier-head">
+        <div class="ri-tier-name">Tier 1 — Off-Price</div>
+        <div class="ri-tier-count" id="cnt-1">0</div>
+        <div class="ri-tier-desc">TBG's primary sell-in channel</div>
+      </div>
+      <div class="ri-grid" id="grid-1"></div>
+    </div>
+    <div id="tier-2" class="ri-tier-section">
+      <div class="ri-tier-head">
+        <div class="ri-tier-name">Tier 2 — Mass + Dollar / Value</div>
+        <div class="ri-tier-count" id="cnt-2">0</div>
+        <div class="ri-tier-desc">Volume channels, private-label pressure</div>
+      </div>
+      <div class="ri-grid" id="grid-2"></div>
+    </div>
+    <div id="tier-3" class="ri-tier-section">
+      <div class="ri-tier-head">
+        <div class="ri-tier-name">Tier 3 — Drug + Beauty Specialty</div>
+        <div class="ri-tier-count" id="cnt-3">0</div>
+        <div class="ri-tier-desc">Beauty-category specific signals</div>
+      </div>
+      <div class="ri-grid" id="grid-3"></div>
+    </div>
+    <div id="tier-4" class="ri-tier-section">
+      <div class="ri-tier-head">
+        <div class="ri-tier-name">Tier 4 — Club + Department</div>
+        <div class="ri-tier-count" id="cnt-4">0</div>
+        <div class="ri-tier-desc">Adjacent channels</div>
+      </div>
+      <div class="ri-grid" id="grid-4"></div>
+    </div>
+  </div>
+
+  <div class="ri-detail" id="r-detail">
+    <div class="r-detail-empty">
+      <div style="font-size:42px;">🏬</div>
+      <div>Select a retailer to view filings &amp; news</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function sb(path){return fetch(SB+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}).then(function(r){return r.json();});}
+
+var allRetailers=[];
+var countsByRetailer={};
+var selectedId=null;
+var currentTab='filings';
+
+function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function timeAgo(iso){if(!iso)return '';var diff=Date.now()-new Date(iso).getTime();var hrs=Math.floor(diff/3600000);if(hrs<1)return Math.floor(diff/60000)+'m ago';if(hrs<24)return hrs+'h ago';return Math.floor(hrs/24)+'d ago';}
+
+function loadRetailers(){
+  Promise.all([
+    sb('retailers?select=*&order=tier.asc,name.asc'),
+    sb('retailer_filings?select=retailer_id&order=filing_date.desc&limit=2000'),
+    sb('retailer_news?select=retailer_id&limit=2000')
+  ]).then(function(results){
+    allRetailers=results[0]||[];
+    var filings=results[1]||[];
+    var news=results[2]||[];
+    countsByRetailer={};
+    allRetailers.forEach(function(r){countsByRetailer[r.id]={filings:0,news:0};});
+    filings.forEach(function(f){if(countsByRetailer[f.retailer_id])countsByRetailer[f.retailer_id].filings++;});
+    news.forEach(function(n){if(countsByRetailer[n.retailer_id])countsByRetailer[n.retailer_id].news++;});
+    renderRetailers();
+  });
+}
+
+function renderRetailers(){
+  [1,2,3,4].forEach(function(t){
+    var grid=document.getElementById('grid-'+t);
+    var retailers=allRetailers.filter(function(r){return r.tier===t;});
+    document.getElementById('cnt-'+t).textContent=retailers.length+' retailers';
+    grid.innerHTML=retailers.map(function(r){
+      var counts=countsByRetailer[r.id]||{filings:0,news:0};
+      var hasData=counts.filings>0||counts.news>0;
+      return '<div class="r-card" data-id="'+r.id+'" onclick="selectRetailer(\''+r.id+'\')">'+
+        '<div class="r-card-head"><div class="r-card-name">'+escapeHtml(r.name)+'</div>'+(r.ticker?'<span class="r-card-ticker">'+escapeHtml(r.ticker)+'</span>':'')+'</div>'+
+        '<div class="r-card-loc">'+escapeHtml([r.hq_city,r.hq_state].filter(Boolean).join(', '))+'</div>'+
+        '<div class="r-card-counts">'+
+          '<span><span class="r-card-count-num">'+counts.filings+'</span> filings</span>'+
+          '<span><span class="r-card-count-num">'+counts.news+'</span> news</span>'+
+        '</div>'+
+        '<span class="r-status '+(hasData?'live':'awaiting')+'">'+(hasData?'TRACKED':'AWAITING PULL')+'</span>'+
+      '</div>';
+    }).join('');
+  });
+}
+
+function selectRetailer(id){
+  selectedId=id;
+  currentTab='filings';
+  document.querySelectorAll('.r-card').forEach(function(el){el.classList.toggle('sel',el.getAttribute('data-id')===id);});
+  var r=allRetailers.find(function(x){return x.id===id;});
+  if(!r)return;
+  renderDetailShell(r);
+  loadTabContent();
+}
+
+function renderDetailShell(r){
+  var counts=countsByRetailer[r.id]||{filings:0,news:0};
+  var tierNames={1:'Off-Price',2:'Mass + Dollar',3:'Drug + Beauty',4:'Club + Department'};
+
+  var html='<div class="r-detail-head">'+
+    '<div class="r-detail-name">'+escapeHtml(r.name)+(r.ticker?'<span class="r-detail-ticker">'+escapeHtml(r.ticker)+'</span>':'')+'</div>'+
+    '<div class="r-detail-meta">Tier '+r.tier+' · '+tierNames[r.tier]+(r.hq_city?' · '+escapeHtml(r.hq_city)+', '+escapeHtml(r.hq_state||''):'')+
+    (r.ir_url?' · <a href="'+escapeHtml(r.ir_url)+'" target="_blank">Investor Relations ↗</a>':'')+'</div>'+
+    '<div class="r-detail-stats">'+
+      '<div class="r-detail-stat"><div class="r-detail-stat-label">SEC Filings</div><div class="r-detail-stat-val">'+counts.filings+'</div></div>'+
+      '<div class="r-detail-stat"><div class="r-detail-stat-label">News Articles</div><div class="r-detail-stat-val">'+counts.news+'</div></div>'+
+      '<div class="r-detail-stat"><div class="r-detail-stat-label">CIK</div><div class="r-detail-stat-val" style="font-size:13px;font-family:Monaco,monospace;">'+escapeHtml(r.cik||'—')+'</div></div>'+
+    '</div>'+
+  '</div>'+
+  '<div class="r-detail-action">'+
+    '<button class="r-btn r-btn-primary" id="pull-edgar-btn" onclick="runEdgar(\''+r.id+'\')">📄 Pull EDGAR Now</button>'+
+    '<button class="r-btn r-btn-primary" id="pull-news-btn" onclick="runNews(\''+r.id+'\')">📰 Pull News Now</button>'+
+    (r.primary_url?'<button class="r-btn r-btn-secondary" onclick="window.open(\''+escapeHtml(r.primary_url)+'\',\'_blank\')">Site ↗</button>':'')+
+  '</div>'+
+  '<div class="r-tabs">'+
+    '<button class="r-tabbtn active" data-tab="filings" onclick="switchTab(\'filings\')">SEC Filings</button>'+
+    '<button class="r-tabbtn" data-tab="news" onclick="switchTab(\'news\')">News</button>'+
+  '</div>'+
+  '<div class="r-content" id="r-content"><div class="r-empty">Loading…</div></div>';
+
+  document.getElementById('r-detail').innerHTML=html;
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.r-tabbtn').forEach(function(b){b.classList.toggle('active',b.getAttribute('data-tab')===tab);});
+  loadTabContent();
+}
+
+function loadTabContent(){
+  if(!selectedId)return;
+  if(currentTab==='filings')loadFilings(selectedId);
+  else loadNews(selectedId);
+}
+
+function loadFilings(retailerId){
+  sb('retailer_filings?retailer_id=eq.'+retailerId+'&order=filing_date.desc.nullslast&limit=30').then(function(rows){
+    var c=document.getElementById('r-content');
+    if(!rows||!rows.length){c.innerHTML='<div class="r-empty">No SEC filings yet for this retailer.<br>Click <strong>Pull EDGAR Now</strong> to fetch recent filings.</div>';return;}
+    c.innerHTML=rows.map(function(f){
+      var formClass=f.form_type==='10-K'?'k':f.form_type==='10-Q'?'q':f.form_type==='8-K'?'k8':'';
+      var signals=f.ai_extracted_signals||{};
+      var sigTags='';
+      if(signals.inventory_trend && signals.inventory_trend!=='not_mentioned'){
+        var cls=signals.inventory_trend==='rising'?'inv-rising':signals.inventory_trend==='falling'?'inv-falling':'';
+        sigTags+='<span class="r-tag '+cls+'">Inventory: '+escapeHtml(signals.inventory_trend)+'</span>';
+      }
+      if(signals.margin_pressure && signals.margin_pressure!=='not_mentioned'){
+        var cls2=signals.margin_pressure==='high'?'margin-high':'';
+        sigTags+='<span class="r-tag '+cls2+'">Margin pressure: '+escapeHtml(signals.margin_pressure)+'</span>';
+      }
+      if(signals.private_label_intentions && signals.private_label_intentions!=='not_mentioned'){
+        sigTags+='<span class="r-tag private-label">Private label: '+escapeHtml(signals.private_label_intentions)+'</span>';
+      }
+      if(signals.store_geography && signals.store_geography!=='not_mentioned'){
+        sigTags+='<span class="r-tag">Stores: '+escapeHtml(signals.store_geography)+'</span>';
+      }
+      if(signals.tariff_mentions)sigTags+='<span class="r-tag">Tariffs mentioned</span>';
+      (signals.category_signals||[]).slice(0,3).forEach(function(s){sigTags+='<span class="r-tag">'+escapeHtml(s)+'</span>';});
+      (signals.exec_moves||[]).slice(0,2).forEach(function(s){sigTags+='<span class="r-tag">Exec: '+escapeHtml(s)+'</span>';});
+
+      var quotes='';
+      if(signals.noteworthy_quotes && signals.noteworthy_quotes.length){
+        quotes='<div class="r-quotes">'+signals.noteworthy_quotes.slice(0,3).map(function(q){return '<div class="r-quote">"'+escapeHtml(q)+'"</div>';}).join('')+'</div>';
+      }
+
+      return '<div class="r-filing">'+
+        '<div class="r-filing-meta">'+
+          '<span class="r-filing-form '+formClass+'">'+escapeHtml(f.form_type)+'</span>'+
+          '<span class="r-filing-date">'+(f.filing_date?new Date(f.filing_date).toLocaleDateString():'')+'</span>'+
+          (f.report_date?'<span class="r-filing-date">period ending '+new Date(f.report_date).toLocaleDateString()+'</span>':'')+
+          (f.primary_doc_url?'<a class="r-filing-link" href="'+escapeHtml(f.primary_doc_url)+'" target="_blank">View on SEC ↗</a>':'')+
+        '</div>'+
+        (f.ai_summary?'<div class="r-filing-summary">'+escapeHtml(f.ai_summary)+'</div>':(f.parse_status==='skipped'?'<div class="r-filing-summary" style="color:#888;font-style:italic;">Filing indexed but not parsed (form type not parsed in v1).</div>':f.parse_status==='failed'?'<div class="r-filing-summary" style="color:#a22;">Parse failed: '+escapeHtml(f.parse_error||'')+'</div>':'<div class="r-filing-summary" style="color:#888;font-style:italic;">Parse pending.</div>'))+
+        (sigTags?'<div class="r-filing-signals">'+sigTags+'</div>':'')+
+        quotes+
+      '</div>';
+    }).join('');
+  });
+}
+
+function loadNews(retailerId){
+  sb('retailer_news?retailer_id=eq.'+retailerId+'&select=news_article_id,news_articles(id,headline,external_url,source_name,published_at,ai_highlight,signal_types,is_fluff)&order=ingested_at.desc&limit=50').then(function(rows){
+    var c=document.getElementById('r-content');
+    if(!rows||!rows.length){c.innerHTML='<div class="r-empty">No news articles yet for this retailer.<br>Click <strong>Pull News Now</strong> to fetch recent articles.</div>';return;}
+    var articles=rows.map(function(r){return r.news_articles;}).filter(Boolean).filter(function(a){return !a.is_fluff;});
+    if(!articles.length){c.innerHTML='<div class="r-empty">All recent articles classified as fluff. Try pulling again later.</div>';return;}
+    c.innerHTML=articles.map(function(a){
+      var tags=(a.signal_types||[]).map(function(s){return '<span class="r-tag">'+escapeHtml(s.replace(/_/g,' '))+'</span>';}).join('');
+      return '<div class="r-news">'+
+        '<div class="r-news-meta"><span class="r-news-source">'+escapeHtml(a.source_name||'Source')+'</span><span class="r-news-date">'+timeAgo(a.published_at)+'</span></div>'+
+        '<div class="r-news-headline"><a href="'+escapeHtml(a.external_url)+'" target="_blank">'+escapeHtml(a.headline||'')+'</a></div>'+
+        (a.ai_highlight?'<div class="r-news-highlight">'+escapeHtml(a.ai_highlight)+'</div>':'')+
+        (tags?'<div class="r-filing-signals">'+tags+'</div>':'')+
+      '</div>';
+    }).join('');
+  });
+}
+
+function runEdgar(retailerId){
+  var btn=document.getElementById('pull-edgar-btn');
+  btn.disabled=true;btn.textContent='Pulling EDGAR…';
+  fetch('/api/pull-retailer-edgar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({retailer_id:retailerId})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.success){
+        btn.textContent='✓ '+d.new_filings+' new filings';
+        setTimeout(function(){
+          loadRetailers();
+          setTimeout(function(){selectRetailer(retailerId);},300);
+        },1200);
+      } else {
+        btn.disabled=false;btn.textContent='📄 Pull EDGAR Now';
+        alert('Pull failed: '+(d.error||'unknown'));
+      }
+    }).catch(function(e){
+      btn.disabled=false;btn.textContent='📄 Pull EDGAR Now';
+      alert('Error: '+e.message);
+    });
+}
+
+function runNews(retailerId){
+  var btn=document.getElementById('pull-news-btn');
+  btn.disabled=true;btn.textContent='Pulling News…';
+  fetch('/api/pull-retailer-news',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({retailer_id:retailerId})})
+    .then(function(r){return r.json();}).then(function(d){
+      if(d.success){
+        btn.textContent='✓ '+d.new_articles+' new articles';
+        setTimeout(function(){
+          loadRetailers();
+          setTimeout(function(){selectRetailer(retailerId);},300);
+        },1200);
+      } else {
+        btn.disabled=false;btn.textContent='📰 Pull News Now';
+        alert('Pull failed: '+(d.error||'unknown'));
+      }
+    }).catch(function(e){
+      btn.disabled=false;btn.textContent='📰 Pull News Now';
+      alert('Error: '+e.message);
+    });
+}
+
+loadRetailers();
+</script>
+
+</body>
+</html>

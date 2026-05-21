@@ -56,6 +56,7 @@
   <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
   <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
   <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="retailer_intel.html" class="ri-tab"><span class="ri-tab-icon">🏬</span> Retailer Intel <span class="ri-tab-badge beta">BETA</span></a>
   <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
   <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
 </div>
@@ -122,6 +123,12 @@
       <div class="mc-stat-label">Retailers</div>
       <div class="mc-desc">Retailer e-commerce catalogs. Documents what's reached online retail.</div>
     </a>
+    <a href="retailer_intel.html" class="module-card">
+      <div class="mc-head"><div class="mc-title">🏬 Retailer Intel <span class="mc-badge beta">BETA</span></div></div>
+      <div class="mc-stat" id="mc-stat-ri">—</div>
+      <div class="mc-stat-label">Retailers tracked</div>
+      <div class="mc-desc">SEC filings + news. What retailers are telling Wall Street about their sourcing strategy.</div>
+    </a>
     <a href="social_trends.html" class="module-card">
       <div class="mc-head"><div class="mc-title">📈 Social Trends <span class="mc-badge soon">SOON</span></div></div>
       <div class="mc-stat zero">—</div>
@@ -173,6 +180,11 @@ function loadCounts(){
     var el=document.getElementById('mc-stat-bw');
     if(r && r.length){el.textContent=r.length;} else {el.textContent='0';el.classList.add('zero');}
   }).catch(function(){document.getElementById('mc-stat-bw').textContent='0';});
+
+  sb('retailers?select=id&status=eq.active').then(function(r){
+    var el=document.getElementById('mc-stat-ri');
+    if(r && r.length){el.textContent=r.length;} else {el.textContent='0';el.classList.add('zero');}
+  }).catch(function(){var el=document.getElementById('mc-stat-ri');if(el)el.textContent='0';});
 
   var todayIso=new Date(new Date().setHours(0,0,0,0)).toISOString();
   sb('news_articles?select=id&ingested_at=gte.'+todayIso+'&is_fluff=eq.false').then(function(r){
