@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roadmap — Supplier Portal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a2e;min-height:100vh;}
+.topbar{height:52px;background:#fff;border-bottom:1px solid #e0e0d8;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:sticky;top:0;z-index:50;}
+.topbar-l{display:flex;align-items:center;gap:10px;}
+.tm{width:28px;height:28px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.topbar-title{font-size:14px;font-weight:600;}
+.topbar-actions{display:flex;gap:10px;align-items:center;}
+.btn{padding:8px 14px;font-size:12px;font-weight:600;border:none;border-radius:7px;cursor:pointer;font-family:inherit;}
+.btn-primary{background:#1a1a2e;color:#fff;}
+.btn-primary:hover{opacity:0.87;}
+.btn-secondary{background:#f0f0e8;color:#444;border:1px solid #e0e0d8;}
+.btn-secondary:hover{background:#e8e8e0;}
+.back-link{font-size:13px;color:#888;text-decoration:none;}
+.back-link:hover{color:#1a1a2e;}
+
+.page-head{padding:1.5rem 1.5rem 0.75rem;max-width:none;}
+.page-title{font-size:22px;font-weight:700;}
+.page-sub{font-size:13px;color:#888;margin-top:4px;}
+
+.controls{padding:0.75rem 1.5rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.search{padding:7px 11px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;width:260px;font-family:inherit;background:#fff;}
+.tag-filter{padding:7px 11px;font-size:12px;border:1px solid #e0e0d8;border-radius:7px;background:#fff;cursor:pointer;font-family:inherit;}
+.counts{margin-left:auto;font-size:11px;color:#888;}
+
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:0 1.5rem 2rem;min-height:calc(100vh - 200px);}
+@media(max-width:1400px){.board{grid-template-columns:repeat(3,1fr);}}
+@media(max-width:800px){.board{grid-template-columns:1fr;}}
+
+.col{background:#fafaf8;border:1px solid #e0e0d8;border-radius:10px;display:flex;flex-direction:column;min-height:200px;}
+.col-head{padding:12px 14px;border-bottom:1px solid #e0e0d8;display:flex;justify-content:space-between;align-items:center;background:#fff;border-radius:10px 10px 0 0;}
+.col-title{font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#444;}
+.col-count{font-size:11px;color:#888;font-weight:600;background:#f0f0e8;padding:2px 7px;border-radius:10px;}
+.col-now .col-head{border-top:3px solid #2244cc;border-radius:7px 7px 0 0;}
+.col-next .col-head{border-top:3px solid #7755dd;border-radius:7px 7px 0 0;}
+.col-soon .col-head{border-top:3px solid #aa8844;border-radius:7px 7px 0 0;}
+.col-backlog .col-head{border-top:3px solid #888;border-radius:7px 7px 0 0;}
+.col-on_hold .col-head{border-top:3px solid #a22;border-radius:7px 7px 0 0;}
+.col-done .col-head{border-top:3px solid #1a7a1a;border-radius:7px 7px 0 0;}
+
+.col-body{padding:10px;display:flex;flex-direction:column;gap:8px;min-height:80px;}
+.col-body.drag-over{background:#eef2ff;}
+
+.item{background:#fff;border:1px solid #e0e0d8;border-radius:8px;padding:10px 12px;cursor:grab;transition:all 0.12s;position:relative;}
+.item:hover{border-color:#2244cc;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+.item.dragging{opacity:0.4;cursor:grabbing;}
+.item.editing{border-color:#2244cc;background:#f5f7ff;cursor:default;}
+.item-title{font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;line-height:1.35;}
+.item-title.editing-input{width:100%;border:1px solid #c0d0f0;background:#fff;border-radius:5px;padding:4px 6px;font-size:13px;font-weight:600;font-family:inherit;}
+.item-desc{font-size:11px;color:#666;line-height:1.5;margin-bottom:6px;}
+.item-desc.editing-input{width:100%;border:1px solid #c0d0f0;background:#fff;border-radius:5px;padding:4px 6px;font-size:11px;font-family:inherit;resize:vertical;min-height:60px;}
+.item-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px;}
+.item-effort{font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:#eef2ff;color:#003366;letter-spacing:0.04em;}
+.item-tag{font-size:9px;padding:2px 6px;border-radius:5px;background:#f0f0e8;color:#666;}
+.item-actions{display:flex;gap:4px;margin-top:8px;}
+.item-actions.editing-show{display:flex;}
+.item-actions.editing-hide{display:none;}
+.action-btn{font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid #e0e0d8;background:#fff;color:#666;cursor:pointer;font-family:inherit;}
+.action-btn:hover{background:#f0f0e8;color:#1a1a2e;}
+.action-btn.save{background:#1a1a2e;color:#fff;border-color:#1a1a2e;}
+.action-btn.save:hover{background:#3344dd;}
+.action-btn.delete{color:#a22;}
+.action-btn.delete:hover{background:#fce8e8;}
+
+.edit-row{display:flex;gap:6px;margin-top:6px;}
+.edit-row select{flex:1;padding:4px 6px;font-size:11px;border:1px solid #c0d0f0;border-radius:5px;font-family:inherit;background:#fff;}
+.edit-tags{width:100%;padding:4px 6px;font-size:11px;border:1px solid #c0d0f0;border-radius:5px;font-family:inherit;background:#fff;margin-top:6px;}
+
+.empty-col{font-size:11px;color:#bbb;text-align:center;padding:1rem;font-style:italic;}
+
+/* Add new modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:200;}
+.overlay.show{display:flex;}
+.modal{background:#fff;border-radius:10px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-head{padding:1rem 1.25rem;border-bottom:1px solid #e0e0d8;display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:15px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer;}
+.modal-body{padding:1.25rem;}
+.modal-body label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 5px;}
+.modal-body label:first-child{margin-top:0;}
+.modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
+.modal-body textarea{resize:vertical;min-height:70px;}
+.modal-row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-foot{padding:0.875rem 1.25rem;border-top:1px solid #e0e0d8;display:flex;justify-content:flex-end;gap:8px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">🗺</div>
+    <div class="topbar-title">Roadmap</div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn btn-primary" onclick="openAddModal()">+ Add Item</button>
+    <a class="back-link" href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="page-head">
+  <div class="page-title">Build Roadmap</div>
+  <div class="page-sub">Drag items between columns to change status. Drag within a column to re-prioritize. Click an item to edit.</div>
+</div>
+
+<div class="controls">
+  <input class="search" id="search" placeholder="Search title, description, tags…" oninput="filterItems()" />
+  <select class="tag-filter" id="tag-filter" onchange="filterItems()">
+    <option value="">All tags</option>
+  </select>
+  <span class="counts" id="counts"></span>
+</div>
+
+<div class="board" id="board">
+  <div class="col col-now"><div class="col-head"><div class="col-title">Now</div><span class="col-count" id="cnt-now">0</span></div><div class="col-body" data-status="now" id="col-now"></div></div>
+  <div class="col col-next"><div class="col-head"><div class="col-title">Next</div><span class="col-count" id="cnt-next">0</span></div><div class="col-body" data-status="next" id="col-next"></div></div>
+  <div class="col col-soon"><div class="col-head"><div class="col-title">Soon</div><span class="col-count" id="cnt-soon">0</span></div><div class="col-body" data-status="soon" id="col-soon"></div></div>
+  <div class="col col-backlog"><div class="col-head"><div class="col-title">Backlog</div><span class="col-count" id="cnt-backlog">0</span></div><div class="col-body" data-status="backlog" id="col-backlog"></div></div>
+  <div class="col col-on_hold"><div class="col-head"><div class="col-title">On Hold</div><span class="col-count" id="cnt-on_hold">0</span></div><div class="col-body" data-status="on_hold" id="col-on_hold"></div></div>
+  <div class="col col-done"><div class="col-head"><div class="col-title">Done</div><span class="col-count" id="cnt-done">0</span></div><div class="col-body" data-status="done" id="col-done"></div></div>
+</div>
+
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title">Add Roadmap Item</div>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <label>Title *</label>
+      <input type="text" id="m-title" placeholder="e.g. Build inventory module" />
+      <label>Description</label>
+      <textarea id="m-description" placeholder="What it does, why it matters, anything to remember"></textarea>
+      <div class="modal-row2">
+        <div>
+          <label>Status</label>
+          <select id="m-status">
+            <option value="now">Now</option>
+            <option value="next">Next</option>
+            <option value="soon">Soon</option>
+            <option value="backlog" selected>Backlog</option>
+            <option value="on_hold">On Hold</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div>
+          <label>Effort</label>
+          <select id="m-effort">
+            <option value="">—</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M" selected>M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+          </select>
+        </div>
+      </div>
+      <label>Tags (comma-separated)</label>
+      <input type="text" id="m-tags" placeholder="e.g. rfq, ai, infra" />
+      <label>Notes</label>
+      <textarea id="m-notes" placeholder="Decision history, gotchas, links"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
+      <button class="btn btn-primary" id="m-save-btn" onclick="submitAdd()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+function sb(path,opts){
+  opts=opts||{};
+  opts.headers=Object.assign({apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},opts.headers||{});
+  return fetch(SB+'/rest/v1/'+path,opts);
+}
+
+var allItems=[];
+var dragSrcId=null;
+
+async function load(){
+  var r=await sb('roadmap_items?select=*&order=status,priority');
+  allItems=r.ok?await r.json():[];
+  populateTagFilter();
+  render();
+}
+
+function populateTagFilter(){
+  var allTags={};
+  allItems.forEach(function(it){(it.tags||[]).forEach(function(t){allTags[t]=true;});});
+  var sel=g('tag-filter');
+  var current=sel.value;
+  sel.innerHTML='<option value="">All tags</option>'+Object.keys(allTags).sort().map(function(t){return '<option value="'+esc(t)+'">'+esc(t)+'</option>';}).join('');
+  sel.value=current;
+}
+
+function filterItems(){render();}
+
+function render(){
+  var search=(g('search').value||'').toLowerCase().trim();
+  var tag=g('tag-filter').value;
+  var statuses=['now','next','soon','backlog','on_hold','done'];
+  var visible=0;
+  statuses.forEach(function(s){
+    var col=g('col-'+s);
+    var items=allItems.filter(function(it){return it.status===s;});
+    if(search){
+      items=items.filter(function(it){
+        var hay=(it.title||'')+' '+(it.description||'')+' '+(it.notes||'')+' '+(it.tags||[]).join(' ');
+        return hay.toLowerCase().indexOf(search)!==-1;
+      });
+    }
+    if(tag){
+      items=items.filter(function(it){return (it.tags||[]).indexOf(tag)!==-1;});
+    }
+    items.sort(function(a,b){return (a.priority||0)-(b.priority||0);});
+    g('cnt-'+s).textContent=items.length;
+    visible+=items.length;
+    if(items.length===0){
+      col.innerHTML='<div class="empty-col">Drop items here</div>';
+    } else {
+      col.innerHTML=items.map(renderItem).join('');
+    }
+  });
+  g('counts').textContent=visible+' of '+allItems.length+' items';
+  attachDragHandlers();
+}
+
+function renderItem(it){
+  var tags=(it.tags||[]).map(function(t){return '<span class="item-tag">'+esc(t)+'</span>';}).join('');
+  var effort=it.effort?'<span class="item-effort">'+esc(it.effort)+'</span>':'';
+  return '<div class="item" draggable="true" data-id="'+it.id+'" data-status="'+it.status+'" onclick="startEdit(event,\''+it.id+'\')">'+
+    '<div class="item-title" id="title-'+it.id+'">'+esc(it.title)+'</div>'+
+    (it.description?'<div class="item-desc" id="desc-'+it.id+'">'+esc(it.description)+'</div>':'<div class="item-desc" id="desc-'+it.id+'" style="display:none;"></div>')+
+    '<div class="item-meta">'+effort+tags+'</div>'+
+    '<div class="item-actions editing-hide" id="actions-'+it.id+'">'+
+      '<button class="action-btn save" onclick="event.stopPropagation();saveItem(\''+it.id+'\')">Save</button>'+
+      '<button class="action-btn" onclick="event.stopPropagation();cancelEdit(\''+it.id+'\')">Cancel</button>'+
+      '<button class="action-btn delete" onclick="event.stopPropagation();deleteItem(\''+it.id+'\')" style="margin-left:auto;">Delete</button>'+
+    '</div>'+
+  '</div>';
+}
+
+// ── Drag and drop ──
+function attachDragHandlers(){
+  document.querySelectorAll('.item').forEach(function(el){
+    el.addEventListener('dragstart',function(e){
+      dragSrcId=el.getAttribute('data-id');
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    el.addEventListener('dragend',function(){
+      el.classList.remove('dragging');
+      document.querySelectorAll('.col-body').forEach(function(c){c.classList.remove('drag-over');});
+    });
+  });
+  document.querySelectorAll('.col-body').forEach(function(col){
+    col.addEventListener('dragover',function(e){
+      e.preventDefault();
+      e.dataTransfer.dropEffect='move';
+      col.classList.add('drag-over');
+      var afterEl=getDragAfterElement(col,e.clientY);
+      var dragging=document.querySelector('.dragging');
+      if(!dragging)return;
+      if(afterEl==null)col.appendChild(dragging);
+      else col.insertBefore(dragging,afterEl);
+    });
+    col.addEventListener('dragleave',function(e){
+      if(e.target===col)col.classList.remove('drag-over');
+    });
+    col.addEventListener('drop',function(e){
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      var newStatus=col.getAttribute('data-status');
+      persistOrderForColumn(col,newStatus);
+    });
+  });
+}
+
+function getDragAfterElement(col,y){
+  var draggable=[].slice.call(col.querySelectorAll('.item:not(.dragging)'));
+  return draggable.reduce(function(closest,child){
+    var box=child.getBoundingClientRect();
+    var offset=y-box.top-box.height/2;
+    if(offset<0 && offset>closest.offset)return {offset:offset,element:child};
+    return closest;
+  },{offset:Number.NEGATIVE_INFINITY}).element;
+}
+
+async function persistOrderForColumn(col,newStatus){
+  var itemEls=[].slice.call(col.querySelectorAll('.item'));
+  var updates=[];
+  itemEls.forEach(function(el,idx){
+    var id=el.getAttribute('data-id');
+    var oldStatus=el.getAttribute('data-status');
+    var newPriority=(idx+1)*10;
+    var item=allItems.find(function(x){return x.id===id;});
+    if(!item)return;
+    var needsUpdate=item.status!==newStatus || item.priority!==newPriority;
+    if(needsUpdate){
+      var patch={status:newStatus,priority:newPriority,updated_at:new Date().toISOString()};
+      if(newStatus==='done' && !item.date_completed)patch.date_completed=new Date().toISOString();
+      if(newStatus!=='done' && item.date_completed)patch.date_completed=null;
+      updates.push({id:id,patch:patch});
+      // Optimistic local update
+      item.status=newStatus;
+      item.priority=newPriority;
+      if(patch.date_completed!==undefined)item.date_completed=patch.date_completed;
+      el.setAttribute('data-status',newStatus);
+    }
+  });
+  // Update counts immediately
+  ['now','next','soon','backlog','on_hold','done'].forEach(function(s){
+    g('cnt-'+s).textContent=allItems.filter(function(x){return x.status===s;}).length;
+  });
+  // Send patches in parallel
+  for(var i=0;i<updates.length;i++){
+    var u=updates[i];
+    try{
+      await sb('roadmap_items?id=eq.'+u.id,{method:'PATCH',body:JSON.stringify(u.patch)});
+    }catch(e){console.warn('Update failed for '+u.id+':',e.message);}
+  }
+}
+
+// ── Inline editing ──
+var editingItemId=null;
+
+function startEdit(e,id){
+  if(editingItemId===id)return;
+  if(editingItemId)cancelEdit(editingItemId);
+  var it=allItems.find(function(x){return x.id===id;});
+  if(!it)return;
+  editingItemId=id;
+  var itemEl=document.querySelector('.item[data-id="'+id+'"]');
+  if(!itemEl)return;
+  itemEl.classList.add('editing');
+  itemEl.setAttribute('draggable','false');
+
+  var titleEl=g('title-'+id);
+  var descEl=g('desc-'+id);
+  var actionsEl=g('actions-'+id);
+
+  titleEl.outerHTML='<input class="item-title editing-input" id="title-input-'+id+'" value="'+esc(it.title)+'" />';
+  descEl.outerHTML='<textarea class="item-desc editing-input" id="desc-input-'+id+'" placeholder="Description">'+esc(it.description||'')+'</textarea>';
+
+  // Add effort + tags inputs after the description
+  var metaEl=itemEl.querySelector('.item-meta');
+  metaEl.innerHTML='<div class="edit-row" style="width:100%;">'+
+    '<select id="effort-input-'+id+'">'+
+      ['','XS','S','M','L','XL'].map(function(e){return '<option value="'+e+'"'+(it.effort===e?' selected':'')+'>'+(e||'—')+'</option>';}).join('')+
+    '</select>'+
+    '<select id="status-input-'+id+'">'+
+      [['now','Now'],['next','Next'],['soon','Soon'],['backlog','Backlog'],['on_hold','On Hold'],['done','Done']].map(function(s){return '<option value="'+s[0]+'"'+(it.status===s[0]?' selected':'')+'>'+s[1]+'</option>';}).join('')+
+    '</select>'+
+  '</div>'+
+  '<input class="edit-tags" id="tags-input-'+id+'" value="'+esc((it.tags||[]).join(', '))+'" placeholder="tags, comma-separated" />';
+
+  actionsEl.classList.remove('editing-hide');
+  actionsEl.classList.add('editing-show');
+}
+
+function cancelEdit(id){
+  editingItemId=null;
+  render();
+}
+
+async function saveItem(id){
+  var it=allItems.find(function(x){return x.id===id;});
+  if(!it)return;
+  var newTitle=(g('title-input-'+id)||{}).value;
+  var newDesc=(g('desc-input-'+id)||{}).value;
+  var newEffort=(g('effort-input-'+id)||{}).value;
+  var newStatus=(g('status-input-'+id)||{}).value;
+  var newTagsRaw=(g('tags-input-'+id)||{}).value;
+  var newTags=newTagsRaw?newTagsRaw.split(',').map(function(t){return t.trim();}).filter(Boolean):[];
+
+  var patch={
+    title:(newTitle||'').trim()||'(untitled)',
+    description:(newDesc||'').trim()||null,
+    effort:newEffort||null,
+    status:newStatus||it.status,
+    tags:newTags,
+    updated_at:new Date().toISOString()
+  };
+  if(patch.status==='done' && !it.date_completed)patch.date_completed=new Date().toISOString();
+  if(patch.status!=='done' && it.date_completed)patch.date_completed=null;
+
+  try{
+    var r=await sb('roadmap_items?id=eq.'+id,{method:'PATCH',body:JSON.stringify(patch)});
+    if(!r.ok){alert('Save failed: '+await r.text());return;}
+    Object.assign(it,patch);
+    editingItemId=null;
+    populateTagFilter();
+    render();
+  }catch(e){alert('Save error: '+e.message);}
+}
+
+async function deleteItem(id){
+  var it=allItems.find(function(x){return x.id===id;});
+  if(!it)return;
+  if(!confirm('Delete "'+it.title+'"?'))return;
+  try{
+    var r=await sb('roadmap_items?id=eq.'+id,{method:'DELETE'});
+    if(!r.ok){alert('Delete failed: '+await r.text());return;}
+    allItems=allItems.filter(function(x){return x.id!==id;});
+    editingItemId=null;
+    populateTagFilter();
+    render();
+  }catch(e){alert('Delete error: '+e.message);}
+}
+
+// ── Add new ──
+function openAddModal(){
+  ['m-title','m-description','m-tags','m-notes'].forEach(function(id){var el=g(id);if(el)el.value='';});
+  g('m-status').value='backlog';
+  g('m-effort').value='M';
+  g('add-modal').classList.add('show');
+}
+function closeAddModal(){g('add-modal').classList.remove('show');}
+
+async function submitAdd(){
+  var title=g('m-title').value.trim();
+  if(!title){alert('Title required.');return;}
+  var btn=g('m-save-btn');
+  btn.disabled=true;btn.textContent='Adding…';
+  var status=g('m-status').value;
+  var maxPriority=Math.max.apply(null,[0].concat(allItems.filter(function(x){return x.status===status;}).map(function(x){return x.priority||0;})));
+  var tagsRaw=g('m-tags').value;
+  var payload={
+    title:title,
+    description:g('m-description').value.trim()||null,
+    status:status,
+    priority:maxPriority+10,
+    effort:g('m-effort').value||null,
+    tags:tagsRaw?tagsRaw.split(',').map(function(t){return t.trim();}).filter(Boolean):[],
+    notes:g('m-notes').value.trim()||null
+  };
+  if(status==='done')payload.date_completed=new Date().toISOString();
+  try{
+    var r=await sb('roadmap_items',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(payload)});
+    if(!r.ok){alert('Add failed: '+await r.text());btn.disabled=false;btn.textContent='Add Item';return;}
+    var rows=await r.json();
+    allItems.push(rows[0]);
+    closeAddModal();
+    btn.disabled=false;btn.textContent='Add Item';
+    populateTagFilter();
+    render();
+  }catch(e){alert('Add error: '+e.message);btn.disabled=false;btn.textContent='Add Item';}
+}
+
+load();
+</script>
+</body>
+</html>
