@@ -77,6 +77,28 @@
 .r-news-headline a:hover{color:#2244cc;}
 .r-news-highlight{font-size:12px;color:#666;line-height:1.5;overflow-wrap:anywhere;}
 .r-empty{padding:2rem;text-align:center;color:#888;font-size:13px;}
+
+/* Add/Edit retailer modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;z-index:200;}
+.overlay.show{display:flex;}
+.modal{background:#fff;border-radius:12px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;}
+.modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid #e0e0d8;display:flex;justify-content:space-between;align-items:center;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:22px;color:#888;cursor:pointer;}
+.modal-body{padding:1.25rem 1.5rem;}
+.modal-body label{display:block;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 5px;}
+.modal-body input,.modal-body select,.modal-body textarea{width:100%;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;background:#fff;}
+.modal-body textarea{resize:vertical;min-height:60px;}
+.modal-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.modal-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.cik-help{font-size:11px;color:#888;margin-top:4px;}
+.cik-help a{color:#2244cc;text-decoration:none;}
+.cik-help a:hover{text-decoration:underline;}
+.modal-foot{padding:1rem 1.5rem;border-top:1px solid #e0e0d8;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.modal-foot-right{display:flex;gap:8px;}
+.ai-hint{background:#eef2ff;border:1px solid #c0d0f0;color:#003366;padding:9px 12px;border-radius:7px;font-size:11px;margin-bottom:12px;line-height:1.5;}
+.section-hdr{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#888;margin:1.25rem 0 4px;padding-top:14px;border-top:1px solid #f0f0e8;}
+.section-hdr:first-of-type{padding-top:0;border-top:none;}
 </style>
 </head>
 <body>
@@ -84,6 +106,7 @@
 <div class="ri-top">
   <div class="ri-top-title">🎯 Retail Intelligence</div>
   <div class="ri-top-actions">
+    <button class="primary" onclick="openAddModal()">+ Add Retailer</button>
     <a href="admin.html">← Admin</a>
   </div>
 </div>
@@ -224,6 +247,7 @@ function renderDetailShell(r){
   '<div class="r-detail-action">'+
     '<button class="r-btn r-btn-primary" id="pull-edgar-btn" onclick="runEdgar(\''+r.id+'\')">📄 Pull EDGAR Now</button>'+
     '<button class="r-btn r-btn-primary" id="pull-news-btn" onclick="runNews(\''+r.id+'\')">📰 Pull News Now</button>'+
+    '<button class="r-btn r-btn-secondary" onclick="openEditModal(\''+r.id+'\')">✏ Edit</button>'+
     (r.primary_url?'<button class="r-btn r-btn-secondary" onclick="window.open(\''+escapeHtml(r.primary_url)+'\',\'_blank\')">Site ↗</button>':'')+
   '</div>'+
   '<div class="r-tabs">'+
@@ -354,7 +378,226 @@ function runNews(retailerId){
 }
 
 loadRetailers();
+
+// ── Add/Edit Retailer modal ──
+var editingRetailerId=null;
+
+function openAddModal(){
+  editingRetailerId=null;
+  document.getElementById('modal-title').textContent='Add Retailer';
+  document.getElementById('m-delete-btn').style.display='none';
+  document.getElementById('m-save-btn').textContent='✨ Save (auto-generate metadata)';
+  ['m-name','m-ticker','m-cik','m-city','m-state','m-ir-url','m-primary-url','m-news-queries','m-notes'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('m-tier').value='4';
+  document.getElementById('m-public').value='true';
+  document.getElementById('add-modal').classList.add('show');
+}
+
+function openEditModal(retailerId){
+  var r=allRetailers.find(function(x){return x.id===retailerId;});
+  if(!r)return;
+  editingRetailerId=retailerId;
+  document.getElementById('modal-title').textContent='Edit Retailer — '+r.name;
+  document.getElementById('m-delete-btn').style.display='inline-block';
+  document.getElementById('m-save-btn').textContent='Save Changes';
+  document.getElementById('m-name').value=r.name||'';
+  document.getElementById('m-ticker').value=r.ticker||'';
+  document.getElementById('m-cik').value=r.cik||'';
+  document.getElementById('m-tier').value=String(r.tier||4);
+  document.getElementById('m-public').value=r.is_public?'true':'false';
+  document.getElementById('m-city').value=r.hq_city||'';
+  document.getElementById('m-state').value=r.hq_state||'';
+  document.getElementById('m-ir-url').value=r.ir_url||'';
+  document.getElementById('m-primary-url').value=r.primary_url||'';
+  document.getElementById('m-news-queries').value=(r.news_query_terms||[]).join('\n');
+  document.getElementById('m-notes').value=r.notes||'';
+  document.getElementById('add-modal').classList.add('show');
+}
+
+function closeModal(){document.getElementById('add-modal').classList.remove('show');}
+
+async function saveRetailer(){
+  var name=document.getElementById('m-name').value.trim();
+  if(!name){alert('Retailer name is required.');return;}
+  var saveBtn=document.getElementById('m-save-btn');
+  saveBtn.disabled=true;
+
+  var ticker=document.getElementById('m-ticker').value.trim().toUpperCase()||null;
+  var cik=document.getElementById('m-cik').value.trim().replace(/\D/g,'');
+  if(cik && cik.length<10){while(cik.length<10)cik='0'+cik;}
+  var tier=parseInt(document.getElementById('m-tier').value,10);
+  var isPublic=document.getElementById('m-public').value==='true';
+  var city=document.getElementById('m-city').value.trim()||null;
+  var state=document.getElementById('m-state').value.trim().toUpperCase()||null;
+  var irUrl=document.getElementById('m-ir-url').value.trim();
+  var primaryUrl=document.getElementById('m-primary-url').value.trim();
+  var queriesText=document.getElementById('m-news-queries').value.trim();
+  var queries=queriesText?queriesText.split(/\n+/).map(function(q){return q.trim();}).filter(Boolean):[];
+  var notes=document.getElementById('m-notes').value.trim()||null;
+
+  var needsAi=(queries.length===0 || !irUrl || !primaryUrl);
+  var slug=null;
+  if(needsAi){
+    saveBtn.textContent='Generating metadata…';
+    try{
+      var aiResp=await fetch('/api/generate-retailer-metadata',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({name:name,ticker:ticker,tier:tier,hq_city:city,hq_state:state})
+      });
+      var aiData=await aiResp.json();
+      if(aiData.success){
+        if(queries.length===0)queries=aiData.news_query_terms||[];
+        if(!irUrl)irUrl=aiData.ir_url||'';
+        if(!primaryUrl)primaryUrl=aiData.primary_url||'';
+        slug=aiData.slug;
+        if(!notes)notes=aiData.notes||null;
+      }
+    }catch(e){console.warn('AI metadata generation failed:',e.message);}
+  }
+
+  if(!slug)slug=name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+
+  var payload={
+    name:name,
+    slug:slug,
+    tier:tier,
+    cik:cik||null,
+    ticker:ticker,
+    is_public:isPublic,
+    ir_url:irUrl||null,
+    primary_url:primaryUrl||null,
+    hq_city:city,
+    hq_state:state,
+    news_query_terms:queries,
+    notes:notes,
+    status:'active',
+    updated_at:new Date().toISOString()
+  };
+
+  saveBtn.textContent='Saving…';
+  try{
+    var url,method;
+    if(editingRetailerId){
+      url=SB+'/rest/v1/retailers?id=eq.'+editingRetailerId;
+      method='PATCH';
+    } else {
+      url=SB+'/rest/v1/retailers';
+      method='POST';
+    }
+    var resp=await fetch(url,{
+      method:method,
+      headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!resp.ok){
+      var errText=await resp.text();
+      alert('Save failed: '+errText);
+      saveBtn.disabled=false;
+      saveBtn.textContent=editingRetailerId?'Save Changes':'✨ Save (auto-generate metadata)';
+      return;
+    }
+    var result=await resp.json();
+    var saved=Array.isArray(result)?result[0]:result;
+    closeModal();
+    saveBtn.disabled=false;
+    loadRetailers();
+    if(saved && saved.id)setTimeout(function(){selectRetailer(saved.id);},400);
+  }catch(e){
+    alert('Save error: '+e.message);
+    saveBtn.disabled=false;
+    saveBtn.textContent=editingRetailerId?'Save Changes':'✨ Save (auto-generate metadata)';
+  }
+}
+
+async function deleteRetailer(){
+  if(!editingRetailerId)return;
+  var rec=allRetailers.find(function(x){return x.id===editingRetailerId;});
+  if(!rec)return;
+  if(!confirm('Delete '+rec.name+'? This will also delete all associated filings, news links, and run history. This cannot be undone.'))return;
+  try{
+    var dresp=await fetch(SB+'/rest/v1/retailers?id=eq.'+editingRetailerId,{
+      method:'DELETE',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+    });
+    if(!dresp.ok){alert('Delete failed: '+await dresp.text());return;}
+    closeModal();
+    selectedId=null;
+    document.getElementById('r-detail').innerHTML='<div class="r-detail-empty"><div style="font-size:42px;">🏬</div><div>Retailer deleted</div></div>';
+    loadRetailers();
+  }catch(e){alert('Delete error: '+e.message);}
+}
 </script>
+
+<div class="overlay" id="add-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="modal-title">Add Retailer</div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="ai-hint">Fill in the basics. Claude will auto-generate news query terms, investor relations URL, and consumer site URL when you save. You can edit any auto-generated values later.</div>
+
+      <div class="section-hdr">Required</div>
+      <label>Retailer name *</label>
+      <input type="text" id="m-name" placeholder="Foot Locker" />
+
+      <div class="modal-row3">
+        <div>
+          <label>Tier *</label>
+          <select id="m-tier">
+            <option value="1">1 — Off-Price</option>
+            <option value="2">2 — Mass + Dollar</option>
+            <option value="3">3 — Drug + Beauty</option>
+            <option value="4" selected>4 — Club + Department</option>
+          </select>
+        </div>
+        <div>
+          <label>Ticker</label>
+          <input type="text" id="m-ticker" placeholder="FL" />
+        </div>
+        <div>
+          <label>Public?</label>
+          <select id="m-public">
+            <option value="true" selected>Yes</option>
+            <option value="false">No (private)</option>
+          </select>
+        </div>
+      </div>
+
+      <label>SEC CIK (10 digits)</label>
+      <input type="text" id="m-cik" placeholder="0000850209" maxlength="10" />
+      <div class="cik-help">
+        Don't know the CIK? <a href="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&owner=include&count=40" target="_blank">Look up on SEC.gov ↗</a> — search the company name, copy the 10-digit CIK from the URL.
+      </div>
+
+      <div class="modal-row2">
+        <div><label>HQ City</label><input type="text" id="m-city" placeholder="New York" /></div>
+        <div><label>HQ State</label><input type="text" id="m-state" placeholder="NY" maxlength="2" /></div>
+      </div>
+
+      <div class="section-hdr">Auto-generated (edit if needed)</div>
+      <label>Investor relations URL</label>
+      <input type="text" id="m-ir-url" placeholder="Will be auto-filled" />
+
+      <label>Primary consumer URL</label>
+      <input type="text" id="m-primary-url" placeholder="Will be auto-filled" />
+
+      <label>News query terms (one per line)</label>
+      <textarea id="m-news-queries" rows="5" placeholder="Will be auto-filled. Each line is a separate Google News query."></textarea>
+
+      <label>Notes (optional)</label>
+      <textarea id="m-notes" rows="2" placeholder="Anything noteworthy about this retailer for sourcing context"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="r-btn r-btn-secondary" id="m-delete-btn" onclick="deleteRetailer()" style="display:none;color:#a22;border:1px solid #fdd;background:#fff0f0;">Delete</button>
+      <div class="modal-foot-right" style="margin-left:auto;">
+        <button class="r-btn r-btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="r-btn r-btn-primary" id="m-save-btn" onclick="saveRetailer()">✨ Save (auto-generate metadata)</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
