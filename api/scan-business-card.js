@@ -48,6 +48,115 @@ function extractJson(text) {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// PHONE NORMALIZATION — China/HK rules
+// ────────────────────────────────────────────────────────────────────
+// Strip all non-digit characters from a phone string.
+function digitsOnly(s) {
+  if (!s) return '';
+  return String(s).replace(/\D+/g, '');
+}
+
+// Detect if a card is from China or Hong Kong.
+// Checks the country field plus common city names that imply CN/HK.
+function detectCnOrHk(card) {
+  const country = (card.country || '').toLowerCase();
+  const city = (card.city || '').toLowerCase();
+  const cnTerms = ['china', 'cn', '中国', 'pr china', 'p.r.china', "people's republic"];
+  const hkTerms = ['hong kong', 'hk', '香港', 'hongkong'];
+  if (hkTerms.some(t => country.includes(t) || city.includes(t))) return 'HK';
+  if (cnTerms.some(t => country.includes(t))) return 'CN';
+  // Common mainland CN cities — if country is empty but city is recognizable
+  const cnCities = ['shenzhen', 'guangzhou', 'shanghai', 'beijing', 'dongguan', 'foshan',
+    'ningbo', 'hangzhou', 'suzhou', 'xiamen', 'qingdao', 'yiwu', 'wenzhou', 'tianjin',
+    'chengdu', 'wuhan', 'changsha', 'jinan', 'zhongshan', 'huizhou', 'jiangmen',
+    'shantou', 'zhuhai', 'haining', 'taizhou', 'shaoxing'];
+  if (cnCities.some(c => city.includes(c))) return 'CN';
+  return null;
+}
+
+// Normalize a China mobile number for the WeChat field.
+// Rules: strip all non-digits; if starts with 86, drop it; expect 11 digits remaining.
+function chinaMobileForWechat(raw) {
+  const digits = digitsOnly(raw);
+  if (!digits) return '';
+  let trimmed = digits;
+  if (trimmed.startsWith('86') && trimmed.length > 11) {
+    trimmed = trimmed.substring(2);
+  }
+  // CN mobile is exactly 11 digits starting with 1
+  if (trimmed.length === 11 && trimmed.startsWith('1')) return trimmed;
+  // Edge: 10 digits starting with 1 — pad? No, just return as-is if not 11.
+  return trimmed.length === 11 ? trimmed : '';
+}
+
+// Normalize a HK mobile number for the WeChat field.
+// Rules: strip all non-digits; if no country code, prefix 852; if starts with 852, keep.
+function hkMobileForWechat(raw) {
+  const digits = digitsOnly(raw);
+  if (!digits) return '';
+  if (digits.startsWith('852') && digits.length === 11) return digits;
+  if (digits.length === 8) return '852' + digits;
+  return '';
+}
+
+// Normalize for WhatsApp: country code + national number, digits only, no symbols.
+function mobileForWhatsapp(raw, region) {
+  const digits = digitsOnly(raw);
+  if (!digits) return '';
+  if (region === 'CN') {
+    if (digits.startsWith('86') && digits.length === 13) return digits;
+    if (digits.length === 11 && digits.startsWith('1')) return '86' + digits;
+    return '';
+  }
+  if (region === 'HK') {
+    if (digits.startsWith('852') && digits.length === 11) return digits;
+    if (digits.length === 8) return '852' + digits;
+    return '';
+  }
+  return digits;
+}
+
+// Apply the China/HK phone-field normalization to a structured card.
+// Mutates and returns the card.
+function applyPhoneRules(card) {
+  const region = detectCnOrHk(card);
+  if (!region) return card;
+
+  const rawMobile = card.sales_mobile || '';
+  const existingWechat = (card.sales_wechat || '').trim();
+  const existingWhatsapp = (card.sales_whatsapp || '').trim();
+
+  // WeChat: if existing value looks like a real WeChat ID (not just digits, or has letters),
+  // keep it. Otherwise, derive from mobile.
+  const wechatLooksLikeId = existingWechat && /[a-zA-Z_\-]/.test(existingWechat);
+  if (!wechatLooksLikeId) {
+    const derivedWechat = region === 'CN'
+      ? chinaMobileForWechat(rawMobile)
+      : hkMobileForWechat(rawMobile);
+    if (derivedWechat) {
+      card.sales_wechat = derivedWechat;
+    } else if (existingWechat) {
+      // Existing value was digits but didn't fit pattern — re-normalize anyway
+      const reNorm = region === 'CN'
+        ? chinaMobileForWechat(existingWechat)
+        : hkMobileForWechat(existingWechat);
+      if (reNorm) card.sales_wechat = reNorm;
+    }
+  }
+
+  // WhatsApp: derive from mobile if not explicitly labeled, OR normalize what was extracted
+  if (existingWhatsapp) {
+    const reNorm = mobileForWhatsapp(existingWhatsapp, region);
+    if (reNorm) card.sales_whatsapp = reNorm;
+  } else if (rawMobile) {
+    const derivedWa = mobileForWhatsapp(rawMobile, region);
+    if (derivedWa) card.sales_whatsapp = derivedWa;
+  }
+
+  return card;
+}
+
+// ────────────────────────────────────────────────────────────────────
 // PASS 1 — TRANSCRIBE
 // ────────────────────────────────────────────────────────────────────
 async function passTranscribe(imageBase64) {
@@ -253,6 +362,9 @@ export default async function handler(req, res) {
           corrected[k] = corrections[k];
         }
       });
+
+      // Apply China/HK phone normalization rules
+      applyPhoneRules(corrected);
 
       corrected._confidence = confidence;
       corrected._flagged = flagged;
