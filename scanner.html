@@ -655,37 +655,296 @@ function resizeImg(dataUrl,maxPx,quality){
   });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// SMART DUPLICATE MERGE
+// ════════════════════════════════════════════════════════════════════
+
+// Reduce a phone/wechat value to comparable digits (drop +, spaces, 86/852 prefixes handled loosely)
+function digitsOnly(v){return (v||'').toString().replace(/[^0-9]/g,'');}
+function normPhone(v){
+  var d=digitsOnly(v);
+  if(d.length>11 && d.indexOf('86')===0) d=d.slice(2);
+  if(d.length>8 && d.indexOf('852')===0) d=d.slice(3);
+  return d;
+}
+function domainOf(url){
+  if(!url)return '';
+  return url.toString().toLowerCase().replace(/^https?:\/\//,'').replace(/^www\./,'').split(/[\/?#]/)[0].trim();
+}
+function gvId(id,k){var el=g(id+'_'+k);return el?el.value.trim():'';}
+
+// Find a probable existing duplicate using several signals, strongest first.
+// Returns the FULL existing factory row (all columns) or null.
+async function findDuplicate(id){
+  var email=gvId(id,'email');
+  var name=gvId(id,'name_en');
+  var city=gvId(id,'city');
+  var mobile=normPhone(gvId(id,'mobile'));
+  var site=domainOf(gvId(id,'website'));
+  var sel='select=*';
+  var hdr={headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}};
+
+  // 1. Email (strongest)
+  if(email){
+    var r=await fetch(SB+'/rest/v1/factories?sales_email=ilike.'+encodeURIComponent(email)+'&'+sel+'&limit=1',hdr);
+    if(r.ok){var l=await r.json();if(l&&l.length){l[0]._match='email';return l[0];}}
+  }
+  // 2. Name + city
+  if(name&&city){
+    var r2=await fetch(SB+'/rest/v1/factories?factory_name_english=ilike.'+encodeURIComponent(name)+'&city=ilike.'+encodeURIComponent(city)+'&'+sel+'&limit=1',hdr);
+    if(r2.ok){var l2=await r2.json();if(l2&&l2.length){l2[0]._match='name + city';return l2[0];}}
+  }
+  // 3. Mobile (normalized) — pull candidates with same trailing digits
+  if(mobile&&mobile.length>=7){
+    var r3=await fetch(SB+'/rest/v1/factories?sales_mobile=not.is.null&'+sel+'&limit=200',hdr);
+    if(r3.ok){var l3=await r3.json();for(var i=0;i<(l3||[]).length;i++){if(normPhone(l3[i].sales_mobile)===mobile){l3[i]._match='mobile number';return l3[i];}}}
+  }
+  // 4. Website domain
+  if(site){
+    var r4=await fetch(SB+'/rest/v1/factories?internal_notes=ilike.*'+encodeURIComponent(site)+'*&'+sel+'&limit=10',hdr);
+    if(r4.ok){var l4=await r4.json();for(var j=0;j<(l4||[]).length;j++){if((l4[j].internal_notes||'').toLowerCase().indexOf(site)!==-1){l4[j]._match='website';return l4[j];}}}
+  }
+  return null;
+}
+
+// Map of factory column -> scanner field id for simple single-value fields.
+var MERGE_FIELDS=[
+  ['factory_name_english','name_en','Company Name (EN)'],
+  ['factory_name_local','name_local','Company Name (Local)'],
+  ['sales_contact_name','contact','Contact Name'],
+  ['sales_email','email','Email'],
+  ['sales_mobile','mobile','Mobile'],
+  ['telephone','telephone','Telephone'],
+  ['sales_wechat','wechat','WeChat'],
+  ['sales_whatsapp','whatsapp','WhatsApp'],
+  ['address','address','Street Address'],
+  ['city','city','City'],
+  ['state_province','state','State / Province'],
+  ['postal_code','postal','Postal Code'],
+  ['country','country','Country']
+];
+
+// Build a merge plan comparing the new scan against the existing record.
+//   fills      = existing empty, scan has value -> set it
+//   conflicts  = both have values, differ       -> ask user
+//   noteAppend = scan notes not already in existing internal_notes
+//   newCerts   = checked certs not already on existing.certifications
+//   newCats    = checked categories not already linked to this factory
+async function buildMergePlan(id, existing){
+  var plan={fills:[],conflicts:[],noteAppend:null,newCerts:[],newCats:[]};
+
+  MERGE_FIELDS.forEach(function(f){
+    var col=f[0], val=gvId(id,f[1]), label=f[2];
+    if(!val) return;
+    var cur=(existing[col]==null?'':String(existing[col])).trim();
+    if(!cur){ plan.fills.push({col:col,label:label,value:val}); }
+    else if(cur.toLowerCase()!==val.toLowerCase()){ plan.conflicts.push({col:col,label:label,existing:cur,scan:val}); }
+  });
+
+  // Notes: append scan-derived notes if not already present
+  var noteParts=[
+    gvId(id,'notes'),
+    gvId(id,'title')?'Title: '+gvId(id,'title'):'',
+    gvId(id,'website')?'Website: '+gvId(id,'website'):''
+  ].filter(Boolean).join(' | ');
+  if(noteParts){
+    var curNotes=(existing.internal_notes||'');
+    if(curNotes.indexOf(noteParts)===-1){ plan.noteAppend={existing:curNotes,add:noteParts}; }
+  }
+
+  // Certs: union — only add ones not already on the record
+  var scanCerts=[];
+  document.querySelectorAll('.scanner-cert[data-cardid="'+id+'"]:checked').forEach(function(cb){scanCerts.push(cb.value);});
+  var co=gvId(id,'cert_other');if(co)scanCerts.push(co);
+  var curCerts=(existing.certifications||[]).map(function(c){return (c||'').toLowerCase();});
+  plan.newCerts=scanCerts.filter(function(c){return curCerts.indexOf(c.toLowerCase())===-1;});
+
+  // Categories: fetch existing links, add only new ones
+  try{
+    var ec=await fetch(SB+'/rest/v1/factory_categories?factory_id=eq.'+existing.id+'&select=category,sub_category,sub_sub_category',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var existingCatKeys=[];
+    if(ec.ok){(await ec.json()).forEach(function(r){existingCatKeys.push((r.category||'')+'|'+(r.sub_category||'')+'|'+(r.sub_sub_category||''));});}
+    document.querySelectorAll('.scanner-cat-cb[data-cardid="'+id+'"]:checked').forEach(function(cb){
+      var key=cb.dataset.cat+'|'+(cb.dataset.sub||'')+'|'+(cb.dataset.subsub||'');
+      if(existingCatKeys.indexOf(key)===-1){
+        plan.newCats.push({factory_id:existing.id,category:cb.dataset.cat,sub_category:cb.dataset.sub||null,sub_sub_category:cb.dataset.subsub||null,is_primary:false,_path:[cb.dataset.cat,cb.dataset.sub,cb.dataset.subsub].filter(Boolean).join(' › ')});
+      }
+    });
+  }catch(e){console.log('Category compare error:',e.message);}
+
+  return plan;
+}
+
+// Render the inline merge/conflict resolver. Auto-applied changes shown for transparency.
+function renderMergeUI(id, existing, plan){
+  var dupSlot=g(id+'_dup');if(!dupSlot)return;
+  var href='factory-detail.html?id='+encodeURIComponent(existing.id);
+
+  var autoBits=[];
+  plan.fills.forEach(function(f){autoBits.push(f.label);});
+  if(plan.noteAppend) autoBits.push('notes (append)');
+  if(plan.newCerts.length) autoBits.push(plan.newCerts.length+' cert'+(plan.newCerts.length>1?'s':''));
+  if(plan.newCats.length) autoBits.push(plan.newCats.length+' categor'+(plan.newCats.length>1?'ies':'y'));
+
+  var h='<div style="background:#fff;border:1px solid #f0d840;border-left:3px solid #d4a800;border-radius:8px;padding:12px 14px;margin-top:8px;">';
+  h+='<div style="font-weight:700;font-size:13px;color:#7a5800;margin-bottom:4px;">Likely duplicate — matched on '+escapeHtml(existing._match)+'</div>';
+  h+='<div style="font-size:12px;margin-bottom:10px;"><strong>'+escapeHtml(existing.factory_name_english||'(no name)')+'</strong>'+(existing.factory_id?' · '+escapeHtml(existing.factory_id):'')+' <a href="'+escapeHtml(href)+'" target="_blank" style="color:#1a7a1a;text-decoration:none;">view →</a></div>';
+
+  if(autoBits.length){
+    h+='<div style="background:#edfaed;border:1px solid #a0d8a0;border-radius:6px;padding:8px 10px;font-size:12px;color:#1a5a1a;margin-bottom:10px;"><b>Will merge in automatically:</b> '+escapeHtml(autoBits.join(', '))+'.</div>';
+  }
+
+  h+='<div style="font-size:12px;color:#a22;font-weight:700;margin-bottom:6px;">Conflicts — choose which to keep:</div>';
+  plan.conflicts.forEach(function(c,i){
+    h+='<div style="background:#fff6f6;border:1px solid #f0c0c0;border-radius:6px;padding:8px 10px;margin-bottom:6px;">';
+    h+='<div style="font-size:11px;color:#888;margin-bottom:4px;">'+escapeHtml(c.label)+'</div>';
+    h+='<label style="display:block;font-size:12px;margin-bottom:3px;cursor:pointer;"><input type="radio" name="'+id+'_cf_'+i+'" value="existing" checked /> Keep existing: <strong>'+escapeHtml(c.existing)+'</strong></label>';
+    h+='<label style="display:block;font-size:12px;cursor:pointer;"><input type="radio" name="'+id+'_cf_'+i+'" value="scan" /> Use new scan: <strong>'+escapeHtml(c.scan)+'</strong></label>';
+    h+='</div>';
+  });
+
+  h+='<div style="display:flex;gap:8px;margin-top:10px;">';
+  h+='<button onclick="resolveAndCommit(\''+id+'\',\''+existing.id+'\')" style="flex:1;padding:10px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Apply merge to existing factory</button>';
+  h+='<button onclick="forceNewFactory(\''+id+'\')" style="padding:10px 14px;background:#f5f5f0;color:#888;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;font-family:inherit;">Not a duplicate — save as new</button>';
+  h+='</div></div>';
+
+  dupSlot.innerHTML=h;dupSlot.style.display='block';
+  // Stash plan + existing for the commit step
+  var card=cards.find(function(c){return c.id===id;});
+  if(card){card._mergeExisting=existing;card._mergePlan=plan;}
+}
+
+// User clicked "Apply merge" — gather conflict choices and commit.
+async function resolveAndCommit(id, existingId){
+  var card=cards.find(function(c){return c.id===id;});if(!card||!card._mergePlan)return;
+  var plan=card._mergePlan, existing=card._mergeExisting;
+  var resolved=[];
+  plan.conflicts.forEach(function(c,i){
+    var sel=document.querySelector('input[name="'+id+'_cf_'+i+'"]:checked');
+    if(sel && sel.value==='scan'){ resolved.push({col:c.col,label:c.label,existing:c.existing,value:c.scan}); }
+  });
+  await commitMerge(id, existing, plan, resolved);
+}
+
+// User said it's not actually a duplicate — fall through to a clean new-factory insert.
+function forceNewFactory(id){
+  var card=cards.find(function(c){return c.id===id;});if(card)card.forceNew=true;
+  var dupSlot=g(id+'_dup');if(dupSlot){dupSlot.style.display='none';dupSlot.innerHTML='';}
+  saveDraft(id);
+}
+
+// Commit a merge: PATCH the existing factory, write audit rows, add cats/certs, upload new card image.
+//   resolvedConflicts = conflicts the user chose to take from the scan (each {col,label,existing,value})
+async function commitMerge(id, existing, plan, resolvedConflicts){
+  var btn=g(id+'_savebtn');if(btn){btn.disabled=true;btn.textContent='Merging...';}
+  var auditRows=[], patch={};
+
+  // 1. Fills (existing was empty)
+  plan.fills.forEach(function(f){
+    patch[f.col]=f.value;
+    auditRows.push({factory_id:existing.id,source:'scanner_merge',field_name:f.col,change_type:'fill',old_value:null,new_value:f.value});
+  });
+  // 2. Resolved conflicts taken from scan (overwrite)
+  resolvedConflicts.forEach(function(c){
+    patch[c.col]=c.value;
+    auditRows.push({factory_id:existing.id,source:'scanner_merge',field_name:c.col,change_type:'overwrite',old_value:c.existing,new_value:c.value});
+  });
+  // 3. Notes append
+  if(plan.noteAppend){
+    var merged=(plan.noteAppend.existing?plan.noteAppend.existing+' | ':'')+plan.noteAppend.add;
+    patch.internal_notes=merged;
+    auditRows.push({factory_id:existing.id,source:'scanner_merge',field_name:'internal_notes',change_type:'append',old_value:plan.noteAppend.existing||null,new_value:merged});
+  }
+  // 4. Certs union
+  if(plan.newCerts.length){
+    var mergedCerts=(existing.certifications||[]).concat(plan.newCerts);
+    patch.certifications=mergedCerts;
+    auditRows.push({factory_id:existing.id,source:'scanner_merge',field_name:'certifications',change_type:'add_cert',old_value:JSON.stringify(existing.certifications||[]),new_value:JSON.stringify(mergedCerts)});
+  }
+
+  try{
+    // PATCH the factory
+    if(Object.keys(patch).length){
+      var pr=await fetch(SB+'/rest/v1/factories?id=eq.'+existing.id,{method:'PATCH',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify(patch)});
+      if(!pr.ok){var pe=await pr.json().catch(function(){return{};});showMsg(id,'err','Merge failed: '+(pe.message||pr.status));if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';}return;}
+    }
+    // New categories
+    if(plan.newCats.length){
+      var rows=plan.newCats.map(function(c){return {factory_id:existing.id,category:c.category,sub_category:c.sub_category,sub_sub_category:c.sub_sub_category,is_primary:false};});
+      await fetch(SB+'/rest/v1/factory_categories',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify(rows)});
+      plan.newCats.forEach(function(c){auditRows.push({factory_id:existing.id,source:'scanner_merge',field_name:'factory_categories',change_type:'add_category',old_value:null,new_value:c._path});});
+    }
+    // New business card image (keep both — timestamped path)
+    var card=cards.find(function(c){return c.id===id;});
+    var cardImgUrl=null;
+    if(card && card.dataUrl){
+      try{
+        var bcResized=await resizeImg(card.dataUrl,2000,0.92);
+        var bcBlob=await fetch(bcResized).then(function(r2){return r2.blob();});
+        var bcPath=existing.id+'/business-card/scan_'+dateStamp()+'_'+Date.now()+'.jpg';
+        var bcR=await fetch(SB+'/storage/v1/object/factory-files/'+bcPath,{method:'POST',headers:{'Authorization':'Bearer '+KEY,'Content-Type':'image/jpeg','x-upsert':'true'},body:bcBlob});
+        if(bcR.ok){cardImgUrl=SB+'/storage/v1/object/public/factory-files/'+bcPath;}
+      }catch(e){console.log('Merge card image upload error:',e.message);}
+    }
+    // Write audit rows (attach card image to each for provenance)
+    if(auditRows.length){
+      auditRows.forEach(function(a){a.card_image_url=cardImgUrl;});
+      await fetch(SB+'/rest/v1/factory_audit_log',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'},body:JSON.stringify(auditRows)});
+    }
+
+    // Success
+    if(card)card.status='saved';
+    var changeCount=auditRows.length;
+    showMsg(id,'ok','✓ Merged into '+(existing.factory_name_english||'existing factory')+' — '+changeCount+' field'+(changeCount===1?'':'s')+' updated.');
+    var dupSlot=g(id+'_dup');if(dupSlot){dupSlot.style.display='none';dupSlot.innerHTML='';}
+    if(btn){btn.disabled=true;btn.textContent='✓ Merged';}
+    var banner=g('top-banner');
+    banner.textContent='✓ Merged into '+(existing.factory_name_english||'existing factory')+' ('+changeCount+' change'+(changeCount===1?'':'s')+').';
+    banner.style.display='block';
+    setTimeout(function(){banner.style.display='none';},6000);
+
+    setTimeout(function(){
+      var el=g(id);
+      if(el){el.style.transition='opacity 0.6s ease, transform 0.6s ease';el.style.opacity='0';el.style.transform='translateY(-8px)';
+        setTimeout(function(){cards=cards.filter(function(c){return c.id!==id;});if(el&&el.parentNode)el.parentNode.removeChild(el);updateBar();},600);}
+    },5000);
+
+  }catch(e){
+    showMsg(id,'err','Merge error: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';}
+  }
+}
+
 async function saveDraft(id){
   var card=cards.find(function(c){return c.id===id;});if(!card)return;
   var btn=g(id+'_savebtn');if(btn){btn.disabled=true;btn.textContent='Checking...';}
 
   var gv=function(k){var el=g(id+'_'+k);return el?el.value.trim():'';};
 
-  var email=gv('email');
   var dupSlot=g(id+'_dup');
   if(dupSlot){dupSlot.style.display='none';dupSlot.innerHTML='';}
-  if(email){
+
+  // ── DUPLICATE DETECTION (multi-signal) ──
+  // Unless the user already chose to force a brand-new record on this card.
+  if(!card.forceNew){
     try{
-      var dupR=await fetch(SB+'/rest/v1/factories?sales_email=ilike.'+encodeURIComponent(email)+'&select=id,factory_id,factory_name_english,sales_contact_name,sales_email,status,created_at&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      if(dupR.ok){
-        var dupList=await dupR.json();
-        if(dupList&&dupList.length){
-          var existing=dupList[0];
-          var savedDate=existing.created_at?new Date(existing.created_at).toLocaleDateString():'';
-          var existingHref='factory-detail.html?id='+encodeURIComponent(existing.id);
-          var html='<div style="background:#edfaed;border:1px solid #a0d8a0;border-left:3px solid #1a7a1a;border-radius:7px;padding:12px 14px;font-size:12px;color:#1a4a1a;margin-top:8px;">'+
-            '<div style="font-weight:600;margin-bottom:6px;">✓ Already in your database — nothing saved</div>'+
-            '<div style="margin-bottom:4px;"><strong>'+escapeHtml(existing.factory_name_english||'(no name)')+'</strong>'+(existing.factory_id?' · '+escapeHtml(existing.factory_id):'')+'</div>'+
-            '<div style="margin-bottom:4px;">Contact: '+escapeHtml(existing.sales_contact_name||'(none)')+' · '+escapeHtml(existing.sales_email||email)+'</div>'+
-            '<div style="margin-bottom:8px;color:#1a7a1a;">Status: '+escapeHtml(existing.status||'pending')+(savedDate?' · Added '+savedDate:'')+'</div>'+
-            '<a href="'+escapeHtml(existingHref)+'" target="_blank" style="display:inline-block;padding:6px 12px;background:#1a7a1a;color:#fff;text-decoration:none;border-radius:5px;font-size:11px;font-weight:600;">View existing factory →</a>'+
-            '</div>';
-          if(dupSlot){dupSlot.innerHTML=html;dupSlot.style.display='block';}
-          if(btn){btn.disabled=true;btn.textContent='Already in database';btn.style.opacity='0.6';}
+      var existing=await findDuplicate(id);
+      if(existing){
+        // Found a probable duplicate. Run merge analysis and route.
+        if(btn){btn.textContent='Comparing...';}
+        var plan=await buildMergePlan(id, existing);
+        if(plan.conflicts.length){
+          // Block and show inline conflict resolver. Save resumes via commitMerge.
+          renderMergeUI(id, existing, plan);
+          if(btn){btn.disabled=false;btn.textContent='✓ Save Factory to Database';btn.style.opacity='';}
           return;
         }
+        // No conflicts — auto-merge everything (fills + appends + new cats/certs) and commit.
+        if(btn){btn.textContent='Merging...';}
+        await commitMerge(id, existing, plan, []);
+        return;
       }
-    }catch(e){console.log('Duplicate check error (proceeding with save):',e.message);}
+    }catch(e){console.log('Duplicate detection error (proceeding as new save):',e.message);}
   }
 
   if(btn)btn.textContent='Saving...';
