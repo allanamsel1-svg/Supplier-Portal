@@ -5359,34 +5359,58 @@ function resetRfqCompliance(){
 
 // Pull the category's compliance_requirements row and pre-fill state.
 // Only applies when the user hasn't manually touched the controls.
+// US/CA baseline floor (Option A — always applied, category rules layer on top).
+var RFQ_BASELINE_UNIVERSAL=['Prop 65 Compliant','COA','MSDS/SDS'];
+var RFQ_BASELINE_COSMETIC=['FDA','Heavy Metals Test','Stability Test','USP <61>'];
+
 async function inheritComplianceForCategory(){
   if(rfqComplianceUserTouched)return;
   var sel=g('rfq-category-id');
   var opt=sel&&sel.options[sel.selectedIndex];
   var catName=opt?(opt.dataset.category||opt.textContent.split(' › ')[0].trim()):'';
-  if(!catName)return;
-  try{
-    var r=await fetch(SB+'/rest/v1/compliance_requirements?category=eq.'+encodeURIComponent(catName)+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    if(!r.ok)return;
-    var rows=await r.json();
-    if(!rows||!rows.length){g('rfq-compliance-inherit-note').style.display='none';return;}
-    var rule=rows[0];
-    var applied={};
-    function applyDoc(name,state){
-      var mapped=RFQ_DOC_ALIASES[name]||name;
-      // only set if it's a value we actually render
-      var known=false;
-      RFQ_CERT_CATALOG.forEach(function(g){if(g.items.indexOf(mapped)!==-1)known=true;});
-      if(known){rfqComplianceState[mapped]=state;applied[mapped]=true;}
-    }
-    (rule.required_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)){rfqComplianceState[c]='req';applied[c]=true;} });
-    (rule.preferred_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)&&!applied[c]){rfqComplianceState[c]='pref';} });
-    (rule.required_product_docs||[]).forEach(function(d){applyDoc(d,'req');});
-    (rule.preferred_product_docs||[]).forEach(function(d){var m=RFQ_DOC_ALIASES[d]||d;if(!applied[m])applyDoc(d,'pref');});
-    var note=g('rfq-compliance-inherit-note');
-    if(note){note.style.display='block';note.textContent='Pre-filled from '+catName+' compliance rules. Adjust below as needed.';}
-    renderRfqCompliance();
-  }catch(e){/* non-fatal */}
+
+  var applied={};
+  // 1. Baseline floor — always Req. Never removed.
+  RFQ_BASELINE_UNIVERSAL.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
+  var cosCb=g('rfq-is-cosmetic');
+  var isCos=(opt&&opt.dataset.cosmetic==='true')||(cosCb&&cosCb.checked);
+  if(isCos){
+    RFQ_BASELINE_COSMETIC.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
+  }
+
+  var noteParts=['US/CA baseline pre-filled'+(isCos?' (incl. cosmetic basics)':'')+'.'];
+
+  // 2. Category rules layer on top (can add, or upgrade pref→req).
+  if(catName){
+    try{
+      var r=await fetch(SB+'/rest/v1/compliance_requirements?category=eq.'+encodeURIComponent(catName)+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      if(r.ok){
+        var rows=await r.json();
+        if(rows&&rows.length){
+          var rule=rows[0];
+          function applyDoc(name,state){
+            var mapped=RFQ_DOC_ALIASES[name]||name;
+            if(isRenderedCert(mapped)){
+              // req beats pref; never downgrade an existing req
+              if(state==='req'||rfqComplianceState[mapped]!=='req'){rfqComplianceState[mapped]=state;}
+              applied[mapped]=true;
+            }
+          }
+          (rule.required_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)){rfqComplianceState[c]='req';applied[c]=true;} });
+          (rule.preferred_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)&&rfqComplianceState[c]!=='req'){rfqComplianceState[c]='pref';applied[c]=true;} });
+          (rule.required_product_docs||[]).forEach(function(d){applyDoc(d,'req');});
+          (rule.preferred_product_docs||[]).forEach(function(d){applyDoc(d,'pref');});
+          noteParts.push('Layered '+catName+' compliance rules on top.');
+        }else{
+          noteParts.push('No category-specific rules set for '+catName+'.');
+        }
+      }
+    }catch(e){/* non-fatal — baseline still applied */}
+  }
+
+  var note=g('rfq-compliance-inherit-note');
+  if(note){note.style.display='block';note.textContent=noteParts.join(' ')+' Adjust below as needed.';}
+  renderRfqCompliance();
 }
 function isRenderedCert(name){
   var hit=false;
@@ -5878,11 +5902,7 @@ function formatPackagingSummary(rfq){
   return parts.join(' · ');
 }
 
-function rfqCosmeticToggled(){
-  // Mark as user-overridden so changing category doesn't reset it
-  var cb=g('rfq-is-cosmetic');
-  if(cb)cb.dataset.userOverride='true';
-}
+
 
 function rfqImageChosen(input){
   var file=input.files[0];if(!file)return;
