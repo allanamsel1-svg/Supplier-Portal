@@ -2948,12 +2948,12 @@ function onSkuTypeChange(){
 var KIT_COMPONENT_FIELDS=[
   {key:'product_title',  label:'Product name',        type:'text',  ph:'e.g. 100g Shampoo Bar',           plain:true},
   {key:'description',    label:'Description',          type:'textarea', ph:'What it is, key details',       plain:true},
-  {key:'size_volume',    label:'Size / volume',        type:'text',  ph:'e.g. 100g, 30ml, 12-pack',        plain:true},
-  {key:'unit_l',         label:'Unit L (cm)',          type:'number',ph:'e.g. 3', step:'0.01',              plain:true},
+  {key:'size_volume',    label:'Size / volume',        type:'text',  ph:'e.g. 8 g, 30 ml', note:'Marketed label size',         plain:true},
+  {key:'unit_l',         label:'Unit L (cm)',          type:'number',ph:'e.g. 3', step:'0.01', note:'Physical size of one piece', plain:true},
   {key:'unit_w',         label:'Unit W (cm)',          type:'number',ph:'e.g. 3', step:'0.01',              plain:true},
   {key:'unit_h',         label:'Unit H (cm)',          type:'number',ph:'e.g. 10', step:'0.01',             plain:true},
-  {key:'unit_wt_g',      label:'Unit weight (g)',      type:'number',ph:'e.g. 6', step:'0.1',               plain:true},
-  {key:'units_per_master',label:'Units / master carton',type:'number',ph:'e.g. 100', step:'1',             plain:true},
+  {key:'unit_wt_g',      label:'Unit weight (g)',      type:'number',ph:'e.g. 6', step:'0.1', note:'Shipping weight of one piece, for freight', plain:true},
+  {key:'units_per_master',label:'Units / master carton',type:'number',ph:'e.g. 100', step:'1', note:'How many ship in one bulk carton', plain:true},
   {key:'unit_cost',      label:'Your price (per unit)',type:'number',ph:'e.g. 0.45', step:'0.0001',         plain:true}
 ];
 
@@ -2980,7 +2980,7 @@ function plainFieldsHtml(idx,data){
     } else {
       input='<input type="text" id="'+id+'" value="'+esc(String(v))+'" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" />';
     }
-    return '<div style="'+span+'"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">'+f.label+'</label>'+input+'</div>';
+    return '<div style="'+span+'"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">'+f.label+'</label>'+input+(f.note?'<div style="font-size:9px;color:#aaa;margin-top:2px;">'+f.note+'</div>':'')+'</div>';
   }).join('');
   return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+inner+'</div>';
 }
