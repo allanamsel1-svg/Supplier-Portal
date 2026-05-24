@@ -118,30 +118,34 @@ function mobileForWhatsapp(raw, region) {
 
 // Apply the China/HK phone-field normalization to a structured card.
 // Mutates and returns the card.
+//
+// RULE (locked 2026-05-20): For CN/HK cards, the WeChat field ALWAYS gets the
+// normalized mobile number — never a printed WeChat ID, never anything derived
+// from a QR code. QR codes are ignored entirely. If the mobile can't be
+// normalized to a valid pattern, WeChat is cleared rather than left as noise.
 function applyPhoneRules(card) {
   const region = detectCnOrHk(card);
   if (!region) return card;
 
   const rawMobile = card.sales_mobile || '';
-  const existingWechat = (card.sales_wechat || '').trim();
   const existingWhatsapp = (card.sales_whatsapp || '').trim();
 
-  // WeChat: if existing value looks like a real WeChat ID (not just digits, or has letters),
-  // keep it. Otherwise, derive from mobile.
-  const wechatLooksLikeId = existingWechat && /[a-zA-Z_\-]/.test(existingWechat);
-  if (!wechatLooksLikeId) {
-    const derivedWechat = region === 'CN'
-      ? chinaMobileForWechat(rawMobile)
-      : hkMobileForWechat(rawMobile);
-    if (derivedWechat) {
-      card.sales_wechat = derivedWechat;
-    } else if (existingWechat) {
-      // Existing value was digits but didn't fit pattern — re-normalize anyway
-      const reNorm = region === 'CN'
-        ? chinaMobileForWechat(existingWechat)
-        : hkMobileForWechat(existingWechat);
-      if (reNorm) card.sales_wechat = reNorm;
-    }
+  // WeChat = normalized mobile, ALWAYS, for CN/HK. Overwrite whatever was extracted.
+  const derivedWechat = region === 'CN'
+    ? chinaMobileForWechat(rawMobile)
+    : hkMobileForWechat(rawMobile);
+
+  if (derivedWechat) {
+    card.sales_wechat = derivedWechat;
+  } else {
+    // Mobile didn't normalize. Try to salvage from whatever was in the WeChat field
+    // ONLY IF it's digits (a misplaced number) — never keep alphanumeric/QR noise.
+    const existingWechatDigits = digitsOnly(card.sales_wechat || '');
+    const reNorm = region === 'CN'
+      ? chinaMobileForWechat(existingWechatDigits)
+      : hkMobileForWechat(existingWechatDigits);
+    // Clear the field unless we got a clean normalized number.
+    card.sales_wechat = reNorm || '';
   }
 
   // WhatsApp: derive from mobile if not explicitly labeled, OR normalize what was extracted
@@ -222,7 +226,7 @@ Return ONLY valid JSON — an ARRAY of card objects, one per distinct business c
     "sales_email": "primary email (closest to the person's name if multiple)",
     "sales_mobile": "mobile/cell number with country code if shown",
     "telephone": "landline (NOT fax)",
-    "sales_wechat": "WeChat ID if printed in readable text — do NOT decode QR codes",
+    "sales_wechat": "Leave empty (\"\"). Do NOT read QR codes. Do NOT extract WeChat IDs. The system fills this from the mobile number for China/HK cards.",
     "sales_whatsapp": "WhatsApp number if explicitly labeled as such",
     "website": "company website URL — NOT an email",
     "address": "full street address",
@@ -239,6 +243,7 @@ Return ONLY valid JSON — an ARRAY of card objects, one per distinct business c
 
 STRICT RULES:
 - IGNORE fax numbers entirely. Never put fax in telephone.
+- IGNORE QR codes completely. Never decode them, never read text adjacent to them as a WeChat ID, never populate sales_wechat from anything. Leave sales_wechat empty.
 - NEVER put a person's name in a company field.
 - NEVER mix data between different cards.
 - If uncertain about digits in a number, leave the field empty rather than guess.
