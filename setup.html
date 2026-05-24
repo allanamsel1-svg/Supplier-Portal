@@ -3261,7 +3261,8 @@ async function saveSku(){
           draft_unit_cost:row.unit_cost,
           reconcile_status:row.reconcile_status
         };});
-        await fetch(SB+'/rest/v1/kit_components',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(kcPayload)});
+        var kcr=await fetch(SB+'/rest/v1/kit_components',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(kcPayload)});
+        if(!kcr.ok){var kce=await kcr.json().catch(function(){return{};});alert('Component save failed: '+(kce.message||kce.details||kcr.status));}
         // Save kit/bulk configuration for components that are real SKUs.
         var cfgPayload=kitRows.filter(function(row){return row.component_sku_id;}).map(function(row){return {
           component_sku_id:row.component_sku_id,
