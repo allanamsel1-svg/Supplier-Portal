@@ -1133,7 +1133,7 @@
         <div class="mgr-card" id="cert-req-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Product Compliance Requirements <span style="font-size:11px;font-weight:400;color:#888;">(product-level only — factory-level certs live on the factory profile)</span></div>
           <div id="rfq-compliance-inherit-note" style="display:none;font-size:11px;color:#1a7a1a;background:#edfaed;border:1px solid #c0e0c0;border-radius:7px;padding:6px 10px;margin:8px 0 4px;"></div>
-          <div style="font-size:11px;color:#999;margin:6px 0 10px;line-height:1.5;">Mark each as <b>Req</b> (must have), <b>Pref</b> (nice-to-have, flagged not blocking), or leave off. Pre-filled from the category's Compliance Rules; override per-RFQ as needed.</div>
+          <div style="font-size:11px;color:#999;margin:6px 0 10px;line-height:1.5;">Full product-doc catalog shown. <b>Req</b> = must have, <b>Pref</b> = nice-to-have (flagged, not blocking), <b>—</b> = off. The US/CA baseline (and cosmetic basics, if applicable) plus any category rules are pre-marked; the grey hint under each item tells you when it applies. Override per-RFQ as needed.</div>
           <div id="rfq-compliance-rows"></div>
         </div>
 
@@ -5260,41 +5260,52 @@ async function populateRFQDropdowns(){
 
 // ── RFQ Compliance Requirements (certs + product docs, required/preferred) ──
 // Cert names MUST match what Layer 2 of check-compliance-status reads and what
-// compliance-rules.html writes. Product-doc short names map to the long names
-// used in compliance_requirements via RFQ_DOC_ALIASES below.
-var RFQ_CERT_CATALOG=[
-  {group:'Regulatory / Safety',items:['FDA','CE','ETL','UL','FCC','RoHS','REACH','NSF','Health Canada','Prop 65 Compliant']},
-  {group:'Cosmetic / Personal Care Testing',items:['TRA','USP <51>','USP <61>','USP <62>','Heavy Metals Test','Stability Test','COA','MSDS/SDS']},
-  {group:'Product Claims',items:['Vegan','Organic','COSMOS']}
+// compliance-rules.html writes. These use the EXACT product-doc names from
+// compliance-rules.html so category rules map 1:1 with no aliasing.
+// PRODUCT-LEVEL ONLY — factory/market-access certs (ISO, CE, UL, FCC...) live
+// on the factory profile, not the RFQ. Each item carries a short "watch-for" hint.
+var RFQ_DOC_CATALOG=[
+  {group:'Safety & Toxicology',items:[
+    {name:'TRA (Toxicological Risk Assessment)',hint:'Cosmetics — safety assessment of the finished formula'},
+    {name:'CPSR (Cosmetic Product Safety Report)',hint:'Required for EU; good practice for premium cosmetics'},
+    {name:'Heavy Metals Testing',hint:'Anything skin-contact or ingestible (Pb/As/Hg/Cd limits)'},
+    {name:'Prop 65 Compliance',hint:'Any product sold in California — effectively national'},
+    {name:'Allergen Disclosure',hint:'Fragranced products; EU 26/81 allergen list'},
+    {name:'SDS / MSDS',hint:'Anything with chemical content — baseline for retail'}
+  ]},
+  {group:'Microbial & Stability',items:[
+    {name:'USP <51> Antimicrobial Effectiveness',hint:'Water-containing cosmetics — preservative challenge'},
+    {name:'USP <61> Microbial Enumeration',hint:'Cosmetics — total microbial count'},
+    {name:'USP <62> Specified Microorganisms',hint:'Cosmetics — absence of pathogens'},
+    {name:'Challenge Test (PET)',hint:'Emulsions/creams — preservation adequacy'},
+    {name:'Stability Testing',hint:'Cosmetics — shelf-life under temperature stress'},
+    {name:'Compatibility Testing',hint:'Formula vs packaging — leaching/interaction'},
+    {name:'PAO / Shelf-life Substantiation',hint:'Supports the period-after-opening claim on pack'}
+  ]},
+  {group:'Documentation & Claims',items:[
+    {name:'COA (Certificate of Analysis)',hint:'Per-batch — baseline retail QA for any product'},
+    {name:'INCI / Full Ingredient Disclosure',hint:'Cosmetics — full ingredient list for labeling'},
+    {name:'Organic Product Certification',hint:'Only if making an organic claim (COSMOS/USDA)'},
+    {name:'Vegan Claim Substantiation',hint:'Only if making a vegan claim'},
+    {name:'Cruelty-Free Claim Substantiation',hint:'Only if making a cruelty-free claim'},
+    {name:'Clinical / Efficacy Testing',hint:'If making performance claims (e.g. "reduces wrinkles")'}
+  ]}
 ];
-// Maps the long compliance_requirements product-doc name -> RFQ short cert/doc value.
-// Lets category rules pre-fill the matching RFQ row.
-var RFQ_DOC_ALIASES={
-  'TRA (Toxicological Risk Assessment)':'TRA',
-  'Heavy Metals Testing':'Heavy Metals Test',
-  'Prop 65 Compliance':'Prop 65 Compliant',
-  'SDS / MSDS':'MSDS/SDS',
-  'USP <51> Antimicrobial Effectiveness':'USP <51>',
-  'USP <61> Microbial Enumeration':'USP <61>',
-  'USP <62> Specified Microorganisms':'USP <62>',
-  'Stability Testing':'Stability Test',
-  'COA (Certificate of Analysis)':'COA',
-  'Organic Product Certification':'Organic',
-  'Vegan Claim Substantiation':'Vegan'
-};
 
-// state map: value -> 'req' | 'pref' | 'na'
+// state map: docName -> 'req' | 'pref' | 'na'
 var rfqComplianceState={};
 var rfqComplianceUserTouched=false;
 
 function rfqEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
-function rfqComplianceSeg(val){
+function rfqComplianceSeg(item){
+  var val=item.name, hint=item.hint||'';
   var st=rfqComplianceState[val]||'na';
   var safe=rfqEsc(val).replace(/'/g,"\\'");
-  return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;font-size:13px;">'+
-    '<span style="flex:1;">'+rfqEsc(val).replace('&lt;','<').replace('&gt;','>')+'</span>'+
-    '<span style="display:inline-flex;border:1px solid #e0e0d8;border-radius:6px;overflow:hidden;">'+
+  var label=rfqEsc(val).replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  return '<div style="display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;font-size:13px;'+(st==='req'?'background:#fcf2f2;':st==='pref'?'background:#fffbf0;':'')+'">'+
+    '<span style="flex:1;min-width:0;"><span>'+label+'</span>'+(hint?'<span style="display:block;font-size:10px;color:#999;line-height:1.3;margin-top:1px;">'+rfqEsc(hint)+'</span>':'')+'</span>'+
+    '<span style="display:inline-flex;border:1px solid #e0e0d8;border-radius:6px;overflow:hidden;flex-shrink:0;">'+
       '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'req\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;border-right:1px solid #e0e0d8;'+(st==='req'?'background:#fce8e8;color:#a22;':'background:#fff;color:#999;')+'">Req</button>'+
       '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'pref\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;border-right:1px solid #e0e0d8;'+(st==='pref'?'background:#fff8e0;color:#7a5a00;':'background:#fff;color:#999;')+'">Pref</button>'+
       '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'na\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;'+(st==='na'?'background:#f0f0e8;color:#555;':'background:#fff;color:#999;')+'">—</button>'+
@@ -5305,8 +5316,8 @@ function rfqComplianceSeg(val){
 function renderRfqCompliance(){
   var host=g('rfq-compliance-rows');
   if(!host)return;
-  host.innerHTML=RFQ_CERT_CATALOG.map(function(grp){
-    return '<div style="margin-top:10px;margin-bottom:2px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">'+rfqEsc(grp.group)+'</div>'+
+  host.innerHTML=RFQ_DOC_CATALOG.map(function(grp){
+    return '<div style="margin-top:12px;margin-bottom:3px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">'+rfqEsc(grp.group)+'</div>'+
       grp.items.map(rfqComplianceSeg).join('');
   }).join('');
 }
@@ -5317,23 +5328,14 @@ function setRfqCompliance(val,state){
   renderRfqCompliance();
 }
 
-// Read current state into the four arrays Layer 2/3 consume.
+// Read current state into the product-doc arrays Layer 2/3 consume.
+// Product-level only — certifications arrays are intentionally left null on the RFQ.
 function readRfqCompliance(){
-  var certVals={};
-  RFQ_CERT_CATALOG.forEach(function(g){g.items.forEach(function(v){certVals[v]=true;});});
   var out={certifications_required:[],certifications_preferred:[],product_docs_required:[],product_docs_preferred:[]};
-  // Treat the "Cosmetic / Personal Care Testing" group as product docs; certs + claims as certifications.
-  var docGroup={};
-  RFQ_CERT_CATALOG[1].items.forEach(function(v){docGroup[v]=true;});
   Object.keys(rfqComplianceState).forEach(function(v){
     var st=rfqComplianceState[v];
-    if(st!=='req'&&st!=='pref')return;
-    var isDoc=docGroup[v];
-    if(isDoc){
-      if(st==='req')out.product_docs_required.push(v);else out.product_docs_preferred.push(v);
-    }else{
-      if(st==='req')out.certifications_required.push(v);else out.certifications_preferred.push(v);
-    }
+    if(st==='req')out.product_docs_required.push(v);
+    else if(st==='pref')out.product_docs_preferred.push(v);
   });
   return out;
 }
@@ -5342,11 +5344,11 @@ function readRfqCompliance(){
 function loadRfqComplianceFromRFQ(rfq){
   rfqComplianceState={};
   rfqComplianceUserTouched=false;
-  (rfq.certifications_required||[]).forEach(function(v){rfqComplianceState[v]='req';});
-  (rfq.certifications_preferred||[]).forEach(function(v){rfqComplianceState[v]='pref';});
   (rfq.product_docs_required||[]).forEach(function(v){rfqComplianceState[v]='req';});
   (rfq.product_docs_preferred||[]).forEach(function(v){rfqComplianceState[v]='pref';});
-  // Any saved value means the user already curated it.
+  // Back-compat: older RFQs stored some product certs in certifications_* — load any that match a doc name.
+  (rfq.certifications_required||[]).forEach(function(v){if(isRenderedCert(v))rfqComplianceState[v]='req';});
+  (rfq.certifications_preferred||[]).forEach(function(v){if(isRenderedCert(v)&&rfqComplianceState[v]!=='req')rfqComplianceState[v]='pref';});
   if(Object.keys(rfqComplianceState).length)rfqComplianceUserTouched=true;
   renderRfqCompliance();
 }
@@ -5360,8 +5362,9 @@ function resetRfqCompliance(){
 // Pull the category's compliance_requirements row and pre-fill state.
 // Only applies when the user hasn't manually touched the controls.
 // US/CA baseline floor (Option A — always applied, category rules layer on top).
-var RFQ_BASELINE_UNIVERSAL=['Prop 65 Compliant','COA','MSDS/SDS'];
-var RFQ_BASELINE_COSMETIC=['FDA','Heavy Metals Test','Stability Test','USP <61>'];
+// Exact product-doc names from RFQ_DOC_CATALOG.
+var RFQ_BASELINE_UNIVERSAL=['Prop 65 Compliance','COA (Certificate of Analysis)','SDS / MSDS'];
+var RFQ_BASELINE_COSMETIC=['TRA (Toxicological Risk Assessment)','Heavy Metals Testing','Stability Testing','USP <61> Microbial Enumeration'];
 
 async function inheritComplianceForCategory(){
   if(rfqComplianceUserTouched)return;
@@ -5381,6 +5384,7 @@ async function inheritComplianceForCategory(){
   var noteParts=['US/CA baseline pre-filled'+(isCos?' (incl. cosmetic basics)':'')+'.'];
 
   // 2. Category rules layer on top (can add, or upgrade pref→req).
+  // Product-docs only — factory certs are NOT applied to the RFQ (they live on the factory).
   if(catName){
     try{
       var r=await fetch(SB+'/rest/v1/compliance_requirements?category=eq.'+encodeURIComponent(catName)+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
@@ -5389,18 +5393,15 @@ async function inheritComplianceForCategory(){
         if(rows&&rows.length){
           var rule=rows[0];
           function applyDoc(name,state){
-            var mapped=RFQ_DOC_ALIASES[name]||name;
-            if(isRenderedCert(mapped)){
+            if(isRenderedCert(name)){
               // req beats pref; never downgrade an existing req
-              if(state==='req'||rfqComplianceState[mapped]!=='req'){rfqComplianceState[mapped]=state;}
-              applied[mapped]=true;
+              if(state==='req'||rfqComplianceState[name]!=='req'){rfqComplianceState[name]=state;}
+              applied[name]=true;
             }
           }
-          (rule.required_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)){rfqComplianceState[c]='req';applied[c]=true;} });
-          (rule.preferred_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)&&rfqComplianceState[c]!=='req'){rfqComplianceState[c]='pref';applied[c]=true;} });
           (rule.required_product_docs||[]).forEach(function(d){applyDoc(d,'req');});
           (rule.preferred_product_docs||[]).forEach(function(d){applyDoc(d,'pref');});
-          noteParts.push('Layered '+catName+' compliance rules on top.');
+          noteParts.push('Layered '+catName+' product-doc rules on top.');
         }else{
           noteParts.push('No category-specific rules set for '+catName+'.');
         }
@@ -5414,7 +5415,7 @@ async function inheritComplianceForCategory(){
 }
 function isRenderedCert(name){
   var hit=false;
-  RFQ_CERT_CATALOG.forEach(function(g){if(g.items.indexOf(name)!==-1)hit=true;});
+  RFQ_DOC_CATALOG.forEach(function(g){g.items.forEach(function(it){if(it.name===name)hit=true;});});
   return hit;
 }
 
