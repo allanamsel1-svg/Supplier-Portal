@@ -1129,45 +1129,12 @@
           </div>
         </div>
 
-        <!-- Certifications -->
+        <!-- Certifications & Product Docs (required / preferred per item) -->
         <div class="mgr-card" id="cert-req-card" style="margin-bottom:1rem;">
-          <div class="mgr-card-title">Product Certifications Required <span style="font-size:11px;font-weight:400;color:#888;">(product-level only — factory-level certs live on the factory profile)</span></div>
-
-          <!-- Section 1: Regulatory / Safety -->
-          <div style="margin-top:8px;margin-bottom:4px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">Regulatory / Safety</div>
-          <div class="checkbox-grid">
-            <label class="cb-item"><input type="checkbox" value="FDA"> FDA</label>
-            <label class="cb-item"><input type="checkbox" value="CE"> CE</label>
-            <label class="cb-item"><input type="checkbox" value="ETL"> ETL</label>
-            <label class="cb-item"><input type="checkbox" value="UL"> UL</label>
-            <label class="cb-item"><input type="checkbox" value="FCC"> FCC</label>
-            <label class="cb-item"><input type="checkbox" value="RoHS"> RoHS</label>
-            <label class="cb-item"><input type="checkbox" value="REACH"> REACH</label>
-            <label class="cb-item"><input type="checkbox" value="NSF"> NSF</label>
-            <label class="cb-item"><input type="checkbox" value="Health Canada"> Health Canada</label>
-            <label class="cb-item"><input type="checkbox" value="Prop 65 Compliant"> Prop 65</label>
-          </div>
-
-          <!-- Section 2: Cosmetic / Personal Care Testing -->
-          <div style="margin-top:14px;margin-bottom:4px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">Cosmetic / Personal Care Testing</div>
-          <div class="checkbox-grid">
-            <label class="cb-item"><input type="checkbox" value="TRA"> TRA</label>
-            <label class="cb-item"><input type="checkbox" value="USP <51>"> USP &lt;51&gt;</label>
-            <label class="cb-item"><input type="checkbox" value="USP <61>"> USP &lt;61&gt;</label>
-            <label class="cb-item"><input type="checkbox" value="USP <62>"> USP &lt;62&gt;</label>
-            <label class="cb-item"><input type="checkbox" value="Heavy Metals Test"> Heavy Metals</label>
-            <label class="cb-item"><input type="checkbox" value="Stability Test"> Stability</label>
-            <label class="cb-item"><input type="checkbox" value="COA"> COA</label>
-            <label class="cb-item"><input type="checkbox" value="MSDS/SDS"> MSDS/SDS</label>
-          </div>
-
-          <!-- Section 3: Product Claims -->
-          <div style="margin-top:14px;margin-bottom:4px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">Product Claims</div>
-          <div class="checkbox-grid">
-            <label class="cb-item"><input type="checkbox" value="Vegan"> Vegan</label>
-            <label class="cb-item"><input type="checkbox" value="Organic"> Organic</label>
-            <label class="cb-item"><input type="checkbox" value="COSMOS"> COSMOS</label>
-          </div>
+          <div class="mgr-card-title">Product Compliance Requirements <span style="font-size:11px;font-weight:400;color:#888;">(product-level only — factory-level certs live on the factory profile)</span></div>
+          <div id="rfq-compliance-inherit-note" style="display:none;font-size:11px;color:#1a7a1a;background:#edfaed;border:1px solid #c0e0c0;border-radius:7px;padding:6px 10px;margin:8px 0 4px;"></div>
+          <div style="font-size:11px;color:#999;margin:6px 0 10px;line-height:1.5;">Mark each as <b>Req</b> (must have), <b>Pref</b> (nice-to-have, flagged not blocking), or leave off. Pre-filled from the category's Compliance Rules; override per-RFQ as needed.</div>
+          <div id="rfq-compliance-rows"></div>
         </div>
 
         <!-- Product Image -->
@@ -5189,11 +5156,8 @@ async function openRFQForm(id){
   g('rfq-pkg-notes').value=rfq.packaging_notes||'';
   // Load structured packaging into form
   loadPkgFormState(rfq);
-  // Check cert checkboxes
-  var certs=rfq.certifications_required||[];
-  document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){
-    cb.checked=certs.includes(cb.value);
-  });
+  // Restore compliance state (certs + product docs, required/preferred)
+  loadRfqComplianceFromRFQ(rfq);
   // Fill margin calculator fields
   if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
   if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
@@ -5241,6 +5205,7 @@ function resetRFQForm(){
   g('rfq-img-name').textContent='';g('rfq-img-preview').style.display='none';
   g('rfq-save-ok').style.display='none';g('rfq-save-err').style.display='none';
   selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
+  resetRfqCompliance();
 }
 
 async function populateRFQDropdowns(){
@@ -5288,9 +5253,145 @@ async function populateRFQDropdowns(){
   }
   allCategories.forEach(function(c){
     var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
-    catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'">'+path+' ['+c.model_prefix+']</option>';
+    catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'" data-category="'+rfqEsc(c.category)+'">'+path+' ['+c.model_prefix+']</option>';
   });
   // Colors are hardcoded in HTML dropdown
+}
+
+// ── RFQ Compliance Requirements (certs + product docs, required/preferred) ──
+// Cert names MUST match what Layer 2 of check-compliance-status reads and what
+// compliance-rules.html writes. Product-doc short names map to the long names
+// used in compliance_requirements via RFQ_DOC_ALIASES below.
+var RFQ_CERT_CATALOG=[
+  {group:'Regulatory / Safety',items:['FDA','CE','ETL','UL','FCC','RoHS','REACH','NSF','Health Canada','Prop 65 Compliant']},
+  {group:'Cosmetic / Personal Care Testing',items:['TRA','USP <51>','USP <61>','USP <62>','Heavy Metals Test','Stability Test','COA','MSDS/SDS']},
+  {group:'Product Claims',items:['Vegan','Organic','COSMOS']}
+];
+// Maps the long compliance_requirements product-doc name -> RFQ short cert/doc value.
+// Lets category rules pre-fill the matching RFQ row.
+var RFQ_DOC_ALIASES={
+  'TRA (Toxicological Risk Assessment)':'TRA',
+  'Heavy Metals Testing':'Heavy Metals Test',
+  'Prop 65 Compliance':'Prop 65 Compliant',
+  'SDS / MSDS':'MSDS/SDS',
+  'USP <51> Antimicrobial Effectiveness':'USP <51>',
+  'USP <61> Microbial Enumeration':'USP <61>',
+  'USP <62> Specified Microorganisms':'USP <62>',
+  'Stability Testing':'Stability Test',
+  'COA (Certificate of Analysis)':'COA',
+  'Organic Product Certification':'Organic',
+  'Vegan Claim Substantiation':'Vegan'
+};
+
+// state map: value -> 'req' | 'pref' | 'na'
+var rfqComplianceState={};
+var rfqComplianceUserTouched=false;
+
+function rfqEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+function rfqComplianceSeg(val){
+  var st=rfqComplianceState[val]||'na';
+  var safe=rfqEsc(val).replace(/'/g,"\\'");
+  return '<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;font-size:13px;">'+
+    '<span style="flex:1;">'+rfqEsc(val).replace('&lt;','<').replace('&gt;','>')+'</span>'+
+    '<span style="display:inline-flex;border:1px solid #e0e0d8;border-radius:6px;overflow:hidden;">'+
+      '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'req\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;border-right:1px solid #e0e0d8;'+(st==='req'?'background:#fce8e8;color:#a22;':'background:#fff;color:#999;')+'">Req</button>'+
+      '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'pref\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;border-right:1px solid #e0e0d8;'+(st==='pref'?'background:#fff8e0;color:#7a5a00;':'background:#fff;color:#999;')+'">Pref</button>'+
+      '<button type="button" onclick="setRfqCompliance(\''+safe+'\',\'na\')" style="border:none;font-family:inherit;font-size:11px;font-weight:600;padding:3px 9px;cursor:pointer;'+(st==='na'?'background:#f0f0e8;color:#555;':'background:#fff;color:#999;')+'">—</button>'+
+    '</span>'+
+  '</div>';
+}
+
+function renderRfqCompliance(){
+  var host=g('rfq-compliance-rows');
+  if(!host)return;
+  host.innerHTML=RFQ_CERT_CATALOG.map(function(grp){
+    return '<div style="margin-top:10px;margin-bottom:2px;font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.06em;">'+rfqEsc(grp.group)+'</div>'+
+      grp.items.map(rfqComplianceSeg).join('');
+  }).join('');
+}
+
+function setRfqCompliance(val,state){
+  rfqComplianceState[val]=state;
+  rfqComplianceUserTouched=true;
+  renderRfqCompliance();
+}
+
+// Read current state into the four arrays Layer 2/3 consume.
+function readRfqCompliance(){
+  var certVals={};
+  RFQ_CERT_CATALOG.forEach(function(g){g.items.forEach(function(v){certVals[v]=true;});});
+  var out={certifications_required:[],certifications_preferred:[],product_docs_required:[],product_docs_preferred:[]};
+  // Treat the "Cosmetic / Personal Care Testing" group as product docs; certs + claims as certifications.
+  var docGroup={};
+  RFQ_CERT_CATALOG[1].items.forEach(function(v){docGroup[v]=true;});
+  Object.keys(rfqComplianceState).forEach(function(v){
+    var st=rfqComplianceState[v];
+    if(st!=='req'&&st!=='pref')return;
+    var isDoc=docGroup[v];
+    if(isDoc){
+      if(st==='req')out.product_docs_required.push(v);else out.product_docs_preferred.push(v);
+    }else{
+      if(st==='req')out.certifications_required.push(v);else out.certifications_preferred.push(v);
+    }
+  });
+  return out;
+}
+
+// Load saved RFQ arrays back into state (edit mode).
+function loadRfqComplianceFromRFQ(rfq){
+  rfqComplianceState={};
+  rfqComplianceUserTouched=false;
+  (rfq.certifications_required||[]).forEach(function(v){rfqComplianceState[v]='req';});
+  (rfq.certifications_preferred||[]).forEach(function(v){rfqComplianceState[v]='pref';});
+  (rfq.product_docs_required||[]).forEach(function(v){rfqComplianceState[v]='req';});
+  (rfq.product_docs_preferred||[]).forEach(function(v){rfqComplianceState[v]='pref';});
+  // Any saved value means the user already curated it.
+  if(Object.keys(rfqComplianceState).length)rfqComplianceUserTouched=true;
+  renderRfqCompliance();
+}
+
+function resetRfqCompliance(){
+  rfqComplianceState={};
+  rfqComplianceUserTouched=false;
+  renderRfqCompliance();
+}
+
+// Pull the category's compliance_requirements row and pre-fill state.
+// Only applies when the user hasn't manually touched the controls.
+async function inheritComplianceForCategory(){
+  if(rfqComplianceUserTouched)return;
+  var sel=g('rfq-category-id');
+  var opt=sel&&sel.options[sel.selectedIndex];
+  var catName=opt?(opt.dataset.category||opt.textContent.split(' › ')[0].trim()):'';
+  if(!catName)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/compliance_requirements?category=eq.'+encodeURIComponent(catName)+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok)return;
+    var rows=await r.json();
+    if(!rows||!rows.length){g('rfq-compliance-inherit-note').style.display='none';return;}
+    var rule=rows[0];
+    var applied={};
+    function applyDoc(name,state){
+      var mapped=RFQ_DOC_ALIASES[name]||name;
+      // only set if it's a value we actually render
+      var known=false;
+      RFQ_CERT_CATALOG.forEach(function(g){if(g.items.indexOf(mapped)!==-1)known=true;});
+      if(known){rfqComplianceState[mapped]=state;applied[mapped]=true;}
+    }
+    (rule.required_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)){rfqComplianceState[c]='req';applied[c]=true;} });
+    (rule.preferred_factory_certs||[]).forEach(function(c){ if(isRenderedCert(c)&&!applied[c]){rfqComplianceState[c]='pref';} });
+    (rule.required_product_docs||[]).forEach(function(d){applyDoc(d,'req');});
+    (rule.preferred_product_docs||[]).forEach(function(d){var m=RFQ_DOC_ALIASES[d]||d;if(!applied[m])applyDoc(d,'pref');});
+    var note=g('rfq-compliance-inherit-note');
+    if(note){note.style.display='block';note.textContent='Pre-filled from '+catName+' compliance rules. Adjust below as needed.';}
+    renderRfqCompliance();
+  }catch(e){/* non-fatal */}
+}
+function isRenderedCert(name){
+  var hit=false;
+  RFQ_CERT_CATALOG.forEach(function(g){if(g.items.indexOf(name)!==-1)hit=true;});
+  return hit;
 }
 
 function rfqCategoryChanged(){
@@ -5302,6 +5403,7 @@ function rfqCategoryChanged(){
   if(cb&&cb.dataset.userOverride!=='true'){
     cb.checked=isCosmetic;
   }
+  inheritComplianceForCategory();
 }
 
 // ─────────────────────────────────────────────────────────
@@ -6050,11 +6152,8 @@ async function saveRFQ(action){
   var pkgFields=getPkgFormState();
   var legacyPkgString=getPkgLegacyString();
 
-  // Collect certs
-  var certs=[];
-  document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){
-    if(cb.checked)certs.push(cb.value);
-  });
+  // Collect compliance (certs + product docs, required/preferred)
+  var compliance=readRfqCompliance();
 
   var factoryIds=Object.keys(selectedFactoryIds);
   if(action==='send'&&!factoryIds.length){
@@ -6089,7 +6188,10 @@ async function saveRFQ(action){
     // Legacy packaging_type — auto-derived from structured fields for backward compat
     packaging_type:legacyPkgString,
     packaging_notes:g('rfq-pkg-notes').value.trim()||null,
-    certifications_required:certs.length?certs:null,
+    certifications_required:compliance.certifications_required.length?compliance.certifications_required:null,
+    certifications_preferred:compliance.certifications_preferred.length?compliance.certifications_preferred:null,
+    product_docs_required:compliance.product_docs_required.length?compliance.product_docs_required:null,
+    product_docs_preferred:compliance.product_docs_preferred.length?compliance.product_docs_preferred:null,
     is_cosmetic:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
     inci_required:g('rfq-is-cosmetic')?g('rfq-is-cosmetic').checked:(catRow?catRow.is_cosmetic:false),
     prop65_strategy:(g('rfq-prop65-strategy')&&g('rfq-prop65-strategy').value)||null,
