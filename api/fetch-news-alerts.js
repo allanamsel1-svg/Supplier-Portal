@@ -344,7 +344,8 @@ export default async function handler(req, res) {
       new_articles: toInsert.length,
       signal_count: toInsert.filter(a => !a.is_fluff).length,
       fluff_count: toInsert.filter(a => a.is_fluff).length,
-      classify_debug: CLASSIFY_DEBUG.raw
+      classify_debug: CLASSIFY_DEBUG.raw,
+      build_version: 'streams-v3'
     });
 
   } catch (err) {
