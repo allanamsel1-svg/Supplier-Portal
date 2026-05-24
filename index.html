@@ -3397,8 +3397,118 @@ async function uploadCertRows(rfqId){
   return out;
 }
 
+// ── Kit RFQ: component-breakout quote form ──
+async function hydrateKitQuoteSection(rfq,assignment){
+  var holder=g('kitq-'+rfq.id); if(!holder)return;
+  // Load the kit's components (the BOM) + any existing quote lines from this factory.
+  var compRows=[],existing=[];
+  try{
+    var cr=await fetch(SB+'/rest/v1/kit_components?kit_sku_id=eq.'+rfq.kit_sku_id+'&order=sort_order',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    compRows=cr.ok?await cr.json():[];
+    // Resolve component labels: prefer real SKU description, else factory_described_name.
+    var skuIds=compRows.map(function(c){return c.component_sku_id;}).filter(Boolean);
+    var skuMap={};
+    if(skuIds.length){
+      var q=skuIds.map(function(id){return 'id=eq.'+id;}).join(',');
+      var sr=await fetch(SB+'/rest/v1/skus?or=('+q+')&select=id,description,model_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+      if(sr.ok)(await sr.json()).forEach(function(s){skuMap[s.id]=s;});
+    }
+    compRows.forEach(function(c){
+      c._label=c.component_sku_id&&skuMap[c.component_sku_id]?(skuMap[c.component_sku_id].description||skuMap[c.component_sku_id].model_number):(c.factory_described_name||'Component');
+    });
+    var er=await fetch(SB+'/rest/v1/kit_quote_lines?rfq_id=eq.'+rfq.id+'&factory_id=eq.'+FACTORY_ID,{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    existing=er.ok?await er.json():[];
+  }catch(e){console.log('kit quote load err',e);}
+
+  function exFor(compId){return existing.find(function(x){return x.kit_component_id===compId;})||{};}
+  var asmEx=existing.find(function(x){return x.line_type==='assembly';})||{};
+
+  var rowsHtml=compRows.map(function(c){
+    var ex=exFor(c.id);
+    return '<tr data-comp="'+c.id+'" data-label="'+esc(c._label)+'" data-qty="'+(c.qty_per_kit||1)+'">'+
+      '<td style="padding:6px 8px;font-size:12px;">'+esc(c._label)+'</td>'+
+      '<td style="padding:6px 8px;text-align:center;font-size:12px;color:#888;">'+(c.qty_per_kit||1)+'</td>'+
+      '<td style="padding:4px 6px;"><input type="number" class="kq-cost" step="0.0001" value="'+(ex.component_unit_cost||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
+      '<td style="padding:4px 6px;"><input type="number" class="kq-frt" step="0.0001" value="'+(ex.freight_to_qb||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
+      '</tr>';
+  }).join('');
+
+  var html=
+    '<div style="background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;padding:12px 14px;font-size:12px;color:#1a3a7a;margin-bottom:12px;line-height:1.5;">'+
+      '<div style="font-weight:600;margin-bottom:4px;">🧩 This is a multi-component set</div>'+
+      'Please quote each component separately — your per-unit cost and the freight to bring that component to the assembly location. Add your assembly cost at the bottom.'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">'+
+      '<thead><tr style="background:#f5f5f0;">'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Component</th>'+
+        '<th style="padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Qty/set</th>'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Cost/unit (USD)</th>'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Freight to assembly</th>'+
+      '</tr></thead>'+
+      '<tbody>'+(rowsHtml||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:#aaa;">No components defined for this kit.</td></tr>')+'</tbody>'+
+    '</table>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
+      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Assembly cost / set (USD)</label>'+
+        '<input type="number" id="kq-asm-'+rfq.id+'" step="0.0001" value="'+(asmEx.assembly_cost||'')+'" placeholder="e.g. 0.5000" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
+      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Notes (optional)</label>'+
+        '<input type="text" id="kq-notes-'+rfq.id+'" value="'+esc(asmEx.factory_notes||'')+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
+    '</div>'+
+    '<button onclick="submitKitQuote(\''+rfq.id+'\')" id="kq-btn-'+rfq.id+'" class="submit-quote-btn">Submit Kit Quote</button>'+
+    '<div id="kq-err-'+rfq.id+'" style="display:none;color:#b00;font-size:12px;margin-top:8px;"></div>'+
+    '<div id="kq-ok-'+rfq.id+'" style="display:none;color:#1a7a1a;font-size:12px;margin-top:8px;">✓ Kit quote submitted.</div>';
+
+  holder.innerHTML=html;
+}
+
+async function submitKitQuote(rfqId){
+  var holder=g('kitq-'+rfqId); if(!holder)return;
+  var btn=g('kq-btn-'+rfqId); var err=g('kq-err-'+rfqId); var ok=g('kq-ok-'+rfqId);
+  if(err)err.style.display='none';
+  var rows=Array.prototype.slice.call(holder.querySelectorAll('tr[data-comp]'));
+  var lines=rows.map(function(tr){
+    return {
+      rfq_id:rfqId, factory_id:FACTORY_ID,
+      kit_component_id:parseInt(tr.getAttribute('data-comp')),
+      line_label:tr.getAttribute('data-label'),
+      line_type:'component',
+      qty_per_kit:parseFloat(tr.getAttribute('data-qty'))||1,
+      component_unit_cost:parseFloat(tr.querySelector('.kq-cost').value)||null,
+      freight_to_qb:parseFloat(tr.querySelector('.kq-frt').value)||null
+    };
+  });
+  // Require at least one component cost.
+  if(!lines.some(function(l){return l.component_unit_cost;})){
+    if(err){err.textContent='Please enter a cost for at least one component.';err.style.display='block';}
+    return;
+  }
+  // Assembly line.
+  var asm=parseFloat(g('kq-asm-'+rfqId).value)||null;
+  var notes=g('kq-notes-'+rfqId).value.trim()||null;
+  lines.push({rfq_id:rfqId,factory_id:FACTORY_ID,line_type:'assembly',line_label:'Assembly',assembly_cost:asm,factory_notes:notes});
+
+  if(btn){btn.disabled=true;btn.textContent='Submitting...';}
+  try{
+    // Replace this factory's prior lines for this RFQ.
+    await fetch(SB+'/rest/v1/kit_quote_lines?rfq_id=eq.'+rfqId+'&factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
+    var r=await fetch(SB+'/rest/v1/kit_quote_lines',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(lines)});
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(e.message||r.status);}
+    // Mark assignment quoted.
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+rfqId+'&factory_id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'quoted'})});
+    if(ok)ok.style.display='block';
+    if(btn){btn.disabled=false;btn.textContent='Update Kit Quote';}
+  }catch(ex){
+    if(err){err.textContent='Submit failed: '+ex.message;err.style.display='block';}
+    if(btn){btn.disabled=false;btn.textContent='Submit Kit Quote';}
+  }
+}
+
 function renderQuoteSection(rfq,assignment,quotes){
   quotes=quotes||[];
+  if(rfq.is_kit_rfq){
+    // Async content — return a placeholder and hydrate after render.
+    setTimeout(function(){hydrateKitQuoteSection(rfq,assignment);},0);
+    return '<div id="kitq-'+rfq.id+'"><div style="padding:16px;color:#aaa;font-size:13px;">Loading components…</div></div>';
+  }
   // Instruction banner — always shown
   var banner='<div style="background:#e8f0ff;border:1px solid #b8ccf0;border-radius:8px;padding:12px 14px;font-size:12px;color:#1a3a7a;margin-bottom:12px;line-height:1.5;">'+
     '<div style="font-weight:600;margin-bottom:4px;">💡 Submit one quote per FOB origin</div>'+

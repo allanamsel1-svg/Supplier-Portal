@@ -2610,6 +2610,7 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
   // ── SAVE ──
   '<div style="display:flex;gap:10px;align-items:center;padding-bottom:2rem;">'+
     '<button onclick="saveSku()" style="padding:11px 28px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Save SKU</button>'+
+    (fv(sku,'is_kit')?'<button onclick="openKitRfqModal()" style="margin-left:10px;padding:11px 22px;background:#1a7a1a;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Send Kit for Quote</button>':'')+
     '<span id="sku-save-msg" style="font-size:13px;"></span>'+
   '</div>'+
   '</div>';
@@ -2928,7 +2929,69 @@ async function aiSuggestHTS(){
   btn.textContent='✦ AI Suggest Duty & Tariff';btn.disabled=false;
 }
 
-// ── Save SKU ──
+// ── Send kit for quote (creates kit RFQ + factory assignments) ──
+function openKitRfqModal(){
+  if(!currentSkuId){alert('Please save the kit first.');return;}
+  fetch(SB+'/rest/v1/factories?select=id,factory_name_english,sales_email&order=factory_name_english',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}})
+  .then(function(r){return r.json();})
+  .then(function(factories){
+    var rows=factories.map(function(f){
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;font-size:13px;cursor:pointer;border-bottom:1px solid #f2f2ec;"><input type="checkbox" class="krfq-f" value="'+f.id+'" data-email="'+(f.sales_email||'')+'" /> '+esc(f.factory_name_english||'')+'</label>';
+    }).join('');
+    var modal=document.createElement('div');
+    modal.id='krfq-modal';
+    modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    modal.innerHTML=
+      '<div style="background:#fff;border-radius:12px;padding:1.5rem;width:440px;max-height:80vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,0.2);">'+
+        '<div style="font-size:16px;font-weight:700;margin-bottom:4px;">Send Kit for Quote</div>'+
+        '<div style="font-size:12px;color:#888;margin-bottom:12px;">Select factories to invite. They will quote each component, assembly, and per-component freight.</div>'+
+        '<div style="border:1px solid #e0e0d8;border-radius:8px;padding:6px 10px;margin-bottom:14px;max-height:300px;overflow:auto;">'+(rows||'<div style="font-size:12px;color:#aaa;padding:8px;">No factories found.</div>')+'</div>'+
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">'+
+          '<button onclick="document.getElementById(\'krfq-modal\').remove()" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>'+
+          '<button onclick="sendKitRfq()" id="krfq-send" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Send</button>'+
+        '</div>'+
+      '</div>';
+    document.body.appendChild(modal);
+  });
+}
+
+async function sendKitRfq(){
+  var checks=Array.prototype.slice.call(document.querySelectorAll('.krfq-f:checked'));
+  if(!checks.length){alert('Select at least one factory.');return;}
+  var btn=g('krfq-send'); if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  try{
+    // 1. Pull the kit SKU for description/category snapshot.
+    var sr=await fetch(SB+'/rest/v1/skus?id=eq.'+currentSkuId+'&select=*,categories(category,sub_category,is_cosmetic)',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var sku=(await sr.json())[0]||{};
+    // 2. Create the kit RFQ (rfqs row, flagged).
+    var payload={
+      item_description:sku.description||'Kit',
+      detailed_specifications:sku.detailed_description||null,
+      category_id:sku.category_id||null,
+      category:sku.categories?sku.categories.category:null,
+      sub_category:sku.categories?sku.categories.sub_category:null,
+      is_cosmetic:sku.categories?!!sku.categories.is_cosmetic:false,
+      inci_required:sku.categories?!!sku.categories.is_cosmetic:false,
+      is_kit_rfq:true,
+      kit_sku_id:currentSkuId,
+      status:'sent'
+    };
+    var rr=await fetch(SB+'/rest/v1/rfqs',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(!rr.ok){var e=await rr.json().catch(function(){return{};});throw new Error(e.message||e.details||rr.status);}
+    var rfq=(await rr.json())[0];
+    // 3. Create assignments.
+    var assignments=checks.map(function(c){return {rfq_id:rfq.id,factory_id:c.value,email_sent_to:c.dataset.email||null,status:'sent'};});
+    var ar=await fetch(SB+'/rest/v1/rfq_factory_assignments',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(assignments)});
+    if(!ar.ok){var ae=await ar.json().catch(function(){return{};});throw new Error('Assignments failed: '+(ae.message||ar.status));}
+    var modal=g('krfq-modal'); if(modal)modal.remove();
+    alert('Kit sent for quote to '+checks.length+' factor'+(checks.length===1?'y':'ies')+'. RFQ '+(rfq.project_number||rfq.id)+'.');
+  }catch(err){
+    alert('Error sending kit RFQ: '+err.message);
+    if(btn){btn.disabled=false;btn.textContent='Send';}
+  }
+}
+
+// ── Send kit for quote (creates kit RFQ + factory assignments) ── END
 // ── Kit components ──
 var kitComponentRows=[];
 
