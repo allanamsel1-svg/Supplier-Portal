@@ -3415,6 +3415,11 @@ async function hydrateKitQuoteSection(rfq,assignment){
     }
     compRows.forEach(function(c){
       c._label=c.component_sku_id&&skuMap[c.component_sku_id]?(skuMap[c.component_sku_id].description||skuMap[c.component_sku_id].model_number):(c.factory_described_name||'Component');
+      c._detail=[];
+      if(c.factory_described_spec)c._detail.push(c.factory_described_spec);
+      if(c.draft_size_volume)c._detail.push(c.draft_size_volume);
+      if(c.draft_unit_l&&c.draft_unit_w&&c.draft_unit_h)c._detail.push(c.draft_unit_l+'×'+c.draft_unit_w+'×'+c.draft_unit_h+' cm');
+      c._detailStr=c._detail.join(' · ');
     });
     var er=await fetch(SB+'/rest/v1/kit_quote_lines?rfq_id=eq.'+rfq.id+'&factory_id=eq.'+FACTORY_ID,{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
     existing=er.ok?await er.json():[];
@@ -3426,7 +3431,7 @@ async function hydrateKitQuoteSection(rfq,assignment){
   var rowsHtml=compRows.map(function(c){
     var ex=exFor(c.id);
     return '<tr data-comp="'+c.id+'" data-label="'+esc(c._label)+'" data-qty="'+(c.qty_per_kit||1)+'">'+
-      '<td style="padding:6px 8px;font-size:12px;">'+esc(c._label)+'</td>'+
+      '<td style="padding:6px 8px;font-size:12px;"><div style="font-weight:600;">'+esc(c._label)+'</div>'+(c._detailStr?'<div style="font-size:11px;color:#888;margin-top:1px;">'+esc(c._detailStr)+'</div>':'')+'</td>'+
       '<td style="padding:6px 8px;text-align:center;font-size:12px;color:#888;">'+(c.qty_per_kit||1)+'</td>'+
       '<td style="padding:4px 6px;"><input type="number" class="kq-cost" step="0.0001" value="'+(ex.component_unit_cost||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
       '<td style="padding:4px 6px;"><input type="number" class="kq-frt" step="0.0001" value="'+(ex.freight_to_qb||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
