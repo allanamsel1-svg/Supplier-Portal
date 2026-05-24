@@ -179,6 +179,9 @@ async function fetchGoogleNewsRss(query) {
 }
 
 // Ensure stream weights are always the four known keys, each a number 0-1.
+// One-shot capture of the first raw classifier output, for diagnosing stream_weights.
+const CLASSIFY_DEBUG = { captured: false, raw: null };
+
 function normalizeStreamWeights(w) {
   const clamp = (n) => {
     const v = typeof n === 'number' ? n : parseFloat(n);
@@ -203,6 +206,7 @@ Source: ${article.source || '(unknown)'}
 
 Return ONLY valid JSON in this exact format:
 {
+  "stream_weights": { "trade": 0.0, "consumer": 0.0, "celebrity": 0.0, "lifestyle": 0.0 },
   "is_fluff": true or false,
   "fluff_reason": "if fluff, brief reason; else null",
   "highlight": "1-2 sentence summary in YOUR OWN WORDS, max 240 chars. Do NOT echo raw URLs or HTML.",
@@ -211,13 +215,7 @@ Return ONLY valid JSON in this exact format:
   "mentioned_products": ["specific product names mentioned"],
   "mentioned_ingredients": ["ingredients mentioned"],
   "mentioned_celebrities": ["celebrity names mentioned"],
-  "mentioned_retailers": ["retailer names mentioned"],
-  "stream_weights": {
-    "trade": 0.0 to 1.0,
-    "consumer": 0.0 to 1.0,
-    "celebrity": 0.0 to 1.0,
-    "lifestyle": 0.0 to 1.0
-  }
+  "mentioned_retailers": ["retailer names mentioned"]
 }
 
 STREAM WEIGHTS — score how strongly this article belongs in each of the four streams, independently (an article can score high in several). Use the full 0-1 range; most articles are strong in one or two streams and near zero in the rest.
@@ -232,8 +230,10 @@ Signal = launches, M&A, ingredient trends, products selling out, celebrity-produ
 Use empty arrays [] when nothing to extract. Do not invent.`;
 
   try {
-    const resp = await claudeMessage([{ role: 'user', content: prompt }], 1000);
-    const parsed = extractJson(resp.content[0].text);
+    const resp = await claudeMessage([{ role: 'user', content: prompt }], 1500);
+    const rawText = resp.content[0].text;
+    if (!CLASSIFY_DEBUG.captured) { CLASSIFY_DEBUG.captured = true; CLASSIFY_DEBUG.raw = rawText.slice(0, 500); }
+    const parsed = extractJson(rawText);
     // Defensive: drop highlight if it contains URL fragments
     if (parsed.highlight && /href=|https?:\/\/news\.google/i.test(parsed.highlight)) {
       parsed.highlight = null;
@@ -343,7 +343,8 @@ export default async function handler(req, res) {
       duplicates: titleDeduped.length - fresh.length,
       new_articles: toInsert.length,
       signal_count: toInsert.filter(a => !a.is_fluff).length,
-      fluff_count: toInsert.filter(a => a.is_fluff).length
+      fluff_count: toInsert.filter(a => a.is_fluff).length,
+      classify_debug: CLASSIFY_DEBUG.raw
     });
 
   } catch (err) {
