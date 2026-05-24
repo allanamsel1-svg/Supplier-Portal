@@ -15,10 +15,10 @@ export const config = { runtime: 'nodejs' };
 export const maxDuration = 300;  // 5 minutes (Vercel Pro)
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const BUCKET = 'shop-out-photos';
-const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const GROUP_BATCH_SIZE = 15;
 const EXTRACT_CONCURRENCY = 4;
 
@@ -246,7 +246,7 @@ export default async function handler(req, res) {
       error: 'Missing env vars',
       missing: {
         SUPABASE_URL: !SUPABASE_URL,
-        SUPABASE_SERVICE_KEY: !SUPABASE_KEY,
+        SUPABASE_SERVICE_ROLE_KEY: !SUPABASE_KEY,
         ANTHROPIC_API_KEY: !ANTHROPIC_KEY
       }
     });

@@ -8,7 +8,7 @@
 // of original size (HEIC, large JPEG, etc.).
 
 const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
   || process.env.SUPABASE_KEY
   || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
