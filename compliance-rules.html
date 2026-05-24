@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Compliance Rules — Supplier Portal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a2e;min-height:100vh;}
+.topbar{height:52px;background:#fff;border-bottom:1px solid #e0e0d8;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:sticky;top:0;z-index:50;}
+.topbar-l{display:flex;align-items:center;gap:10px;}
+.tm{width:28px;height:28px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.topbar-title{font-size:14px;font-weight:600;}
+.back-link{font-size:13px;color:#888;text-decoration:none;}
+.back-link:hover{color:#1a1a2e;}
+
+.main{max-width:1100px;margin:0 auto;padding:1.5rem;}
+.page-title{font-size:22px;font-weight:700;}
+.page-sub{font-size:13px;color:#888;margin-top:4px;margin-bottom:1rem;line-height:1.5;}
+.intro{background:#eef2ff;border:1px solid #c0d0f0;color:#003366;border-radius:9px;padding:12px 16px;font-size:12px;line-height:1.6;margin-bottom:1.25rem;}
+.intro b{font-weight:700;}
+
+.layout{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start;}
+@media(max-width:800px){.layout{grid-template-columns:1fr;}}
+
+.cat-list{background:#fff;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;position:sticky;top:68px;}
+.cat-list-head{padding:11px 14px;border-bottom:1px solid #e0e0d8;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#888;}
+.cat-item{padding:10px 14px;border-bottom:1px solid #f0f0e8;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+.cat-item:hover{background:#f8f8f4;}
+.cat-item.sel{background:#eef2ff;border-left:3px solid #2244cc;font-weight:600;}
+.cat-item-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;background:#edfaed;color:#1a7a1a;white-space:nowrap;}
+.cat-item-badge.empty{background:#f0f0e8;color:#aaa;}
+
+.editor{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem 1.5rem;}
+.editor-empty{color:#bbb;text-align:center;padding:3rem 1rem;font-size:14px;}
+.editor-cat-name{font-size:18px;font-weight:700;margin-bottom:2px;}
+.editor-cat-sub{font-size:12px;color:#888;margin-bottom:1.25rem;}
+
+.cert-section{margin-bottom:1.5rem;}
+.cert-section-head{font-size:12px;font-weight:700;letter-spacing:0.04em;color:#1a1a2e;margin-bottom:4px;}
+.cert-section-desc{font-size:11px;color:#999;margin-bottom:10px;line-height:1.5;}
+
+.cert-group{margin-bottom:14px;}
+.cert-group-label{font-size:10px;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:#bbb;margin-bottom:7px;padding-bottom:3px;border-bottom:1px solid #f0f0e8;}
+.cert-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;font-size:13px;}
+.cert-row:hover{background:#fafaf8;}
+.cert-name{flex:1;}
+.seg{display:inline-flex;border:1px solid #e0e0d8;border-radius:7px;overflow:hidden;}
+.seg button{border:none;background:#fff;font-size:11px;font-weight:600;padding:5px 11px;cursor:pointer;font-family:inherit;color:#888;border-right:1px solid #e0e0d8;}
+.seg button:last-child{border-right:none;}
+.seg button.on-req{background:#fce8e8;color:#a22;}
+.seg button.on-pref{background:#fff8e0;color:#7a5a00;}
+.seg button.on-na{background:#f0f0e8;color:#666;}
+
+.save-bar{position:sticky;bottom:0;background:#fff;border-top:1px solid #e0e0d8;padding:12px 0 0;margin-top:1rem;display:flex;align-items:center;gap:12px;}
+.btn-save{padding:10px 20px;background:#1a1a2e;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-save:hover{opacity:0.87;}
+.btn-save:disabled{opacity:0.5;cursor:not-allowed;}
+.save-msg{font-size:12px;}
+.save-msg.ok{color:#1a7a1a;}
+.save-msg.err{color:#b00;}
+.summary-pill{font-size:11px;color:#666;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l"><div class="tm">🛡</div><div class="topbar-title">Compliance Rules</div></div>
+  <a class="back-link" href="admin.html">← Admin</a>
+</div>
+
+<div class="main">
+  <div class="page-title">Compliance Rules by Category</div>
+  <div class="page-sub">Define which factory certifications are required vs preferred for each product category. The compliance engine uses these to flag factories and gate RFQs.</div>
+
+  <div class="intro">
+    <b>How this works:</b> For each category, mark each cert as <b>Required</b> (factory must have a current one to qualify), <b>Preferred</b> (nice-to-have, flagged but not blocking), or <b>N/A</b>. A factory missing a required cert is flagged but never deleted — they can get certified later and auto-qualify. RFQs in a category inherit these requirements as the baseline.
+  </div>
+
+  <div class="layout">
+    <div class="cat-list" id="cat-list">
+      <div class="cat-list-head">Categories</div>
+      <div id="cat-items"><div style="padding:1rem;font-size:13px;color:#bbb;">Loading…</div></div>
+    </div>
+
+    <div class="editor" id="editor">
+      <div class="editor-empty">Select a category to set its compliance requirements.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+// EXACT same cert list as factory-detail.html CERTS array — names MUST match for the
+// reconcile RPC and Layer 1 matching to work. Grouped here for editing UX only.
+var CERT_GROUPS=[
+  {label:'Quality & Manufacturing Systems',certs:['ISO 9001','ISO 14001','ISO 45001','ISO 13485','GMP','HACCP','BRC']},
+  {label:'Social & Ethical Compliance',certs:['BSCI','Sedex','SA8000']},
+  {label:'Specialty Production',certs:['GRS','OEKO-TEX','FSC','GOTS','Leaping Bunny','Cruelty Free','Vegan','Organic','COSMOS']},
+  {label:'Category-Specific & Market Access',certs:['ETL','UL','CE','FCC','FDA','RoHS','REACH','Health Canada','Prop 65 Compliant','CCC','KC','PSE','BIS']}
+];
+// Flat list to verify completeness against factory-detail.html
+var ALL_CERTS=['ISO 9001','ISO 14001','ISO 45001','ISO 13485','BSCI','Sedex','SA8000','ETL','UL','CE','FCC','FDA','RoHS','REACH','GRS','OEKO-TEX','FSC','GOTS','HACCP','BRC','GMP','Leaping Bunny','Cruelty Free','Vegan','Organic','COSMOS','Health Canada','Prop 65 Compliant','CCC','KC','PSE','BIS'];
+
+// Product-level document catalog (3 groups) — feeds required_product_docs / preferred_product_docs
+var PRODUCT_DOC_GROUPS=[
+  {label:'Safety & Toxicology',docs:['TRA (Toxicological Risk Assessment)','CPSR (Cosmetic Product Safety Report)','Heavy Metals Testing','Prop 65 Compliance','Allergen Disclosure','SDS / MSDS']},
+  {label:'Microbial & Stability',docs:['USP <51> Antimicrobial Effectiveness','USP <61> Microbial Enumeration','USP <62> Specified Microorganisms','Challenge Test (PET)','Stability Testing','Compatibility Testing','PAO / Shelf-life Substantiation']},
+  {label:'Documentation & Claims',docs:['COA (Certificate of Analysis)','INCI / Full Ingredient Disclosure','Organic Product Certification','Vegan Claim Substantiation','Cruelty-Free Claim Substantiation','Clinical / Efficacy Testing']}
+];
+
+var categories=[];     // distinct top-level categories
+var rulesByCat={};     // category -> compliance_requirements row
+var selectedCat=null;
+var working=null;       // working copy of the selected category's rule
+
+async function load(){
+  // Distinct top-level categories
+  var cr=await fetch(SB+'/rest/v1/categories?select=category&order=category',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+  var rows=cr.ok?await cr.json():[];
+  var seen={};categories=[];
+  rows.forEach(function(r){if(r.category&&!seen[r.category]){seen[r.category]=true;categories.push(r.category);}});
+
+  // Existing rules
+  var rr=await fetch(SB+'/rest/v1/compliance_requirements?select=*',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+  var rules=rr.ok?await rr.json():[];
+  rulesByCat={};
+  rules.forEach(function(rule){rulesByCat[rule.category]=rule;});
+
+  renderCatList();
+}
+
+function ruleHasReqs(cat){
+  var r=rulesByCat[cat];
+  if(!r)return false;
+  return (r.required_factory_certs&&r.required_factory_certs.length)||(r.preferred_factory_certs&&r.preferred_factory_certs.length)||(r.required_product_docs&&r.required_product_docs.length)||(r.preferred_product_docs&&r.preferred_product_docs.length);
+}
+
+function renderCatList(){
+  g('cat-items').innerHTML=categories.map(function(cat){
+    var hasReqs=ruleHasReqs(cat);
+    var reqCount=rulesByCat[cat]?((rulesByCat[cat].required_factory_certs||[]).length):0;
+    return '<div class="cat-item'+(cat===selectedCat?' sel':'')+'" onclick="selectCat(\''+esc(cat).replace(/'/g,"\\'")+'\')">'+
+      '<span>'+esc(cat)+'</span>'+
+      (hasReqs?'<span class="cat-item-badge">'+reqCount+' req</span>':'<span class="cat-item-badge empty">not set</span>')+
+    '</div>';
+  }).join('');
+}
+
+function selectCat(cat){
+  selectedCat=cat;
+  var existing=rulesByCat[cat]||{category:cat,required_factory_certs:[],preferred_factory_certs:[],required_product_docs:[],preferred_product_docs:[]};
+  // Build a working copy: map each cert/doc to its current state
+  working={
+    category:cat,
+    fcReq:(existing.required_factory_certs||[]).slice(),
+    fcPref:(existing.preferred_factory_certs||[]).slice(),
+    pdReq:(existing.required_product_docs||[]).slice(),
+    pdPref:(existing.preferred_product_docs||[]).slice()
+  };
+  renderCatList();
+  renderEditor();
+}
+
+function certState(name){
+  if(working.fcReq.indexOf(name)!==-1)return 'req';
+  if(working.fcPref.indexOf(name)!==-1)return 'pref';
+  return 'na';
+}
+function docState(name){
+  if(working.pdReq.indexOf(name)!==-1)return 'req';
+  if(working.pdPref.indexOf(name)!==-1)return 'pref';
+  return 'na';
+}
+
+function setCert(name,state){
+  working.fcReq=working.fcReq.filter(function(x){return x!==name;});
+  working.fcPref=working.fcPref.filter(function(x){return x!==name;});
+  if(state==='req')working.fcReq.push(name);
+  else if(state==='pref')working.fcPref.push(name);
+  renderEditor();
+}
+function setDoc(name,state){
+  working.pdReq=working.pdReq.filter(function(x){return x!==name;});
+  working.pdPref=working.pdPref.filter(function(x){return x!==name;});
+  if(state==='req')working.pdReq.push(name);
+  else if(state==='pref')working.pdPref.push(name);
+  renderEditor();
+}
+
+function segHtml(name,state,kind){
+  var fn=kind==='cert'?'setCert':'setDoc';
+  var safe=esc(name).replace(/'/g,"\\'");
+  return '<div class="seg">'+
+    '<button class="'+(state==='req'?'on-req':'')+'" onclick="'+fn+'(\''+safe+'\',\'req\')">Required</button>'+
+    '<button class="'+(state==='pref'?'on-pref':'')+'" onclick="'+fn+'(\''+safe+'\',\'pref\')">Preferred</button>'+
+    '<button class="'+(state==='na'?'on-na':'')+'" onclick="'+fn+'(\''+safe+'\',\'na\')">N/A</button>'+
+  '</div>';
+}
+
+function renderEditor(){
+  if(!selectedCat){g('editor').innerHTML='<div class="editor-empty">Select a category to set its compliance requirements.</div>';return;}
+
+  var factoryCertHtml=CERT_GROUPS.map(function(grp){
+    return '<div class="cert-group"><div class="cert-group-label">'+esc(grp.label)+'</div>'+
+      grp.certs.map(function(c){
+        return '<div class="cert-row"><span class="cert-name">'+esc(c)+'</span>'+segHtml(c,certState(c),'cert')+'</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+
+  var productDocHtml=PRODUCT_DOC_GROUPS.map(function(grp){
+    return '<div class="cert-group"><div class="cert-group-label">'+esc(grp.label)+'</div>'+
+      grp.docs.map(function(d){
+        return '<div class="cert-row"><span class="cert-name">'+esc(d)+'</span>'+segHtml(d,docState(d),'doc')+'</div>';
+      }).join('')+
+    '</div>';
+  }).join('');
+
+  g('editor').innerHTML=
+    '<div class="editor-cat-name">'+esc(selectedCat)+'</div>'+
+    '<div class="editor-cat-sub">Required = factory must hold a current cert to qualify · Preferred = flagged but not blocking · N/A = not relevant</div>'+
+
+    '<div class="cert-section">'+
+      '<div class="cert-section-head">Factory-Level Certifications</div>'+
+      '<div class="cert-section-desc">Attributes of the factory as an entity. Tracked on the factory record with expiry. Required ones gate RFQ invitations (live check).</div>'+
+      factoryCertHtml+
+    '</div>'+
+
+    '<div class="cert-section">'+
+      '<div class="cert-section-head">Product-Level Documents &amp; Testing</div>'+
+      '<div class="cert-section-desc">Generated per product/batch. Required at the quote/PD stage for products in this category. RFQs can override these per-RFQ.</div>'+
+      productDocHtml+
+    '</div>'+
+
+    '<div class="save-bar">'+
+      '<button class="btn-save" id="save-btn" onclick="saveRule()">Save Requirements</button>'+
+      '<span class="summary-pill">'+working.fcReq.length+' required certs · '+working.fcPref.length+' preferred · '+working.pdReq.length+' required docs · '+working.pdPref.length+' preferred docs</span>'+
+      '<span class="save-msg" id="save-msg"></span>'+
+    '</div>';
+}
+
+async function saveRule(){
+  if(!working)return;
+  var btn=g('save-btn');btn.disabled=true;btn.textContent='Saving…';
+  var payload={
+    category:working.category,
+    required_factory_certs:working.fcReq,
+    preferred_factory_certs:working.fcPref,
+    required_product_docs:working.pdReq,
+    preferred_product_docs:working.pdPref,
+    updated_at:new Date().toISOString()
+  };
+  try{
+    // Upsert on category (unique). Use POST with resolution=merge-duplicates.
+    var r=await fetch(SB+'/rest/v1/compliance_requirements?on_conflict=category',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){
+      var t=await r.text();
+      g('save-msg').className='save-msg err';g('save-msg').textContent='Save failed: '+t;
+      btn.disabled=false;btn.textContent='Save Requirements';return;
+    }
+    var rows=await r.json();
+    rulesByCat[working.category]=Array.isArray(rows)?rows[0]:rows;
+    g('save-msg').className='save-msg ok';g('save-msg').textContent='✓ Saved';
+    btn.disabled=false;btn.textContent='Save Requirements';
+    renderCatList();
+    setTimeout(function(){var m=g('save-msg');if(m)m.textContent='';},2500);
+  }catch(e){
+    g('save-msg').className='save-msg err';g('save-msg').textContent='Error: '+e.message;
+    btn.disabled=false;btn.textContent='Save Requirements';
+  }
+}
+
+load();
+</script>
+</body>
+</html>
