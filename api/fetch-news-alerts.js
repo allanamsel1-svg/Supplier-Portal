@@ -164,7 +164,7 @@ function parseRssXml(xml) {
 }
 
 async function fetchGoogleNewsRss(query) {
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en&ceid=:en`;
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   const r = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TBGIntelBot/1.0)' }
   });
