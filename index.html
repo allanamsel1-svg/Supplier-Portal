@@ -3459,6 +3459,8 @@ function populateQuoteForm(rfqId,q){
   setVal('qquoteid-'+rfqId,q?q.id:'');
   setVal('qfob-'+rfqId,q?q.unit_fob_price:'');
   setVal('qpkg-'+rfqId,q?q.packaging_price_per_unit:'');
+  setVal('qbulk-'+rfqId,q?q.bulk_unit_price:'');
+  setVal('qbulkmaster-'+rfqId,q?q.bulk_units_per_master:'');
   setVal('qmoq-'+rfqId,q?q.moq:'');
   setVal('qhts-'+rfqId,q?q.hts_code_factory:'');
   setVal('qmodel-'+rfqId,q?q.factory_existing_model_number:'');
@@ -3672,6 +3674,14 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
       '<div class="qf"><label>Total FOB (calculated)</label><input type="text" id="qtotalfob-'+rfq.id+'" readonly style="background:#f8f8f4;font-weight:600;" /></div>' +
     '</div>' +
     '<div style="font-size:10px;color:#888;margin-bottom:10px;margin-top:-2px;">Please quote unit price and packaging cost separately. Total FOB will be calculated automatically.</div>' +
+    '<div style="margin-top:6px;margin-bottom:10px;padding:12px;background:#f7f7f2;border:1px solid #e6e6dc;border-radius:8px;">' +
+      '<div style="font-size:12px;font-weight:600;color:#556;margin-bottom:3px;">Bulk / unpackaged pricing <span style="font-weight:400;color:#999;">(optional)</span></div>' +
+      '<div style="font-size:10px;color:#999;margin-bottom:8px;">If this item were supplied in bulk with no retail packaging (e.g. for inclusion in a set), what would your price be?</div>' +
+      '<div class="quote-grid">' +
+        '<div class="qf"><label>Bulk price / unit (USD)</label><input type="number" id="qbulk-'+rfq.id+'" step="0.0001" placeholder="e.g. 0.3200" /></div>' +
+        '<div class="qf"><label>Units / bulk master carton</label><input type="number" id="qbulkmaster-'+rfq.id+'" step="1" placeholder="e.g. 100" /></div>' +
+      '</div>' +
+    '</div>' +
     '<div class="quote-grid">' +
       '<div class="qf"><label>MOQ (Minimum Order Quantity) *</label><input type="number" id="qmoq-'+rfq.id+'" placeholder="e.g. 1000" value="'+moq+'" /></div>' +
       '<div class="qf"><label>FOB Port * <span style="font-size:10px;color:#888;font-weight:400;">(this quote is for shipping from)</span></label><input type="text" id="qfobport-'+rfq.id+'" placeholder="e.g. Yantian, Shekou, Shanghai" /></div>' +
@@ -3836,6 +3846,8 @@ async function saveQuoteDraft(rfqId){
     rfq_id:rfqId,factory_id:FACTORY_ID,
     unit_fob_price:parseFloat(g('qfob-'+rfqId).value)||null,
     packaging_price_per_unit:parseFloat(g('qpkg-'+rfqId).value)||null,
+    bulk_unit_price:parseFloat(g('qbulk-'+rfqId)&&g('qbulk-'+rfqId).value)||null,
+    bulk_units_per_master:parseInt(g('qbulkmaster-'+rfqId)&&g('qbulkmaster-'+rfqId).value)||null,
     moq:parseInt(g('qmoq-'+rfqId).value)||null,
     hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
     country_of_manufacture:g('qcountry-'+rfqId).value?[g('qcountry-'+rfqId).value]:null,
@@ -3980,6 +3992,8 @@ async function submitQuote(rfqId){
     factory_id:FACTORY_ID,
     unit_fob_price:fob,
     packaging_price_per_unit:pkg||null,
+    bulk_unit_price:parseFloat(g('qbulk-'+rfqId)&&g('qbulk-'+rfqId).value)||null,
+    bulk_units_per_master:parseInt(g('qbulkmaster-'+rfqId)&&g('qbulkmaster-'+rfqId).value)||null,
     moq:moq,
     hts_code_factory:g('qhts-'+rfqId).value.trim()||null,
     country_of_manufacture:[g('qcountry-'+rfqId).value],
@@ -4028,6 +4042,20 @@ async function submitQuote(rfqId){
     }
     var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
     if(r.ok){
+      // Reference-cost collection: if a bulk price was provided, bank it (qualifier-grade).
+      if(payload.bulk_unit_price){
+        try{
+          await fetch(SB+'/rest/v1/reference_component_costs',{method:'POST',
+            headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+            body:JSON.stringify({
+              rfq_id:rfqId, factory_id:FACTORY_ID,
+              bulk_unit_price:payload.bulk_unit_price,
+              bulk_units_per_master:payload.bulk_units_per_master,
+              retail_unit_price:payload.unit_fob_price,
+              grade:'qualifier'
+            })});
+        }catch(e){console.log('refcost write err',e);}
+      }
       // Update assignment status to 'quoted'
       await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+assignId,{
         method:'PATCH',
