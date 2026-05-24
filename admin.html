@@ -3430,6 +3430,15 @@ async function openRFQDetail(rfqId){
     });
     var quotes=await q.json();
 
+    // Kit RFQs store quotes as component line-items in kit_quote_lines, not rfq_quotes.
+    var kitLines=null;
+    if(rfq.is_kit_rfq){
+      var klr=await fetch(SB+'/rest/v1/kit_quote_lines?rfq_id=eq.'+rfqId+'&order=factory_id,line_type,kit_component_id',{
+        headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
+      });
+      kitLines=klr.ok?await klr.json():[];
+    }
+
     // Load version history for updated quotes
     var quoteVersions={};
     var updatedQuotes=quotes.filter(function(q){return q.updated_at&&q.created_at&&new Date(q.updated_at)>new Date(new Date(q.created_at).getTime()+60000);});
@@ -3438,7 +3447,7 @@ async function openRFQDetail(rfqId){
       if(vr.ok){var vrows=await vr.json();if(vrows.length)quoteVersions[updatedQuotes[i].id]=vrows;}
     }
 
-    renderRFQDetailPane(rfq,assignments,quotes,quoteVersions);
+    renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines);
   }catch(e){
     g('rfq-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error loading: '+e.message+'</div>';
   }
@@ -3702,7 +3711,84 @@ async function loadVariantSiblings(rfq){
   }
 }
 
-function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
+// ── Kit quote comparison (kit RFQs store data in kit_quote_lines) ──
+function renderKitQuotes(rfq,assignments,kitLines){
+  kitLines=kitLines||[];
+  if(!kitLines.length){
+    return '<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No kit quotes received yet.</div>';
+  }
+  var fname={};
+  (assignments||[]).forEach(function(a){fname[a.factory_id]=(a.factories||{}).factory_name_english||'—';});
+
+  var byFactory={};
+  kitLines.forEach(function(l){
+    if(!byFactory[l.factory_id])byFactory[l.factory_id]={components:[],assembly:null};
+    if(l.line_type==='assembly')byFactory[l.factory_id].assembly=l;
+    else byFactory[l.factory_id].components.push(l);
+  });
+
+  var factoryIds=Object.keys(byFactory);
+
+  function kitTotal(f){
+    var t=0;
+    f.components.forEach(function(c){
+      var unit=(parseFloat(c.component_unit_cost)||0)+(parseFloat(c.freight_to_qb)||0);
+      t+=unit*(parseFloat(c.qty_per_kit)||1);
+    });
+    if(f.assembly)t+=parseFloat(f.assembly.assembly_cost)||0;
+    return t;
+  }
+  var totals=factoryIds.map(function(id){return kitTotal(byFactory[id]);}).filter(function(v){return v>0;});
+  var best=totals.length?Math.min.apply(null,totals):null;
+
+  var html='<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px;">Kit Quotes Received ('+factoryIds.length+')</div>';
+
+  factoryIds.forEach(function(id){
+    var f=byFactory[id];
+    var total=kitTotal(f);
+    var isBest=(best!==null&&Math.abs(total-best)<0.0001&&total>0);
+    html+='<div style="border:1px solid '+(isBest?'#a0d8a0':'#e8e8e0')+';border-radius:10px;margin-bottom:10px;overflow:hidden;background:#fff;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:'+(isBest?'#edfaed':'#f8f8f4')+';border-bottom:1px solid #e8e8e0;">'+
+        '<span style="font-size:13px;font-weight:600;">'+esc(fname[id]||'Factory')+(isBest?' <span style="font-size:10px;color:#1a7a1a;font-weight:700;">· LOWEST</span>':'')+'</span>'+
+        '<span style="font-size:13px;font-weight:700;color:#1a1a2e;">$'+total.toFixed(4)+' / kit</span>'+
+      '</div>'+
+      '<table style="width:100%;border-collapse:collapse;font-size:12px;">'+
+        '<thead><tr style="color:#999;text-align:left;">'+
+          '<th style="padding:6px 14px;font-weight:600;">Component</th>'+
+          '<th style="padding:6px 8px;font-weight:600;text-align:right;">Qty</th>'+
+          '<th style="padding:6px 8px;font-weight:600;text-align:right;">Cost/unit</th>'+
+          '<th style="padding:6px 8px;font-weight:600;text-align:right;">Freight</th>'+
+          '<th style="padding:6px 14px;font-weight:600;text-align:right;">Line</th>'+
+        '</tr></thead><tbody>';
+    f.components.forEach(function(c){
+      var qty=parseFloat(c.qty_per_kit)||1;
+      var cost=parseFloat(c.component_unit_cost)||0;
+      var frt=parseFloat(c.freight_to_qb)||0;
+      var line=(cost+frt)*qty;
+      html+='<tr style="border-top:1px solid #f0f0ea;">'+
+        '<td style="padding:7px 14px;">'+esc(c.line_label||'Component')+'</td>'+
+        '<td style="padding:7px 8px;text-align:right;">'+qty+'</td>'+
+        '<td style="padding:7px 8px;text-align:right;">$'+cost.toFixed(4)+'</td>'+
+        '<td style="padding:7px 8px;text-align:right;">$'+frt.toFixed(4)+'</td>'+
+        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+line.toFixed(4)+'</td>'+
+      '</tr>';
+    });
+    if(f.assembly&&f.assembly.assembly_cost!=null){
+      html+='<tr style="border-top:1px solid #f0f0ea;background:#fafaf8;">'+
+        '<td style="padding:7px 14px;font-style:italic;color:#666;" colspan="4">Assembly / set</td>'+
+        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+(parseFloat(f.assembly.assembly_cost)||0).toFixed(4)+'</td>'+
+      '</tr>';
+    }
+    html+='</tbody></table>';
+    if(f.assembly&&f.assembly.factory_notes){
+      html+='<div style="padding:8px 14px;font-size:11px;color:#777;border-top:1px solid #f0f0ea;"><strong>Notes:</strong> '+esc(f.assembly.factory_notes)+'</div>';
+    }
+    html+='</div>';
+  });
+  return html;
+}
+
+function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines){
   var el=g('rfq-detail-pane');
   var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
   var qtyStr=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'each')+' — '+uomStr:'—';
@@ -3759,7 +3845,9 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
     '</div>'+
 
     // Quotes
-    (quotes.length?
+    (rfq.is_kit_rfq
+      ? renderKitQuotes(rfq,assignments,kitLines)
+      : (quotes.length?
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;">'+
         '<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.07em;">Quotes Received ('+quotes.length+')</div>'+
         (quotes.length>1?'<button id="batch-score-btn-'+rfq.id+'" onclick="batchScoreAllQuotes(\''+rfq.id+'\')" style="padding:7px 14px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">✦ Score & compare all quotes</button>':'')+
@@ -3782,7 +3870,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions){
           return renderQuoteCard(q,rfq,idx,quoteVersions&&quoteVersions[q.id],peerStats);
         }).join('');
       })()
-    :'<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No quotes received yet.</div>')+
+    :'<div style="font-size:13px;color:#bbb;padding:1rem;text-align:center;background:#f8f8f4;border-radius:8px;">No quotes received yet.</div>'))+
   '';
 
   el.innerHTML=html;
