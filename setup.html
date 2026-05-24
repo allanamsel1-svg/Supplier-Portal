@@ -3075,7 +3075,10 @@ function addKitComponentRow(data){
       // PLAIN LAYER — the shared, factory-safe product fields. Shown only for new/described
       // components (an existing SKU already carries these).
       '<div id="kc-plain-'+idx+'" style="display:'+(data.component_sku_id?'none':'block')+';margin-top:10px;">'+
-        '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Product Details</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
+          '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Product Details</div>'+
+          '<button onclick="promoteComponentToSku('+idx+')" style="padding:5px 11px;background:#eef7ee;border:1px solid #b0d8b0;border-radius:6px;font-size:11px;cursor:pointer;color:#1a7a1a;white-space:nowrap;">↑ Promote to SKU</button>'+
+        '</div>'+
         plainFieldsHtml(idx,data)+
       '</div>'+
 
@@ -3506,6 +3509,60 @@ async function loadSkuFromQuote(quoteId,rfqId){
     if(area&&area.firstChild)area.insertBefore(banner,area.firstChild);
 
   }catch(e){console.error('loadSkuFromQuote:',e);alert('Error loading quote data: '+e.message);}
+}
+
+// ── Promote a described kit component into a real SKU ──
+// Mirrors loadSkuFromQuote: read the component's plain fields, save the current
+// kit first (durability — never lose kit edits), then open a fresh SKU form
+// pre-filled with the component detail for operator review before save.
+async function promoteComponentToSku(idx){
+  // 1. Read this component's plain fields from the form.
+  var plain={};
+  KIT_COMPONENT_FIELDS.forEach(function(f){
+    var el=g('kc-'+f.key+'-'+idx);
+    if(el)plain[f.key]=(f.type==='number')?(el.value?parseFloat(el.value):null):(el.value?el.value.trim():null);
+  });
+  if(!plain.product_title){alert('Give the component a Product name before promoting it to a SKU.');return;}
+  var catId=g('kc-cat-'+idx)?g('kc-cat-'+idx).value||null:null;
+
+  if(!confirm('Promote "'+plain.product_title+'" to a SKU?\n\nThe current kit will be saved first, then you\u2019ll review and save the new SKU. You\u2019ll return to the kit afterward.')){return;}
+
+  // 2. Save the current kit first so no edits are lost.
+  try{ await saveSku(); }
+  catch(e){ alert('Could not save the kit before promoting: '+e.message); return; }
+
+  // 3. Pre-fill a fresh SKU form from the component detail.
+  pendingSource=null; // no factory source yet — operator can add one on the SKU form
+  var partialSku={
+    description:plain.product_title||'',
+    detailed_description:plain.description||'',
+    category_id:catId,
+    status:'draft'
+  };
+  var partialPkg={
+    unit_length_cm:plain.unit_l||null,
+    unit_width_cm:plain.unit_w||null,
+    unit_height_cm:plain.unit_h||null,
+    unit_weight_kg:(plain.unit_wt_g!=null)?(plain.unit_wt_g/1000):null,
+    unit_dim_status:'estimated',
+    master_qty:plain.units_per_master||null
+  };
+  var partialCosting={ fob_price:plain.unit_cost||null };
+
+  currentSkuId=null;
+  renderSkuForm(partialSku,partialPkg,[],[],partialCosting,[]);
+  setTimeout(function(){
+    if(g('sf-category')&&catId)g('sf-category').value=catId;
+    setTimeout(generateModelNumber,150);
+    if(typeof recalcAll==='function')recalcAll();
+  },300);
+
+  // 4. Review banner — same convention as quote-promote.
+  var banner=document.createElement('div');
+  banner.style.cssText='background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#1a7a1a;';
+  banner.innerHTML='\u2191 Promoting kit component to a SKU. <strong>Pick brand &amp; category, review all fields, then click Save SKU.</strong> After saving, re-open the kit and select this new SKU in the component\u2019s dropdown to link it.';
+  var area=g('sku-form-area');
+  if(area&&area.firstChild)area.insertBefore(banner,area.firstChild);
 }
 
 // ── FREIGHT RATES TAB ──
