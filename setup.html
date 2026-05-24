@@ -2240,15 +2240,15 @@ async function openSkuForm(skuId){
       if(sources.length){
         var quoteIds=sources.map(function(s){return s.rfq_quote_id;}).filter(Boolean);
         if(quoteIds.length){
-          var certQ=quoteIds.map(function(id){return 'quote_id=eq.'+id;}).join(',');
+          var certQ=quoteIds.map(function(id){return 'quote_id.eq.'+id;}).join(',');
           var cr=await fetch(SB+'/rest/v1/rfq_quote_cert_assets?or=('+certQ+')&order=uploaded_at',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
           if(cr.ok)certs=await cr.json();
         }
         // Also fetch INCI docs from quotes
         var inciIds=sources.map(function(s){return s.rfq_quote_id;}).filter(Boolean);
         if(inciIds.length){
-          var inciQ=inciIds.map(function(id){return 'id=eq.'+id;}).join(',');
-          var ir=await fetch(SB+'/rest/v1/rfq_quotes?or=('+inciQ+')&select=id,inci_document_url&neq.inci_document_url.null',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+          var inciQ=inciIds.map(function(id){return 'id.eq.'+id;}).join(',');
+          var ir=await fetch(SB+'/rest/v1/rfq_quotes?or=('+inciQ+')&select=id,inci_document_url&inci_document_url=neq.null',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
           if(ir.ok){
             var inciRows=await ir.json();
             inciRows.forEach(function(row){
@@ -2274,7 +2274,7 @@ async function openSkuForm(skuId){
       var compIds=kcs.map(function(k){return k.component_sku_id;}).filter(Boolean);
       var cfgMap={};
       if(compIds.length){
-        var cfgQ=compIds.map(function(id){return 'component_sku_id=eq.'+id;}).join(',');
+        var cfgQ=compIds.map(function(id){return 'component_sku_id.eq.'+id;}).join(',');
         var cfr=await fetch(SB+'/rest/v1/component_configurations?or=('+cfgQ+')&config_type=eq.kit_bulk',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
         if(cfr.ok){(await cfr.json()).forEach(function(c){cfgMap[c.component_sku_id]=c;});}
       }
