@@ -142,12 +142,15 @@ function stripHtml(s) {
 
 function parseRssXml(xml) {
   const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  // Tolerant: <item> may carry attributes; closing tag may be </item>.
+  // Split on item boundaries rather than requiring a perfect greedy pair.
+  const itemRegex = /<item(?:\s[^>]*)?>([\s\S]*?)<\/item\s*>/g;
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
     const block = match[1];
     const get = (tag) => {
-      const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
+      // tolerate attributes on the open tag and whitespace in the close tag
+      const m = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}\\s*>`, 'i'));
       if (!m) return null;
       return stripHtml(m[1]);
     };
@@ -175,8 +178,9 @@ async function fetchGoogleNewsRss(query) {
   });
   const body = await r.text();
   const items = r.ok ? parseRssXml(body) : [];
-  const itemIdx = body.indexOf('<item');
-  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length, itemIdx, itemSample: itemIdx >= 0 ? body.slice(itemIdx, itemIdx + 300) : body.slice(0, 300) });
+  const rawItemTags = (body.match(/<item[\s>]/g) || []).length;
+  const rawCloseTags = (body.match(/<\/item\s*>/g) || []).length;
+  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length, rawItemTags, rawCloseTags });
   if (!r.ok) throw new Error(`Google News ${r.status} for "${query}"`);
   return items;
 }
