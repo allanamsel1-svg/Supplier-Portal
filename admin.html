@@ -415,6 +415,7 @@
       <button class="sitem on" id="nav-dashboard" onclick="showPanel('dashboard')"><span class="sicon">▦</span> Dashboard</button>
       <button class="sitem" id="nav-intel" onclick="window.open('intelligence_hub.html','_blank')"><span class="sicon">🎯</span> Intel</button>
       <button class="sitem" id="nav-roadmap" onclick="window.open('roadmap.html','_blank')"><span class="sicon">🗺</span> System</button>
+      <button class="sitem" id="nav-logic-log" onclick="window.open('logic_log.html','_blank')"><span class="sicon">📘</span> Logic Log</button>
       <div class="slabel">Operations</div>
       <button class="sitem" id="nav-orders" onclick="showPanel('orders');loadOpenOrders();"><span class="sicon">📋</span> Open Orders <span class="scount" id="cnt-orders-urgent" style="background:#fff0f0;color:#b00;border:1px solid #fdd;font-weight:600;">3</span></button>
       <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
@@ -2114,27 +2115,14 @@
     </div>
 
     <div class="d-section">
-      <div class="d-section-title">Sales Contact <span style="font-size:10px;font-weight:400;color:#aaa;text-transform:none;letter-spacing:0;">— primary; handles RFQs, invoices, payments</span></div>
+      <div class="d-section-title">Contact</div>
       <div class="d-grid">
         <div class="d-field"><div class="d-label">Contact Name</div><div class="d-value" id="d-contact">—</div><input class="d-input" id="de-contact" type="text" placeholder="Contact name" style="display:none" /></div>
-        <div class="d-field"><div class="d-label">Title</div><div class="d-value" id="d-title">—</div><input class="d-input" id="de-title" type="text" placeholder="e.g. Sales Manager" style="display:none" /></div>
         <div class="d-field"><div class="d-label">Mobile</div><div class="d-value" id="d-mobile">—</div><input class="d-input" id="de-mobile" type="tel" placeholder="+86 138..." style="display:none" /></div>
         <div class="d-field"><div class="d-label">Email</div><div class="d-value" id="d-email">—</div><input class="d-input" id="de-email" type="email" placeholder="email@factory.com" style="display:none" /></div>
         <div class="d-field"><div class="d-label">Telephone</div><div class="d-value" id="d-tel">—</div><input class="d-input" id="de-tel" type="tel" placeholder="+86 20..." style="display:none" /></div>
         <div class="d-field"><div class="d-label">WeChat</div><div class="d-value" id="d-wechat">—</div><input class="d-input" id="de-wechat" type="text" placeholder="WeChat ID" style="display:none" /></div>
         <div class="d-field"><div class="d-label">WhatsApp</div><div class="d-value" id="d-whatsapp">—</div><input class="d-input" id="de-whatsapp" type="tel" placeholder="+86 138..." style="display:none" /></div>
-      </div>
-    </div>
-
-    <div class="d-section">
-      <div class="d-section-title">Additional Contacts</div>
-      <!-- View mode: rendered list of logistics/owner contacts -->
-      <div id="d-additional-contacts" style="display:flex;flex-direction:column;gap:10px;"></div>
-      <!-- Edit mode: dynamic forms + add buttons (hidden until Edit) -->
-      <div id="de-additional-contacts" style="display:none;flex-direction:column;gap:12px;"></div>
-      <div id="de-add-contact-buttons" style="display:none;gap:8px;margin-top:10px;">
-        <button type="button" onclick="addContactForm('logistics')" style="padding:7px 14px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ Add logistics contact</button>
-        <button type="button" onclick="addContactForm('principal')" style="padding:7px 14px;background:#f0f4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ Add factory owner</button>
       </div>
     </div>
 
@@ -2242,99 +2230,6 @@ var currentDrawerFactory=null;
 function g(id){return document.getElementById(id);}
 function v(id){var e=g(id);return e?e.textContent:'—';}
 function dv(id,val){var e=g(id);if(e)e.textContent=val||'—';}
-
-// ── Multi-contact (factory_contacts) ──
-var currentFactoryContacts=[];   // all rows for the open factory
-var pendingContactForms=0;       // counter for unique edit-form ids
-
-async function loadFactoryContacts(factoryId){
-  currentFactoryContacts=[];
-  try{
-    var r=await fetch(SB+'/rest/v1/factory_contacts?factory_id=eq.'+factoryId+'&select=*&order=created_at.asc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    if(r.ok)currentFactoryContacts=await r.json();
-  }catch(e){console.log('loadFactoryContacts error:',e);}
-  // Sales title goes in the Sales Contact card
-  var sales=currentFactoryContacts.find(function(c){return c.is_sales;});
-  dv('d-title',sales?sales.title:null);
-  renderAdditionalContacts();
-}
-
-function _contactRoleLabel(c){
-  var parts=[];
-  if(c.is_logistics)parts.push('Logistics');
-  if(c.is_principal)parts.push('Factory Owner');
-  if(c.is_sales)parts.push('Sales');
-  return parts.join(' · ')||'Contact';
-}
-
-// VIEW mode: list non-sales contacts (logistics / owner)
-function renderAdditionalContacts(){
-  var el=g('d-additional-contacts');if(!el)return;
-  var extra=currentFactoryContacts.filter(function(c){return !c.is_sales;});
-  if(!extra.length){el.innerHTML='<div style="font-size:12px;color:#bbb;">No additional contacts. Click Edit to add a logistics contact or factory owner.</div>';return;}
-  el.innerHTML=extra.map(function(c){
-    var line=function(lbl,val){return val?'<div style="font-size:12px;color:#555;"><span style="color:#999;">'+lbl+':</span> '+esc(val)+'</div>':'';};
-    return '<div style="padding:10px 12px;background:#f8f8f4;border:1px solid #e8e8e0;border-radius:8px;">'+
-      '<div style="font-size:12px;font-weight:700;color:#2244cc;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">'+esc(_contactRoleLabel(c))+'</div>'+
-      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(c.contact_name||'—')+(c.title?' <span style="font-weight:400;color:#888;">· '+esc(c.title)+'</span>':'')+'</div>'+
-      line('Email',c.email)+line('Mobile',c.mobile)+line('WeChat',c.wechat)+line('WhatsApp',c.whatsapp)+
-    '</div>';
-  }).join('');
-}
-
-// EDIT mode: build a form card for one additional contact (existing or new)
-function addContactForm(role,existing){
-  var wrap=g('de-additional-contacts');if(!wrap)return;
-  var fid='cf'+(pendingContactForms++);
-  var c=existing||{};
-  var roleTitle=role==='logistics'?'Logistics Contact':(role==='principal'?'Factory Owner':'Contact');
-  var div=document.createElement('div');
-  div.className='de-contact-form';
-  div.dataset.role=role;
-  div.dataset.contactId=c.id||'';
-  div.style.cssText='padding:12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:8px;';
-  div.innerHTML=
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">'+
-      '<div style="font-size:12px;font-weight:700;color:#2244cc;text-transform:uppercase;letter-spacing:0.04em;">'+roleTitle+'</div>'+
-      '<button type="button" onclick="this.closest(\'.de-contact-form\').remove()" style="background:none;border:none;color:#b00;font-size:12px;cursor:pointer;">Remove</button>'+
-    '</div>'+
-    '<div class="d-grid">'+
-      '<div class="d-field"><div class="d-label">Contact Name</div><input class="d-input cf-name" type="text" value="'+esc(c.contact_name||'')+'" placeholder="Contact name" style="display:block" /></div>'+
-      '<div class="d-field"><div class="d-label">Title</div><input class="d-input cf-title" type="text" value="'+esc(c.title||'')+'" placeholder="e.g. Logistics Manager" style="display:block" /></div>'+
-      '<div class="d-field"><div class="d-label">Email</div><input class="d-input cf-email" type="email" value="'+esc(c.email||'')+'" placeholder="email@factory.com" style="display:block" /></div>'+
-      '<div class="d-field"><div class="d-label">Mobile</div><input class="d-input cf-mobile" type="tel" value="'+esc(c.mobile||'')+'" placeholder="+86 138..." style="display:block" /></div>'+
-      '<div class="d-field"><div class="d-label">WeChat</div><input class="d-input cf-wechat" type="text" value="'+esc(c.wechat||'')+'" placeholder="WeChat ID" style="display:block" /></div>'+
-      '<div class="d-field"><div class="d-label">WhatsApp</div><input class="d-input cf-whatsapp" type="tel" value="'+esc(c.whatsapp||'')+'" placeholder="+86 138..." style="display:block" /></div>'+
-    '</div>';
-  wrap.appendChild(div);
-}
-
-// Build edit forms for existing additional contacts when entering edit mode
-function populateAdditionalContactForms(){
-  var wrap=g('de-additional-contacts');if(wrap)wrap.innerHTML='';
-  currentFactoryContacts.filter(function(c){return !c.is_sales;}).forEach(function(c){
-    var role=c.is_logistics?'logistics':(c.is_principal?'principal':'logistics');
-    addContactForm(role,c);
-  });
-}
-
-// Read all edit-mode contact forms into payload objects
-function collectAdditionalContacts(){
-  var out=[];
-  document.querySelectorAll('#de-additional-contacts .de-contact-form').forEach(function(div){
-    var v=function(cls){var el=div.querySelector('.'+cls);return el?el.value.trim():'';};
-    var name=v('cf-name'),email=v('cf-email');
-    if(!name&&!email)return;  // skip empty forms
-    var role=div.dataset.role;
-    out.push({
-      id:div.dataset.contactId||null,
-      contact_name:name||null,title:v('cf-title')||null,email:email||null,
-      mobile:v('cf-mobile')||null,wechat:v('cf-wechat')||null,whatsapp:v('cf-whatsapp')||null,
-      is_logistics:role==='logistics',is_principal:role==='principal',is_sales:false,is_primary:false
-    });
-  });
-  return out;
-}
 
 function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value;
@@ -2752,9 +2647,6 @@ async function openDrawer(id,e){
   // Kick off async performance scorecard loader
   loadFactoryPerformanceScore(id);
 
-  // Kick off async multi-contact loader (logistics / owner / sales title)
-  loadFactoryContacts(id);
-
   // Header
   g('d-name').textContent=f.factory_name_english||'—';
   g('d-local').textContent=f.factory_name_local||'';
@@ -2928,7 +2820,6 @@ function enterDrawerEdit(){
     'contact':f.sales_contact_name||'',
     'mobile':f.sales_mobile||'',
     'email':f.sales_email||'',
-    'title':(currentFactoryContacts.find(function(c){return c.is_sales;})||{}).title||'',
     'tel':f.telephone||'',
     'wechat':f.sales_wechat||'',
     'whatsapp':f.sales_whatsapp||'',
@@ -2946,12 +2837,6 @@ function enterDrawerEdit(){
     if(viewEl)viewEl.style.display='none';
     if(editEl){editEl.value=map[k];editEl.style.display='block';}
   });
-
-  // Additional contacts: hide view list, show edit forms + add buttons
-  var addView=g('d-additional-contacts');if(addView)addView.style.display='none';
-  var addEdit=g('de-additional-contacts');if(addEdit)addEdit.style.display='flex';
-  var addBtns=g('de-add-contact-buttons');if(addBtns)addBtns.style.display='flex';
-  populateAdditionalContactForms();
 }
 
 function cancelDrawerEdit(){
@@ -2964,10 +2849,6 @@ function cancelDrawerEdit(){
   // Restore name in header
   var nameEl=g('de-name');if(nameEl)nameEl.style.display='none';
   var localEl=g('de-local');if(localEl)localEl.style.display='none';
-  // Additional contacts: restore view, hide edit forms + buttons
-  var addView=g('d-additional-contacts');if(addView)addView.style.display='flex';
-  var addEdit=g('de-additional-contacts');if(addEdit){addEdit.style.display='none';addEdit.innerHTML='';}
-  var addBtns=g('de-add-contact-buttons');if(addBtns)addBtns.style.display='none';
 }
 
 async function saveDrawerEdit(){
@@ -3006,8 +2887,6 @@ async function saveDrawerEdit(){
     if(r.ok){
       // Also save category selections
       await saveCategorySelections();
-      // Sync factory_contacts (sales row + additional contacts)
-      await syncFactoryContacts(f.id,payload);
       // Update local factory object
       Object.assign(f,payload);
       // Re-render view fields with new values
@@ -3028,39 +2907,6 @@ async function saveDrawerEdit(){
   }finally{
     if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='✓ Save Changes';}
   }
-}
-
-// Sync factory_contacts on save (Option 1: sales_* columns stay in sync via the
-// factories PATCH; here we mirror the sales contact into factory_contacts and
-// replace the additional logistics/owner contacts).
-async function syncFactoryContacts(factoryId,payload){
-  var ge=function(k){var el=g('de-'+k);return el?el.value.trim():'';};
-  var sbH={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'};
-  try{
-    // 1. Upsert the sales+primary contact
-    var salesRow=currentFactoryContacts.find(function(c){return c.is_sales;});
-    var salesPayload={
-      factory_id:factoryId,
-      contact_name:payload.sales_contact_name,title:ge('title')||null,
-      email:payload.sales_email,mobile:payload.sales_mobile,
-      wechat:payload.sales_wechat,whatsapp:payload.sales_whatsapp,
-      is_sales:true,is_primary:true,updated_at:new Date().toISOString()
-    };
-    if(salesRow){
-      await fetch(SB+'/rest/v1/factory_contacts?id=eq.'+salesRow.id,{method:'PATCH',headers:sbH,body:JSON.stringify(salesPayload)});
-    }else if(salesPayload.contact_name||salesPayload.email){
-      await fetch(SB+'/rest/v1/factory_contacts',{method:'POST',headers:sbH,body:JSON.stringify(salesPayload)});
-    }
-
-    // 2. Replace additional (non-sales) contacts: delete existing non-sales rows, insert current forms
-    await fetch(SB+'/rest/v1/factory_contacts?factory_id=eq.'+factoryId+'&is_sales=eq.false',{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var additional=collectAdditionalContacts().map(function(c){
-      return {factory_id:factoryId,contact_name:c.contact_name,title:c.title,email:c.email,mobile:c.mobile,wechat:c.wechat,whatsapp:c.whatsapp,is_sales:false,is_logistics:c.is_logistics,is_principal:c.is_principal,is_primary:false};
-    });
-    if(additional.length){
-      await fetch(SB+'/rest/v1/factory_contacts',{method:'POST',headers:sbH,body:JSON.stringify(additional)});
-    }
-  }catch(e){console.log('syncFactoryContacts error (non-fatal):',e);}
 }
 
 async function deleteFromDrawer(){

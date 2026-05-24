@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Logic Log — Supplier Portal</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0;color:#1a1a2e;min-height:100vh;}
+.topbar{height:52px;background:#fff;border-bottom:1px solid #e0e0d8;display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:sticky;top:0;z-index:50;}
+.topbar-l{display:flex;align-items:center;gap:10px;}
+.tm{width:28px;height:28px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+.topbar-title{font-size:14px;font-weight:600;}
+.back-link{font-size:13px;color:#888;text-decoration:none;}
+.back-link:hover{color:#1a1a2e;}
+
+.page-head{padding:1.5rem 1.5rem 0.75rem;}
+.page-title{font-size:22px;font-weight:700;}
+.page-sub{font-size:13px;color:#888;margin-top:4px;line-height:1.5;}
+
+.controls{padding:0.5rem 1.5rem 0.75rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.search{padding:9px 13px;font-size:13px;border:1px solid #e0e0d8;border-radius:8px;width:320px;max-width:60vw;font-family:inherit;background:#fff;}
+.area-filter{padding:9px 11px;font-size:12px;border:1px solid #e0e0d8;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;}
+.count{font-size:12px;color:#888;margin-left:auto;}
+
+.area{padding:0 1.5rem 1.5rem;}
+.cap-group{margin-bottom:0.5rem;}
+.group-head{font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#444;padding:14px 0 8px;border-bottom:1px solid #e0e0d8;margin-bottom:12px;}
+
+.card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:16px 18px;margin-bottom:12px;}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.card-name{font-size:15px;font-weight:700;color:#1a1a2e;flex:1;min-width:200px;}
+.pill{font-size:9px;font-weight:700;padding:3px 9px;border-radius:6px;letter-spacing:0.04em;text-transform:uppercase;}
+.pill.active{background:#edfaed;color:#1a7a1a;}
+.pill.not_yet_working{background:#fff3df;color:#a05a00;}
+.pill.deprecated{background:#fce8e8;color:#a22;}
+.pill.backlog{background:#eef0f5;color:#556;}
+.card-updated{font-size:11px;color:#aaa;}
+
+.field{margin-bottom:9px;}
+.field-label{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#aaa;margin-bottom:3px;}
+.field-val{font-size:12.5px;color:#3a3a3a;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap;}
+.field-val.decisions{color:#1a5a1a;background:#f3fbf3;border:1px solid #d4ecd4;border-radius:7px;padding:8px 11px;}
+.field-val.rejected{color:#8a2a2a;background:#fdf4f4;border:1px solid #f0d8d8;border-radius:7px;padding:8px 11px;}
+.field-val.gotchas{color:#7a4400;background:#fffbea;border:1px solid #f0e0a0;border-radius:7px;padding:8px 11px;}
+.field-val.location{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:#555;}
+
+.empty{padding:3rem 1.5rem;text-align:center;color:#aaa;font-size:14px;}
+mark{background:#ffe9a8;color:inherit;border-radius:2px;padding:0 1px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">📘</div>
+    <div class="topbar-title">Logic Log</div>
+  </div>
+  <a href="admin.html" class="back-link">← Admin</a>
+</div>
+
+<div class="page-head">
+  <div class="page-title">Logic &amp; Decision Log</div>
+  <div class="page-sub">Why each module was built the way it was — key decisions, rejected alternatives, and gotchas. Search across everything below.</div>
+</div>
+
+<div class="controls">
+  <input class="search" id="search" placeholder="Search decisions, reasoning, gotchas…" oninput="render()" />
+  <select class="area-filter" id="area-filter" onchange="render()">
+    <option value="">All areas</option>
+  </select>
+  <span class="count" id="count">—</span>
+</div>
+
+<div class="area" id="area">
+  <div class="empty">Loading logic log…</div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function sb(path){return fetch(SB+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}).then(function(r){return r.json();});}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+var STATUS_LABEL={active:'Active',not_yet_working:'Not Yet Working',deprecated:'Deprecated',backlog:'Backlog'};
+var allRows=[];
+
+function highlight(text,term){
+  var safe=esc(text);
+  if(!term)return safe;
+  try{
+    var re=new RegExp('('+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig');
+    return safe.replace(re,'<mark>$1</mark>');
+  }catch(e){return safe;}
+}
+
+function field(label,val,cls,term){
+  if(!val)return '';
+  return '<div class="field"><div class="field-label">'+label+'</div>'+
+    '<div class="field-val '+(cls||'')+'">'+highlight(val,term)+'</div></div>';
+}
+
+function load(){
+  sb('logic_log?select=*&order=sort_order,module').then(function(rows){
+    allRows=rows||[];
+    // populate area dropdown
+    var areas=[];
+    allRows.forEach(function(r){if(r.area&&areas.indexOf(r.area)===-1)areas.push(r.area);});
+    var sel=g('area-filter');
+    areas.forEach(function(a){var o=document.createElement('option');o.value=a;o.textContent=a;sel.appendChild(o);});
+    render();
+  }).catch(function(){
+    g('area').innerHTML='<div class="empty">Could not load logic log. Has the table been created?</div>';
+  });
+}
+
+function render(){
+  var term=(g('search').value||'').toLowerCase().trim();
+  var areaFilter=g('area-filter').value;
+  var rows=allRows.slice();
+
+  if(areaFilter)rows=rows.filter(function(r){return r.area===areaFilter;});
+  if(term){
+    rows=rows.filter(function(r){
+      var hay=[r.module,r.what_it_does,r.decisions,r.rejected,r.gotchas,r.location,r.area].join(' ').toLowerCase();
+      return hay.indexOf(term)!==-1;
+    });
+  }
+
+  g('count').textContent=rows.length+' of '+allRows.length+' modules';
+
+  if(!rows.length){
+    g('area').innerHTML='<div class="empty">No modules match your search.</div>';
+    return;
+  }
+
+  // group by area, preserving sort_order
+  var groups={};var order=[];
+  rows.forEach(function(r){
+    var a=r.area||'Other';
+    if(!groups[a]){groups[a]=[];order.push(a);}
+    groups[a].push(r);
+  });
+
+  var html='';
+  order.forEach(function(a){
+    html+='<div class="cap-group"><div class="group-head">'+esc(a)+'</div>';
+    groups[a].forEach(function(r){
+      var st=r.status||'active';
+      html+='<div class="card">'+
+        '<div class="card-head">'+
+          '<div class="card-name">'+highlight(r.module,term)+'</div>'+
+          '<span class="pill '+st+'">'+(STATUS_LABEL[st]||st)+'</span>'+
+          (r.updated_at?'<span class="card-updated">'+esc((r.updated_at||'').slice(0,10))+'</span>':'')+
+        '</div>'+
+        field('What it does',r.what_it_does,'',term)+
+        field('Key decisions',r.decisions,'decisions',term)+
+        field('Rejected alternatives',r.rejected,'rejected',term)+
+        field('Gotchas',r.gotchas,'gotchas',term)+
+        field('Where it lives',r.location,'location',term)+
+      '</div>';
+    });
+    html+='</div>';
+  });
+  g('area').innerHTML=html;
+}
+
+load();
+</script>
+</body>
+</html>
