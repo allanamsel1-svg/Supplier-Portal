@@ -3478,7 +3478,9 @@ async function submitKitQuote(rfqId){
       line_type:'component',
       qty_per_kit:parseFloat(tr.getAttribute('data-qty'))||1,
       component_unit_cost:parseFloat(tr.querySelector('.kq-cost').value)||null,
-      freight_to_qb:parseFloat(tr.querySelector('.kq-frt').value)||null
+      freight_to_qb:parseFloat(tr.querySelector('.kq-frt').value)||null,
+      assembly_cost:null,
+      factory_notes:null
     };
   });
   // Require at least one component cost.
@@ -3486,10 +3488,21 @@ async function submitKitQuote(rfqId){
     if(err){err.textContent='Please enter a cost for at least one component.';err.style.display='block';}
     return;
   }
-  // Assembly line.
+  // Assembly line. Must carry the SAME key set as component rows — PostgREST
+  // rejects a bulk insert if any object in the array has different keys.
   var asm=parseFloat(g('kq-asm-'+rfqId).value)||null;
   var notes=g('kq-notes-'+rfqId).value.trim()||null;
-  lines.push({rfq_id:rfqId,factory_id:FACTORY_ID,line_type:'assembly',line_label:'Assembly',assembly_cost:asm,factory_notes:notes});
+  lines.push({
+    rfq_id:rfqId, factory_id:FACTORY_ID,
+    kit_component_id:null,
+    line_label:'Assembly',
+    line_type:'assembly',
+    qty_per_kit:null,
+    component_unit_cost:null,
+    freight_to_qb:null,
+    assembly_cost:asm,
+    factory_notes:notes
+  });
 
   if(btn){btn.disabled=true;btn.textContent='Submitting...';}
   try{
