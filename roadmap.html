@@ -30,6 +30,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .tabbtn:hover:not(.active){color:#444;}
 .tabview{display:none;}
 .tabview.active{display:block;}
+.logic-card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:16px 18px;margin-bottom:12px;}
+.logic-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.logic-name{font-size:15px;font-weight:700;color:#1a1a2e;flex:1;min-width:200px;}
+.logic-pill{font-size:9px;font-weight:700;padding:3px 9px;border-radius:6px;letter-spacing:0.04em;text-transform:uppercase;}
+.logic-pill.active{background:#edfaed;color:#1a7a1a;}
+.logic-pill.not_yet_working{background:#fff3df;color:#a05a00;}
+.logic-pill.deprecated{background:#fce8e8;color:#a22;}
+.logic-pill.backlog{background:#eef0f5;color:#556;}
+.logic-field{margin-bottom:9px;}
+.logic-field-label{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#aaa;margin-bottom:3px;}
+.logic-field-val{font-size:12.5px;color:#3a3a3a;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap;}
+.logic-field-val.decisions{color:#1a5a1a;background:#f3fbf3;border:1px solid #d4ecd4;border-radius:7px;padding:8px 11px;}
+.logic-field-val.rejected{color:#8a2a2a;background:#fdf4f4;border:1px solid #f0d8d8;border-radius:7px;padding:8px 11px;}
+.logic-field-val.gotchas{color:#7a4400;background:#fffbea;border:1px solid #f0e0a0;border-radius:7px;padding:8px 11px;}
+.logic-field-val.location{font-family:ui-monospace,Menlo,monospace;font-size:11.5px;color:#555;}
+.logic-card mark{background:#ffe9a8;color:inherit;border-radius:2px;padding:0 1px;}
 
 /* Capabilities */
 .cap-controls{padding:0.75rem 1.5rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
@@ -142,6 +158,7 @@ textarea.cap-edit-input{resize:vertical;min-height:50px;}
 <div class="tabbar">
   <button class="tabbtn active" id="tab-roadmap" onclick="switchView('roadmap')">Roadmap</button>
   <button class="tabbtn" id="tab-capabilities" onclick="switchView('capabilities')">Capabilities</button>
+  <button class="tabbtn" id="tab-logic" onclick="switchView('logic')">Logic</button>
 </div>
 
 <div class="tabview active" id="view-roadmap">
@@ -175,6 +192,17 @@ textarea.cap-edit-input{resize:vertical;min-height:50px;}
     <button class="btn btn-secondary" onclick="openCapAddModal()">+ Add Capability</button>
   </div>
   <div class="cap-area" id="cap-list"></div>
+</div>
+
+<div class="tabview" id="view-logic">
+  <div class="cap-controls">
+    <input class="search" id="logic-search" placeholder="Search decisions, reasoning, rejected alternatives, gotchas…" oninput="renderLogic()" style="width:340px;max-width:60vw;" />
+    <select class="tag-filter" id="logic-area-filter" onchange="renderLogic()">
+      <option value="">All areas</option>
+    </select>
+    <span class="counts" id="logic-counts"></span>
+  </div>
+  <div class="cap-area" id="logic-list"></div>
 </div>
 
 <div class="overlay" id="add-modal">
@@ -561,17 +589,93 @@ async function submitAdd(){
 function switchView(view){
   document.getElementById('tab-roadmap').classList.toggle('active',view==='roadmap');
   document.getElementById('tab-capabilities').classList.toggle('active',view==='capabilities');
+  document.getElementById('tab-logic').classList.toggle('active',view==='logic');
   document.getElementById('view-roadmap').classList.toggle('active',view==='roadmap');
   document.getElementById('view-capabilities').classList.toggle('active',view==='capabilities');
+  document.getElementById('view-logic').classList.toggle('active',view==='logic');
   document.getElementById('add-btn-top').style.display=(view==='roadmap')?'inline-block':'none';
   if(view==='roadmap'){
     g('page-title').textContent='Build Roadmap';
     g('page-sub').textContent='Drag items between columns to change status. Drag within a column to re-prioritize. Click an item to edit.';
-  } else {
+  } else if(view==='capabilities'){
     g('page-title').textContent='System Capabilities';
     g('page-sub').textContent='What already exists and how it behaves. Read this before proposing new work. Click any capability to edit.';
     if(allCaps.length===0)loadCapabilities();
+  } else {
+    g('page-title').textContent='Logic & Decision Log';
+    g('page-sub').textContent='Why each module was built the way it was — key decisions, rejected alternatives, and gotchas. Search to see how we arrived at a conclusion.';
+    if(allLogic.length===0)loadLogic();
   }
+}
+
+// ── Logic Log ──
+var allLogic=[];
+var LOGIC_STATUS={active:'Active',not_yet_working:'Not Yet Working',deprecated:'Deprecated',backlog:'Backlog'};
+
+async function loadLogic(){
+  try{
+    var r=await sb('logic_log?select=*&order=sort_order,module');
+    allLogic=await r.json();
+    var sel=g('logic-area-filter');
+    var areas=[];
+    allLogic.forEach(function(x){if(x.area&&areas.indexOf(x.area)===-1)areas.push(x.area);});
+    areas.forEach(function(a){var o=document.createElement('option');o.value=a;o.textContent=a;sel.appendChild(o);});
+    renderLogic();
+  }catch(e){
+    g('logic-list').innerHTML='<div style="padding:2rem;color:#aaa;">Could not load logic log. Has the logic_log table been created?</div>';
+  }
+}
+
+function logicHighlight(text,term){
+  var safe=esc(text);
+  if(!term)return safe;
+  try{var re=new RegExp('('+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig');return safe.replace(re,'<mark>$1</mark>');}
+  catch(e){return safe;}
+}
+
+function logicField(label,val,cls,term){
+  if(!val)return '';
+  return '<div class="logic-field"><div class="logic-field-label">'+label+'</div>'+
+    '<div class="logic-field-val '+(cls||'')+'">'+logicHighlight(val,term)+'</div></div>';
+}
+
+function renderLogic(){
+  var term=(g('logic-search').value||'').toLowerCase().trim();
+  var areaFilter=g('logic-area-filter').value;
+  var rows=allLogic.slice();
+  if(areaFilter)rows=rows.filter(function(r){return r.area===areaFilter;});
+  if(term){
+    rows=rows.filter(function(r){
+      var hay=[r.module,r.what_it_does,r.decisions,r.rejected,r.gotchas,r.location,r.area].join(' ').toLowerCase();
+      return hay.indexOf(term)!==-1;
+    });
+  }
+  g('logic-counts').textContent=rows.length+' of '+allLogic.length+' modules';
+  if(!rows.length){g('logic-list').innerHTML='<div style="padding:2rem;color:#aaa;">No modules match your search.</div>';return;}
+
+  var groups={};var order=[];
+  rows.forEach(function(r){var a=r.area||'Other';if(!groups[a]){groups[a]=[];order.push(a);}groups[a].push(r);});
+
+  var html='';
+  order.forEach(function(a){
+    html+='<div class="cap-group"><div class="cap-group-head">'+esc(a)+'</div>';
+    groups[a].forEach(function(r){
+      var st=r.status||'active';
+      html+='<div class="logic-card">'+
+        '<div class="logic-head"><div class="logic-name">'+logicHighlight(r.module,term)+'</div>'+
+          '<span class="logic-pill '+st+'">'+(LOGIC_STATUS[st]||st)+'</span>'+
+          (r.updated_at?'<span style="font-size:11px;color:#aaa;">'+esc((r.updated_at||'').slice(0,10))+'</span>':'')+
+        '</div>'+
+        logicField('What it does',r.what_it_does,'',term)+
+        logicField('Key decisions',r.decisions,'decisions',term)+
+        logicField('Rejected alternatives',r.rejected,'rejected',term)+
+        logicField('Gotchas',r.gotchas,'gotchas',term)+
+        logicField('Where it lives',r.location,'location',term)+
+      '</div>';
+    });
+    html+='</div>';
+  });
+  g('logic-list').innerHTML=html;
 }
 
 // ── Capabilities ──
