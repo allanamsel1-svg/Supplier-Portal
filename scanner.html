@@ -227,33 +227,25 @@ async function loadCategories(refreshCards){
 
 // Rebuild only the categories section of a card without touching other fields.
 function rebuildCategorySection(cardId){
-  // Find the section by its title text, then replace the cat-list that follows it.
   var card=g(cardId);if(!card)return;
-  var sections=card.querySelectorAll('.section-title');
-  for(var i=0;i<sections.length;i++){
-    if(sections[i].textContent.indexOf('Manufacturing Categories')!==-1){
-      // Preserve current selections before rebuild
-      var prevChecked={};
-      card.querySelectorAll('.scanner-cat-cb[data-cardid="'+cardId+'"]:checked').forEach(function(cb){
-        prevChecked[cb.value]=true;
-      });
-      // The cat-list element comes right after this section-title
-      var oldList=sections[i].nextElementSibling;
-      if(oldList && (oldList.classList.contains('cat-list')||oldList.tagName==='DIV')){
-        var temp=document.createElement('div');
-        temp.innerHTML=buildCatCheckboxes(cardId);
-        var newList=temp.firstElementChild;
-        if(newList){
-          oldList.replaceWith(newList);
-          // Restore checks
-          newList.querySelectorAll('.scanner-cat-cb').forEach(function(cb){
-            if(prevChecked[cb.value])cb.checked=true;
-          });
-        }
-      }
-      // Update the section title to include refresh hint
-      break;
-    }
+  // Preserve current selections before rebuild
+  var prevChecked={};
+  card.querySelectorAll('.scanner-cat-cb[data-cardid="'+cardId+'"]:checked').forEach(function(cb){
+    prevChecked[cb.value]=true;
+  });
+  var oldWrap=g(cardId+'_catwrap');
+  if(!oldWrap)return;
+  var temp=document.createElement('div');
+  // Rebuild without product text (refresh keeps existing checks, doesn't re-suggest)
+  temp.innerHTML=buildCatCheckboxes(cardId,'');
+  var newWrap=temp.firstElementChild;
+  if(newWrap){
+    oldWrap.replaceWith(newWrap);
+    // Restore checks, then sync pills
+    newWrap.querySelectorAll('.scanner-cat-cb').forEach(function(cb){
+      if(prevChecked[cb.value])cb.checked=true;
+    });
+    updateCatPills(cardId);
   }
 }
 
@@ -381,7 +373,7 @@ function renderCard(card){
     '<div class="rf"><label>What They Manufacture (free text)</label><textarea id="'+card.id+'_categories" rows="2">'+esc(d.product_categories||'')+'</textarea></div>'+
 
     '<div class="section-title" style="display:flex;align-items:center;justify-content:space-between;"><span>Manufacturing Categories (select all that apply)</span><button type="button" onclick="loadCategories(true)" style="background:#f0f0e8;border:1px solid #e0e0d8;border-radius:5px;font-size:10px;padding:3px 8px;cursor:pointer;font-family:inherit;color:#666;">↻ Refresh list</button></div>'+
-    buildCatCheckboxes(card.id)+
+    buildCatCheckboxes(card.id, d.product_categories||'')+
 
     '<div class="section-title">Certifications'+(d.listed_certifications && d.listed_certifications.length?' <span class="intel-badge">'+d.listed_certifications.length+' found on card</span>':'')+'</div>'+
     (d.listed_certifications && d.listed_certifications.length?'<div style="font-size:11px;color:#7a6000;background:#fffbea;border:1px solid #f0d840;border-radius:6px;padding:6px 10px;margin-bottom:8px;">From card: '+d.listed_certifications.map(esc).join(', ')+'</div>':'')+
@@ -433,6 +425,8 @@ function renderCard(card){
   el.id=card.id;el.className=cls;
   el.innerHTML=topRow+'<div class="ci-body">'+leftCol+rightCol+'</div>';
   g('queue').appendChild(el);
+  // Sync the checked-category pills (AI-suggested categories start checked)
+  if(typeof updateCatPills==='function')updateCatPills(card.id);
 }
 
 function fi(card,key,label,val,confKey,type){
@@ -447,13 +441,87 @@ function fiPlain(cid,key,label,val,type){
   return '<div class="rf"><label>'+label+'</label><input type="'+(type||'text')+'" id="'+cid+'_'+key+'" value="'+esc(val||'')+'" /></div>';
 }
 
-function buildCatCheckboxes(cardId){
+function buildCatCheckboxes(cardId, productText){
   if(!allCategories.length)return '<div style="font-size:12px;color:#bbb;padding:8px;">No categories set up yet — add them in Admin → Categories first.</div>';
-  return '<div class="cat-list">'+allCategories.map(function(c){
+
+  // Compute AI-suggested categories by fuzzy-matching the extracted product text
+  // against the taxonomy. Local, zero-cost. Returns a Set of category keys.
+  var suggested=suggestCategoryKeys(productText);
+
+  var searchBox='<input type="text" class="cat-search" placeholder="🔍 Search categories…" oninput="filterCatList(\''+cardId+'\',this.value)" style="width:100%;padding:7px 10px;font-size:12px;border:1px solid #e0e0d8;border-radius:7px;margin-bottom:6px;font-family:inherit;" />';
+  var pillsRow='<div class="cat-checked-pills" id="'+cardId+'_catpills" style="display:none;flex-wrap:wrap;gap:4px;margin-bottom:6px;"></div>';
+
+  var list='<div class="cat-list" id="'+cardId+'_catlist">'+allCategories.map(function(c){
     var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
     var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
-    return '<label class="cat-label"><input type="checkbox" class="scanner-cat-cb" data-cardid="'+cardId+'" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'" /> '+path+(c.is_cosmetic?' <span style="font-size:10px;background:#fce8f0;color:#880044;border:1px solid #f0b8d0;padding:1px 5px;border-radius:8px;margin-left:4px;">Cosmetic</span>':'')+'</label>';
+    var isSug=suggested.has(key);
+    var checkedAttr=isSug?' checked':'';
+    var sugTag=isSug?' <span class="ai-sug-tag" style="font-size:9px;background:#eef2ff;color:#2244cc;border:1px solid #c0d0f0;padding:1px 5px;border-radius:7px;margin-left:4px;font-weight:600;">AI suggested</span>':'';
+    return '<label class="cat-label" data-catpath="'+esc(path.toLowerCase())+'" data-catkey="'+esc(key)+'"><input type="checkbox" class="scanner-cat-cb" data-cardid="'+cardId+'" value="'+key+'" data-cat="'+c.category+'" data-sub="'+(c.sub_category||'')+'" data-subsub="'+(c.sub_sub_category||'')+'"'+checkedAttr+' onchange="updateCatPills(\''+cardId+'\')" /> '+path+(c.is_cosmetic?' <span style="font-size:10px;background:#fce8f0;color:#880044;border:1px solid #f0b8d0;padding:1px 5px;border-radius:8px;margin-left:4px;">Cosmetic</span>':'')+sugTag+'</label>';
   }).join('')+'</div>';
+
+  return '<div class="cat-wrap" id="'+cardId+'_catwrap">'+searchBox+pillsRow+list+'</div>';
+}
+
+// Local fuzzy match: returns Set of category keys whose path words overlap the product text.
+function suggestCategoryKeys(productText){
+  var out=new Set();
+  if(!productText)return out;
+  var text=(' '+productText.toLowerCase()+' ').replace(/[^a-z0-9 ]/g,' ');
+  // Build a word set from the product text (length>=4 to avoid noise like "and","the")
+  var textWords={};
+  text.split(/\s+/).forEach(function(w){if(w.length>=4)textWords[w]=true;});
+  allCategories.forEach(function(c){
+    var key=c.category+'|'+(c.sub_category||'')+'|'+(c.sub_sub_category||'');
+    var pathParts=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean);
+    // A category is suggested if any of its significant words (>=4 chars) appears in the product text,
+    // OR a full sub/sub-sub phrase appears verbatim.
+    var hit=false;
+    pathParts.forEach(function(part){
+      var pl=part.toLowerCase();
+      if(text.indexOf(' '+pl+' ')!==-1){hit=true;return;}
+      pl.replace(/[^a-z0-9 ]/g,' ').split(/\s+/).forEach(function(w){
+        if(w.length>=4 && textWords[w])hit=true;
+      });
+    });
+    if(hit)out.add(key);
+  });
+  return out;
+}
+
+// Live filter of a card's category list by search text.
+function filterCatList(cardId,q){
+  var list=document.getElementById(cardId+'_catlist');
+  if(!list)return;
+  var query=(q||'').toLowerCase().trim();
+  list.querySelectorAll('.cat-label').forEach(function(lbl){
+    var path=lbl.getAttribute('data-catpath')||'';
+    lbl.style.display=(!query||path.indexOf(query)!==-1)?'flex':'none';
+  });
+}
+
+// Show checked-but-possibly-hidden categories as pills above the list.
+function updateCatPills(cardId){
+  var pills=document.getElementById(cardId+'_catpills');
+  if(!pills)return;
+  var checked=[];
+  document.querySelectorAll('.scanner-cat-cb[data-cardid="'+cardId+'"]:checked').forEach(function(cb){
+    var lbl=cb.closest('.cat-label');
+    var path=lbl?lbl.textContent.trim():cb.value;
+    checked.push({key:cb.value,path:path});
+  });
+  if(!checked.length){pills.style.display='none';pills.innerHTML='';return;}
+  pills.style.display='flex';
+  pills.innerHTML=checked.map(function(c){
+    return '<span style="font-size:10px;background:#eef2ff;color:#003366;border:1px solid #c0d0f0;padding:2px 7px;border-radius:8px;">'+esc(c.path)+' <span style="cursor:pointer;font-weight:700;" onclick="uncheckCat(\''+cardId+'\',\''+esc(c.key).replace(/'/g,"\\'")+'\')">×</span></span>';
+  }).join('');
+}
+
+function uncheckCat(cardId,key){
+  document.querySelectorAll('.scanner-cat-cb[data-cardid="'+cardId+'"]').forEach(function(cb){
+    if(cb.value===key)cb.checked=false;
+  });
+  updateCatPills(cardId);
 }
 
 function esc(v){return(v||'').toString().replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
