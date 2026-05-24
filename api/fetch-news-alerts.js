@@ -7,9 +7,9 @@ export const config = { runtime: 'nodejs' };
 export const maxDuration = 300;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-const CLAUDE_MODEL = 'claude-sonnet-4-6';
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
 
 const DEFAULT_QUERIES = [
   'beauty product launch',
@@ -70,6 +70,39 @@ function extractJson(text) {
   const lb = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
   if (lb === -1) throw new Error('No closing brace');
   return JSON.parse(cleaned.substring(0, lb + 1));
+}
+
+// Normalize a headline for similarity comparison: lowercase, strip a trailing
+// " - Source"/" | Source" suffix, remove punctuation, collapse whitespace.
+function normalizeHeadline(title) {
+  if (!title) return '';
+  return title
+    .replace(/\s*[-|–—]\s*[^-|–—]{1,40}$/, '')   // drop trailing " - Reuters" style source tag
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Rank a source for tie-breaking: known wire/trade outlets win over unknown blogs.
+const PRIMARY_SOURCES = ['reuters','associated press','ap','bloomberg','wwd',"women's wear daily",'cnbc','the wall street journal','wsj','business of fashion','cosmetics business','happi','financial times','ft'];
+function sourceRank(src) {
+  const s = (src || '').toLowerCase();
+  return PRIMARY_SOURCES.some(p => s.includes(p)) ? 1 : 0;  // 1 = primary, 0 = other
+}
+
+// Collapse articles that are the same story from different URLs by normalized
+// headline. On a clash, keep the copy from the higher-ranked source.
+function dedupeByTitle(articles) {
+  const byTitle = new Map();
+  for (const a of articles) {
+    const key = normalizeHeadline(a.title);
+    if (!key) { byTitle.set(Symbol(), a); continue; }  // no title — keep, can't compare
+    const existing = byTitle.get(key);
+    if (!existing) { byTitle.set(key, a); continue; }
+    if (sourceRank(a.source) > sourceRank(existing.source)) byTitle.set(key, a);
+  }
+  return Array.from(byTitle.values());
 }
 
 async function sha256(text) {
@@ -211,14 +244,18 @@ export default async function handler(req, res) {
       }
     }
 
-    const hashes = dedup.map(a => a.url_hash);
+    // Second pass: collapse syndicated copies of the same story (same headline,
+    // different URLs) so we don't store or classify the same article repeatedly.
+    const titleDeduped = dedupeByTitle(dedup);
+
+    const hashes = titleDeduped.map(a => a.url_hash);
     let existingHashes = new Set();
     if (hashes.length) {
       const inList = hashes.map(h => `"${h}"`).join(',');
       const existing = await sb(`/rest/v1/news_articles?url_hash=in.(${inList})&select=url_hash`);
       existingHashes = new Set((existing || []).map(r => r.url_hash));
     }
-    const fresh = dedup.filter(a => !existingHashes.has(a.url_hash));
+    const fresh = titleDeduped.filter(a => !existingHashes.has(a.url_hash));
 
     const toInsert = [];
     const concurrency = 5;
@@ -265,7 +302,8 @@ export default async function handler(req, res) {
       success: true,
       queries_run: queries.length,
       articles_seen: dedup.length,
-      duplicates: dedup.length - fresh.length,
+      title_duplicates_collapsed: dedup.length - titleDeduped.length,
+      duplicates: titleDeduped.length - fresh.length,
       new_articles: toInsert.length,
       signal_count: toInsert.filter(a => !a.is_fluff).length,
       fluff_count: toInsert.filter(a => a.is_fluff).length

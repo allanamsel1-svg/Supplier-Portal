@@ -12,7 +12,7 @@ export const config = { runtime: 'nodejs' };
 export const maxDuration = 300;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
@@ -57,6 +57,32 @@ function extractJson(text) {
   const lb = Math.max(cleaned.lastIndexOf('}'), cleaned.lastIndexOf(']'));
   if (lb === -1) throw new Error('No closing brace');
   return JSON.parse(cleaned.substring(0, lb + 1));
+}
+
+function normalizeHeadline(title) {
+  if (!title) return '';
+  return title
+    .replace(/\s*[-|–—]\s*[^-|–—]{1,40}$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+const PRIMARY_SOURCES = ['reuters','associated press','ap','bloomberg','wwd',"women's wear daily",'cnbc','the wall street journal','wsj','business of fashion','cosmetics business','happi','financial times','ft'];
+function sourceRank(src) {
+  const s = (src || '').toLowerCase();
+  return PRIMARY_SOURCES.some(p => s.includes(p)) ? 1 : 0;
+}
+function dedupeByTitle(articles) {
+  const byTitle = new Map();
+  for (const a of articles) {
+    const key = normalizeHeadline(a.title);
+    if (!key) { byTitle.set(Symbol(), a); continue; }
+    const existing = byTitle.get(key);
+    if (!existing) { byTitle.set(key, a); continue; }
+    if (sourceRank(a.source) > sourceRank(existing.source)) byTitle.set(key, a);
+  }
+  return Array.from(byTitle.values());
 }
 
 async function sha256(text) {
@@ -210,11 +236,13 @@ export default async function handler(req, res) {
 
         // Dedupe by URL hash
         const seen = new Set();
-        const dedup = [];
+        const urlDedup = [];
         for (const a of allArticles) {
           const h = await sha256(a.link);
-          if (!seen.has(h)) { seen.add(h); a.url_hash = h; dedup.push(a); }
+          if (!seen.has(h)) { seen.add(h); a.url_hash = h; urlDedup.push(a); }
         }
+        // Collapse syndicated copies (same headline, different URLs)
+        const dedup = dedupeByTitle(urlDedup);
 
         // Find which are already in news_articles
         if (dedup.length === 0) {
