@@ -178,6 +178,22 @@ async function fetchGoogleNewsRss(query) {
   return parseRssXml(await r.text());
 }
 
+// Ensure stream weights are always the four known keys, each a number 0-1.
+function normalizeStreamWeights(w) {
+  const clamp = (n) => {
+    const v = typeof n === 'number' ? n : parseFloat(n);
+    if (isNaN(v)) return 0;
+    return Math.max(0, Math.min(1, v));
+  };
+  w = w || {};
+  return {
+    trade: clamp(w.trade),
+    consumer: clamp(w.consumer),
+    celebrity: clamp(w.celebrity),
+    lifestyle: clamp(w.lifestyle)
+  };
+}
+
 async function classifyArticle(article) {
   const prompt = `You are classifying a beauty/HBA industry news article for a sourcing platform.
 
@@ -195,8 +211,21 @@ Return ONLY valid JSON in this exact format:
   "mentioned_products": ["specific product names mentioned"],
   "mentioned_ingredients": ["ingredients mentioned"],
   "mentioned_celebrities": ["celebrity names mentioned"],
-  "mentioned_retailers": ["retailer names mentioned"]
+  "mentioned_retailers": ["retailer names mentioned"],
+  "stream_weights": {
+    "trade": 0.0 to 1.0,
+    "consumer": 0.0 to 1.0,
+    "celebrity": 0.0 to 1.0,
+    "lifestyle": 0.0 to 1.0
+  }
 }
+
+STREAM WEIGHTS — score how strongly this article belongs in each of the four streams, independently (an article can score high in several). Use the full 0-1 range; most articles are strong in one or two streams and near zero in the rest.
+- trade: business-of-beauty — M&A, mergers, acquisitions, funding, earnings, executive moves, retailer expansion/partnerships, supply-chain, manufacturing, packaging, distribution. The sourcing-relevant stream.
+- consumer: actual new products reaching shoppers — product launches, "now available", new lines hitting shelves/retail.
+- celebrity: celebrity- or influencer-attached brands and launches (this stream feeds Brand Watch). Score high when a named celebrity/influencer is tied to a product or brand.
+- lifestyle: softer editorial — trend roundups, "products to watch", seasonal edits, ranking listicles, routine/how-to content.
+Example: a Selena Gomez Rare Beauty launch at Sephora might be celebrity 0.9, consumer 0.7, trade 0.4, lifestyle 0.1. A Puig/ELC merger might be trade 0.95, consumer 0.1, celebrity 0.0, lifestyle 0.0. A "20 best lipsticks of May" listicle might be lifestyle 0.9, consumer 0.4, the rest 0.0.
 
 Fluff = generic listicles ("10 best lipsticks"), pure ad copy, "how to shop X sale", celebrity gossip without product attachment, broad seasonal roundups.
 Signal = launches, M&A, ingredient trends, products selling out, celebrity-product attachments, category shifts, retail partnerships.
@@ -215,7 +244,8 @@ Use empty arrays [] when nothing to extract. Do not invent.`;
     return {
       is_fluff: false, fluff_reason: null, highlight: null,
       signal_types: [], mentioned_brands: [], mentioned_products: [],
-      mentioned_ingredients: [], mentioned_celebrities: [], mentioned_retailers: []
+      mentioned_ingredients: [], mentioned_celebrities: [], mentioned_retailers: [],
+      stream_weights: { trade: 0, consumer: 0, celebrity: 0, lifestyle: 0 }
     };
   }
 }
@@ -287,7 +317,8 @@ export default async function handler(req, res) {
           mentioned_products: c.mentioned_products || [],
           mentioned_ingredients: c.mentioned_ingredients || [],
           mentioned_celebrities: c.mentioned_celebrities || [],
-          mentioned_retailers: c.mentioned_retailers || []
+          mentioned_retailers: c.mentioned_retailers || [],
+          stream_weights: normalizeStreamWeights(c.stream_weights)
         });
       });
     }
