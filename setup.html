@@ -3169,12 +3169,16 @@ function collectKitComponents(){
       var val=el.value;
       plain[f.key]=(f.type==='number')?(val?parseFloat(val):null):(val?val.trim():null);
     });
+    // For existing-SKU components the plain fields are hidden in the form, so
+    // snapshot the SKU's own name/spec into the draft_* columns. This is what the
+    // factory form labels read — without it, linked components render as "Component".
+    var s=skuId?(allSkus||[]).find(function(x){return x.id===skuId;}):null;
     rows.push({
       component_sku_id:skuId||null,
       qty_per_kit:parseFloat(g('kc-qty-'+idx).value)||1,
-      // Draft-SKU detail (for new/described components)
-      product_title:skuId?null:plain.product_title,
-      description:skuId?null:plain.description,
+      // Draft-SKU detail (for new/described components; for linked SKUs, snapshotted)
+      product_title:skuId?(s?s.description:null):plain.product_title,
+      description:skuId?(s?(s.detailed_description||null):null):plain.description,
       size_volume:skuId?null:plain.size_volume,
       unit_l:skuId?null:plain.unit_l,
       unit_w:skuId?null:plain.unit_w,
