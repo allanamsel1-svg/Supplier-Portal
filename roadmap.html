@@ -23,6 +23,38 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .page-title{font-size:22px;font-weight:700;}
 .page-sub{font-size:13px;color:#888;margin-top:4px;}
 
+/* Tab bar */
+.tabbar{display:flex;gap:0;padding:0 1.5rem;border-bottom:1px solid #e0e0d8;background:#fff;}
+.tabbtn{padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;font-size:13px;font-weight:600;color:#888;cursor:pointer;font-family:inherit;}
+.tabbtn.active{color:#1a1a2e;border-bottom-color:#1a1a2e;}
+.tabbtn:hover:not(.active){color:#444;}
+.tabview{display:none;}
+.tabview.active{display:block;}
+
+/* Capabilities */
+.cap-controls{padding:0.75rem 1.5rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.cap-area{padding:0 1.5rem 2rem;}
+.cap-group{margin-bottom:1.5rem;}
+.cap-group-head{font-size:12px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#444;padding:10px 0 8px;border-bottom:1px solid #e0e0d8;margin-bottom:10px;}
+.cap-item{background:#fff;border:1px solid #e0e0d8;border-radius:9px;padding:14px 16px;margin-bottom:10px;}
+.cap-item.editing{border-color:#2244cc;background:#f5f7ff;}
+.cap-item-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.cap-item-name{font-size:14px;font-weight:700;color:#1a1a2e;flex:1;}
+.cap-status{font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;letter-spacing:0.04em;}
+.cap-status.exists{background:#edfaed;color:#1a7a1a;}
+.cap-status.partial{background:#fff8e0;color:#664400;}
+.cap-status.deprecated{background:#fce8e8;color:#a22;}
+.cap-field{margin-bottom:7px;}
+.cap-field-label{font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:#aaa;margin-bottom:2px;}
+.cap-field-val{font-size:12px;color:#444;line-height:1.55;overflow-wrap:anywhere;}
+.cap-field-val.decisions{color:#7a4400;background:#fffbea;border:1px solid #f0e0a0;border-radius:6px;padding:7px 10px;}
+.cap-field-val.location{font-family:'SF Mono',Monaco,Consolas,monospace;font-size:11px;color:#666;}
+.cap-actions{display:flex;gap:6px;margin-top:8px;}
+.cap-edit-input{width:100%;border:1px solid #c0d0f0;background:#fff;border-radius:5px;padding:5px 7px;font-size:12px;font-family:inherit;}
+.cap-edit-input.area-name{font-weight:700;font-size:14px;}
+textarea.cap-edit-input{resize:vertical;min-height:50px;}
+.cap-last{font-size:10px;color:#bbb;margin-top:6px;}
+
 .controls{padding:0.75rem 1.5rem;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
 .search{padding:7px 11px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;width:260px;font-family:inherit;background:#fff;}
 .tag-filter{padding:7px 11px;font-size:12px;border:1px solid #e0e0d8;border-radius:7px;background:#fff;cursor:pointer;font-family:inherit;}
@@ -94,18 +126,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="topbar">
   <div class="topbar-l">
     <div class="tm">🗺</div>
-    <div class="topbar-title">Roadmap</div>
+    <div class="topbar-title">System</div>
   </div>
   <div class="topbar-actions">
-    <button class="btn btn-primary" onclick="openAddModal()">+ Add Item</button>
+    <button class="btn btn-primary" id="add-btn-top" onclick="openAddModal()">+ Add Item</button>
     <a class="back-link" href="admin.html">← Admin</a>
   </div>
 </div>
 
 <div class="page-head">
-  <div class="page-title">Build Roadmap</div>
-  <div class="page-sub">Drag items between columns to change status. Drag within a column to re-prioritize. Click an item to edit.</div>
+  <div class="page-title" id="page-title">Build Roadmap</div>
+  <div class="page-sub" id="page-sub">Drag items between columns to change status. Drag within a column to re-prioritize. Click an item to edit.</div>
 </div>
+
+<div class="tabbar">
+  <button class="tabbtn active" id="tab-roadmap" onclick="switchView('roadmap')">Roadmap</button>
+  <button class="tabbtn" id="tab-capabilities" onclick="switchView('capabilities')">Capabilities</button>
+</div>
+
+<div class="tabview active" id="view-roadmap">
 
 <div class="controls">
   <input class="search" id="search" placeholder="Search title, description, tags…" oninput="filterItems()" />
@@ -122,6 +161,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="col col-backlog"><div class="col-head"><div class="col-title">Backlog</div><span class="col-count" id="cnt-backlog">0</span></div><div class="col-body" data-status="backlog" id="col-backlog"></div></div>
   <div class="col col-on_hold"><div class="col-head"><div class="col-title">On Hold</div><span class="col-count" id="cnt-on_hold">0</span></div><div class="col-body" data-status="on_hold" id="col-on_hold"></div></div>
   <div class="col col-done"><div class="col-head"><div class="col-title">Done</div><span class="col-count" id="cnt-done">0</span></div><div class="col-body" data-status="done" id="col-done"></div></div>
+</div>
+
+</div>
+
+<div class="tabview" id="view-capabilities">
+  <div class="cap-controls">
+    <input class="search" id="cap-search" placeholder="Search capabilities…" oninput="renderCapabilities()" />
+    <select class="tag-filter" id="cap-area-filter" onchange="renderCapabilities()">
+      <option value="">All areas</option>
+    </select>
+    <span class="counts" id="cap-counts"></span>
+    <button class="btn btn-secondary" onclick="openCapAddModal()">+ Add Capability</button>
+  </div>
+  <div class="cap-area" id="cap-list"></div>
 </div>
 
 <div class="overlay" id="add-modal">
@@ -167,6 +220,53 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeAddModal()">Cancel</button>
       <button class="btn btn-primary" id="m-save-btn" onclick="submitAdd()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="cap-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-title" id="cap-modal-title">Add Capability</div>
+      <button class="modal-close" onclick="closeCapModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <label>Feature name *</label>
+      <input type="text" id="cap-feature" placeholder="e.g. Factory cert expiry tracking" />
+      <div class="modal-row2">
+        <div>
+          <label>Area</label>
+          <select id="cap-area">
+            <option value="Intel">Intel</option>
+            <option value="Scanner">Scanner</option>
+            <option value="Factory">Factory</option>
+            <option value="RFQ">RFQ</option>
+            <option value="Operations">Operations</option>
+            <option value="Comms">Comms</option>
+            <option value="Admin">Admin</option>
+            <option value="Infra">Infra</option>
+          </select>
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="cap-status">
+            <option value="exists">Exists</option>
+            <option value="partial">Partial</option>
+            <option value="deprecated">Deprecated</option>
+          </select>
+        </div>
+      </div>
+      <label>Location (files + tables)</label>
+      <textarea id="cap-location" placeholder="e.g. factory-detail.html; tables: factories, factory_locations"></textarea>
+      <label>Behavior (how it works now)</label>
+      <textarea id="cap-behavior" placeholder="What it actually does"></textarea>
+      <label>Decisions / nuances (locked)</label>
+      <textarea id="cap-decisions" placeholder="Key decisions, gotchas, things not to rebuild"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" id="cap-delete-btn" onclick="deleteCapability()" style="display:none;color:#a22;border:1px solid #fdd;background:#fff0f0;margin-right:auto;">Delete</button>
+      <button class="btn btn-secondary" onclick="closeCapModal()">Cancel</button>
+      <button class="btn btn-primary" id="cap-save-btn" onclick="submitCap()">Add Capability</button>
     </div>
   </div>
 </div>
@@ -455,6 +555,158 @@ async function submitAdd(){
     populateTagFilter();
     render();
   }catch(e){alert('Add error: '+e.message);btn.disabled=false;btn.textContent='Add Item';}
+}
+
+// ── Tab switching ──
+function switchView(view){
+  document.getElementById('tab-roadmap').classList.toggle('active',view==='roadmap');
+  document.getElementById('tab-capabilities').classList.toggle('active',view==='capabilities');
+  document.getElementById('view-roadmap').classList.toggle('active',view==='roadmap');
+  document.getElementById('view-capabilities').classList.toggle('active',view==='capabilities');
+  document.getElementById('add-btn-top').style.display=(view==='roadmap')?'inline-block':'none';
+  if(view==='roadmap'){
+    g('page-title').textContent='Build Roadmap';
+    g('page-sub').textContent='Drag items between columns to change status. Drag within a column to re-prioritize. Click an item to edit.';
+  } else {
+    g('page-title').textContent='System Capabilities';
+    g('page-sub').textContent='What already exists and how it behaves. Read this before proposing new work. Click any capability to edit.';
+    if(allCaps.length===0)loadCapabilities();
+  }
+}
+
+// ── Capabilities ──
+var allCaps=[];
+var editingCapId=null;
+
+async function loadCapabilities(){
+  var r=await sb('system_registry?select=*&order=area,feature');
+  allCaps=r.ok?await r.json():[];
+  populateAreaFilter();
+  renderCapabilities();
+}
+
+function populateAreaFilter(){
+  var areas={};
+  allCaps.forEach(function(c){if(c.area)areas[c.area]=true;});
+  var sel=g('cap-area-filter');
+  var cur=sel.value;
+  sel.innerHTML='<option value="">All areas</option>'+Object.keys(areas).sort().map(function(a){return '<option value="'+esc(a)+'">'+esc(a)+'</option>';}).join('');
+  sel.value=cur;
+}
+
+function renderCapabilities(){
+  var search=(g('cap-search').value||'').toLowerCase().trim();
+  var areaF=g('cap-area-filter').value;
+  var list=g('cap-list');
+  var items=allCaps.slice();
+  if(search)items=items.filter(function(c){var hay=(c.feature||'')+' '+(c.behavior||'')+' '+(c.decisions||'')+' '+(c.location||'');return hay.toLowerCase().indexOf(search)!==-1;});
+  if(areaF)items=items.filter(function(c){return c.area===areaF;});
+  g('cap-counts').textContent=items.length+' of '+allCaps.length+' capabilities';
+
+  // Group by area
+  var byArea={};
+  items.forEach(function(c){if(!byArea[c.area])byArea[c.area]=[];byArea[c.area].push(c);});
+  var areaOrder=['Intel','Scanner','Factory','RFQ','Operations','Comms','Admin','Infra'];
+  var html='';
+  areaOrder.concat(Object.keys(byArea).filter(function(a){return areaOrder.indexOf(a)===-1;})).forEach(function(area){
+    if(!byArea[area])return;
+    html+='<div class="cap-group"><div class="cap-group-head">'+esc(area)+'</div>';
+    byArea[area].forEach(function(c){html+=renderCap(c);});
+    html+='</div>';
+  });
+  list.innerHTML=html||'<div class="empty-col">No capabilities match.</div>';
+}
+
+function renderCap(c){
+  return '<div class="cap-item" data-id="'+c.id+'" onclick="editCap(event,\''+c.id+'\')">'+
+    '<div class="cap-item-head">'+
+      '<div class="cap-item-name" id="cap-name-'+c.id+'">'+esc(c.feature)+'</div>'+
+      '<span class="cap-status '+c.status+'">'+esc(c.status)+'</span>'+
+    '</div>'+
+    (c.location?'<div class="cap-field"><div class="cap-field-label">Location</div><div class="cap-field-val location">'+esc(c.location)+'</div></div>':'')+
+    (c.behavior?'<div class="cap-field"><div class="cap-field-label">Behavior</div><div class="cap-field-val">'+esc(c.behavior)+'</div></div>':'')+
+    (c.decisions?'<div class="cap-field"><div class="cap-field-label">Decisions / Nuances</div><div class="cap-field-val decisions">'+esc(c.decisions)+'</div></div>':'')+
+    (c.last_touched?'<div class="cap-last">Last touched '+esc(c.last_touched)+'</div>':'')+
+  '</div>';
+}
+
+function editCap(e,id){
+  // open the cap modal in edit mode
+  var c=allCaps.find(function(x){return x.id===id;});
+  if(!c)return;
+  editingCapId=id;
+  g('cap-modal-title').textContent='Edit Capability';
+  g('cap-delete-btn').style.display='inline-block';
+  g('cap-save-btn').textContent='Save Changes';
+  g('cap-feature').value=c.feature||'';
+  g('cap-area').value=c.area||'Intel';
+  g('cap-status').value=c.status||'exists';
+  g('cap-location').value=c.location||'';
+  g('cap-behavior').value=c.behavior||'';
+  g('cap-decisions').value=c.decisions||'';
+  g('cap-modal').classList.add('show');
+}
+
+function openCapAddModal(){
+  editingCapId=null;
+  g('cap-modal-title').textContent='Add Capability';
+  g('cap-delete-btn').style.display='none';
+  g('cap-save-btn').textContent='Add Capability';
+  ['cap-feature','cap-location','cap-behavior','cap-decisions'].forEach(function(id){g(id).value='';});
+  g('cap-area').value='Intel';
+  g('cap-status').value='exists';
+  g('cap-modal').classList.add('show');
+}
+
+function closeCapModal(){g('cap-modal').classList.remove('show');}
+
+async function submitCap(){
+  var feature=g('cap-feature').value.trim();
+  if(!feature){alert('Feature name required.');return;}
+  var btn=g('cap-save-btn');
+  btn.disabled=true;
+  var payload={
+    feature:feature,
+    area:g('cap-area').value,
+    status:g('cap-status').value,
+    location:g('cap-location').value.trim()||null,
+    behavior:g('cap-behavior').value.trim()||null,
+    decisions:g('cap-decisions').value.trim()||null,
+    last_touched:new Date().toISOString().substring(0,10),
+    updated_at:new Date().toISOString()
+  };
+  try{
+    var r;
+    if(editingCapId){
+      r=await sb('system_registry?id=eq.'+editingCapId,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(payload)});
+    } else {
+      r=await sb('system_registry',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(payload)});
+    }
+    if(!r.ok){alert('Save failed: '+await r.text());btn.disabled=false;return;}
+    var rows=await r.json();
+    var saved=Array.isArray(rows)?rows[0]:rows;
+    if(editingCapId){var idx=allCaps.findIndex(function(x){return x.id===editingCapId;});if(idx>=0)allCaps[idx]=saved;}
+    else allCaps.push(saved);
+    closeCapModal();
+    btn.disabled=false;
+    populateAreaFilter();
+    renderCapabilities();
+  }catch(e){alert('Save error: '+e.message);btn.disabled=false;}
+}
+
+async function deleteCapability(){
+  if(!editingCapId)return;
+  var c=allCaps.find(function(x){return x.id===editingCapId;});
+  if(!c)return;
+  if(!confirm('Delete capability "'+c.feature+'"?'))return;
+  try{
+    var r=await sb('system_registry?id=eq.'+editingCapId,{method:'DELETE'});
+    if(!r.ok){alert('Delete failed: '+await r.text());return;}
+    allCaps=allCaps.filter(function(x){return x.id!==editingCapId;});
+    closeCapModal();
+    populateAreaFilter();
+    renderCapabilities();
+  }catch(e){alert('Delete error: '+e.message);}
 }
 
 load();
