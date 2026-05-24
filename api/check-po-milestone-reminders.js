@@ -40,6 +40,25 @@ async function sb(path, opts = {}) {
   return res.status === 204 ? null : await res.json();
 }
 
+// Resolve the right factory contact for a given role from factory_contacts.
+// role 'logistics' -> logistics contact if one exists, else the sales/primary
+// contact. Falls back to the embedded factories.sales_* fields if the
+// factory_contacts lookup returns nothing (so this can never lose a recipient).
+async function contactFor(factoryId, role, fallback) {
+  fallback = fallback || {};
+  const fb = { email: fallback.sales_email || null, name: fallback.sales_contact_name || 'Team' };
+  if (!factoryId) return fb;
+  try {
+    const rows = await sb(`factory_contacts?factory_id=eq.${factoryId}&select=contact_name,email,is_sales,is_logistics,is_principal,is_primary`);
+    if (!rows || !rows.length) return fb;
+    let pick = null;
+    if (role === 'logistics') pick = rows.find(c => c.is_logistics && c.email);
+    if (!pick) pick = rows.find(c => c.is_sales && c.email) || rows.find(c => c.is_primary && c.email);
+    if (pick && pick.email) return { email: pick.email, name: pick.contact_name || 'Team' };
+  } catch (e) { /* fall through to fallback */ }
+  return fb;
+}
+
 async function sendEmail(toEmail, toName, subject, body) {
   if (!SG_KEY) return { ok: false, error: 'SENDGRID_API_KEY not set' };
   try {
@@ -246,8 +265,10 @@ The factory is waiting for your decision (approve, revise, or reject).`;
       try {
         const dedupF = await sb('po_milestone_reminders?po_milestone_id=eq.' + m.id + '&reminder_type=eq.' + bucket + '&recipient_type=eq.factory&select=id&limit=1');
         if (!dedupF || !dedupF.length) {
-          if (f.sales_email) {
-            const firstName = (f.sales_contact_name || 'Team').split(/\s+/)[0];
+          // Production/shipping milestone -> route to logistics contact if one exists, else sales.
+          const recip = await contactFor(f.id, 'logistics', f);
+          if (recip.email) {
+            const firstName = (recip.name || 'Team').split(/\s+/)[0];
             const subj = bucket === 'day_of' ? `${msLabel} due today — ${itemDesc}` : `${msLabel} due in ${daysAway} days — ${itemDesc}`;
             const body = `Dear ${firstName},
 
@@ -261,17 +282,17 @@ Best regards,
 Tyler Durden
 Sourcing Manager, TBG Sourcing
 ${FROM_EMAIL}`;
-            const send = await sendEmail(f.sales_email, f.sales_contact_name || '', subj, body);
+            const send = await sendEmail(recip.email, recip.name || '', subj, body);
             if (send.ok) {
               summary.production_milestone_reminders++;
-              summary.sent_emails.push({ to: f.sales_email, type: 'milestone_' + bucket + '_factory' });
+              summary.sent_emails.push({ to: recip.email, type: 'milestone_' + bucket + '_factory' });
               fetch(`${SUPABASE_URL}/rest/v1/po_milestone_reminders`, {
                 method: 'POST',
                 headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-                body: JSON.stringify({ po_milestone_id: m.id, reminder_type: bucket, recipient_type: 'factory', recipient_email: f.sales_email, delivery_status: 'sent' })
+                body: JSON.stringify({ po_milestone_id: m.id, reminder_type: bucket, recipient_type: 'factory', recipient_email: recip.email, delivery_status: 'sent' })
               }).catch(() => {});
             } else {
-              summary.errors.push({ to: f.sales_email, error: send.error });
+              summary.errors.push({ to: recip.email, error: send.error });
             }
           }
         }
