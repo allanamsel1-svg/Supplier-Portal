@@ -38,6 +38,10 @@
 .ne-tag-signal{background:#1a1a2e;color:#fff;}
 .ne-empty{padding:3rem;text-align:center;color:#888;font-size:14px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;}
 .ne-loading{padding:2rem;text-align:center;color:#888;}
+.ne-streams{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap;}
+.ne-stream-tab{padding:7px 16px;font-size:13px;font-weight:600;background:#fff;color:#555;border:1px solid #e0e0d8;border-radius:20px;cursor:pointer;font-family:inherit;transition:all .12s;}
+.ne-stream-tab:hover{border-color:#2244cc;color:#2244cc;}
+.ne-stream-tab.active{background:#1a1a2e;color:#fff;border-color:#1a1a2e;}
 </style>
 </head>
 <body>
@@ -75,6 +79,14 @@
     <button class="ne-refresh" id="refresh-btn" onclick="refresh()">↻ Refresh Feed</button>
   </div>
 
+  <div class="ne-streams" id="ne-streams">
+    <button class="ne-stream-tab active" data-stream="all" onclick="setStream('all')">All</button>
+    <button class="ne-stream-tab" data-stream="trade" onclick="setStream('trade')">Trade</button>
+    <button class="ne-stream-tab" data-stream="consumer" onclick="setStream('consumer')">Consumer</button>
+    <button class="ne-stream-tab" data-stream="celebrity" onclick="setStream('celebrity')">Celebrity</button>
+    <button class="ne-stream-tab" data-stream="lifestyle" onclick="setStream('lifestyle')">Lifestyle</button>
+  </div>
+
   <div class="ne-feed" id="ne-feed">
     <div class="ne-loading">Loading articles…</div>
   </div>
@@ -90,6 +102,23 @@ function sb(path){
 }
 
 var allArticles=[];
+var currentStream='all';
+var STREAM_THRESHOLD=0.35; // min weight for an article to appear in a specific stream
+
+function setStream(s){
+  currentStream=s;
+  var tabs=document.querySelectorAll('.ne-stream-tab');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].className='ne-stream-tab'+(tabs[i].getAttribute('data-stream')===s?' active':'');
+  }
+  renderFeed();
+}
+
+function streamWeight(a,stream){
+  var w=a.stream_weights||{};
+  var v=w[stream];
+  return typeof v==='number'?v:0;
+}
 
 function escapeHtml(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
@@ -138,10 +167,18 @@ function loadArticles(){
 function renderFeed(){
   var hideFluff=document.getElementById('hide-fluff').checked;
   var filtered=hideFluff?allArticles.filter(function(a){return !a.is_fluff;}):allArticles;
+
+  // Stream filter: on a specific stream, keep articles above the weight threshold
+  // and sort by that stream's weight (strongest first). "All" keeps date order.
+  if(currentStream!=='all'){
+    filtered=filtered.filter(function(a){return streamWeight(a,currentStream)>=STREAM_THRESHOLD;})
+      .sort(function(x,y){return streamWeight(y,currentStream)-streamWeight(x,currentStream);});
+  }
+
   var feed=document.getElementById('ne-feed');
   document.getElementById('ne-count').textContent=filtered.length+' of '+allArticles.length+' articles';
   if(!filtered.length){
-    feed.innerHTML='<div class="ne-empty">No articles yet. Click <strong>Refresh Feed</strong> to fetch today\'s news.</div>';
+    feed.innerHTML='<div class="ne-empty">No articles in this stream yet. Try <strong>All</strong>, or click <strong>Refresh Feed</strong>.</div>';
     return;
   }
   feed.innerHTML=filtered.map(function(a){
