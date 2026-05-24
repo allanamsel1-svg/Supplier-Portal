@@ -115,20 +115,20 @@ function stripHtml(s) {
 
 function parseRssXml(xml) {
   const items = [];
-  const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+  const itemRegex = /<item(?:\s[^>]*)?>([\s\S]*?)<\/item\s*>/g;
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
     const block = match[1];
-    const get = (tag) => {
-      const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`));
-      if (!m) return null;
-      return stripHtml(m[1]);
+    const grab = (tag) => {
+      const m = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}\\s*>`, 'i'));
+      return m ? m[1] : null;
     };
-    const title = get('title');
-    const link = get('link');
-    const pubDate = get('pubDate');
-    const description = get('description');
-    const source = get('source');
+    const title = grab('title') ? stripHtml(grab('title')) : null;
+    const rawLink = grab('link');
+    const link = rawLink ? decodeEntities(rawLink).trim() : null;
+    const pubDate = grab('pubDate') ? decodeEntities(grab('pubDate')).trim() : null;
+    const description = grab('description') ? stripHtml(grab('description')) : null;
+    const source = grab('source') ? stripHtml(grab('source')) : null;
     if (title && link) items.push({ title, link, pubDate, description, source });
   }
   return items;

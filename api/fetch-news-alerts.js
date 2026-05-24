@@ -142,23 +142,22 @@ function stripHtml(s) {
 
 function parseRssXml(xml) {
   const items = [];
-  // Tolerant: <item> may carry attributes; closing tag may be </item>.
-  // Split on item boundaries rather than requiring a perfect greedy pair.
   const itemRegex = /<item(?:\s[^>]*)?>([\s\S]*?)<\/item\s*>/g;
   let match;
   while ((match = itemRegex.exec(xml)) !== null) {
     const block = match[1];
-    const get = (tag) => {
-      // tolerate attributes on the open tag and whitespace in the close tag
+    // raw = just the inner text with entities decoded; clean = full HTML/URL strip.
+    const grab = (tag) => {
       const m = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}\\s*>`, 'i'));
-      if (!m) return null;
-      return stripHtml(m[1]);
+      return m ? m[1] : null;
     };
-    const title = get('title');
-    const link = get('link');
-    const pubDate = get('pubDate');
-    const description = get('description');
-    const source = get('source');
+    const title = grab('title') ? stripHtml(grab('title')) : null;
+    // link must NOT go through stripHtml — it deletes news.google.com URLs.
+    const rawLink = grab('link');
+    const link = rawLink ? decodeEntities(rawLink).trim() : null;
+    const pubDate = grab('pubDate') ? decodeEntities(grab('pubDate')).trim() : null;
+    const description = grab('description') ? stripHtml(grab('description')) : null;
+    const source = grab('source') ? stripHtml(grab('source')) : null;
     if (title && link) {
       items.push({ title, link, pubDate, description, source });
     }
@@ -166,7 +165,6 @@ function parseRssXml(xml) {
   return items;
 }
 
-const NEWS_DEBUG = [];
 async function fetchGoogleNewsRss(query) {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   const r = await fetch(url, {
@@ -176,13 +174,8 @@ async function fetchGoogleNewsRss(query) {
       'Accept-Language': 'en-US,en;q=0.9'
     }
   });
-  const body = await r.text();
-  const items = r.ok ? parseRssXml(body) : [];
-  const rawItemTags = (body.match(/<item[\s>]/g) || []).length;
-  const rawCloseTags = (body.match(/<\/item\s*>/g) || []).length;
-  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length, rawItemTags, rawCloseTags });
   if (!r.ok) throw new Error(`Google News ${r.status} for "${query}"`);
-  return items;
+  return parseRssXml(await r.text());
 }
 
 async function classifyArticle(article) {
@@ -319,13 +312,12 @@ export default async function handler(req, res) {
       duplicates: titleDeduped.length - fresh.length,
       new_articles: toInsert.length,
       signal_count: toInsert.filter(a => !a.is_fluff).length,
-      fluff_count: toInsert.filter(a => a.is_fluff).length,
-      debug: NEWS_DEBUG
+      fluff_count: toInsert.filter(a => a.is_fluff).length
     });
 
   } catch (err) {
     console.error('fetch-news-alerts fatal:', err);
-    return res.status(500).json({ error: err.message, debug: NEWS_DEBUG });
+    return res.status(500).json({ error: err.message });
   }
 }
 
