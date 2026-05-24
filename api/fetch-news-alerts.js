@@ -175,7 +175,7 @@ async function fetchGoogleNewsRss(query) {
   });
   const body = await r.text();
   const items = r.ok ? parseRssXml(body) : [];
-  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length });
+  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length, head: body.slice(0, 180) });
   if (!r.ok) throw new Error(`Google News ${r.status} for "${query}"`);
   return items;
 }
