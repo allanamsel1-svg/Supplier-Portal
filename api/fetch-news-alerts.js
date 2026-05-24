@@ -163,13 +163,21 @@ function parseRssXml(xml) {
   return items;
 }
 
+const NEWS_DEBUG = [];
 async function fetchGoogleNewsRss(query) {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
   const r = await fetch(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; TBGIntelBot/1.0)' }
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'application/rss+xml,application/xml,text/xml,*/*',
+      'Accept-Language': 'en-US,en;q=0.9'
+    }
   });
+  const body = await r.text();
+  const items = r.ok ? parseRssXml(body) : [];
+  NEWS_DEBUG.push({ query, status: r.status, bytes: body.length, items: items.length });
   if (!r.ok) throw new Error(`Google News ${r.status} for "${query}"`);
-  return parseRssXml(await r.text());
+  return items;
 }
 
 async function classifyArticle(article) {
@@ -306,12 +314,13 @@ export default async function handler(req, res) {
       duplicates: titleDeduped.length - fresh.length,
       new_articles: toInsert.length,
       signal_count: toInsert.filter(a => !a.is_fluff).length,
-      fluff_count: toInsert.filter(a => a.is_fluff).length
+      fluff_count: toInsert.filter(a => a.is_fluff).length,
+      debug: NEWS_DEBUG
     });
 
   } catch (err) {
     console.error('fetch-news-alerts fatal:', err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message, debug: NEWS_DEBUG });
   }
 }
 
