@@ -2286,7 +2286,11 @@ async function openSkuForm(skuId){
           product_title:k.factory_described_name,
           description:k.factory_described_spec,
           size_volume:k.draft_size_volume,
-          packaging_type:k.draft_packaging_type,
+          unit_l:k.draft_unit_l,
+          unit_w:k.draft_unit_w,
+          unit_h:k.draft_unit_h,
+          unit_wt_g:k.draft_unit_wt_g,
+          units_per_master:k.draft_units_per_master,
           category_id:k.draft_category_id,
           unit_cost:cfg?cfg.unit_cost:k.draft_unit_cost,
           consumer_packaging:cfg?cfg.consumer_packaging:false,
@@ -2945,7 +2949,11 @@ var KIT_COMPONENT_FIELDS=[
   {key:'product_title',  label:'Product name',        type:'text',  ph:'e.g. 100g Shampoo Bar',           plain:true},
   {key:'description',    label:'Description',          type:'textarea', ph:'What it is, key details',       plain:true},
   {key:'size_volume',    label:'Size / volume',        type:'text',  ph:'e.g. 100g, 30ml, 12-pack',        plain:true},
-  {key:'packaging_type', label:'Packaging type',       type:'text',  ph:'e.g. Glass jar, blister, naked',  plain:true},
+  {key:'unit_l',         label:'Unit L (cm)',          type:'number',ph:'e.g. 3', step:'0.01',              plain:true},
+  {key:'unit_w',         label:'Unit W (cm)',          type:'number',ph:'e.g. 3', step:'0.01',              plain:true},
+  {key:'unit_h',         label:'Unit H (cm)',          type:'number',ph:'e.g. 10', step:'0.01',             plain:true},
+  {key:'unit_wt_g',      label:'Unit weight (g)',      type:'number',ph:'e.g. 6', step:'0.1',               plain:true},
+  {key:'units_per_master',label:'Units / master carton',type:'number',ph:'e.g. 100', step:'1',             plain:true},
   {key:'unit_cost',      label:'Your price (per unit)',type:'number',ph:'e.g. 0.45', step:'0.0001',         plain:true}
 ];
 
@@ -2960,9 +2968,10 @@ function skuOptions(selectedId){
 
 // Renders the shared PLAIN fields for one component (factory-safe layer).
 function plainFieldsHtml(idx,data){
-  return KIT_COMPONENT_FIELDS.map(function(f){
+  var inner=KIT_COMPONENT_FIELDS.map(function(f){
     var id='kc-'+f.key+'-'+idx;
     var v=data[f.key]!=null?data[f.key]:'';
+    var span=(f.type==='textarea'||f.key==='product_title')?'grid-column:1/-1;':'';
     var input;
     if(f.type==='textarea'){
       input='<textarea id="'+id+'" rows="2" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;resize:vertical;">'+esc(String(v))+'</textarea>';
@@ -2971,8 +2980,9 @@ function plainFieldsHtml(idx,data){
     } else {
       input='<input type="text" id="'+id+'" value="'+esc(String(v))+'" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" />';
     }
-    return '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">'+f.label+'</label>'+input+'</div>';
+    return '<div style="'+span+'"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">'+f.label+'</label>'+input+'</div>';
   }).join('');
+  return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+inner+'</div>';
 }
 
 function addKitComponentRow(data){
@@ -3103,7 +3113,11 @@ function collectKitComponents(){
       product_title:skuId?null:plain.product_title,
       description:skuId?null:plain.description,
       size_volume:skuId?null:plain.size_volume,
-      packaging_type:skuId?null:plain.packaging_type,
+      unit_l:skuId?null:plain.unit_l,
+      unit_w:skuId?null:plain.unit_w,
+      unit_h:skuId?null:plain.unit_h,
+      unit_wt_g:skuId?null:plain.unit_wt_g,
+      units_per_master:skuId?null:plain.units_per_master,
       category_id:skuId?null:(g('kc-cat-'+idx)?g('kc-cat-'+idx).value||null:null),
       reconcile_status:skuId?'matched':'unmatched',
       // Kit/bulk config
@@ -3175,7 +3189,11 @@ async function saveSku(){
           factory_described_name:row.product_title,
           factory_described_spec:row.description,
           draft_size_volume:row.size_volume,
-          draft_packaging_type:row.packaging_type,
+          draft_unit_l:row.unit_l,
+          draft_unit_w:row.unit_w,
+          draft_unit_h:row.unit_h,
+          draft_unit_wt_g:row.unit_wt_g,
+          draft_units_per_master:row.units_per_master,
           draft_category_id:row.category_id,
           draft_unit_cost:row.unit_cost,
           reconcile_status:row.reconcile_status
