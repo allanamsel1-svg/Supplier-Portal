@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-E';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-F';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -5453,6 +5453,15 @@ function populateRFQEditForm(rfq){
   }
   rfqCategoryChanged();
   calcMargins();
+  // Restore kit mode + components if this is a kit RFQ. (This is the edit path used
+  // by the detail-pane Edit button — openRFQForm is a separate, older path.)
+  if(rfq.is_kit_rfq){
+    loadKitForEdit(rfq);
+  } else {
+    // Ensure non-kit RFQs show as single product (toggle may persist from a prior kit edit).
+    var singleRadio=document.querySelector('input[name="rfq-skutype"][value="single"]');
+    if(singleRadio){singleRadio.checked=true;onRfqTypeChange();}
+  }
 }
 
 async function loadRFQById(rfqId){
