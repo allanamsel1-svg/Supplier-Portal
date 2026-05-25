@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-C';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-D';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -2317,22 +2317,32 @@ async function createKitForRfq(savedRFQ){
 
   // Reuse an existing kit SKU if this RFQ already made one (editing case).
   var kitSkuId=savedRFQ.kit_sku_id||null;
-  var skuPayload={
-    model_number:model,
-    brand_prefix:brandPrefix,
-    category_prefix:catPrefix,
-    sequence_number:seq,
-    description:desc,
-    detailed_description:g('rfq-specs').value.trim()||null,
-    brand_id:brandId,
-    category_id:catId,
-    is_kit:true,
-    status:'draft',
-    updated_at:new Date().toISOString()
-  };
   if(kitSkuId){
-    await fetch(SB+'/rest/v1/skus?id=eq.'+kitSkuId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(skuPayload)});
+    // Updating an existing kit SKU — do NOT change model_number/sequence (they're
+    // stable identifiers); only refresh the editable fields.
+    var patchPayload={
+      description:desc,
+      detailed_description:g('rfq-specs').value.trim()||null,
+      brand_id:brandId,
+      category_id:catId,
+      is_kit:true,
+      updated_at:new Date().toISOString()
+    };
+    await fetch(SB+'/rest/v1/skus?id=eq.'+kitSkuId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(patchPayload)});
   } else {
+    var skuPayload={
+      model_number:model,
+      brand_prefix:brandPrefix,
+      category_prefix:catPrefix,
+      sequence_number:seq,
+      description:desc,
+      detailed_description:g('rfq-specs').value.trim()||null,
+      brand_id:brandId,
+      category_id:catId,
+      is_kit:true,
+      status:'draft',
+      updated_at:new Date().toISOString()
+    };
     var sr=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
     if(!sr.ok){var se=await sr.json().catch(function(){return{};});throw new Error('kit SKU: '+(se.message||se.details||sr.status));}
     var srows=await sr.json();
@@ -5501,6 +5511,51 @@ async function openRFQForm(id){
   if(g('rfq-brand-id')&&rfq.brand_id)g('rfq-brand-id').value=rfq.brand_id;
   rfqCategoryChanged();
   calcMargins();
+  // Restore kit mode + components if this is a kit RFQ.
+  if(rfq.is_kit_rfq){ loadKitForEdit(rfq); }
+}
+
+// Repopulate the kit builder + packaging line when editing a saved kit RFQ.
+async function loadKitForEdit(rfq){
+  // Switch the toggle to Kit and reveal the section.
+  var kitRadio=document.querySelector('input[name="rfq-skutype"][value="kit"]');
+  if(kitRadio){ kitRadio.checked=true; }
+  await onRfqTypeChange(); // loads SKUs + packaging dropdown, reveals section, seeds a row
+  if(typeof KitBuilder==='undefined')return;
+  KitBuilder.reset(); // clear the seeded blank row
+  if(!rfq.kit_sku_id)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_components?kit_sku_id=eq.'+rfq.kit_sku_id+'&order=sort_order',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok)return;
+    var lines=await r.json();
+    var pkgLine=null;
+    lines.forEach(function(ln){
+      if(ln.line_type==='packaging'){ pkgLine=ln; return; }
+      // Component row → map DB columns back to the builder's data shape.
+      KitBuilder.addRow({
+        component_sku_id:ln.component_sku_id||null,
+        qty_per_kit:ln.qty_per_kit||1,
+        product_title:ln.factory_described_name||null,
+        description:ln.factory_described_spec||null,
+        size_volume:ln.draft_size_volume||null,
+        unit_l:ln.draft_unit_l,unit_w:ln.draft_unit_w,unit_h:ln.draft_unit_h,
+        unit_wt_g:ln.draft_unit_wt_g,units_per_master:ln.draft_units_per_master,
+        category_id:ln.draft_category_id||null,
+        unit_cost:ln.draft_unit_cost
+      });
+    });
+    if(KitBuilder.rowCount()===0)KitBuilder.addRow();
+    // Restore the kit packaging line into its fields.
+    if(pkgLine){
+      if(g('rfq-kit-pkg-type'))g('rfq-kit-pkg-type').value=pkgLine.packaging_type||'';
+      if(g('rfq-kit-pkg-detail'))g('rfq-kit-pkg-detail').value=pkgLine.factory_described_spec||'';
+      if(g('rfq-kit-pkg-l'))g('rfq-kit-pkg-l').value=pkgLine.pkg_length_cm||'';
+      if(g('rfq-kit-pkg-w'))g('rfq-kit-pkg-w').value=pkgLine.pkg_width_cm||'';
+      if(g('rfq-kit-pkg-h'))g('rfq-kit-pkg-h').value=pkgLine.pkg_height_cm||'';
+      if(g('rfq-kit-pkg-notes'))g('rfq-kit-pkg-notes').value=pkgLine.pkg_notes||'';
+      if(g('rfq-kit-pkg-artwork'))g('rfq-kit-pkg-artwork').value=pkgLine.pkg_artwork_url||'';
+    }
+  }catch(e){console.error('loadKitForEdit:',e);}
 }
 
 function resetRFQForm(){
