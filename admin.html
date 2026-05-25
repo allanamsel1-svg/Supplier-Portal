@@ -2267,7 +2267,8 @@ KitBuilder.init({
   getSkus:function(){return allSkus;},
   containerId:'rfq-kit-components',
   warningId:'rfq-kit-warning',
-  pkgTypeId:'rfq-kit-pkg-type'
+  pkgTypeId:'rfq-kit-pkg-type',
+  hidePrice:true
 });
 // Load SKUs once for the component dropdowns (admin didn't load these before).
 async function loadAllSkusForKit(){
@@ -2334,12 +2335,15 @@ async function createKitForRfq(savedRFQ){
   // Replace component rows for this kit (delete-then-insert).
   await fetch(SB+'/rest/v1/kit_components?kit_sku_id=eq.'+kitSkuId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   var rows=KitBuilder.collect();
+  // Every row in the array MUST carry an identical key set — PostgREST rejects
+  // mismatched keys ("All object keys must match"). Null-fill consistently.
   var payload=rows.map(function(row,i){return {
     kit_sku_id:kitSkuId,
     component_sku_id:row.component_sku_id,
     qty_per_kit:row.qty_per_kit,
     line_type:'component',
     sort_order:(i+1)*10,
+    packaging_type:null,
     factory_described_name:row.product_title,
     factory_described_spec:row.description,
     draft_size_volume:row.size_volume,
@@ -2348,14 +2352,23 @@ async function createKitForRfq(savedRFQ){
     draft_category_id:row.category_id,draft_unit_cost:row.unit_cost,
     reconcile_status:row.reconcile_status
   };});
-  // Packaging line (always last).
+  // Packaging line (always last) — same key set, null-filled.
   var pkgType=g('rfq-kit-pkg-type')?g('rfq-kit-pkg-type').value:'';
   var pkgDetail=g('rfq-kit-pkg-detail')?g('rfq-kit-pkg-detail').value.trim():'';
   if(pkgType){
     payload.push({
-      kit_sku_id:kitSkuId,component_sku_id:null,qty_per_kit:1,
-      line_type:'packaging',sort_order:9999,packaging_type:pkgType,
-      factory_described_name:pkgType,factory_described_spec:pkgDetail||null,
+      kit_sku_id:kitSkuId,
+      component_sku_id:null,
+      qty_per_kit:1,
+      line_type:'packaging',
+      sort_order:9999,
+      packaging_type:pkgType,
+      factory_described_name:pkgType,
+      factory_described_spec:pkgDetail||null,
+      draft_size_volume:null,
+      draft_unit_l:null,draft_unit_w:null,draft_unit_h:null,
+      draft_unit_wt_g:null,draft_units_per_master:null,
+      draft_category_id:null,draft_unit_cost:null,
       reconcile_status:'unmatched'
     });
   }
