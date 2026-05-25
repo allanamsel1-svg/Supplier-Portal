@@ -1032,7 +1032,33 @@
           </div>
         </div>
 
-        <!-- Packaging -->
+        <!-- Kit toggle + component builder (mirrors setup.html, shared module) -->
+        <div class="mgr-card" style="margin-bottom:1rem;">
+          <div class="mgr-card-title">Product Type</div>
+          <div style="display:flex;gap:20px;align-items:center;margin-top:6px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="rfq-skutype" value="standalone" checked onchange="onRfqTypeChange()" /> Single product</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="rfq-skutype" value="kit" onchange="onRfqTypeChange()" /> Kit (multiple components)</label>
+          </div>
+          <div style="font-size:11px;color:#aaa;margin-top:8px;">A kit is quoted as separate components plus packaging. Choosing Kit reveals the component breakout below. Factories quote each component per-unit.</div>
+
+          <div id="rfq-kit-section" style="display:none;margin-top:14px;">
+            <div style="font-size:11px;color:#888;margin-bottom:10px;">Break the kit out by component. Each component is an existing SKU, or a new described item.</div>
+            <div id="rfq-kit-components"></div>
+            <button type="button" onclick="KitBuilder.addRow()" style="margin-top:8px;padding:7px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:12px;cursor:pointer;">+ Add Component</button>
+            <div id="rfq-kit-warning" style="display:none;margin-top:10px;padding:8px 11px;background:#fffbea;border:1px solid #f0e0a0;border-radius:7px;font-size:11.5px;color:#7a4400;"></div>
+            <div style="margin-top:14px;padding-top:12px;border-top:2px solid #e0e0d8;">
+              <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Kit Packaging</div>
+              <div style="font-size:11px;color:#aaa;margin-bottom:8px;">The outer packaging that holds the kit. Quoted by the factory as its own line.</div>
+              <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;align-items:start;">
+                <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Type</label>
+                  <select id="rfq-kit-pkg-type" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;"><option value="">— Select packaging —</option></select></div>
+                <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Detail (optional)</label>
+                  <input type="text" id="rfq-kit-pkg-detail" placeholder="e.g. kraft, 20×20×8cm" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="mgr-card" id="pkg-type-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Packaging <span style="font-size:11px;font-weight:400;color:#888;">— structured selection across primary container, closure/applicator, and secondary display</span></div>
 
@@ -2210,6 +2236,7 @@
   </div>
 </div>
 
+<script src="kit-builder.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
@@ -2218,6 +2245,7 @@ var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
 var allCategories=[];
 var allBrands=[];
+var allSkus=[];
 var allCustomers=[];
 var allRFQs=[];
 var factoryFiles={};
@@ -2229,6 +2257,107 @@ var currentDrawerFactory=null;
 function g(id){return document.getElementById(id);}
 function v(id){var e=g(id);return e?e.textContent:'—';}
 function dv(id,val){var e=g(id);if(e)e.textContent=val||'—';}
+
+// ── Kit builder wiring (shared module: kit-builder.js) ──
+// Same module setup.html uses. Admin has no promote handler here — promotion
+// happens later from accepted quotes, not during RFQ creation.
+KitBuilder.init({
+  SB:SB, KEY:KEY, g:g, esc:esc,
+  getCats:function(){return allCategories;},
+  getSkus:function(){return allSkus;},
+  containerId:'rfq-kit-components',
+  warningId:'rfq-kit-warning',
+  pkgTypeId:'rfq-kit-pkg-type'
+});
+// Load SKUs once for the component dropdowns (admin didn't load these before).
+async function loadAllSkusForKit(){
+  if(allSkus.length)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/skus?select=id,model_number,description,detailed_description,is_kit,category_id,categories(is_cosmetic)&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok)allSkus=await r.json();
+  }catch(e){console.error('loadAllSkusForKit:',e);}
+}
+
+// Toggle the RFQ kit section. On entering kit mode, load SKUs + packaging types and seed a row.
+async function onRfqTypeChange(){
+  var r=document.querySelector('input[name="rfq-skutype"]:checked');
+  var isKit=r&&r.value==='kit';
+  var sec=g('rfq-kit-section'); if(sec)sec.style.display=isKit?'block':'none';
+  if(isKit){
+    await loadAllSkusForKit();
+    await KitBuilder.populatePackaging();
+    if(KitBuilder.rowCount()===0)KitBuilder.addRow();
+  }
+}
+function isRfqKit(){var r=document.querySelector('input[name="rfq-skutype"]:checked');return !!(r&&r.value==='kit');}
+
+// Create (or update) the kit SKU that backs a kit RFQ, save its components +
+// packaging line, and point the RFQ at it via is_kit_rfq + kit_sku_id.
+async function createKitForRfq(savedRFQ){
+  var catId=g('rfq-category-id').value||null;
+  var brandId=g('rfq-brand-id')?(g('rfq-brand-id').value||null):null;
+  var desc=g('rfq-description').value.trim()||'Kit';
+  // Auto model number — RFQ-scoped, unique, never shown to factories.
+  var model='KIT-'+(savedRFQ.project_number||savedRFQ.id.slice(0,8));
+
+  // Reuse an existing kit SKU if this RFQ already made one (editing case).
+  var kitSkuId=savedRFQ.kit_sku_id||null;
+  var skuPayload={
+    model_number:model,
+    description:desc,
+    detailed_description:g('rfq-specs').value.trim()||null,
+    brand_id:brandId,
+    category_id:catId,
+    is_kit:true,
+    status:'draft',
+    updated_at:new Date().toISOString()
+  };
+  if(kitSkuId){
+    await fetch(SB+'/rest/v1/skus?id=eq.'+kitSkuId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(skuPayload)});
+  } else {
+    var sr=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
+    if(!sr.ok){var se=await sr.json().catch(function(){return{};});throw new Error('kit SKU: '+(se.message||se.details||sr.status));}
+    var srows=await sr.json();
+    kitSkuId=(Array.isArray(srows)?srows[0]:srows).id;
+  }
+
+  // Replace component rows for this kit (delete-then-insert).
+  await fetch(SB+'/rest/v1/kit_components?kit_sku_id=eq.'+kitSkuId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  var rows=KitBuilder.collect();
+  var payload=rows.map(function(row,i){return {
+    kit_sku_id:kitSkuId,
+    component_sku_id:row.component_sku_id,
+    qty_per_kit:row.qty_per_kit,
+    line_type:'component',
+    sort_order:(i+1)*10,
+    factory_described_name:row.product_title,
+    factory_described_spec:row.description,
+    draft_size_volume:row.size_volume,
+    draft_unit_l:row.unit_l,draft_unit_w:row.unit_w,draft_unit_h:row.unit_h,
+    draft_unit_wt_g:row.unit_wt_g,draft_units_per_master:row.units_per_master,
+    draft_category_id:row.category_id,draft_unit_cost:row.unit_cost,
+    reconcile_status:row.reconcile_status
+  };});
+  // Packaging line (always last).
+  var pkgType=g('rfq-kit-pkg-type')?g('rfq-kit-pkg-type').value:'';
+  var pkgDetail=g('rfq-kit-pkg-detail')?g('rfq-kit-pkg-detail').value.trim():'';
+  if(pkgType){
+    payload.push({
+      kit_sku_id:kitSkuId,component_sku_id:null,qty_per_kit:1,
+      line_type:'packaging',sort_order:9999,packaging_type:pkgType,
+      factory_described_name:pkgType,factory_described_spec:pkgDetail||null,
+      reconcile_status:'unmatched'
+    });
+  }
+  if(payload.length){
+    var kr=await fetch(SB+'/rest/v1/kit_components',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(!kr.ok){var ke=await kr.json().catch(function(){return{};});throw new Error('components: '+(ke.message||ke.details||kr.status));}
+  }
+
+  // Point the RFQ at the kit SKU.
+  await fetch(SB+'/rest/v1/rfqs?id=eq.'+savedRFQ.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_kit_rfq:true,kit_sku_id:kitSkuId})});
+  savedRFQ.kit_sku_id=kitSkuId; savedRFQ.is_kit_rfq=true;
+}
 
 function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value;
@@ -5294,6 +5423,13 @@ function resetRFQForm(){
   g('rfq-save-ok').style.display='none';g('rfq-save-err').style.display='none';
   selectedFactoryIds={};rfqImageFile=null;rfqImageUrl=null;
   resetRfqCompliance();
+  // Reset kit toggle + builder
+  var stand=document.querySelector('input[name="rfq-skutype"][value="standalone"]');
+  if(stand)stand.checked=true;
+  if(g('rfq-kit-section'))g('rfq-kit-section').style.display='none';
+  if(g('rfq-kit-pkg-type'))g('rfq-kit-pkg-type').value='';
+  if(g('rfq-kit-pkg-detail'))g('rfq-kit-pkg-detail').value='';
+  if(typeof KitBuilder!=='undefined')KitBuilder.reset();
 }
 
 async function populateRFQDropdowns(){
@@ -6366,6 +6502,16 @@ async function saveRFQ(action){
               rfqImageUrl=imgUrl;
             }
           }catch(imgErr){console.log('Image upload error:',imgErr);}
+        }
+
+        // ── Kit RFQ: create the kit SKU + components, point the RFQ at it ──
+        if(isRfqKit()&&savedRFQ.id){
+          try{
+            await createKitForRfq(savedRFQ);
+          }catch(kitErr){
+            console.error('kit create error:',kitErr);
+            alert('RFQ saved but kit components failed to save: '+kitErr.message);
+          }
         }
 
         // Create factory assignments — delete existing first to avoid duplicate key errors
