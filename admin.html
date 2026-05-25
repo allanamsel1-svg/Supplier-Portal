@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-F';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-G';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -4060,7 +4060,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines){
       '</div>'+
       '<div style="display:flex;gap:8px;align-items:center;">'+
         '<span style="font-size:12px;padding:4px 10px;border-radius:20px;background:'+(statusColors[rfq.status]||'#f0f0e8')+';color:#555;border:1px solid #ddd;">'+(statusText[rfq.status]||rfq.status)+'</span>'+
-        '<button data-eid="'+rfq.id+'" onclick="showRFQForm();loadRFQById(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x270F; Edit</button>'+'<button data-rid="'+rfq.id+'" onclick="openVariantModal(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#e8eef8;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:6px;cursor:pointer;font-weight:600;" title="Duplicate this RFQ as a variant (different size, packaging, etc.)">&#x29C9; Duplicate as Variant</button>'+'<button data-rid="'+rfq.id+'" data-st="on_hold" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#fff8e0;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x23F8; On Hold</button>'+'<button data-rid="'+rfq.id+'" data-st="archived" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#f0f0f0;color:#888;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x1F4C1; Archive</button>'+'<button data-rid="'+rfq.id+'" onclick="deleteRFQ(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x1F5D1; Delete</button>'+
+        '<button data-eid="'+rfq.id+'" onclick="editRFQ(this.dataset.eid)" style="font-size:12px;padding:6px 12px;background:#f5f5f0;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x270F; Edit</button>'+'<button data-rid="'+rfq.id+'" onclick="openVariantModal(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#e8eef8;color:#1a3a8a;border:1px solid #c0d8f0;border-radius:6px;cursor:pointer;font-weight:600;" title="Duplicate this RFQ as a variant (different size, packaging, etc.)">&#x29C9; Duplicate as Variant</button>'+'<button data-rid="'+rfq.id+'" data-st="on_hold" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#fff8e0;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x23F8; On Hold</button>'+'<button data-rid="'+rfq.id+'" data-st="archived" onclick="setRFQStatus(this.dataset.rid,this.dataset.st)" style="font-size:12px;padding:6px 12px;background:#f0f0f0;color:#888;border:1px solid #ddd;border-radius:6px;cursor:pointer;">&#x1F4C1; Archive</button>'+'<button data-rid="'+rfq.id+'" onclick="deleteRFQ(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x1F5D1; Delete</button>'+
       '</div>'+
     '</div>'+
 
@@ -5403,7 +5403,7 @@ async function saveQuoteToFactory(quoteId,rfqId){
 }
 
 
-function populateRFQEditForm(rfq){
+async function populateRFQEditForm(rfq){
   if(!rfq)return;
   g('rfq-form-title').textContent='Edit RFQ';
   g('rfq-project-number').textContent=rfq.project_number||'';
@@ -5455,19 +5455,29 @@ function populateRFQEditForm(rfq){
   calcMargins();
   // Restore kit mode + components if this is a kit RFQ. (This is the edit path used
   // by the detail-pane Edit button — openRFQForm is a separate, older path.)
+  // Awaited so callers (loadRFQById / editRFQ) can sequence around a fully-loaded form.
   if(rfq.is_kit_rfq){
-    loadKitForEdit(rfq);
+    await loadKitForEdit(rfq);
   } else {
     // Ensure non-kit RFQs show as single product (toggle may persist from a prior kit edit).
-    var singleRadio=document.querySelector('input[name="rfq-skutype"][value="single"]');
-    if(singleRadio){singleRadio.checked=true;onRfqTypeChange();}
+    var standRadio=document.querySelector('input[name="rfq-skutype"][value="standalone"]');
+    if(standRadio){standRadio.checked=true;await onRfqTypeChange();}
   }
 }
 
 async function loadRFQById(rfqId){
   await populateRFQDropdowns();
   var rfq=allRFQs.find(function(r){return r.id===rfqId;});
-  if(rfq)populateRFQEditForm(rfq);
+  if(rfq) await populateRFQEditForm(rfq);
+}
+
+// Edit entry point — sequences showRFQForm (which clears the form and resets KitBuilder)
+// strictly BEFORE loadRFQById fills it. The previous inline `showRFQForm();loadRFQById()`
+// fired both async fns concurrently, which let resetRFQForm race against loadKitForEdit
+// and intermittently dropped the kit components on edit.
+async function editRFQ(rfqId){
+  await showRFQForm();
+  await loadRFQById(rfqId);
 }
 
 
