@@ -44,11 +44,15 @@ var KitBuilder = (function(){
 
   function init(config){
     cfg = config;
+    cfg.pkgOptions = cfg.pkgOptions || {primary:[],closure:[],secondary:[]};
     rows = [];
   }
+  // Per-row SearchDropdown instances for new-packaging entry: pkgDD[idx]={primary,closure,secondary}
+  var pkgDD = {};
 
   function reset(){
     rows = [];
+    pkgDD = {};
     var wrap = g(cfg.containerId);
     if(wrap) wrap.innerHTML='';
   }
@@ -135,9 +139,11 @@ var KitBuilder = (function(){
           plainFieldsHtml(idx,data)+
         '</div>'+
         '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0d8;">'+
-          '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Product Category</div>'+
-          '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Product Category</label>'+
-            '<select id="kc-cat-'+idx+'" onchange="KitBuilder._warn()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+catOptions(data.category_id)+'</select></div>'+
+          '<div id="kc-catrow-'+idx+'" style="display:'+(data.component_sku_id?'none':'block')+';">'+
+            '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Product Category</div>'+
+            '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Product Category</label>'+
+              '<select id="kc-cat-'+idx+'" onchange="KitBuilder._warn()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+catOptions(data.category_id)+'</select></div>'+
+          '</div>'+
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;align-items:center;">'+
             '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;"><input type="checkbox" id="kc-consumer-'+idx+'" '+(data.consumer_packaging?'checked':'')+' onchange="KitBuilder._warn()" /> Consumer pkg</label>'+
             '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;"><input type="checkbox" id="kc-inner-'+idx+'" '+(data.inner_carton?'checked':'')+' /> Inner carton</label>'+
@@ -153,14 +159,14 @@ var KitBuilder = (function(){
             '<option value="bulk"'+(data.pkg_mode==='bulk'?' selected':'')+'>Bulk / naked (no packaging)</option>'+
           '</select>'+
           '<div id="kc-newpkg-'+idx+'" style="display:none;margin-top:8px;padding:8px;background:#f7f9ff;border:1px solid #d8e2f5;border-radius:6px;">'+
-            '<div style="font-size:10px;color:#2244cc;font-weight:600;margin-bottom:6px;">New packaging — a child variant SKU (\u2011V#) will be created on save. Same product &amp; certs, new packaging + cost.</div>'+
-            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+
-              '<input type="text" id="kc-np-primary-'+idx+'" placeholder="Primary container (e.g. glass bottle)" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
-              '<input type="text" id="kc-np-material-'+idx+'" placeholder="Material (e.g. glass, PET)" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
-              '<input type="text" id="kc-np-closure-'+idx+'" placeholder="Closure / applicator" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
-              '<input type="text" id="kc-np-secondary-'+idx+'" placeholder="Secondary / display" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
-            '</div>'+
-            '<input type="text" id="kc-np-artwork-'+idx+'" placeholder="Packaging artwork link (optional)" style="width:100%;margin-top:6px;padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+            '<div style="font-size:10px;color:#2244cc;font-weight:600;margin-bottom:8px;">New packaging — a child variant SKU (\u2011V#) will be created on save. Same product &amp; certs, new packaging + cost.</div>'+
+            '<label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Primary container</label>'+
+            '<div id="kc-np-primary-mount-'+idx+'"></div>'+
+            '<label style="font-size:10px;color:#888;display:block;margin:8px 0 2px;text-transform:uppercase;letter-spacing:0.04em;">Closure / applicator</label>'+
+            '<div id="kc-np-closure-mount-'+idx+'"></div>'+
+            '<label style="font-size:10px;color:#888;display:block;margin:8px 0 2px;text-transform:uppercase;letter-spacing:0.04em;">Secondary / display</label>'+
+            '<div id="kc-np-secondary-mount-'+idx+'"></div>'+
+            '<input type="text" id="kc-np-artwork-'+idx+'" placeholder="Packaging artwork link (optional)" style="width:100%;margin-top:8px;padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
             '<textarea id="kc-np-notes-'+idx+'" rows="2" placeholder="Packaging notes (optional)" style="width:100%;margin-top:6px;padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;resize:vertical;"></textarea>'+
           '</div>'+
         '</div>'+
@@ -170,11 +176,18 @@ var KitBuilder = (function(){
     _warn();
   }
 
-  // Show/hide the new-packaging sub-form; only meaningful for existing-SKU components.
+  // Show/hide the new-packaging sub-form; lazily build the SearchDropdowns once.
   function _pkgModeChange(idx){
     var mode=g('kc-pkgmode-'+idx)?g('kc-pkgmode-'+idx).value:'existing';
     var np=g('kc-newpkg-'+idx);
     if(np)np.style.display=(mode==='new')?'block':'none';
+    if(mode==='new' && !pkgDD[idx]){
+      pkgDD[idx]={
+        primary:SearchDropdown.create({mountId:'kc-np-primary-mount-'+idx, options:cfg.pkgOptions.primary||[], multi:false, placeholder:"Click or type (e.g. 'glass', 'tube')..."}),
+        closure:SearchDropdown.create({mountId:'kc-np-closure-mount-'+idx, options:cfg.pkgOptions.closure||[], multi:true, placeholder:"Click or type (e.g. 'pump', 'dropper')..."}),
+        secondary:SearchDropdown.create({mountId:'kc-np-secondary-mount-'+idx, options:cfg.pkgOptions.secondary||[], multi:true, placeholder:"Click or type (e.g. 'carton', 'sleeve')..."})
+      };
+    }
   }
 
   function _toggle(idx){
@@ -194,6 +207,9 @@ var KitBuilder = (function(){
     var sku=g('kc-sku-'+idx).value;
     var p=g('kc-plain-'+idx);
     if(p)p.style.display=sku?'none':'block';
+    // Existing SKU carries its own category — don't ask for it. Hide the category row.
+    var catRow=g('kc-catrow-'+idx);
+    if(catRow)catRow.style.display=sku?'none':'block';
     _warn();
   }
 
@@ -248,11 +264,15 @@ var KitBuilder = (function(){
       var pkgMode=g('kc-pkgmode-'+idx)?g('kc-pkgmode-'+idx).value:'existing';
       var newPkg=null;
       if(pkgMode==='new'){
+        var dd=pkgDD[idx]||{};
+        var prim=dd.primary?dd.primary.getSelected():null;
+        var clo=dd.closure?dd.closure.getSelected():[];
+        var sec=dd.secondary?dd.secondary.getSelected():[];
         newPkg={
-          primary:g('kc-np-primary-'+idx)?g('kc-np-primary-'+idx).value.trim()||null:null,
-          material:g('kc-np-material-'+idx)?g('kc-np-material-'+idx).value.trim()||null:null,
-          closure:g('kc-np-closure-'+idx)?g('kc-np-closure-'+idx).value.trim()||null:null,
-          secondary:g('kc-np-secondary-'+idx)?g('kc-np-secondary-'+idx).value.trim()||null:null,
+          primary: prim||null,
+          material: null,
+          closure: (clo&&clo.length)?clo.join(', '):null,
+          secondary: (sec&&sec.length)?sec.join(', '):null,
           artwork_url:g('kc-np-artwork-'+idx)?g('kc-np-artwork-'+idx).value.trim()||null:null,
           notes:g('kc-np-notes-'+idx)?g('kc-np-notes-'+idx).value.trim()||null:null
         };
@@ -288,4 +308,137 @@ var KitBuilder = (function(){
     // internal handlers referenced by inline onclick:
     _toggle:_toggle, _remove:_remove, _skuChange:_skuChange, _promote:_promote, _warn:_warn, _pkgModeChange:_pkgModeChange
   };
+})();
+
+
+/* ════════════════════════════════════════════════════════════════════
+   SearchDropdown — a clean, reusable searchable multi/single-select.
+   Replaces the fragile inline-onmousedown packaging dropdowns. Proper
+   event listeners, commits on click, stays open for multi-select, click
+   anywhere outside closes it, and selections are changeable.
+
+   Usage:
+     var dd = SearchDropdown.create({
+       mountId: 'some-div-id',        // empty container in your DOM
+       options: [{value, group}, ...],// grouped options
+       multi: true|false,
+       placeholder: 'Click or type to filter...',
+       initial: ['x'] or 'x',         // pre-selected
+       onChange: function(selected){} // selected = array (multi) or string|null (single)
+     });
+     dd.getSelected();  dd.setSelected(v);  dd.destroy();
+   ════════════════════════════════════════════════════════════════════ */
+var SearchDropdown = (function(){
+  var instances = [];
+  var idSeq = 0;
+
+  function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+  function create(opts){
+    var id = 'sd-'+(++idSeq);
+    var mount = document.getElementById(opts.mountId);
+    if(!mount) return null;
+    var multi = !!opts.multi;
+    var selected = multi
+      ? (Array.isArray(opts.initial)?opts.initial.slice():[])
+      : (opts.initial||null);
+
+    mount.innerHTML =
+      '<div class="sd-wrap" style="position:relative;">'+
+        '<input type="text" class="sd-input" placeholder="'+esc(opts.placeholder||'Click or type to filter...')+'" autocomplete="off" '+
+          'style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />'+
+        '<div class="sd-menu" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #d0d0c8;border-top:none;border-radius:0 0 6px 6px;max-height:280px;overflow-y:auto;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.10);"></div>'+
+        '<div class="sd-chips" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;"></div>'+
+      '</div>';
+
+    var input = mount.querySelector('.sd-input');
+    var menu  = mount.querySelector('.sd-menu');
+    var chips = mount.querySelector('.sd-chips');
+
+    function isSel(v){ return multi ? selected.indexOf(v)>=0 : selected===v; }
+
+    function renderMenu(filter){
+      var q=(filter||'').toLowerCase().trim();
+      var list=opts.options.filter(function(o){
+        return !q || o.value.toLowerCase().indexOf(q)>=0 || (o.group||'').toLowerCase().indexOf(q)>=0;
+      });
+      if(!list.length){ menu.innerHTML='<div style="padding:10px;font-size:12px;color:#888;font-style:italic;">No matches</div>'; return; }
+      var groups={}, order=[];
+      list.forEach(function(o){var gp=o.group||'Other'; if(!groups[gp]){groups[gp]=[];order.push(gp);} groups[gp].push(o);});
+      menu.innerHTML=order.map(function(gp){
+        return '<div style="padding:6px 10px;font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.06em;background:#fafaf6;border-bottom:1px solid #f0f0e8;">'+esc(gp)+'</div>'+
+          groups[gp].map(function(o){
+            var sel=isSel(o.value);
+            return '<div class="sd-opt" data-val="'+esc(o.value)+'" style="padding:7px 10px;font-size:12px;color:#1a1a2e;cursor:pointer;background:'+(sel?'#edfaed':'#fff')+';border-bottom:1px solid #f5f5f0;">'+
+              (sel?'<span style="color:#1a7a1a;font-weight:700;margin-right:6px;">✓</span>':'<span style="display:inline-block;width:14px;"></span>')+esc(o.value)+'</div>';
+          }).join('');
+      }).join('');
+    }
+
+    function renderChips(){
+      var arr = multi ? selected : (selected?[selected]:[]);
+      chips.innerHTML = arr.map(function(v){
+        return '<span style="display:inline-flex;align-items:center;gap:5px;background:#eef2ff;color:#2244cc;border-radius:14px;padding:3px 10px;font-size:12px;">'+esc(v)+
+          '<span class="sd-chip-x" data-val="'+esc(v)+'" style="cursor:pointer;font-weight:700;">×</span></span>';
+      }).join('');
+    }
+
+    function open(){ renderMenu(input.value); menu.style.display='block'; }
+    function close(){ menu.style.display='none'; }
+
+    function commit(v){
+      if(multi){
+        var i=selected.indexOf(v);
+        if(i>=0) selected.splice(i,1); else selected.push(v);
+        renderChips(); renderMenu(input.value); // stay open, update checks
+      } else {
+        selected=v; renderChips(); input.value=''; close();
+      }
+      if(opts.onChange) opts.onChange(multi?selected.slice():selected);
+    }
+
+    function removeChip(v){
+      if(multi){ var i=selected.indexOf(v); if(i>=0)selected.splice(i,1); }
+      else { selected=null; }
+      renderChips(); renderMenu(input.value);
+      if(opts.onChange) opts.onChange(multi?selected.slice():selected);
+    }
+
+    // ── Proper event listeners (no inline preventDefault/blur fighting) ──
+    input.addEventListener('focus', open);
+    input.addEventListener('click', function(e){ e.stopPropagation(); open(); });
+    input.addEventListener('input', function(){ open(); });
+    input.addEventListener('keydown', function(e){ if(e.key==='Escape'){ close(); input.blur(); } });
+
+    // Selection: listen on the menu, act on the option element. Click commits
+    // reliably; menu only closes on outside click or (single) on select.
+    menu.addEventListener('mousedown', function(e){
+      // prevent the input blur so focus stays; selection handled on click
+      e.preventDefault();
+    });
+    menu.addEventListener('click', function(e){
+      var opt=e.target.closest('.sd-opt');
+      if(opt){ e.stopPropagation(); commit(opt.getAttribute('data-val')); }
+    });
+    chips.addEventListener('click', function(e){
+      var x=e.target.closest('.sd-chip-x');
+      if(x){ e.stopPropagation(); removeChip(x.getAttribute('data-val')); }
+    });
+
+    // Outside click closes — scoped to THIS instance's wrap.
+    var outside=function(e){ if(!mount.contains(e.target)) close(); };
+    document.addEventListener('click', outside);
+
+    renderChips();
+
+    var api={
+      getSelected:function(){ return multi?selected.slice():selected; },
+      setSelected:function(v){ selected = multi?(Array.isArray(v)?v.slice():[]):v; renderChips(); },
+      destroy:function(){ document.removeEventListener('click', outside); mount.innerHTML=''; }
+    };
+    instances.push(api);
+    return api;
+  }
+
+  return { create:create };
 })();

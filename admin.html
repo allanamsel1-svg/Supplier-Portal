@@ -2278,7 +2278,12 @@ KitBuilder.init({
   containerId:'rfq-kit-components',
   warningId:'rfq-kit-warning',
   pkgTypeId:'rfq-kit-pkg-type',
-  hidePrice:true
+  hidePrice:true,
+  pkgOptions:{
+    get primary(){return typeof PKG_PRIMARY_OPTIONS!=='undefined'?PKG_PRIMARY_OPTIONS:[];},
+    get closure(){return typeof PKG_CLOSURE_OPTIONS!=='undefined'?PKG_CLOSURE_OPTIONS:[];},
+    get secondary(){return typeof PKG_SECONDARY_OPTIONS!=='undefined'?PKG_SECONDARY_OPTIONS:[];}
+  }
 });
 // Load SKUs once for the component dropdowns (admin didn't load these before).
 async function loadAllSkusForKit(){
@@ -2354,10 +2359,13 @@ async function createKitForRfq(savedRFQ){
   // references the variant instead of the parent.
   for(var ri=0; ri<rows.length; ri++){
     var row=rows[ri];
-    if(row.pkg_mode==='new' && row.component_sku_id && row.new_packaging){
+    if(row.component_sku_id && (row.pkg_mode==='new' || row.pkg_mode==='bulk')){
       try{
-        var variantId=await createPackagingVariant(row.component_sku_id, row.new_packaging);
-        if(variantId) row.component_sku_id=variantId; // kit now points at the variant
+        var np = row.pkg_mode==='new'
+          ? (row.new_packaging||{})
+          : {primary:null,material:null,closure:null,secondary:null,artwork_url:null,notes:'Bulk / naked — no packaging'};
+        var variantId=await createPackagingVariant(row.component_sku_id, np, row.pkg_mode);
+        if(variantId) row.component_sku_id=variantId;
       }catch(ve){ console.error('variant create:',ve); throw new Error('packaging variant: '+ve.message); }
     }
   }
@@ -2418,7 +2426,7 @@ async function createKitForRfq(savedRFQ){
 // Create a packaging variant (child SKU) of an existing SKU. Inherits the parent's
 // identity/dims/category (certs are factory+category keyed, so compliance carries
 // automatically). Model number = parent + "-V{n}", n incrementing across existing variants.
-async function createPackagingVariant(parentSkuId, np){
+async function createPackagingVariant(parentSkuId, np, mode){
   // Fetch parent.
   var pr=await fetch(SB+'/rest/v1/skus?id=eq.'+parentSkuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   if(!pr.ok) throw new Error('parent fetch '+pr.status);
