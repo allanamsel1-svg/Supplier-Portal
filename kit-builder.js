@@ -120,7 +120,7 @@ var KitBuilder = (function(){
       '<div style="display:grid;grid-template-columns:2fr 70px auto auto;gap:8px;align-items:center;padding:10px;">'+
         '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Component</label>'+
           '<select id="kc-sku-'+idx+'" onchange="KitBuilder._skuChange('+idx+')" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+skuOptions(data.component_sku_id)+'</select></div>'+
-        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Qty/kit</label>'+
+        '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Order Qty</label>'+
           '<input type="number" id="kc-qty-'+idx+'" value="'+(data.qty_per_kit||1)+'" step="1" min="1" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
         '<button onclick="KitBuilder._toggle('+idx+')" id="kc-toggle-'+idx+'" style="padding:6px 10px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:6px;font-size:12px;cursor:pointer;color:#2244cc;white-space:nowrap;">Details ▾</button>'+
         '<button onclick="KitBuilder._remove('+idx+')" style="padding:6px 9px;background:#fce8e8;border:1px solid #f0d0d0;border-radius:6px;font-size:12px;cursor:pointer;color:#a22;">×</button>'+

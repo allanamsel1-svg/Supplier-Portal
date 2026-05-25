@@ -3879,12 +3879,12 @@ function renderKitQuotes(rfq,assignments,kitLines){
     html+='<div style="border:1px solid '+(isBest?'#a0d8a0':'#e8e8e0')+';border-radius:10px;margin-bottom:10px;overflow:hidden;background:#fff;">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:'+(isBest?'#edfaed':'#f8f8f4')+';border-bottom:1px solid #e8e8e0;">'+
         '<span style="font-size:13px;font-weight:600;">'+esc(fname[id]||'Factory')+(isBest?' <span style="font-size:10px;color:#1a7a1a;font-weight:700;">· LOWEST</span>':'')+'</span>'+
-        '<span style="font-size:13px;font-weight:700;color:#1a1a2e;">$'+total.toFixed(4)+' / kit</span>'+
+        '<span style="font-size:13px;font-weight:700;color:#1a1a2e;">$'+total.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' total</span>'+
       '</div>'+
       '<table style="width:100%;border-collapse:collapse;font-size:12px;">'+
         '<thead><tr style="color:#999;text-align:left;">'+
           '<th style="padding:6px 14px;font-weight:600;">Component</th>'+
-          '<th style="padding:6px 8px;font-weight:600;text-align:right;">Qty</th>'+
+          '<th style="padding:6px 8px;font-weight:600;text-align:right;">Order Qty</th>'+
           '<th style="padding:6px 8px;font-weight:600;text-align:right;">Cost/unit</th>'+
           '<th style="padding:6px 8px;font-weight:600;text-align:right;">Freight</th>'+
           '<th style="padding:6px 14px;font-weight:600;text-align:right;">Line</th>'+
@@ -3896,16 +3896,16 @@ function renderKitQuotes(rfq,assignments,kitLines){
       var line=(cost+frt)*qty;
       html+='<tr style="border-top:1px solid #f0f0ea;">'+
         '<td style="padding:7px 14px;">'+esc(c.line_label||'Component')+'</td>'+
-        '<td style="padding:7px 8px;text-align:right;">'+qty+'</td>'+
+        '<td style="padding:7px 8px;text-align:right;">'+qty.toLocaleString()+'</td>'+
         '<td style="padding:7px 8px;text-align:right;">$'+cost.toFixed(4)+'</td>'+
         '<td style="padding:7px 8px;text-align:right;">$'+frt.toFixed(4)+'</td>'+
-        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+line.toFixed(4)+'</td>'+
+        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+line.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'+
       '</tr>';
     });
     if(f.assembly&&f.assembly.assembly_cost!=null){
       html+='<tr style="border-top:1px solid #f0f0ea;background:#fafaf8;">'+
-        '<td style="padding:7px 14px;font-style:italic;color:#666;" colspan="4">Assembly / set</td>'+
-        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+(parseFloat(f.assembly.assembly_cost)||0).toFixed(4)+'</td>'+
+        '<td style="padding:7px 14px;font-style:italic;color:#666;" colspan="4">Assembly</td>'+
+        '<td style="padding:7px 14px;text-align:right;font-weight:600;">$'+(parseFloat(f.assembly.assembly_cost)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</td>'+
       '</tr>';
     }
     html+='</tbody></table>';
