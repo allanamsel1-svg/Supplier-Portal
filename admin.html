@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-D';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-E';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -3604,6 +3604,18 @@ function filterRFQs(filter){
   renderRFQList();
 }
 
+// SKU-type indicator for an RFQ: KIT (purple), variant (blue), or standalone (none).
+// Badges from DATA, not the title: is_kit_rfq => kit; project_number ending -V<n> => variant.
+function rfqTypeBadge(r){
+  if(r&&r.is_kit_rfq){
+    return '<span style="font-size:9px;padding:1px 6px;border-radius:5px;background:#e7d9f7;color:#5b2a86;font-weight:600;margin-left:6px;">KIT</span>';
+  }
+  if(r&&r.project_number&&/-V\d+$/.test(r.project_number)){
+    return '<span style="font-size:9px;padding:1px 6px;border-radius:5px;background:#d9e6fb;color:#1a4480;font-weight:600;margin-left:6px;">variant</span>';
+  }
+  return '';
+}
+
 function renderRFQList(){
   var el=g('rfq-list-items');if(!el)return;
   var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0','on_hold':'#fff8e0','archived':'#f0f0f0'};
@@ -3639,7 +3651,7 @@ function renderRFQList(){
     return '<div class="rfq-list-item'+(isSelected?' selected':'')+' " data-rfqid="'+r.id+'" onclick="openRFQDetail(this.dataset.rfqid)">'+
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;">'+
         '<div style="flex:1;min-width:0;">'+
-          '<div class="rli-proj">'+r.project_number+'</div>'+
+          '<div class="rli-proj">'+r.project_number+rfqTypeBadge(r)+'</div>'+
           '<div class="rli-desc">'+(r.item_description||'—')+'</div>'+
         '</div>'+
         '<span class="rli-badge" style="background:'+sc+';color:'+bc+';margin-left:6px;flex-shrink:0;">'+st+'</span>'+
@@ -4043,7 +4055,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines){
     // Header
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">'+
       '<div>'+
-        '<div style="font-size:18px;font-weight:700;color:#1a1a2e;">'+rfq.project_number+'</div>'+
+        '<div style="font-size:18px;font-weight:700;color:#1a1a2e;">'+rfq.project_number+rfqTypeBadge(rfq)+'</div>'+
         '<div style="font-size:13px;color:#666;margin-top:2px;">'+(rfq.item_description||'—')+'</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;align-items:center;">'+
