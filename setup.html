@@ -724,6 +724,7 @@
 </div>
 
 
+<script src="kit-builder.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
@@ -2371,8 +2372,7 @@ async function openSkuForm(skuId){
   renderSkuForm(sku,pkg,vars,sources,costing,certs);
 
   // Hydrate kit components if this SKU is a kit.
-  kitComponentRows=[];
-  if(g('sf-kit-components'))g('sf-kit-components').innerHTML='';
+  KitBuilder.reset();
   if(sku&&sku.is_kit){await populateKitPackagingDropdown();}
   if(sku&&sku.is_kit&&skuId){
     try{
@@ -3119,224 +3119,29 @@ async function sendKitRfq(){
 
 // ── Send kit for quote (creates kit RFQ + factory assignments) ── END
 // ── Kit components ──
-var kitComponentRows=[];
+// ── Kit builder wiring (shared module: kit-builder.js) ──
+// Init once; getters hand the module this page's live cats/skus arrays.
+KitBuilder.init({
+  SB:SB, KEY:KEY, g:g, esc:esc,
+  getCats:function(){return allCats;},
+  getSkus:function(){return allSkus;},
+  containerId:'sf-kit-components',
+  warningId:'sf-kit-warning',
+  pkgTypeId:'sf-kit-pkg-type',
+  onPromote:function(idx){promoteComponentToSku(idx);}
+});
+// Back-compat aliases so existing callers keep working.
+function addKitComponentRow(data){return KitBuilder.addRow(data);}
+function collectKitComponents(){return KitBuilder.collect();}
+function populateKitPackagingDropdown(){return KitBuilder.populatePackaging();}
 
 function onSkuTypeChange(){
   var isKit=document.querySelector('input[name="sf-skutype"]:checked');
   isKit=isKit&&isKit.value==='kit';
   var ks=g('sf-kit-section'); if(ks)ks.style.display=isKit?'block':'none';
   var ps=g('sf-packaging-section'); if(ps)ps.style.display=isKit?'none':'block';
-  if(isKit&&kitComponentRows.length===0)addKitComponentRow();
-  if(isKit)populateKitPackagingDropdown();
-}
-
-// Fill the kit packaging type dropdown from kit_packaging_types (active only).
-async function populateKitPackagingDropdown(){
-  var sel=g('sf-kit-pkg-type'); if(!sel)return;
-  var current=sel.value;
-  try{
-    var r=await fetch(SB+'/rest/v1/kit_packaging_types?active=eq.true&select=name&order=sort_order,name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var types=r.ok?await r.json():[];
-    sel.innerHTML='<option value="">— Select packaging —</option>'+types.map(function(t){return '<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>';}).join('');
-    if(current)sel.value=current;
-  }catch(e){console.error('packaging dropdown:',e);}
-}
-
-// ── Shared draft-SKU component field definitions ──
-// Defined ONCE as data so the factory-side "Propose a Product" render can reuse the
-// exact same plain fields later. PLAIN fields = factory-safe (neutral, transactional).
-// The admin-only block (category, naked config) is rendered separately and is NEVER
-// part of the factory render — AI/intelligence invisibility by construction.
-var KIT_COMPONENT_FIELDS=[
-  {key:'product_title',  label:'Product name',        type:'text',  ph:'e.g. 100g Shampoo Bar',           plain:true},
-  {key:'description',    label:'Description',          type:'textarea', ph:'What it is, key details',       plain:true},
-  {key:'size_volume',    label:'Size / volume',        type:'text',  ph:'e.g. 8 g, 30 ml', note:'Marketed label size',         plain:true},
-  {key:'unit_l',         label:'Unit L (cm)',          type:'number',ph:'e.g. 3', step:'0.01', note:'Physical size of one piece', plain:true},
-  {key:'unit_w',         label:'Unit W (cm)',          type:'number',ph:'e.g. 3', step:'0.01',              plain:true},
-  {key:'unit_h',         label:'Unit H (cm)',          type:'number',ph:'e.g. 10', step:'0.01',             plain:true},
-  {key:'unit_wt_g',      label:'Unit weight (g)',      type:'number',ph:'e.g. 6', step:'0.1', note:'Shipping weight of one piece, for freight', plain:true},
-  {key:'units_per_master',label:'Units / master carton',type:'number',ph:'e.g. 100', step:'1', note:'How many ship in one bulk carton', plain:true},
-  {key:'unit_cost',      label:'Your price (per unit)',type:'number',ph:'e.g. 0.45', step:'0.0001',         plain:true}
-];
-
-function skuOptions(selectedId){
-  var opts='<option value="">— New / factory-described (enter details below) —</option>';
-  (allSkus||[]).forEach(function(s){
-    if(s.is_kit)return; // a kit can't be a component of itself
-    opts+='<option value="'+s.id+'"'+(s.id===selectedId?' selected':'')+'>'+esc(s.model_number||'')+' — '+esc((s.description||'').slice(0,40))+'</option>';
-  });
-  return opts;
-}
-
-// Renders the shared PLAIN fields for one component (factory-safe layer).
-function plainFieldsHtml(idx,data){
-  var inner=KIT_COMPONENT_FIELDS.map(function(f){
-    var id='kc-'+f.key+'-'+idx;
-    var v=data[f.key]!=null?data[f.key]:'';
-    var span=(f.type==='textarea'||f.key==='product_title')?'grid-column:1/-1;':'';
-    var input;
-    if(f.type==='textarea'){
-      input='<textarea id="'+id+'" rows="2" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;resize:vertical;">'+esc(String(v))+'</textarea>';
-    } else if(f.type==='number'){
-      input='<input type="number" id="'+id+'" value="'+(v||'')+'" step="'+(f.step||'0.01')+'" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" />';
-    } else {
-      input='<input type="text" id="'+id+'" value="'+esc(String(v))+'" placeholder="'+f.ph+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" />';
-    }
-    return '<div style="'+span+'"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">'+f.label+'</label>'+input+(f.note?'<div style="font-size:9px;color:#aaa;margin-top:2px;">'+f.note+'</div>':'')+'</div>';
-  }).join('');
-  return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">'+inner+'</div>';
-}
-
-function addKitComponentRow(data){
-  data=data||{};
-  var idx=kitComponentRows.length;
-  kitComponentRows.push(idx);
-  var wrap=g('sf-kit-components'); if(!wrap)return;
-  var row=document.createElement('div');
-  row.id='kc-row-'+idx;
-  row.setAttribute('data-kc',idx);
-  row.style.cssText='border:1px solid #e8e8e0;border-radius:8px;margin-bottom:8px;background:#fcfcfa;overflow:hidden;';
-
-  // Summary header (always visible) + expandable detail panel.
-  row.innerHTML=
-    '<div style="display:grid;grid-template-columns:2fr 70px auto auto;gap:8px;align-items:center;padding:10px;">'+
-      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Component</label>'+
-        '<select id="kc-sku-'+idx+'" onchange="onKitCompSkuChange('+idx+')" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+skuOptions(data.component_sku_id)+'</select></div>'+
-      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Qty/kit</label>'+
-        '<input type="number" id="kc-qty-'+idx+'" value="'+(data.qty_per_kit||1)+'" step="1" min="1" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
-      '<button onclick="toggleKitDetail('+idx+')" id="kc-toggle-'+idx+'" style="padding:6px 10px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:6px;font-size:12px;cursor:pointer;color:#2244cc;white-space:nowrap;">Details ▾</button>'+
-      '<button onclick="removeKitComponentRow('+idx+')" style="padding:6px 9px;background:#fce8e8;border:1px solid #f0d0d0;border-radius:6px;font-size:12px;cursor:pointer;color:#a22;">×</button>'+
-    '</div>'+
-
-    // ── Detail panel (collapsed by default) ──
-    '<div id="kc-detail-'+idx+'" style="display:none;padding:0 10px 10px;border-top:1px solid #f0f0e8;">'+
-
-      // PLAIN LAYER — the shared, factory-safe product fields. Shown only for new/described
-      // components (an existing SKU already carries these).
-      '<div id="kc-plain-'+idx+'" style="display:'+(data.component_sku_id?'none':'block')+';margin-top:10px;">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'+
-          '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;">Product Details</div>'+
-          '<button onclick="promoteComponentToSku('+idx+')" style="padding:5px 11px;background:#eef7ee;border:1px solid #b0d8b0;border-radius:6px;font-size:11px;cursor:pointer;color:#1a7a1a;white-space:nowrap;">↑ Promote to SKU</button>'+
-        '</div>'+
-        plainFieldsHtml(idx,data)+
-      '</div>'+
-
-      // ADMIN-ONLY LAYER — never part of the factory render. Category + kit/bulk config.
-      '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0d8;">'+
-        '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Admin · category &amp; kit packaging</div>'+
-        '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Category</label>'+
-          '<select id="kc-cat-'+idx+'" onchange="updateKitWarning()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+kitCatOptions(data.category_id)+'</select></div>'+
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;align-items:center;">'+
-          '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;"><input type="checkbox" id="kc-consumer-'+idx+'" '+(data.consumer_packaging?'checked':'')+' onchange="updateKitWarning()" /> Consumer pkg</label>'+
-          '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;"><input type="checkbox" id="kc-inner-'+idx+'" '+(data.inner_carton?'checked':'')+' /> Inner carton</label>'+
-          '<div><input type="number" id="kc-bulk-'+idx+'" value="'+(data.bulk_master_pack_qty||'')+'" placeholder="Bulk/master qty" step="1" style="width:100%;padding:5px 7px;font-size:11px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
-        '</div>'+
-      '</div>'+
-    '</div>';
-  wrap.appendChild(row);
-  updateKitWarning();
-}
-
-function kitCatOptions(selectedId){
-  var opts='<option value="">— uncategorized —</option>';
-  (allCats||[]).forEach(function(c){
-    var label=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
-    opts+='<option value="'+c.id+'"'+(c.id===selectedId?' selected':'')+'>'+esc(label)+'</option>';
-  });
-  return opts;
-}
-
-function toggleKitDetail(idx){
-  var d=g('kc-detail-'+idx),t=g('kc-toggle-'+idx);
-  if(!d)return;
-  var open=d.style.display==='none';
-  d.style.display=open?'block':'none';
-  if(t)t.innerHTML=open?'Details ▴':'Details ▾';
-}
-
-function removeKitComponentRow(idx){
-  var row=g('kc-row-'+idx); if(row)row.remove();
-  updateKitWarning();
-}
-
-function onKitCompSkuChange(idx){
-  // Existing SKU already has product detail; hide the plain entry fields. New/described shows them.
-  var sku=g('kc-sku-'+idx).value;
-  var p=g('kc-plain-'+idx);
-  if(p)p.style.display=sku?'none':'block';
-  updateKitWarning();
-}
-
-function updateKitWarning(){
-  // Warn about naked components (no consumer packaging), heavier for cosmetic categories.
-  var warnEl=g('sf-kit-warning'); if(!warnEl)return;
-  var nakedCosmetic=0, nakedHard=0;
-  document.querySelectorAll('#sf-kit-components [data-kc]').forEach(function(row){
-    var idx=row.getAttribute('data-kc');
-    var consumerEl=g('kc-consumer-'+idx); if(!consumerEl)return;
-    if(consumerEl.checked)return; // packaged — fine
-    // Determine cosmetic: prefer existing SKU's category, else the admin-assigned category.
-    var skuId=g('kc-sku-'+idx)?g('kc-sku-'+idx).value:'';
-    var isCosmetic=false;
-    if(skuId){
-      var s=(allSkus||[]).find(function(x){return x.id===skuId;});
-      isCosmetic=s&&s.categories&&s.categories.is_cosmetic;
-    } else {
-      var catId=g('kc-cat-'+idx)?g('kc-cat-'+idx).value:'';
-      var c=(allCats||[]).find(function(x){return x.id===catId;});
-      isCosmetic=c&&c.is_cosmetic;
-    }
-    if(isCosmetic)nakedCosmetic++; else nakedHard++;
-  });
-  if(nakedCosmetic||nakedHard){
-    var parts=[];
-    if(nakedCosmetic)parts.push('<b>'+nakedCosmetic+' cosmetic component(s) shipping naked</b> — cannot be sold standalone if the kit is broken up without repackaging. Higher risk.');
-    if(nakedHard)parts.push(nakedHard+' hard-line component(s) shipping naked — lower risk, but de-kitting would need repackaging.');
-    warnEl.innerHTML='⚠ '+parts.join('<br>');
-    warnEl.style.display='block';
-  } else {
-    warnEl.style.display='none';
-  }
-}
-
-function collectKitComponents(){
-  var rows=[];
-  document.querySelectorAll('#sf-kit-components [data-kc]').forEach(function(row){
-    var idx=row.getAttribute('data-kc');
-    var skuId=g('kc-sku-'+idx)?g('kc-sku-'+idx).value:'';
-    var plain={};
-    KIT_COMPONENT_FIELDS.forEach(function(f){
-      var el=g('kc-'+f.key+'-'+idx);
-      if(!el)return;
-      var val=el.value;
-      plain[f.key]=(f.type==='number')?(val?parseFloat(val):null):(val?val.trim():null);
-    });
-    // For existing-SKU components the plain fields are hidden in the form, so
-    // snapshot the SKU's own name/spec into the draft_* columns. This is what the
-    // factory form labels read — without it, linked components render as "Component".
-    var s=skuId?(allSkus||[]).find(function(x){return x.id===skuId;}):null;
-    rows.push({
-      component_sku_id:skuId||null,
-      qty_per_kit:parseFloat(g('kc-qty-'+idx).value)||1,
-      // Draft-SKU detail (for new/described components; for linked SKUs, snapshotted)
-      product_title:skuId?(s?s.description:null):plain.product_title,
-      description:skuId?(s?(s.detailed_description||null):null):plain.description,
-      size_volume:skuId?null:plain.size_volume,
-      unit_l:skuId?null:plain.unit_l,
-      unit_w:skuId?null:plain.unit_w,
-      unit_h:skuId?null:plain.unit_h,
-      unit_wt_g:skuId?null:plain.unit_wt_g,
-      units_per_master:skuId?null:plain.units_per_master,
-      category_id:skuId?null:(g('kc-cat-'+idx)?g('kc-cat-'+idx).value||null:null),
-      reconcile_status:skuId?'matched':'unmatched',
-      // Kit/bulk config
-      consumer_packaging:g('kc-consumer-'+idx)?g('kc-consumer-'+idx).checked:false,
-      inner_carton:g('kc-inner-'+idx)?g('kc-inner-'+idx).checked:false,
-      bulk_master_pack_qty:g('kc-bulk-'+idx)&&g('kc-bulk-'+idx).value?parseInt(g('kc-bulk-'+idx).value):null,
-      unit_cost:plain.unit_cost
-    });
-  });
-  return rows;
+  if(isKit&&KitBuilder.rowCount()===0)KitBuilder.addRow();
+  if(isKit)KitBuilder.populatePackaging();
 }
 
 async function saveSku(){
@@ -3673,7 +3478,7 @@ async function loadSkuFromQuote(quoteId,rfqId){
 async function promoteComponentToSku(idx){
   // 1. Read this component's plain fields from the form.
   var plain={};
-  KIT_COMPONENT_FIELDS.forEach(function(f){
+  KitBuilder.FIELDS.forEach(function(f){
     var el=g('kc-'+f.key+'-'+idx);
     if(el)plain[f.key]=(f.type==='number')?(el.value?parseFloat(el.value):null):(el.value?el.value.trim():null);
   });
