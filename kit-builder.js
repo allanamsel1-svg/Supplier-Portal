@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════
-   kit-builder.js — SHARED kit-component builder
+   kit-builder.js — SHARED kit-component builder  [build: KB-2026-05-25-C]
    Loaded by BOTH setup.html and admin.html via <script src="kit-builder.js">.
    Edit once, both pages update. No build step — plain global script.
 
@@ -329,6 +329,7 @@ var KitBuilder = (function(){
      dd.getSelected();  dd.setSelected(v);  dd.destroy();
    ════════════════════════════════════════════════════════════════════ */
 var SearchDropdown = (function(){
+  try{console.log('kit-builder.js build: KB-2026-05-25-C');}catch(e){}
   var instances = [];
   var idSeq = 0;
 
@@ -410,23 +411,25 @@ var SearchDropdown = (function(){
     input.addEventListener('input', function(){ open(); });
     input.addEventListener('keydown', function(e){ if(e.key==='Escape'){ close(); input.blur(); } });
 
-    // Selection: listen on the menu, act on the option element. Click commits
-    // reliably; menu only closes on outside click or (single) on select.
+    var clickedInside=false;
     menu.addEventListener('mousedown', function(e){
-      // prevent the input blur so focus stays; selection handled on click
-      e.preventDefault();
-    });
-    menu.addEventListener('click', function(e){
+      clickedInside=true;
       var opt=e.target.closest('.sd-opt');
-      if(opt){ e.stopPropagation(); commit(opt.getAttribute('data-val')); }
+      if(opt){ e.preventDefault(); e.stopPropagation(); commit(opt.getAttribute('data-val')); }
     });
-    chips.addEventListener('click', function(e){
+    chips.addEventListener('mousedown', function(e){
+      clickedInside=true;
       var x=e.target.closest('.sd-chip-x');
-      if(x){ e.stopPropagation(); removeChip(x.getAttribute('data-val')); }
+      if(x){ e.preventDefault(); e.stopPropagation(); removeChip(x.getAttribute('data-val')); }
     });
+    mount.addEventListener('mousedown', function(){ clickedInside=true; });
 
-    // Outside click closes — scoped to THIS instance's wrap.
-    var outside=function(e){ if(!mount.contains(e.target)) close(); };
+    // Outside click closes. clickedInside is set at mousedown (before any
+    // re-render), so a re-rendered/removed target can't fool the check.
+    var outside=function(e){
+      if(clickedInside){ clickedInside=false; return; }
+      close();
+    };
     document.addEventListener('click', outside);
 
     renderChips();
