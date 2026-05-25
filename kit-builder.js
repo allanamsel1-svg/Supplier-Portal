@@ -328,6 +328,189 @@ var KitBuilder = (function(){
      });
      dd.getSelected();  dd.setSelected(v);  dd.destroy();
    ════════════════════════════════════════════════════════════════════ */
+// ── Shared packaging option lists (used by SearchDropdown.PKG_OPTIONS) ──
+var PKG_PRIMARY_OPTIONS = [
+  // Glass
+  { group:'Glass', value:'Glass bottle - round',                          material:'Glass' },
+  { group:'Glass', value:'Glass bottle - boston round',                   material:'Glass' },
+  { group:'Glass', value:'Glass bottle - square',                         material:'Glass' },
+  { group:'Glass', value:'Glass bottle - cylindrical tall',               material:'Glass' },
+  { group:'Glass', value:'Glass bottle - cylindrical short',              material:'Glass' },
+  { group:'Glass', value:'Glass bottle - oval',                           material:'Glass' },
+  { group:'Glass', value:'Glass bottle - dropper blank',                  material:'Glass' },
+  { group:'Glass', value:'Glass jar - straight-sided',                    material:'Glass' },
+  { group:'Glass', value:'Glass jar - low-profile cosmetic',              material:'Glass' },
+  { group:'Glass', value:'Glass jar - tall cosmetic',                     material:'Glass' },
+  { group:'Glass', value:'Glass jar - hexagonal',                         material:'Glass' },
+  { group:'Glass', value:'Glass vial',                                    material:'Glass' },
+  { group:'Glass', value:'Glass ampoule',                                 material:'Glass' },
+  { group:'Glass', value:'Glass roll-on bottle',                          material:'Glass' },
+  // Plastic — bottles
+  { group:'Plastic', value:'Plastic bottle - PET round',                  material:'PET' },
+  { group:'Plastic', value:'Plastic bottle - PET boston round',           material:'PET' },
+  { group:'Plastic', value:'Plastic bottle - HDPE round',                 material:'HDPE' },
+  { group:'Plastic', value:'Plastic bottle - HDPE oval',                  material:'HDPE' },
+  { group:'Plastic', value:'Plastic bottle - PP',                         material:'PP' },
+  { group:'Plastic', value:'Plastic bottle - PCR (post-consumer recycled)', material:'PCR' },
+  { group:'Plastic', value:'Plastic bottle - airless',                    material:'PP' },
+  { group:'Plastic', value:'Plastic bottle - dropper blank',              material:'Plastic' },
+  // Plastic — jars
+  { group:'Plastic', value:'Plastic jar - PET',                           material:'PET' },
+  { group:'Plastic', value:'Plastic jar - PP',                            material:'PP' },
+  { group:'Plastic', value:'Plastic jar - PCR',                           material:'PCR' },
+  { group:'Plastic', value:'Plastic jar - airless',                       material:'PP' },
+  // Plastic — vials, roll-ons, tubes, pouches
+  { group:'Plastic', value:'Plastic vial',                                material:'Plastic' },
+  { group:'Plastic', value:'Plastic roll-on bottle',                      material:'Plastic' },
+  { group:'Plastic', value:'Squeeze tube - LDPE',                         material:'LDPE' },
+  { group:'Plastic', value:'Squeeze tube - laminate (ABL)',               material:'Laminate' },
+  { group:'Plastic', value:'Squeeze tube - aluminum-plastic laminate',    material:'Laminate' },
+  { group:'Plastic', value:'Plastic pouch / sachet',                      material:'Plastic film' },
+  { group:'Plastic', value:'Stand-up pouch (gusseted)',                   material:'Plastic film' },
+  { group:'Plastic', value:'Spout pouch',                                 material:'Plastic film' },
+  // Metal
+  { group:'Metal', value:'Aluminum bottle',                               material:'Aluminum' },
+  { group:'Metal', value:'Aluminum jar',                                  material:'Aluminum' },
+  { group:'Metal', value:'Aluminum tin (round)',                          material:'Aluminum' },
+  { group:'Metal', value:'Aluminum tin (rectangular)',                    material:'Aluminum' },
+  { group:'Metal', value:'Aluminum aerosol can',                          material:'Aluminum' },
+  { group:'Metal', value:'Steel aerosol can',                             material:'Steel' },
+  { group:'Metal', value:'Tinplate tin',                                  material:'Tinplate' },
+  { group:'Metal', value:'Aluminum collapsible tube',                     material:'Aluminum' },
+  // Paper / Board
+  { group:'Paper / Board', value:'Paperboard push-up tube (kraft)',       material:'Paperboard' },
+  { group:'Paper / Board', value:'Cardboard box (primary)',               material:'Paperboard' },
+  { group:'Paper / Board', value:'Compostable molded fiber container',    material:'Molded fiber' },
+  // Specialty
+  { group:'Specialty', value:'Compact (powder / cream)',                  material:'Mixed' },
+  { group:'Specialty', value:'Stick container (chapstick-style)',         material:'Mixed' },
+  { group:'Specialty', value:'Click-pen applicator',                      material:'Mixed' },
+  { group:'Specialty', value:'Hot-pour stick mold',                       material:'Mixed' },
+  // None / bulk
+  { group:'No primary container', value:'Bulk / no individual primary container', material:'N/A' }
+];
+
+var PKG_CLOSURE_OPTIONS = [
+  // Caps / Lids
+  { group:'Caps / Lids', value:'Screw cap - smooth' },
+  { group:'Caps / Lids', value:'Screw cap - ribbed' },
+  { group:'Caps / Lids', value:'Screw cap - disc top / flip top' },
+  { group:'Caps / Lids', value:'Screw cap - with built-in spatula' },
+  { group:'Caps / Lids', value:'Snap cap' },
+  { group:'Caps / Lids', value:'Hinged flip-top lid' },
+  { group:'Caps / Lids', value:'Twist-up tube cap' },
+  { group:'Caps / Lids', value:'Crimp seal (aluminum)' },
+  { group:'Caps / Lids', value:'Cork stopper' },
+  { group:'Caps / Lids', value:'T-top wood cap' },
+  // Pumps
+  { group:'Pumps', value:'Pump - lotion / cream' },
+  { group:'Pumps', value:'Pump - foamer' },
+  { group:'Pumps', value:'Pump - airless' },
+  { group:'Pumps', value:'Pump - treatment (small dose)' },
+  { group:'Pumps', value:'Pump - high-viscosity' },
+  // Sprayers
+  { group:'Sprayers', value:'Mist sprayer - fine mist' },
+  { group:'Sprayers', value:'Mist sprayer - continuous (no propellant)' },
+  { group:'Sprayers', value:'Trigger sprayer' },
+  { group:'Sprayers', value:'Aerosol valve - continuous spray' },
+  { group:'Sprayers', value:'Aerosol valve - metered dose' },
+  // Dispensers / Spouts
+  { group:'Dispensers / Spouts', value:'Orifice reducer' },
+  { group:'Dispensers / Spouts', value:'Disc top / flip top spout' },
+  { group:'Dispensers / Spouts', value:'Pour spout' },
+  { group:'Dispensers / Spouts', value:'Yorker spout' },
+  { group:'Dispensers / Spouts', value:'Twist-and-pour spout' },
+  // Droppers
+  { group:'Droppers', value:'Dropper - glass with rubber bulb' },
+  { group:'Droppers', value:'Dropper - calibrated / graduated' },
+  { group:'Droppers', value:'Dropper - plastic' },
+  { group:'Droppers', value:'Dropper - pipette (drop-by-drop)' },
+  // Applicators
+  { group:'Applicators', value:'Roller ball' },
+  { group:'Applicators', value:'Brush applicator (small)' },
+  { group:'Applicators', value:'Brush applicator (wide)' },
+  { group:'Applicators', value:'Wand applicator (mascara-style)' },
+  { group:'Applicators', value:'Doe foot applicator (lip gloss)' },
+  { group:'Applicators', value:'Spatula included (separate)' },
+  { group:'Applicators', value:'Spoon included (separate)' },
+  { group:'Applicators', value:'Cotton tip applicator' },
+  { group:'Applicators', value:'Foam tip applicator' },
+  { group:'Applicators', value:'Sponge applicator' },
+  // Seals
+  { group:'Seals', value:'Induction seal (foil)' },
+  { group:'Seals', value:'Tamper-evident band' },
+  { group:'Seals', value:'Pressure-sensitive seal' },
+  // Other
+  { group:'Other', value:'Twist-up mechanism (stick products)' },
+  { group:'Other', value:'Click mechanism' },
+  { group:'Other', value:'None / bulk (no closure)' }
+];
+
+var PKG_SECONDARY_OPTIONS = [
+  // Boxes
+  { group:'Boxes', value:'Paper folding carton (mono-material)' },
+  { group:'Boxes', value:'Paper folding carton (with insert)' },
+  { group:'Boxes', value:'Paper folding carton (with window cutout)' },
+  { group:'Boxes', value:'Rigid box / set-up box' },
+  { group:'Boxes', value:'Mailer box (corrugated)' },
+  { group:'Boxes', value:'Sleeve box' },
+  // Blister / Card
+  { group:'Blister / Card', value:'Blister pack (carded)' },
+  { group:'Blister / Card', value:'Clamshell' },
+  { group:'Blister / Card', value:'Skin pack' },
+  { group:'Blister / Card', value:'Slide card' },
+  // Wrapping / Sealing
+  { group:'Wrapping / Sealing', value:'Shrink sleeve (decorative full-body)' },
+  { group:'Wrapping / Sealing', value:'Shrink wrap (clear protective)' },
+  { group:'Wrapping / Sealing', value:'Belly band / paper sleeve' },
+  { group:'Wrapping / Sealing', value:'Pillow pack / flow wrap' },
+  // Hang / Display
+  { group:'Hang / Display', value:'Hang tag (paper)' },
+  { group:'Hang / Display', value:'Hang tag (plastic clip)' },
+  { group:'Hang / Display', value:'Pouch with hang hole / Eurohole' },
+  { group:'Hang / Display', value:'Display tray' },
+  { group:'Hang / Display', value:'Counter display (PDQ)' },
+  { group:'Hang / Display', value:'Floor display unit' },
+  // None
+  { group:'None', value:'Naked (no secondary packaging)' },
+  { group:'None', value:'Bulk shipper only' }
+];
+
+var PKG_DECORATION_OPTIONS = [
+  { group:'Direct on package', value:'Silkscreen print' },
+  { group:'Direct on package', value:'Pad print' },
+  { group:'Direct on package', value:'Direct digital print' },
+  { group:'Direct on package', value:'Hot stamp' },
+  { group:'Direct on package', value:'Foil stamp' },
+  { group:'Direct on package', value:'Embossing' },
+  { group:'Direct on package', value:'Debossing' },
+  { group:'Direct on package', value:'Spot UV' },
+  { group:'Direct on package', value:'Frosting / etching' },
+  { group:'Labels', value:'Paper label' },
+  { group:'Labels', value:'Clear label' },
+  { group:'Labels', value:'Metallized label' },
+  { group:'Labels', value:'Textured / specialty label' },
+  { group:'Sleeves', value:'Shrink sleeve (decorative)' },
+  { group:'None', value:'No decoration' }
+];
+
+var PKG_SUSTAINABILITY_OPTIONS = [
+  { group:'Recycled content', value:'PCR 25%+ (post-consumer recycled)' },
+  { group:'Recycled content', value:'PCR 50%+' },
+  { group:'Recycled content', value:'PCR 100%' },
+  { group:'Certifications', value:'FSC certified board' },
+  { group:'Certifications', value:'How2Recycle label compliant' },
+  { group:'Design', value:'Recyclable (single-material)' },
+  { group:'Design', value:'Refillable design' },
+  { group:'Design', value:'Lightweighted (reduced plastic)' },
+  { group:'Biodegradable / Compostable', value:'Biodegradable' },
+  { group:'Biodegradable / Compostable', value:'Industrially compostable' },
+  { group:'Biodegradable / Compostable', value:'Home compostable' },
+  { group:'Alternative materials', value:'Bio-based plastic (PE/PET)' },
+  { group:'Alternative materials', value:'Aluminum-free / plastic-free' }
+];
+
+
 var SearchDropdown = (function(){
   try{console.log('kit-builder.js build: KB-2026-05-25-C');}catch(e){}
   var instances = [];
@@ -443,5 +626,13 @@ var SearchDropdown = (function(){
     return api;
   }
 
-  return { create:create };
+  return { create:create,
+    PKG_OPTIONS:{
+      primary:(typeof PKG_PRIMARY_OPTIONS!=='undefined')?PKG_PRIMARY_OPTIONS:[],
+      closure:(typeof PKG_CLOSURE_OPTIONS!=='undefined')?PKG_CLOSURE_OPTIONS:[],
+      secondary:(typeof PKG_SECONDARY_OPTIONS!=='undefined')?PKG_SECONDARY_OPTIONS:[],
+      decoration:(typeof PKG_DECORATION_OPTIONS!=='undefined')?PKG_DECORATION_OPTIONS:[],
+      sustainability:(typeof PKG_SUSTAINABILITY_OPTIONS!=='undefined')?PKG_SUSTAINABILITY_OPTIONS:[]
+    }
+  };
 })();

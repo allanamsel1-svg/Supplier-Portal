@@ -727,6 +727,7 @@
 <script src="kit-builder.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var SETUP_BUILD='SETUP-2026-05-25-C'; try{console.log('setup.html build:',SETUP_BUILD);}catch(e){}
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var allCats=[], allBrands=[], allCusts=[], allDepts=[], currentCustId=null;
 
@@ -2549,6 +2550,23 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
 
   // ── 3. DIMENSIONS (standalone packaging — hidden for kits) ──
   '<div id="sf-packaging-section" style="display:'+(fv(sku,'is_kit')?'none':'block')+';">'+
+  card('Packaging Attributes',
+    '<div style="font-size:11px;color:#888;margin-bottom:10px;">How this product is packaged. Carried with the SKU and sent to factories so they quote against the real packaging.</div>'+
+    fld('Primary Container','<div id="sku-pkg-primary-mount"></div>')+
+    fld('Closure / Applicator','<div id="sku-pkg-closure-mount"></div>')+
+    fld('Secondary / Display','<div id="sku-pkg-secondary-mount"></div>')+
+    '<div style="margin-top:6px;"><button type="button" onclick="toggleSkuPkgAdvanced()" id="sku-pkg-adv-toggle" style="background:none;border:none;color:#2244cc;font-size:12px;cursor:pointer;padding:0;">▸ Decoration, finish, color &amp; sustainability claims</button></div>'+
+    '<div id="sku-pkg-advanced" style="display:none;margin-top:10px;">'+
+      fld('Decoration','<div id="sku-pkg-decoration-mount"></div>')+
+      fld('Sustainability Claims','<div id="sku-pkg-sustainability-mount"></div>')+
+      grid('1fr 1fr','8px',
+        fld('Finish',txtIn('sku-pkg-finish',pv(sku,'packaging_finish'),'e.g. matte, gloss'))+
+        fld('Color',txtIn('sku-pkg-color',pv(sku,'packaging_color'),'e.g. frosted, amber'))
+      )+
+    '</div>'+
+    fld('Packaging Notes','<textarea id="sku-pkg-notes" rows="2" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;box-sizing:border-box;resize:vertical;">'+(pv(sku,'packaging_notes')||'')+'</textarea>')+
+    fld('Packaging Artwork Link','<input type="text" id="sku-pkg-artwork" value="'+(pv(sku,'packaging_artwork_url')||'')+'" placeholder="Supabase storage path or URL (current approved artwork)" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;box-sizing:border-box;" />','Current approved TBG artwork. Factory-proposed changes reviewed separately.')
+  )+
   card('Packaging & Dimensions',
     // Unit
     '<div style="font-size:11px;font-weight:600;color:#666;margin-bottom:6px;">UNIT &nbsp;'+dimSt(pv(pkg,'unit_dim_status','estimated'))+'</div>'+
@@ -2744,8 +2762,56 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
   area.innerHTML=html;
   updateModelPreview();
   recalcAll();
+  initSkuPkgDropdowns(sku);
   // Initialize freight dest dropdown if origin is set
   if(cv(costing,'freight_origin')){updateFreightDests();}
+}
+
+// Packaging SearchDropdowns on the SKU form (uses shared SearchDropdown.PKG_OPTIONS).
+var _skuPkgDD={};
+function initSkuPkgDropdowns(pkg){
+  if(typeof SearchDropdown==='undefined')return;
+  Object.keys(_skuPkgDD).forEach(function(k){if(_skuPkgDD[k]&&_skuPkgDD[k].destroy)_skuPkgDD[k].destroy();});
+  _skuPkgDD={};
+  var O=SearchDropdown.PKG_OPTIONS||{};
+  function arr(v){return Array.isArray(v)?v:[];}
+  _skuPkgDD.primary=SearchDropdown.create({mountId:'sku-pkg-primary-mount',options:arr(O.primary),multi:false,initial:pv(pkg,'packaging_primary')||null,placeholder:"Click or type (e.g. 'glass', 'tube')..."});
+  _skuPkgDD.closure=SearchDropdown.create({mountId:'sku-pkg-closure-mount',options:arr(O.closure),multi:true,initial:arr(pkg&&pkg.packaging_closures),placeholder:"Click or type (e.g. 'pump', 'dropper')..."});
+  _skuPkgDD.secondary=SearchDropdown.create({mountId:'sku-pkg-secondary-mount',options:arr(O.secondary),multi:true,initial:arr(pkg&&pkg.packaging_secondary),placeholder:"Click or type (e.g. 'carton', 'sleeve')..."});
+  _skuPkgDD.decoration=SearchDropdown.create({mountId:'sku-pkg-decoration-mount',options:arr(O.decoration),multi:true,initial:arr(pkg&&pkg.packaging_decoration),placeholder:"e.g. 'silkscreen', 'foil'..."});
+  _skuPkgDD.sustainability=SearchDropdown.create({mountId:'sku-pkg-sustainability-mount',options:arr(O.sustainability),multi:true,initial:arr(pkg&&pkg.packaging_sustainability),placeholder:"e.g. 'PCR', 'FSC', 'recyclable'..."});
+  // Auto-open advanced if any advanced field is populated.
+  var hasAdv=(pkg&&((pkg.packaging_decoration&&pkg.packaging_decoration.length)||(pkg.packaging_sustainability&&pkg.packaging_sustainability.length)||pv(sku,'packaging_finish')||pv(sku,'packaging_color')));
+  if(hasAdv)toggleSkuPkgAdvanced(true);
+}
+function toggleSkuPkgAdvanced(forceOpen){
+  var sec=g('sku-pkg-advanced'),tog=g('sku-pkg-adv-toggle');
+  if(!sec)return;
+  var open=forceOpen===true?true:sec.style.display==='none';
+  sec.style.display=open?'block':'none';
+  if(tog)tog.innerHTML=(open?'▾':'▸')+' Decoration, finish, color &amp; sustainability claims';
+}
+function getSkuPkgState(){
+  function sel(dd){return dd&&dd.getSelected?dd.getSelected():null;}
+  var clo=sel(_skuPkgDD.closure)||[], sec=sel(_skuPkgDD.secondary)||[], dec=sel(_skuPkgDD.decoration)||[], sus=sel(_skuPkgDD.sustainability)||[];
+  var prim=sel(_skuPkgDD.primary)||null;
+  var mat=null;
+  if(prim&&SearchDropdown.PKG_OPTIONS&&SearchDropdown.PKG_OPTIONS.primary){
+    var f=SearchDropdown.PKG_OPTIONS.primary.find(function(o){return o.value===prim;});
+    mat=f?(f.material||null):null;
+  }
+  return {
+    packaging_primary:prim,
+    packaging_primary_material:mat,
+    packaging_closures:clo.length?clo:null,
+    packaging_secondary:sec.length?sec:null,
+    packaging_decoration:dec.length?dec:null,
+    packaging_sustainability:sus.length?sus:null,
+    packaging_finish:g('sku-pkg-finish')?g('sku-pkg-finish').value.trim()||null:null,
+    packaging_color:g('sku-pkg-color')?g('sku-pkg-color').value.trim()||null:null,
+    packaging_notes:g('sku-pkg-notes')?g('sku-pkg-notes').value.trim()||null:null,
+    packaging_artwork_url:g('sku-pkg-artwork')?g('sku-pkg-artwork').value.trim()||null:null
+  };
 }
 
 // ── Calculation helpers ──
@@ -3177,6 +3243,13 @@ async function saveSku(){
     status:g('sf-status')?g('sf-status').value:'draft',
     updated_at:new Date().toISOString()
   };
+  // Merge rich packaging attributes (Batch 2). nz() guards undefined → null so
+  // PATCH/POST never drops keys.
+  (function(){
+    var pk=(typeof getSkuPkgState==='function')?getSkuPkgState():{};
+    function nz(v){return v===undefined?null:v;}
+    Object.keys(pk).forEach(function(k){skuPayload[k]=nz(pk[k]);});
+  })();
 
   try{
     var url=currentSkuId?SB+'/rest/v1/skus?id=eq.'+currentSkuId:SB+'/rest/v1/skus';
