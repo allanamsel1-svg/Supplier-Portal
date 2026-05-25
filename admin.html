@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-B';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-C';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -2361,21 +2361,24 @@ async function createKitForRfq(savedRFQ){
   }
 
   // Every row in the array MUST carry an identical key set — PostgREST rejects
-  // mismatched keys ("All object keys must match"). Null-fill consistently.
+  // mismatched keys ("All object keys must match"). CRITICAL: JSON.stringify drops
+  // any key whose value is `undefined`, which silently desyncs row shapes. So we
+  // null-coerce EVERY value (nz) — undefined becomes null and the key survives.
+  function nz(v){return v===undefined?null:v;}
   var payload=rows.map(function(row,i){return {
-    kit_sku_id:kitSkuId,
-    component_sku_id:row.component_sku_id,
-    qty_per_kit:row.qty_per_kit,
+    kit_sku_id:nz(kitSkuId),
+    component_sku_id:nz(row.component_sku_id),
+    qty_per_kit:nz(row.qty_per_kit),
     line_type:'component',
     sort_order:(i+1)*10,
     packaging_type:null,
-    factory_described_name:row.product_title,
-    factory_described_spec:row.description,
-    draft_size_volume:row.size_volume,
-    draft_unit_l:row.unit_l,draft_unit_w:row.unit_w,draft_unit_h:row.unit_h,
-    draft_unit_wt_g:row.unit_wt_g,draft_units_per_master:row.units_per_master,
-    draft_category_id:row.category_id,draft_unit_cost:row.unit_cost,
-    reconcile_status:row.reconcile_status,
+    factory_described_name:nz(row.product_title),
+    factory_described_spec:nz(row.description),
+    draft_size_volume:nz(row.size_volume),
+    draft_unit_l:nz(row.unit_l),draft_unit_w:nz(row.unit_w),draft_unit_h:nz(row.unit_h),
+    draft_unit_wt_g:nz(row.unit_wt_g),draft_units_per_master:nz(row.units_per_master),
+    draft_category_id:nz(row.category_id),draft_unit_cost:nz(row.unit_cost),
+    reconcile_status:nz(row.reconcile_status),
     pkg_length_cm:null,pkg_width_cm:null,pkg_height_cm:null,pkg_notes:null,pkg_artwork_url:null
   };});
   // Packaging line (always last) — same key set, null-filled, now with dims/notes/artwork.
