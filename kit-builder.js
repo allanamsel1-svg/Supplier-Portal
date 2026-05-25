@@ -84,7 +84,8 @@ var KitBuilder = (function(){
   }
 
   function plainFieldsHtml(idx,data){
-    var inner=FIELDS.map(function(f){
+    var fields=cfg.hidePrice?FIELDS.filter(function(f){return f.key!=='unit_cost';}):FIELDS;
+    var inner=fields.map(function(f){
       var id='kc-'+f.key+'-'+idx;
       var v=data[f.key]!=null?data[f.key]:'';
       var span=(f.type==='textarea'||f.key==='product_title')?'grid-column:1/-1;':'';
@@ -134,8 +135,8 @@ var KitBuilder = (function(){
           plainFieldsHtml(idx,data)+
         '</div>'+
         '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0d8;">'+
-          '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Admin · category &amp; kit packaging</div>'+
-          '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Category</label>'+
+          '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Product Category</div>'+
+          '<div style="margin-bottom:7px;"><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Product Category</label>'+
             '<select id="kc-cat-'+idx+'" onchange="KitBuilder._warn()" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+catOptions(data.category_id)+'</select></div>'+
           '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px;align-items:center;">'+
             '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;"><input type="checkbox" id="kc-consumer-'+idx+'" '+(data.consumer_packaging?'checked':'')+' onchange="KitBuilder._warn()" /> Consumer pkg</label>'+
@@ -143,9 +144,37 @@ var KitBuilder = (function(){
             '<div><input type="number" id="kc-bulk-'+idx+'" value="'+(data.bulk_master_pack_qty||'')+'" placeholder="Bulk/master qty" step="1" style="width:100%;padding:5px 7px;font-size:11px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
           '</div>'+
         '</div>'+
+        // ── Per-component packaging mode: existing / new (→ variant) / bulk-naked ──
+        '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #e0e0d8;">'+
+          '<div style="font-size:10px;font-weight:600;color:#aaa;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Component Packaging</div>'+
+          '<select id="kc-pkgmode-'+idx+'" onchange="KitBuilder._pkgModeChange('+idx+')" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;">'+
+            '<option value="existing"'+(data.pkg_mode==='existing'||!data.pkg_mode?' selected':'')+'>Existing packaging (use this SKU\u2019s packaging on file)</option>'+
+            '<option value="new"'+(data.pkg_mode==='new'?' selected':'')+'>New packaging (creates a packaging variant of this SKU)</option>'+
+            '<option value="bulk"'+(data.pkg_mode==='bulk'?' selected':'')+'>Bulk / naked (no packaging)</option>'+
+          '</select>'+
+          '<div id="kc-newpkg-'+idx+'" style="display:none;margin-top:8px;padding:8px;background:#f7f9ff;border:1px solid #d8e2f5;border-radius:6px;">'+
+            '<div style="font-size:10px;color:#2244cc;font-weight:600;margin-bottom:6px;">New packaging — a child variant SKU (\u2011V#) will be created on save. Same product &amp; certs, new packaging + cost.</div>'+
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'+
+              '<input type="text" id="kc-np-primary-'+idx+'" placeholder="Primary container (e.g. glass bottle)" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+              '<input type="text" id="kc-np-material-'+idx+'" placeholder="Material (e.g. glass, PET)" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+              '<input type="text" id="kc-np-closure-'+idx+'" placeholder="Closure / applicator" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+              '<input type="text" id="kc-np-secondary-'+idx+'" placeholder="Secondary / display" style="padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+            '</div>'+
+            '<input type="text" id="kc-np-artwork-'+idx+'" placeholder="Packaging artwork link (optional)" style="width:100%;margin-top:6px;padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;" />'+
+            '<textarea id="kc-np-notes-'+idx+'" rows="2" placeholder="Packaging notes (optional)" style="width:100%;margin-top:6px;padding:5px 7px;font-size:11px;border:1px solid #d8e2f5;border-radius:6px;resize:vertical;"></textarea>'+
+          '</div>'+
+        '</div>'+
       '</div>';
     wrap.appendChild(row);
+    _pkgModeChange(idx);
     _warn();
+  }
+
+  // Show/hide the new-packaging sub-form; only meaningful for existing-SKU components.
+  function _pkgModeChange(idx){
+    var mode=g('kc-pkgmode-'+idx)?g('kc-pkgmode-'+idx).value:'existing';
+    var np=g('kc-newpkg-'+idx);
+    if(np)np.style.display=(mode==='new')?'block':'none';
   }
 
   function _toggle(idx){
@@ -216,6 +245,18 @@ var KitBuilder = (function(){
         plain[f.key]=(f.type==='number')?(val?parseFloat(val):null):(val?val.trim():null);
       });
       var s=skuId?skus().find(function(x){return x.id===skuId;}):null;
+      var pkgMode=g('kc-pkgmode-'+idx)?g('kc-pkgmode-'+idx).value:'existing';
+      var newPkg=null;
+      if(pkgMode==='new'){
+        newPkg={
+          primary:g('kc-np-primary-'+idx)?g('kc-np-primary-'+idx).value.trim()||null:null,
+          material:g('kc-np-material-'+idx)?g('kc-np-material-'+idx).value.trim()||null:null,
+          closure:g('kc-np-closure-'+idx)?g('kc-np-closure-'+idx).value.trim()||null:null,
+          secondary:g('kc-np-secondary-'+idx)?g('kc-np-secondary-'+idx).value.trim()||null:null,
+          artwork_url:g('kc-np-artwork-'+idx)?g('kc-np-artwork-'+idx).value.trim()||null:null,
+          notes:g('kc-np-notes-'+idx)?g('kc-np-notes-'+idx).value.trim()||null:null
+        };
+      }
       out.push({
         component_sku_id:skuId||null,
         qty_per_kit:parseFloat(g('kc-qty-'+idx).value)||1,
@@ -232,7 +273,9 @@ var KitBuilder = (function(){
         consumer_packaging:g('kc-consumer-'+idx)?g('kc-consumer-'+idx).checked:false,
         inner_carton:g('kc-inner-'+idx)?g('kc-inner-'+idx).checked:false,
         bulk_master_pack_qty:g('kc-bulk-'+idx)&&g('kc-bulk-'+idx).value?parseInt(g('kc-bulk-'+idx).value):null,
-        unit_cost:plain.unit_cost
+        unit_cost:plain.unit_cost,
+        pkg_mode:pkgMode,
+        new_packaging:newPkg
       });
     });
     return out;
@@ -243,6 +286,6 @@ var KitBuilder = (function(){
     populatePackaging:populatePackaging, FIELDS:FIELDS,
     rowCount:function(){return document.querySelectorAll('#'+cfg.containerId+' [data-kc]').length;},
     // internal handlers referenced by inline onclick:
-    _toggle:_toggle, _remove:_remove, _skuChange:_skuChange, _promote:_promote, _warn:_warn
+    _toggle:_toggle, _remove:_remove, _skuChange:_skuChange, _promote:_promote, _warn:_warn, _pkgModeChange:_pkgModeChange
   };
 })();

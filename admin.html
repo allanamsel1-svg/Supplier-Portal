@@ -1053,8 +1053,18 @@
                 <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Type</label>
                   <select id="rfq-kit-pkg-type" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;"><option value="">— Select packaging —</option></select></div>
                 <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Detail (optional)</label>
-                  <input type="text" id="rfq-kit-pkg-detail" placeholder="e.g. kraft, 20×20×8cm" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
+                  <input type="text" id="rfq-kit-pkg-detail" placeholder="e.g. kraft, custom print" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
               </div>
+              <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px;">
+                <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Length (cm)</label>
+                  <input type="number" id="rfq-kit-pkg-l" step="0.1" placeholder="L" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
+                <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Width (cm)</label>
+                  <input type="number" id="rfq-kit-pkg-w" step="0.1" placeholder="W" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
+                <div><label style="font-size:10px;color:#888;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;">Height (cm)</label>
+                  <input type="number" id="rfq-kit-pkg-h" step="0.1" placeholder="H" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>
+              </div>
+              <input type="text" id="rfq-kit-pkg-artwork" placeholder="Kit packaging artwork link (optional)" style="width:100%;margin-top:8px;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" />
+              <textarea id="rfq-kit-pkg-notes" rows="2" placeholder="Kit packaging notes (optional)" style="width:100%;margin-top:8px;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;resize:vertical;"></textarea>
             </div>
           </div>
         </div>
@@ -2305,8 +2315,10 @@ async function createKitForRfq(savedRFQ){
   var catPrefix=(catObj&&catObj.model_prefix)?catObj.model_prefix:'KT';
   // Draft RFQ-container SKU — sequence just needs to be unique, not catalog-continuous.
   var seq=parseInt(String(Date.now()).slice(-7),10);
-  // Auto model number — RFQ-scoped, unique, never shown to factories.
-  var model='KIT-'+(savedRFQ.project_number||savedRFQ.id.slice(0,8));
+  // Auto model number — RFQ-scoped, unique. Suffix with a short timestamp so
+  // re-saves / repeated test RFQs never collide on skus_model_number_key.
+  var uniqSuffix=String(Date.now()).slice(-6);
+  var model='KIT-'+(savedRFQ.project_number||savedRFQ.id.slice(0,8))+'-'+uniqSuffix;
 
   // Reuse an existing kit SKU if this RFQ already made one (editing case).
   var kitSkuId=savedRFQ.kit_sku_id||null;
@@ -2335,6 +2347,21 @@ async function createKitForRfq(savedRFQ){
   // Replace component rows for this kit (delete-then-insert).
   await fetch(SB+'/rest/v1/kit_components?kit_sku_id=eq.'+kitSkuId,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
   var rows=KitBuilder.collect();
+
+  // For any component set to "new packaging" on an existing SKU, create a child
+  // variant SKU (-V#). Same product/category/dims/certs (certs are factory+category
+  // keyed, so inheritance is automatic), new packaging + own artwork. The kit then
+  // references the variant instead of the parent.
+  for(var ri=0; ri<rows.length; ri++){
+    var row=rows[ri];
+    if(row.pkg_mode==='new' && row.component_sku_id && row.new_packaging){
+      try{
+        var variantId=await createPackagingVariant(row.component_sku_id, row.new_packaging);
+        if(variantId) row.component_sku_id=variantId; // kit now points at the variant
+      }catch(ve){ console.error('variant create:',ve); throw new Error('packaging variant: '+ve.message); }
+    }
+  }
+
   // Every row in the array MUST carry an identical key set — PostgREST rejects
   // mismatched keys ("All object keys must match"). Null-fill consistently.
   var payload=rows.map(function(row,i){return {
@@ -2350,9 +2377,10 @@ async function createKitForRfq(savedRFQ){
     draft_unit_l:row.unit_l,draft_unit_w:row.unit_w,draft_unit_h:row.unit_h,
     draft_unit_wt_g:row.unit_wt_g,draft_units_per_master:row.units_per_master,
     draft_category_id:row.category_id,draft_unit_cost:row.unit_cost,
-    reconcile_status:row.reconcile_status
+    reconcile_status:row.reconcile_status,
+    pkg_length_cm:null,pkg_width_cm:null,pkg_height_cm:null,pkg_notes:null,pkg_artwork_url:null
   };});
-  // Packaging line (always last) — same key set, null-filled.
+  // Packaging line (always last) — same key set, null-filled, now with dims/notes/artwork.
   var pkgType=g('rfq-kit-pkg-type')?g('rfq-kit-pkg-type').value:'';
   var pkgDetail=g('rfq-kit-pkg-detail')?g('rfq-kit-pkg-detail').value.trim():'';
   if(pkgType){
@@ -2369,7 +2397,12 @@ async function createKitForRfq(savedRFQ){
       draft_unit_l:null,draft_unit_w:null,draft_unit_h:null,
       draft_unit_wt_g:null,draft_units_per_master:null,
       draft_category_id:null,draft_unit_cost:null,
-      reconcile_status:'unmatched'
+      reconcile_status:'unmatched',
+      pkg_length_cm:g('rfq-kit-pkg-l')&&g('rfq-kit-pkg-l').value?parseFloat(g('rfq-kit-pkg-l').value):null,
+      pkg_width_cm:g('rfq-kit-pkg-w')&&g('rfq-kit-pkg-w').value?parseFloat(g('rfq-kit-pkg-w').value):null,
+      pkg_height_cm:g('rfq-kit-pkg-h')&&g('rfq-kit-pkg-h').value?parseFloat(g('rfq-kit-pkg-h').value):null,
+      pkg_notes:g('rfq-kit-pkg-notes')?g('rfq-kit-pkg-notes').value.trim()||null:null,
+      pkg_artwork_url:g('rfq-kit-pkg-artwork')?g('rfq-kit-pkg-artwork').value.trim()||null:null
     });
   }
   if(payload.length){
@@ -2380,6 +2413,53 @@ async function createKitForRfq(savedRFQ){
   // Point the RFQ at the kit SKU.
   await fetch(SB+'/rest/v1/rfqs?id=eq.'+savedRFQ.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_kit_rfq:true,kit_sku_id:kitSkuId})});
   savedRFQ.kit_sku_id=kitSkuId; savedRFQ.is_kit_rfq=true;
+}
+
+// Create a packaging variant (child SKU) of an existing SKU. Inherits the parent's
+// identity/dims/category (certs are factory+category keyed, so compliance carries
+// automatically). Model number = parent + "-V{n}", n incrementing across existing variants.
+async function createPackagingVariant(parentSkuId, np){
+  // Fetch parent.
+  var pr=await fetch(SB+'/rest/v1/skus?id=eq.'+parentSkuId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  if(!pr.ok) throw new Error('parent fetch '+pr.status);
+  var parr=await pr.json(); var p=parr&&parr[0];
+  if(!p) throw new Error('parent not found');
+
+  // Determine next -V{n} by counting existing children of this parent.
+  var cr=await fetch(SB+'/rest/v1/skus?parent_sku_id=eq.'+parentSkuId+'&select=model_number',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+  var kids=cr.ok?await cr.json():[];
+  var n=kids.length+2; // first variant is V2 (parent is implicitly V1)
+  var childModel=p.model_number+'-V'+n;
+
+  var childPayload={
+    model_number:childModel,
+    brand_prefix:p.brand_prefix,
+    category_prefix:p.category_prefix,
+    sequence_number:parseInt(String(Date.now()).slice(-7),10),
+    description:p.description,
+    detailed_description:p.detailed_description,
+    brand_id:p.brand_id,
+    category_id:p.category_id,
+    parent_sku_id:parentSkuId,
+    is_cosmetic:p.is_cosmetic,
+    is_kit:false,
+    status:'draft',
+    // inherit physical dims
+    unit_length_cm:p.unit_length_cm,unit_width_cm:p.unit_width_cm,unit_height_cm:p.unit_height_cm,unit_weight_kg:p.unit_weight_kg,
+    units_per_master:p.units_per_master,
+    // new packaging
+    packaging_primary:np.primary,
+    packaging_primary_material:np.material,
+    packaging_closures:np.closure?[np.closure]:null,
+    packaging_secondary:np.secondary?[np.secondary]:null,
+    packaging_notes:np.notes,
+    packaging_artwork_url:np.artwork_url,
+    updated_at:new Date().toISOString()
+  };
+  var ins=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(childPayload)});
+  if(!ins.ok){var e=await ins.json().catch(function(){return{};});throw new Error(e.message||e.details||ins.status);}
+  var irows=await ins.json();
+  return (Array.isArray(irows)?irows[0]:irows).id;
 }
 
 function doLogin(){
@@ -5452,6 +5532,7 @@ function resetRFQForm(){
   if(g('rfq-kit-section'))g('rfq-kit-section').style.display='none';
   if(g('rfq-kit-pkg-type'))g('rfq-kit-pkg-type').value='';
   if(g('rfq-kit-pkg-detail'))g('rfq-kit-pkg-detail').value='';
+  ['rfq-kit-pkg-l','rfq-kit-pkg-w','rfq-kit-pkg-h','rfq-kit-pkg-notes','rfq-kit-pkg-artwork'].forEach(function(id){if(g(id))g(id).value='';});
   if(typeof KitBuilder!=='undefined')KitBuilder.reset();
 }
 
