@@ -2236,7 +2236,7 @@
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
-var BUILD_MARKER='KIT-BUILD-2026-05-25-G';  // bump to verify deploys reached the browser
+var BUILD_MARKER='KIT-BUILD-2026-05-25-H';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
 var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
 var allFactories=[];
@@ -5448,7 +5448,11 @@ async function populateRFQEditForm(rfq){
   if(g('rfq-fob-port'))g('rfq-fob-port').value=rfq.fob_port||'';
   if(g('rfq-target-gross'))g('rfq-target-gross').value=80;
   if(rfq.product_image_url){
-    if(g('rfq-img-thumb')){g('rfq-img-thumb').src=rfq.product_image_url;g('rfq-img-thumb').style.display='block';}
+    // The preview <img> sits inside #rfq-img-preview which defaults to display:none —
+    // toggling only the inner img keeps the whole container hidden. Match the upload
+    // path (see ~line 6351) and reveal the container.
+    if(g('rfq-img-thumb'))g('rfq-img-thumb').src=rfq.product_image_url;
+    if(g('rfq-img-preview'))g('rfq-img-preview').style.display='block';
     if(g('rfq-img-name'))g('rfq-img-name').textContent='Image on file';
   }
   rfqCategoryChanged();
