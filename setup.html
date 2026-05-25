@@ -184,6 +184,7 @@
   <div class="tab" onclick="switchTab('skus')">📦 SKUs</div>
   <div class="tab" onclick="switchTab('freight');loadFreightTab();">🚢 Freight Rates</div>
   <div class="tab" onclick="switchTab('upc');loadUpcPool();">🏷 UPC Pool</div>
+  <div class="tab" onclick="switchTab('packaging');loadPackagingTypes();">📦 Kit Packaging</div>
 </div>
 
 <!-- ══════════════════════════════════════ -->
@@ -700,6 +701,29 @@
 </div>
 
 
+<div class="tab-panel" id="tab-packaging">
+  <div style="padding:1.25rem 1.5rem;max-width:680px;">
+    <div style="font-size:13px;color:#888;margin-bottom:1rem;">Manage the packaging types available when defining a kit. Each kit gets one packaging line (box, tray, basket, etc.). Deactivated types stay on existing kits but won't appear in the dropdown for new ones.</div>
+
+    <div style="background:#fff;border:1px solid #e0e0d8;border-radius:8px;padding:14px 16px;margin-bottom:1rem;">
+      <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:8px;">Add packaging type</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <input type="text" id="pkg-new-name" placeholder="e.g. Kraft gift box" style="flex:1;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" onkeypress="if(event.key==='Enter')addPackagingType();" />
+        <button style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;" onclick="addPackagingType()">Add</button>
+      </div>
+      <div id="pkg-add-msg" style="font-size:12px;margin-top:8px;display:none;"></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e0e0d8;border-radius:8px;overflow:hidden;">
+      <table style="width:100%;font-size:13px;border-collapse:collapse;">
+        <thead><tr style="background:#fafaf6;color:#888;"><th style="padding:10px 14px;text-align:left;font-weight:500;">Packaging Type</th><th style="padding:10px 14px;text-align:left;font-weight:500;width:90px;">Status</th><th style="padding:10px 14px;text-align:right;font-weight:500;width:160px;">Actions</th></tr></thead>
+        <tbody id="pkg-table-body"><tr><td colspan="3" style="padding:2rem;text-align:center;color:#bbb;">Loading...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
@@ -718,11 +742,93 @@ function showMsg(id,type,text){
   if(type==='ok')setTimeout(function(){el.style.display='none';},4000);
 }
 
+// ════════════════════════════════════════
+// KIT PACKAGING TYPES (management UI)
+// ════════════════════════════════════════
+var allPackagingTypes=[];
+
+async function loadPackagingTypes(){
+  var body=g('pkg-table-body');
+  if(body)body.innerHTML='<tr><td colspan="3" style="padding:2rem;text-align:center;color:#bbb;">Loading...</td></tr>';
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_packaging_types?select=*&order=sort_order,name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    allPackagingTypes=r.ok?await r.json():[];
+    renderPackagingTypes();
+  }catch(e){
+    if(body)body.innerHTML='<tr><td colspan="3" style="padding:2rem;text-align:center;color:#b00;">Error: '+esc(e.message)+'</td></tr>';
+  }
+}
+
+function renderPackagingTypes(){
+  var body=g('pkg-table-body'); if(!body)return;
+  if(!allPackagingTypes.length){
+    body.innerHTML='<tr><td colspan="3" style="padding:2rem;text-align:center;color:#bbb;">No packaging types yet. Add one above.</td></tr>';
+    return;
+  }
+  body.innerHTML=allPackagingTypes.map(function(p){
+    var active=p.active!==false;
+    return '<tr style="border-top:1px solid #f0f0e8;'+(active?'':'opacity:0.55;')+'">'+
+      '<td style="padding:9px 14px;"><span id="pkg-name-'+p.id+'">'+esc(p.name)+'</span></td>'+
+      '<td style="padding:9px 14px;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:'+(active?'#edfaed;color:#1a7a1a':'#f0f0e8;color:#999')+';">'+(active?'ACTIVE':'OFF')+'</span></td>'+
+      '<td style="padding:9px 14px;text-align:right;white-space:nowrap;">'+
+        '<button onclick="renamePackagingType(\''+p.id+'\')" style="font-size:11px;padding:4px 9px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;font-family:inherit;margin-right:4px;">Rename</button>'+
+        '<button onclick="togglePackagingType(\''+p.id+'\','+(!active)+')" style="font-size:11px;padding:4px 9px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:5px;cursor:pointer;font-family:inherit;margin-right:4px;">'+(active?'Disable':'Enable')+'</button>'+
+        '<button onclick="deletePackagingType(\''+p.id+'\')" style="font-size:11px;padding:4px 9px;background:#fff0f0;border:1px solid #fdd;color:#b00;border-radius:5px;cursor:pointer;font-family:inherit;">Delete</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+async function addPackagingType(){
+  var name=gv('pkg-new-name');
+  var msg=g('pkg-add-msg');
+  function say(text,ok){if(msg){msg.textContent=text;msg.style.color=ok?'#1a7a1a':'#b00';msg.style.display='block';if(ok)setTimeout(function(){msg.style.display='none';},3000);}}
+  if(!name){say('Enter a name.',false);return;}
+  var maxSort=allPackagingTypes.reduce(function(m,p){return Math.max(m,p.sort_order||0);},0);
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_packaging_types',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({name:name,sort_order:maxSort+10,active:true})});
+    if(!r.ok){var e=await r.json().catch(function(){return{};});say('Add failed: '+(e.message||r.status),false);return;}
+    g('pkg-new-name').value='';
+    say('✓ Added',true);
+    loadPackagingTypes();
+  }catch(e){say('Error: '+e.message,false);}
+}
+
+async function renamePackagingType(id){
+  var p=allPackagingTypes.find(function(x){return x.id===id;}); if(!p)return;
+  var name=prompt('Rename packaging type:',p.name);
+  if(name===null)return;
+  name=name.trim(); if(!name)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_packaging_types?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({name:name})});
+    if(!r.ok){alert('Rename failed.');return;}
+    loadPackagingTypes();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function togglePackagingType(id,makeActive){
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_packaging_types?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({active:makeActive})});
+    if(!r.ok){alert('Update failed.');return;}
+    loadPackagingTypes();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function deletePackagingType(id){
+  var p=allPackagingTypes.find(function(x){return x.id===id;}); if(!p)return;
+  if(!confirm('Delete "'+p.name+'"? This removes it from the dropdown. Existing kits keep their saved packaging. Consider Disable instead.'))return;
+  try{
+    var r=await fetch(SB+'/rest/v1/kit_packaging_types?id=eq.'+id,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){alert('Delete failed.');return;}
+    loadPackagingTypes();
+  }catch(e){alert('Error: '+e.message);}
+}
+
 // ── TABS ──
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t,i){t.classList.remove('on');});
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
-  var tabs=['categories','brands','customers','skus','freight','upc'];
+  var tabs=['categories','brands','customers','skus','freight','upc','packaging'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('on');
   g('tab-'+name).classList.add('on');
   if(name==='categories')loadCats();
@@ -731,6 +837,7 @@ function switchTab(name){
   if(name==='brands')loadBrands();
   if(name==='customers')loadCusts();
   if(name==='upc')loadUpcPool();
+  if(name==='packaging')loadPackagingTypes();
 }
 
 // ════════════════════════════════════════
