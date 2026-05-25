@@ -727,7 +727,7 @@
 <script src="kit-builder.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
-var SETUP_BUILD='SETUP-2026-05-25-C'; try{console.log('setup.html build:',SETUP_BUILD);}catch(e){}
+var SETUP_BUILD='SETUP-2026-05-25-D'; try{console.log('setup.html build:',SETUP_BUILD);}catch(e){}
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var allCats=[], allBrands=[], allCusts=[], allDepts=[], currentCustId=null;
 
@@ -2421,6 +2421,15 @@ async function openSkuForm(skuId){
 // ── Helpers ──
 function fv(sku,f,d){var v=(sku&&sku[f]!=null)?sku[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
 function pv(pkg,f,d){var v=(pkg&&pkg[f]!=null)?pkg[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
+// Format an ISO timestamp as a readable local date+time, e.g. "May 25, 2026, 9:41 AM".
+function fmtTs(iso){
+  if(!iso)return '—';
+  try{
+    var d=new Date(iso);
+    if(isNaN(d.getTime()))return iso;
+    return d.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+  }catch(e){return iso;}
+}
 function cv(c,f,d){var v=(c&&c[f]!=null)?c[f]:(d!==undefined?d:'');return v===null||v===undefined?'':v;}
 
 function dimSt(s){
@@ -2498,6 +2507,10 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
 
   // ── 1. BASIC INFO ──
   card('Basic Information',
+    (sku&&(sku.created_at||sku.updated_at)?'<div style="font-size:11px;color:#999;margin-bottom:12px;display:flex;gap:18px;flex-wrap:wrap;">'+
+      (sku.created_at?'<span>Created: <strong style="color:#666;font-weight:500;">'+fmtTs(sku.created_at)+'</strong></span>':'')+
+      (sku.updated_at?'<span>Last updated: <strong style="color:#666;font-weight:500;">'+fmtTs(sku.updated_at)+'</strong></span>':'')+
+    '</div>':'')+
     grid('1fr 1fr','10px',
       fld('Brand *',sel('sf-brand',brandOpts,'onchange="onBrandCatChange()"'))+
       fld('Category *',sel('sf-category',catOpts,'onchange="onBrandCatChange()"'))
