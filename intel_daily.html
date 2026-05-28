@@ -58,6 +58,44 @@
 .id-loading{padding:1.5rem;text-align:center;color:#888;font-size:13px;}
 .id-empty{padding:1.5rem;text-align:center;color:#888;font-size:13px;font-style:italic;}
 .id-error{padding:1rem;color:#a22;font-size:12px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;}
+
+/* Cross-intel overview card */
+.id-overview{background:#fff;border:1px solid #e0e0d8;border-radius:12px;padding:1.1rem 1.4rem;margin-bottom:1.25rem;}
+.id-ov-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#888;margin-bottom:10px;}
+.id-ov-row{display:flex;align-items:center;gap:12px;padding:10px 6px;border-bottom:1px solid #f0f0e8;cursor:pointer;border-radius:6px;margin:0 -6px;transition:background 0.1s;}
+.id-ov-row:last-child{border-bottom:none;}
+.id-ov-row:hover{background:#fafaf8;}
+.id-ov-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0;}
+.id-ov-body{flex:1;min-width:0;}
+.id-ov-title{font-size:13px;font-weight:600;color:#1a1a2e;}
+.id-ov-title .n{color:#2244cc;font-weight:700;}
+.id-ov-title .n.zero{color:#bbb;}
+.id-ov-detail{font-size:11px;color:#888;margin-top:3px;}
+.id-ov-arrow{color:#bbb;font-size:14px;flex-shrink:0;}
+.id-ov-row:hover .id-ov-arrow{color:#2244cc;}
+
+/* Count badges on section heads */
+.id-count-badge{font-size:11px;background:#f0f0e8;color:#666;padding:1px 8px;border-radius:10px;font-weight:600;margin-left:6px;letter-spacing:0.02em;vertical-align:middle;}
+.id-count-badge.zero{color:#bbb;}
+.id-count-badge.fresh{background:#edfaed;color:#1a7a1a;}
+
+/* Retailer-grouped news */
+.id-retailer-group{margin-bottom:1.25rem;}
+.id-retailer-group:last-child{margin-bottom:0;}
+.id-retailer-head{display:flex;align-items:baseline;gap:8px;padding-bottom:6px;border-bottom:1px solid #f0f0e8;margin-bottom:6px;flex-wrap:wrap;}
+.id-retailer-name{font-size:12px;font-weight:700;color:#1a1a2e;letter-spacing:0.02em;}
+.id-retailer-meta{font-size:10px;color:#888;}
+
+/* Shop-out items */
+.id-shopout{display:flex;gap:12px;padding:11px 0;border-bottom:0.5px dashed #f0f0e8;}
+.id-shopout:last-child{border-bottom:none;}
+.id-so-body{flex:1;min-width:0;}
+.id-so-brand{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:0.04em;}
+.id-so-product{font-size:13px;font-weight:600;color:#1a1a2e;margin-top:1px;}
+.id-so-meta{font-size:11px;color:#888;margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.id-so-price{color:#2244cc;font-weight:700;}
+.id-so-markdown{color:#a22;font-weight:600;}
+.id-so-stale-note{font-size:11.5px;color:#7a5a00;background:#fff8e0;border:1px solid #f0d860;padding:8px 12px;border-radius:7px;margin-bottom:10px;line-height:1.45;}
 </style>
 </head>
 <body>
@@ -90,10 +128,60 @@
     <div class="id-d-text" id="id-d-text"><span class="id-d-empty">Loading today's digest…</span></div>
   </div>
 
-  <!-- TOP HEADLINES — news_articles, grouped by source, 24h default with 7d toggle -->
-  <div class="ri-section">
+  <!-- CROSS-INTEL OVERVIEW — one-line counts per source for the last 24h.
+       Each row scrolls to the matching section below. -->
+  <div class="id-overview">
+    <div class="id-ov-label">Cross-intel overview · last 24h</div>
+    <div class="id-ov-row" onclick="scrollToSection('sec-headlines')" id="id-ov-signals">
+      <div class="id-ov-icon">🎯</div>
+      <div class="id-ov-body">
+        <div class="id-ov-title"><span class="n zero">—</span> News signals</div>
+        <div class="id-ov-detail">signal-typed, non-fluff articles</div>
+      </div>
+      <div class="id-ov-arrow">→</div>
+    </div>
+    <div class="id-ov-row" onclick="scrollToSection('sec-retailer')" id="id-ov-retailer">
+      <div class="id-ov-icon">🏬</div>
+      <div class="id-ov-body">
+        <div class="id-ov-title"><span class="n zero">—</span> Retailer news</div>
+        <div class="id-ov-detail">—</div>
+      </div>
+      <div class="id-ov-arrow">→</div>
+    </div>
+    <div class="id-ov-row" onclick="scrollToSection('sec-shopout')" id="id-ov-shopout">
+      <div class="id-ov-icon">📸</div>
+      <div class="id-ov-body">
+        <div class="id-ov-title"><span class="n zero">—</span> Shop-outs <span style="font-weight:500;color:#888;">new observations</span></div>
+        <div class="id-ov-detail">retail intel observations posted today</div>
+      </div>
+      <div class="id-ov-arrow">→</div>
+    </div>
+  </div>
+
+  <!-- RETAILER NEWS — retailer_news joined to retailers + news_articles. 24h/7d toggle. Grouped by retailer. -->
+  <div class="ri-section" id="sec-retailer">
     <div class="id-section-head">
-      <div class="ri-section-title">Top Headlines</div>
+      <div class="ri-section-title">Retailer News <span class="id-count-badge zero" id="id-badge-retailer">—</span></div>
+      <div class="id-window-toggle" role="tablist">
+        <button class="id-win id-rwin active" data-win="24h" onclick="setRetailerWindow('24h')">Last 24h</button>
+        <button class="id-win id-rwin" data-win="7d" onclick="setRetailerWindow('7d')">Last 7d</button>
+      </div>
+    </div>
+    <div id="id-retailer-news"><div class="id-loading">Loading retailer news…</div></div>
+  </div>
+
+  <!-- SHOP-OUTS — recent shop_out_observations. Last 7d window with stale fallback. -->
+  <div class="ri-section" id="sec-shopout">
+    <div class="id-section-head">
+      <div class="ri-section-title">Shop-Outs <span class="id-count-badge zero" id="id-badge-shopout">—</span></div>
+    </div>
+    <div id="id-shopouts"><div class="id-loading">Loading shop-outs…</div></div>
+  </div>
+
+  <!-- TOP HEADLINES — news_articles, grouped by source, 24h default with 7d toggle -->
+  <div class="ri-section" id="sec-headlines">
+    <div class="id-section-head">
+      <div class="ri-section-title">Top Headlines <span class="id-count-badge zero" id="id-badge-headlines">—</span></div>
       <div class="id-window-toggle" role="tablist">
         <button class="id-win active" data-win="24h" onclick="setWindow('24h')">Last 24h</button>
         <button class="id-win" data-win="7d" onclick="setWindow('7d')">Last 7d</button>
@@ -187,7 +275,8 @@ function windowStartIso(w){
 function setWindow(w){
   if(w===currentWindow)return;
   currentWindow=w;
-  var btns=document.querySelectorAll('.id-win');
+  // Scoped to the Top Headlines section so the retailer-news toggle (same .id-win class) is unaffected.
+  var btns=document.querySelectorAll('#sec-headlines .id-win');
   for(var i=0;i<btns.length;i++) btns[i].className='id-win'+(btns[i].getAttribute('data-win')===w?' active':'');
   loadHeadlines();
 }
@@ -200,6 +289,7 @@ function loadHeadlines(){
     '&is_fluff=eq.false&ingested_at=gte.'+encodeURIComponent(since)+
     '&order=ingested_at.desc&limit='+cap;
   sb(path).then(function(rows){
+    setBadge('id-badge-headlines', rows?rows.length:0);
     if(!rows||!rows.length){
       host.innerHTML='<div class="id-empty">No fresh headlines in this window.</div>';
       return;
@@ -281,8 +371,171 @@ function expandPast(item, idx){
   }
 }
 
+// ── Cross-intel overview (count badges + per-source one-liners) ─────────
+// Uses Prefer: count=exact for cheap counts. Each PostgREST request is read-only.
+function headCount(path){
+  var sep=path.indexOf('?')>=0?'&':'?';
+  return fetch(SB+'/rest/v1/'+path+sep+'select=id&limit=1',{
+    method:'GET',
+    headers:{apikey:KEY,Authorization:'Bearer '+KEY,Prefer:'count=exact'}
+  }).then(function(r){
+    var range=r.headers.get('content-range')||'';
+    var m=/\/(\d+)$/.exec(range);
+    return m?parseInt(m[1],10):0;
+  });
+}
+function setBadge(id, n){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.textContent=n;
+  el.className='id-count-badge'+(n>0?' fresh':' zero');
+}
+function setOverviewCount(rowId, n, label, tail){
+  var el=document.getElementById(rowId);
+  if(!el)return;
+  var nCls=n>0?'n':'n zero';
+  el.querySelector('.id-ov-title').innerHTML='<span class="'+nCls+'">'+n+'</span> '+esc(label)+(tail?' <span style="font-weight:500;color:#888;">'+esc(tail)+'</span>':'');
+}
+function loadOverview(){
+  var since=encodeURIComponent(windowStartIso('24h'));
+  Promise.all([
+    headCount('news_articles?is_fluff=eq.false&signal_types=not.is.null&ingested_at=gte.'+since),
+    headCount('retailer_news?ingested_at=gte.'+since),
+    headCount('shop_out_observations?created_at=gte.'+since)
+  ]).then(function(c){
+    setOverviewCount('id-ov-signals',  c[0], 'News signals', '');
+    setOverviewCount('id-ov-retailer', c[1], 'Retailer news', '');
+    setOverviewCount('id-ov-shopout',  c[2], 'Shop-outs', 'new observations');
+    // Section badges shadow the same counts (retailer & shopout get refined by their loaders).
+    setBadge('id-badge-retailer', c[1]);
+    setBadge('id-badge-shopout',  c[2]);
+  }).catch(function(e){console.error('overview:',e);});
+}
+
+// ── Retailer News (24h default, 7d toggle, grouped by retailer) ─────────
+var retailerWindow='24h';
+function setRetailerWindow(w){
+  if(w===retailerWindow)return;
+  retailerWindow=w;
+  var btns=document.querySelectorAll('#sec-retailer .id-win');
+  for(var i=0;i<btns.length;i++) btns[i].className='id-win id-rwin'+(btns[i].getAttribute('data-win')===w?' active':'');
+  loadRetailerNews();
+}
+function loadRetailerNews(){
+  var host=document.getElementById('id-retailer-news');
+  host.innerHTML='<div class="id-loading">Loading retailer news…</div>';
+  var since=windowStartIso(retailerWindow);
+  // Embedded select pulls retailer + article details in one round-trip (read-only).
+  var path='retailer_news?select=ingested_at,retailers(name,slug,tier,ticker),news_articles(headline,external_url,source_name,published_at,ai_highlight,snippet,signal_types,is_fluff)'+
+    '&ingested_at=gte.'+encodeURIComponent(since)+
+    '&order=ingested_at.desc&limit=200';
+  sb(path).then(function(rows){
+    setBadge('id-badge-retailer', rows?rows.length:0);
+    if(!rows||!rows.length){
+      host.innerHTML='<div class="id-empty">No retailer news in this window.</div>';
+      var detail=document.querySelector('#id-ov-retailer .id-ov-detail');
+      if(detail && retailerWindow==='24h') detail.textContent='—';
+      return;
+    }
+    var byName={}, order=[];
+    rows.forEach(function(r){
+      var nm=(r.retailers&&r.retailers.name)||'Unknown';
+      if(!byName[nm]){byName[nm]={items:[],ticker:(r.retailers&&r.retailers.ticker)||null};order.push(nm);}
+      byName[nm].items.push(r);
+    });
+    order.sort(function(a,b){return byName[b].items.length-byName[a].items.length;});
+    // Refresh overview "top retailers" hint when we're in the 24h window
+    if(retailerWindow==='24h'){
+      var detail=document.querySelector('#id-ov-retailer .id-ov-detail');
+      if(detail) detail.textContent='top: '+order.slice(0,3).join(', ');
+    }
+    host.innerHTML=order.map(function(nm){
+      var g=byName[nm];
+      return '<div class="id-retailer-group">'+
+        '<div class="id-retailer-head">'+
+          '<div class="id-retailer-name">'+esc(nm)+(g.ticker?' <span style="color:#888;font-weight:500;">('+esc(g.ticker)+')</span>':'')+'</div>'+
+          '<div class="id-retailer-meta">'+g.items.length+' article'+(g.items.length>1?'s':'')+'</div>'+
+        '</div>'+
+        g.items.slice(0,5).map(renderRetailerItem).join('')+
+      '</div>';
+    }).join('');
+  }).catch(function(e){
+    host.innerHTML='<div class="id-error">Could not load retailer news: '+esc(e.message)+'</div>';
+  });
+}
+function renderRetailerItem(r){
+  var a=r.news_articles||{};
+  var ctx=cleanText(a.ai_highlight||a.snippet||'');
+  if(ctx.length>200) ctx=ctx.slice(0,197)+'…';
+  var when=a.published_at||r.ingested_at;
+  var title=esc(cleanText(a.headline||'(untitled)'));
+  var linkHtml=a.external_url
+    ? '<a href="'+esc(a.external_url)+'" target="_blank" rel="noopener">'+title+'</a>'
+    : title;
+  var src=a.source_name?'<span>'+esc(a.source_name)+'</span><span>·</span>':'';
+  return '<div class="id-headline">'+
+    '<div class="id-h-meta">'+src+'<span>'+esc(timeAgo(when))+'</span></div>'+
+    '<div class="id-h-title">'+linkHtml+'</div>'+
+    (ctx?'<div class="id-h-context">'+esc(ctx)+'</div>':'')+
+  '</div>';
+}
+
+// ── Shop-outs (last 7d; if empty, show 5 most recent with a stale note) ─
+function loadShopOuts(){
+  var host=document.getElementById('id-shopouts');
+  host.innerHTML='<div class="id-loading">Loading shop-outs…</div>';
+  // Pull most recent 15 unconditionally; filter to 7d client-side. Read-only.
+  sb('shop_out_observations?select=id,brand,product_name,sub_brand,retail_price,compare_at_price,markdown_pct,currency,pack_size,pack_size_unit,ai_suggested_category,created_at,front_photo_id&order=created_at.desc&limit=15')
+    .then(function(rows){
+      if(!rows||!rows.length){
+        host.innerHTML='<div class="id-empty">No shop-out observations on file.</div>';
+        return;
+      }
+      var since7=Date.now()-7*24*3600*1000;
+      var fresh=rows.filter(function(r){return new Date(r.created_at).getTime()>=since7;});
+      setBadge('id-badge-shopout', fresh.length);
+      var show=fresh.length?fresh:rows.slice(0,5);
+      var note='';
+      if(!fresh.length){
+        var last=rows[0] && rows[0].created_at ? fmtDate(rows[0].created_at) : 'unknown';
+        note='<div class="id-so-stale-note">⚠ No new observations in the last 7 days. Showing the 5 most recent (last activity: '+esc(last)+').</div>';
+      }
+      host.innerHTML=note+show.map(renderShopOut).join('');
+    }).catch(function(e){
+      host.innerHTML='<div class="id-error">Could not load shop-outs: '+esc(e.message)+'</div>';
+    });
+}
+function renderShopOut(r){
+  var priceTxt='—';
+  if(r.retail_price!=null){
+    var sym=(r.currency==='USD'||!r.currency)?'$':(r.currency+' ');
+    priceTxt=sym+parseFloat(r.retail_price).toFixed(2);
+  }
+  var bits=[];
+  if(r.pack_size) bits.push((r.pack_size+(r.pack_size_unit||'')).replace(/\s+/g,''));
+  if(r.ai_suggested_category) bits.push(r.ai_suggested_category);
+  bits.push(timeAgo(r.created_at));
+  var markdown=r.markdown_pct?'<span class="id-so-markdown">'+parseFloat(r.markdown_pct).toFixed(0)+'% off</span><span>·</span>':'';
+  return '<div class="id-shopout">'+
+    '<div class="id-so-body">'+
+      '<div class="id-so-brand">'+esc(r.brand||'')+(r.sub_brand?' · '+esc(r.sub_brand):'')+'</div>'+
+      '<div class="id-so-product">'+esc(r.product_name||'(unnamed)')+'</div>'+
+      '<div class="id-so-meta"><span class="id-so-price">'+esc(priceTxt)+'</span><span>·</span>'+markdown+esc(bits.join(' · '))+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+// ── Scroll to section (used by cross-intel overview rows) ───────────────
+function scrollToSection(id){
+  var el=document.getElementById(id);
+  if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
 // ── Boot ────────────────────────────────────────────────────────────────
 loadDigest();
+loadOverview();
+loadRetailerNews();
+loadShopOuts();
 loadHeadlines();
 </script>
 
