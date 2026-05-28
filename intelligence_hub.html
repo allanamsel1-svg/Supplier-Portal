@@ -135,6 +135,12 @@
       <div class="mc-stat-label">Posts tracked</div>
       <div class="mc-desc">TikTok and Instagram velocity. Confirmation signal for trends already forming.</div>
     </a>
+    <a href="intel_fx.html" class="module-card">
+      <div class="mc-head"><div class="mc-title">💱 FX Watch</div></div>
+      <div class="mc-stat" id="mc-stat-fx">—</div>
+      <div class="mc-stat-label">USD → CNY</div>
+      <div class="mc-desc">Daily USD/CNY reference rate. Drift signals direct impact on landed cost from Chinese factories.</div>
+    </a>
   </div>
 
 </div>
@@ -191,6 +197,12 @@ function loadCounts(){
     var el=document.getElementById('mc-stat-ne');
     if(r && r.length){el.textContent=r.length;} else {el.textContent='0';el.classList.add('zero');}
   }).catch(function(){document.getElementById('mc-stat-ne').textContent='0';});
+
+  sb('fx_rates?pair=eq.USD%2FCNY&order=rate_date.desc&limit=1').then(function(r){
+    var el=document.getElementById('mc-stat-fx');
+    if(!el)return;
+    if(r && r.length){el.textContent=Number(r[0].rate).toFixed(4);} else {el.textContent='—';el.classList.add('zero');}
+  }).catch(function(){var el=document.getElementById('mc-stat-fx');if(el)el.textContent='—';});
 }
 
 function askQuestion(){
