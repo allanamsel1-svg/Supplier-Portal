@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Intel Report — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+.id{max-width:1100px;margin:0 auto;padding:1.5rem 2rem;}
+
+/* Today's digest hero card — same visual language as news_editorial summary */
+.id-digest{background:linear-gradient(135deg,#1a1a2e 0%,#4a2266 100%);color:#fff;border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;}
+.id-d-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;}
+.id-d-meta{font-size:11px;opacity:0.65;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.id-d-meta .dot{opacity:0.4;}
+.id-d-counts{background:rgba(255,255,255,0.12);padding:2px 9px;border-radius:10px;font-weight:600;letter-spacing:0.02em;}
+.id-d-text{font-size:14px;line-height:1.7;color:#f0e8ff;}
+.id-d-text p{margin-bottom:0.85rem;}
+.id-d-text p:last-child{margin-bottom:0;}
+.id-d-text em{font-style:italic;color:#fff;}
+.id-d-empty{font-size:13px;opacity:0.7;font-style:italic;}
+
+/* Section heads inside ri-section cards */
+.id-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.85rem;gap:10px;flex-wrap:wrap;}
+.id-section-head .ri-section-title{margin-bottom:0;}
+
+/* Window toggle (24h / 7d) */
+.id-window-toggle{display:flex;background:#fafaf8;border:1px solid #e0e0d8;border-radius:8px;padding:2px;}
+.id-win{padding:5px 11px;font-size:11px;font-weight:600;background:transparent;border:none;color:#666;cursor:pointer;border-radius:6px;font-family:inherit;letter-spacing:0.02em;}
+.id-win:hover{color:#1a1a2e;}
+.id-win.active{background:#1a1a2e;color:#fff;}
+
+/* Headlines, grouped by source */
+.id-source-group{margin-bottom:1.25rem;}
+.id-source-group:last-child{margin-bottom:0;}
+.id-source-name{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.07em;padding-bottom:6px;border-bottom:1px solid #f0f0e8;margin-bottom:8px;}
+.id-headline{padding:9px 0;border-bottom:0.5px dashed #f0f0e8;}
+.id-headline:last-child{border-bottom:none;}
+.id-h-title{font-size:13.5px;font-weight:600;line-height:1.4;margin-bottom:3px;}
+.id-h-title a{color:#1a1a2e;text-decoration:none;}
+.id-h-title a:hover{color:#2244cc;}
+.id-h-meta{font-size:11px;color:#888;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:3px;}
+.id-h-signal{font-size:9px;padding:1px 6px;background:#1a1a2e;color:#fff;border-radius:5px;font-weight:700;letter-spacing:0.04em;}
+.id-h-context{font-size:12px;line-height:1.5;color:#555;}
+
+/* Past digests — collapsible */
+.id-past-toggle{width:100%;background:none;border:none;text-align:left;font-family:inherit;cursor:pointer;font-size:12px;font-weight:600;color:#666;letter-spacing:0.03em;padding:0;display:flex;align-items:center;gap:6px;}
+.id-past-toggle:hover{color:#1a1a2e;}
+.id-past-toggle .chev{display:inline-block;transition:transform 0.15s;}
+.id-past-toggle.open .chev{transform:rotate(90deg);}
+.id-past{margin-top:1rem;display:flex;flex-direction:column;gap:8px;}
+.id-past-item{background:#fafaf8;border:1px solid #e8e8e0;border-radius:8px;padding:11px 14px;cursor:pointer;}
+.id-past-item:hover{border-color:#c8c8c0;}
+.id-past-date{font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:3px;}
+.id-past-preview{font-size:12px;color:#666;line-height:1.5;}
+.id-past-item.open .id-past-preview{color:#1a1a2e;white-space:pre-wrap;}
+.id-past-item.open .id-past-preview em{font-style:italic;}
+
+.id-loading{padding:1.5rem;text-align:center;color:#888;font-size:13px;}
+.id-empty{padding:1.5rem;text-align:center;color:#888;font-size:13px;font-style:italic;}
+.id-error{padding:1rem;color:#a22;font-size:12px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;}
+</style>
+</head>
+<body>
+
+<div class="ri-top">
+  <div class="ri-top-title">🎯 Retail Intelligence</div>
+  <div class="ri-top-actions">
+    <a href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="ri-tabs">
+  <a href="intel_daily.html" class="ri-tab active"><span class="ri-tab-icon">📋</span> Daily Intel</a>
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
+  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
+  <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="retailer_intel.html" class="ri-tab"><span class="ri-tab-icon">🏬</span> Retailer Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
+</div>
+
+<div class="id">
+
+  <!-- TODAY'S DIGEST — most-recent news_daily_summaries row -->
+  <div class="id-digest">
+    <div class="id-d-label">Today's Digest</div>
+    <div class="id-d-meta" id="id-d-meta"><span id="id-d-date">—</span></div>
+    <div class="id-d-text" id="id-d-text"><span class="id-d-empty">Loading today's digest…</span></div>
+  </div>
+
+  <!-- TOP HEADLINES — news_articles, grouped by source, 24h default with 7d toggle -->
+  <div class="ri-section">
+    <div class="id-section-head">
+      <div class="ri-section-title">Top Headlines</div>
+      <div class="id-window-toggle" role="tablist">
+        <button class="id-win active" data-win="24h" onclick="setWindow('24h')">Last 24h</button>
+        <button class="id-win" data-win="7d" onclick="setWindow('7d')">Last 7d</button>
+      </div>
+    </div>
+    <div id="id-headlines"><div class="id-loading">Loading headlines…</div></div>
+  </div>
+
+  <!-- PAST DIGESTS — last 7 daily summaries, collapsed by default -->
+  <div class="ri-section">
+    <button class="id-past-toggle" id="id-past-toggle" onclick="togglePast()"><span class="chev">▸</span> Past digests (last 7)</button>
+    <div id="id-past" class="id-past" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script>
+// ── Supabase (anon, read-only) ──────────────────────────────────────────
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+function sb(path){
+  return fetch(SB+'/rest/v1/'+path,{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  });
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function cleanText(s){
+  if(!s)return '';
+  s=String(s).replace(/<[^>]+>/g,' ');
+  s=s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&nbsp;/g,' ');
+  s=s.replace(/https?:\/\/news\.google\.com\/[^\s]+/g,'');
+  return s.replace(/\s+/g,' ').trim();
+}
+function timeAgo(iso){
+  if(!iso)return '';
+  var diff=Date.now()-new Date(iso).getTime();
+  var mins=Math.floor(diff/60000);
+  if(mins<1)return 'just now';
+  if(mins<60)return mins+'m ago';
+  var hrs=Math.floor(mins/60);
+  if(hrs<24)return hrs+'h ago';
+  var days=Math.floor(hrs/24);
+  return days+'d ago';
+}
+function fmtDate(d){
+  return new Date(d).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+}
+// summary_text uses *italics* and blank-line paragraphs. Escape first, then
+// promote *…* spans and split on blank lines — no other markdown.
+function renderSummary(text){
+  if(!text) return '';
+  var safe=esc(text);
+  safe=safe.replace(/\*([^*\n]+)\*/g,'<em>$1</em>');
+  return safe.split(/\n\s*\n/).map(function(p){return '<p>'+p.replace(/\n/g,'<br>')+'</p>';}).join('');
+}
+
+// ── Block 1: Today's Digest ─────────────────────────────────────────────
+function loadDigest(){
+  sb('news_daily_summaries?select=summary_date,summary_text,article_count,signal_article_count,generated_at&order=summary_date.desc&limit=1')
+    .then(function(rows){
+      var meta=document.getElementById('id-d-meta');
+      var body=document.getElementById('id-d-text');
+      if(!rows||!rows.length){
+        meta.innerHTML='<span id="id-d-date">'+esc(fmtDate(new Date()))+'</span>';
+        body.innerHTML='<span class="id-d-empty">No digest available yet.</span>';
+        return;
+      }
+      var r=rows[0];
+      var bits=['<span id="id-d-date">'+esc(fmtDate(r.summary_date))+'</span>'];
+      if(r.generated_at) bits.push('<span class="dot">·</span><span>generated '+esc(timeAgo(r.generated_at))+'</span>');
+      var sig=r.signal_article_count!=null?r.signal_article_count:r.article_count;
+      var tot=r.article_count!=null?r.article_count:sig;
+      if(sig!=null) bits.push('<span class="dot">·</span><span class="id-d-counts">'+sig+' signals / '+tot+' articles</span>');
+      meta.innerHTML=bits.join('');
+      body.innerHTML=renderSummary(r.summary_text);
+    })
+    .catch(function(e){
+      document.getElementById('id-d-text').innerHTML='<div class="id-error">Could not load digest: '+esc(e.message)+'</div>';
+    });
+}
+
+// ── Block 2: Top Headlines ──────────────────────────────────────────────
+var currentWindow='24h';
+function windowStartIso(w){
+  var hours=w==='7d'?168:24;
+  return new Date(Date.now()-hours*3600*1000).toISOString();
+}
+function setWindow(w){
+  if(w===currentWindow)return;
+  currentWindow=w;
+  var btns=document.querySelectorAll('.id-win');
+  for(var i=0;i<btns.length;i++) btns[i].className='id-win'+(btns[i].getAttribute('data-win')===w?' active':'');
+  loadHeadlines();
+}
+function loadHeadlines(){
+  var host=document.getElementById('id-headlines');
+  host.innerHTML='<div class="id-loading">Loading headlines…</div>';
+  var since=windowStartIso(currentWindow);
+  var cap=currentWindow==='7d'?60:40;
+  var path='news_articles?select=headline,snippet,ai_highlight,external_url,source_name,ingested_at,published_at,signal_types,mentioned_brands,mentioned_retailers'+
+    '&is_fluff=eq.false&ingested_at=gte.'+encodeURIComponent(since)+
+    '&order=ingested_at.desc&limit='+cap;
+  sb(path).then(function(rows){
+    if(!rows||!rows.length){
+      host.innerHTML='<div class="id-empty">No fresh headlines in this window.</div>';
+      return;
+    }
+    // Group by source_name, preserve recency order across groups
+    var byGroup={}, order=[];
+    rows.forEach(function(a){
+      var s=a.source_name||'Unknown';
+      if(!byGroup[s]){byGroup[s]=[];order.push(s);}
+      byGroup[s].push(a);
+    });
+    var html=order.map(function(src){
+      return '<div class="id-source-group">'+
+        '<div class="id-source-name">'+esc(src)+'</div>'+
+        byGroup[src].map(renderHeadline).join('')+
+      '</div>';
+    }).join('');
+    host.innerHTML=html;
+  }).catch(function(e){
+    host.innerHTML='<div class="id-error">Could not load headlines: '+esc(e.message)+'</div>';
+  });
+}
+function renderHeadline(a){
+  var ctx=cleanText(a.ai_highlight||a.snippet||'');
+  if(ctx.length>240) ctx=ctx.slice(0,237)+'…';
+  var sig=(a.signal_types&&a.signal_types.length)?'<span class="id-h-signal">'+esc(a.signal_types[0])+'</span>':'';
+  var when=a.published_at||a.ingested_at;
+  var titleHtml=esc(cleanText(a.headline||'(untitled)'));
+  var linkHtml=a.external_url
+    ? '<a href="'+esc(a.external_url)+'" target="_blank" rel="noopener">'+titleHtml+'</a>'
+    : titleHtml;
+  return '<div class="id-headline">'+
+    '<div class="id-h-meta">'+sig+'<span>'+esc(timeAgo(when))+'</span></div>'+
+    '<div class="id-h-title">'+linkHtml+'</div>'+
+    (ctx?'<div class="id-h-context">'+esc(ctx)+'</div>':'')+
+  '</div>';
+}
+
+// ── Block 3: Past Digests (collapsible) ─────────────────────────────────
+var pastLoaded=false;
+function togglePast(){
+  var box=document.getElementById('id-past');
+  var btn=document.getElementById('id-past-toggle');
+  var open=box.style.display==='none';
+  box.style.display=open?'flex':'none';
+  btn.className='id-past-toggle'+(open?' open':'');
+  if(open && !pastLoaded){ loadPast(); }
+}
+function loadPast(){
+  var host=document.getElementById('id-past');
+  host.innerHTML='<div class="id-loading">Loading past digests…</div>';
+  sb('news_daily_summaries?select=summary_date,summary_text,article_count,signal_article_count,generated_at&order=summary_date.desc&limit=7&offset=1')
+    .then(function(rows){
+      pastLoaded=true;
+      if(!rows||!rows.length){host.innerHTML='<div class="id-empty">No prior digests.</div>';return;}
+      host.innerHTML=rows.map(function(r,i){
+        var preview=cleanText(r.summary_text||'').slice(0,200);
+        if(r.summary_text && r.summary_text.length>200) preview+='…';
+        return '<div class="id-past-item" data-idx="'+i+'" onclick="expandPast(this,'+i+')">'+
+          '<div class="id-past-date">'+esc(fmtDate(r.summary_date))+' · '+(r.signal_article_count!=null?r.signal_article_count:(r.article_count||0))+' signals</div>'+
+          '<div class="id-past-preview" data-full="'+esc(r.summary_text||'')+'">'+esc(preview)+'</div>'+
+        '</div>';
+      }).join('');
+    }).catch(function(e){
+      host.innerHTML='<div class="id-error">Could not load past digests: '+esc(e.message)+'</div>';
+    });
+}
+function expandPast(item, idx){
+  var preview=item.querySelector('.id-past-preview');
+  if(item.classList.contains('open')){
+    var full=preview.getAttribute('data-full')||'';
+    var collapsed=cleanText(full).slice(0,200)+(full.length>200?'…':'');
+    preview.innerHTML=esc(collapsed);
+    item.classList.remove('open');
+  } else {
+    var full2=preview.getAttribute('data-full')||'';
+    preview.innerHTML=renderSummary(full2);
+    item.classList.add('open');
+  }
+}
+
+// ── Boot ────────────────────────────────────────────────────────────────
+loadDigest();
+loadHeadlines();
+</script>
+
+</body>
+</html>
