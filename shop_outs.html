@@ -633,15 +633,37 @@ async function uploadOneWithRetry(file,seq){
 }
 
 async function uploadOne(file,seq,attempt){
-  // Upload the raw file blob as-is. HEIC/HEIF and other formats are normalized
-  // server-side by the Supabase image transform when Claude processes them.
   console.log('[upload] → start seq '+seq+' attempt '+attempt+': "'+file.name+'" ('+(file.type||'unknown type')+', '+file.size+' bytes)');
+
+  // Re-encode to JPEG via the Canvas API to shrink large files (esp. HEIC) and
+  // avoid Supabase storage 504 timeouts. createImageBitmap() decodes the file
+  // (HEIC decode works in Safari; other browsers fall back to the original).
+  var uploadBlob=file;
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+  var contentType=file.type||'image/jpeg';
+  try {
+    var bmp=await createImageBitmap(file);
+    var canvas=document.createElement('canvas');
+    canvas.width=bmp.width;
+    canvas.height=bmp.height;
+    canvas.getContext('2d').drawImage(bmp,0,0);
+    if(bmp.close)bmp.close();
+    var jpeg=await new Promise(function(resolve){canvas.toBlob(resolve,'image/jpeg',0.85);});
+    if(jpeg){
+      uploadBlob=jpeg;ext='jpg';contentType='image/jpeg';
+      console.log('[upload]    canvas re-encode seq '+seq+': '+file.size+' → '+jpeg.size+' bytes (jpeg q0.85)');
+    } else {
+      console.warn('[upload]    canvas toBlob returned null for "'+file.name+'", uploading original');
+    }
+  } catch(e){
+    console.warn('[upload]    canvas re-encode failed for "'+file.name+'" ('+(e&&e.message||e)+'), uploading original');
+  }
+
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
   var sr=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
     method:'POST',
-    headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':file.type||'image/jpeg'},
-    body:file
+    headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':contentType},
+    body:uploadBlob
   });
   if(!sr.ok)throw new Error('Storage '+sr.status);
   console.log('[upload]    storage OK seq '+seq+' → '+path);
