@@ -510,7 +510,8 @@ function preventUnload(e){e.preventDefault();e.returnValue='Work in progress. Le
 async function handleFiles(fileList){
   if(!currentId){alert('No active shop-out.');return;}
   var files=Array.from(fileList);
-  if(files.length===0)return;
+  console.log('[upload] handleFiles: received '+files.length+' file(s) for shop-out '+currentId);
+  if(files.length===0){console.log('[upload] no files received — aborting');return;}
 
   // Skip video files (.mov / video/*) — this is a photo pipeline.
   var beforeVideoFilter=files.length;
@@ -519,8 +520,8 @@ async function handleFiles(fileList){
     return !isVideo;
   });
   var videoSkipped=beforeVideoFilter-files.length;
-  if(videoSkipped>0)console.log('[shop_outs] skipped '+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' (.mov / video/*)');
-  if(files.length===0){alert('Only video files selected — nothing to upload.');return;}
+  console.log('[upload] video filter: '+files.length+' passed, '+videoSkipped+' skipped (.mov / video/*)');
+  if(files.length===0){console.log('[upload] all selected files were video — aborting');alert('Only video files selected — nothing to upload.');return;}
 
   // Dedup against already-uploaded photos
   var existingNames={};
@@ -534,11 +535,13 @@ async function handleFiles(fileList){
   var originalCount=files.length;
   files=files.filter(function(f){return !existingNames[f.name];});
   var skipped=originalCount-files.length;
-  if(files.length===0){alert('All '+originalCount+' already uploaded.'+(videoSkipped>0?'\n('+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' skipped — Live Photo .mov sidecars are not uploaded.)':''));return;}
+  console.log('[upload] dedup: '+skipped+' already-uploaded skipped, '+files.length+' remain to upload');
+  if(files.length===0){console.log('[upload] nothing new to upload — aborting');alert('All '+originalCount+' already uploaded.'+(videoSkipped>0?'\n('+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' skipped — Live Photo .mov sidecars are not uploaded.)':''));return;}
 
   var startSeq=getPhotoCount(currentId)+1;
   uploadCancelled=false;
   setUploadInProgress(true);
+  console.log('[upload] starting: '+files.length+' file(s), startSeq '+startSeq+', concurrency '+UPLOAD_CONCURRENCY+', maxAttempts '+MAX_UPLOAD_ATTEMPTS);
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
     '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong></div>'+
@@ -553,27 +556,30 @@ async function handleFiles(fileList){
 
   var uploaded=0,failed=[];
   for(var i=0;i<files.length;i+=UPLOAD_CONCURRENCY){
-    if(uploadCancelled)break;
+    if(uploadCancelled){console.warn('[upload] cancelled by user at index '+i+' of '+files.length);break;}
     var batch=files.slice(i,i+UPLOAD_CONCURRENCY);
     var batchStart=startSeq+i;
+    console.log('[upload] batch '+(Math.floor(i/UPLOAD_CONCURRENCY)+1)+': files '+(i+1)+'-'+Math.min(i+batch.length,files.length)+' of '+files.length);
     await Promise.all(batch.map(async function(file,bi){
       if(uploadCancelled)return;
       var result=await uploadOneWithRetry(file,batchStart+bi);
       if(result.success){uploaded++;photoCounts[currentId]=(photoCounts[currentId]||0)+1;}
-      else failed.push({name:file.name,err:result.error,file:file});
+      else {failed.push({name:file.name,err:result.error,file:file});console.error('[upload] ✗ FAILED '+file.name+': '+result.error);}
       var totalDone=uploaded+failed.length;
       var fill=g('up-fill');if(fill)fill.style.width=((totalDone/files.length)*100)+'%';
       var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
       if(failed.length>0){var fl=g('up-failed');if(fl)fl.innerHTML='<strong>Failed:</strong><ul>'+failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+'</ul>';}
     }));
   }
+  console.log('[upload] upload loop finished: '+uploaded+' uploaded, '+failed.length+' failed'+(uploadCancelled?' (cancelled)':''));
 
   try {
-    await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
+    var ptr=await h(SB+'/rest/v1/shop_outs?id=eq.'+currentId,{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({total_photos:photoCounts[currentId]||0,updated_at:new Date().toISOString()})
     });
-  } catch(e) {}
+    console.log('[upload] total_photos PATCH → HTTP '+ptr.status+' (count '+(photoCounts[currentId]||0)+')');
+  } catch(e) { console.error('[upload] total_photos PATCH error:', e); }
 
   // Persist a failed-uploads banner so failures don't vanish after init() re-renders.
   if(failed.length>0){
@@ -591,6 +597,7 @@ async function handleFiles(fileList){
     try{sessionStorage.setItem('shopout-failed-banner-'+currentId,bannerHtml);}catch(e){}
   }
 
+  console.log('[upload] handleFiles complete — final count for shop-out '+currentId+': '+(photoCounts[currentId]||0)+' photos ('+uploaded+' added this run, '+failed.length+' failed)');
   setUploadInProgress(false);
   await init();
   selectShop(currentId);
@@ -617,13 +624,18 @@ async function uploadOneWithRetry(file,seq){
   for(var attempt=1;attempt<=MAX_UPLOAD_ATTEMPTS;attempt++){
     if(uploadCancelled)return {success:false,error:'cancelled'};
     try{return await uploadOne(file,seq,attempt);}
-    catch(err){if(attempt===MAX_UPLOAD_ATTEMPTS)return {success:false,error:err.message};await new Promise(function(r){setTimeout(r,300*attempt);});}
+    catch(err){
+      console.warn('[upload] attempt '+attempt+'/'+MAX_UPLOAD_ATTEMPTS+' failed for "'+file.name+'" (seq '+seq+'): '+err.message);
+      if(attempt===MAX_UPLOAD_ATTEMPTS){console.error('[upload] giving up on "'+file.name+'" after '+attempt+' attempts');return {success:false,error:err.message};}
+      await new Promise(function(r){setTimeout(r,300*attempt);});
+    }
   }
 }
 
 async function uploadOne(file,seq,attempt){
   // Upload the raw file blob as-is. HEIC/HEIF and other formats are normalized
   // server-side by the Supabase image transform when Claude processes them.
+  console.log('[upload] → start seq '+seq+' attempt '+attempt+': "'+file.name+'" ('+(file.type||'unknown type')+', '+file.size+' bytes)');
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
   var sr=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
@@ -632,6 +644,7 @@ async function uploadOne(file,seq,attempt){
     body:file
   });
   if(!sr.ok)throw new Error('Storage '+sr.status);
+  console.log('[upload]    storage OK seq '+seq+' → '+path);
   var ts=file.lastModified?new Date(file.lastModified).toISOString():null;
   var dbR=await h(SB+'/rest/v1/shop_out_photos',{
     method:'POST',headers:{'Content-Type':'application/json'},
@@ -642,6 +655,7 @@ async function uploadOne(file,seq,attempt){
     })
   });
   if(!dbR.ok)throw new Error('DB '+dbR.status+': '+await dbR.text());
+  console.log('[upload]    db row OK seq '+seq+': "'+file.name+'" ✓');
   return {success:true};
 }
 
