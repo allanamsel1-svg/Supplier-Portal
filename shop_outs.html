@@ -432,6 +432,10 @@ async function renderDetail(){
         '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry</button>'+
       '</div>';
     }
+    // When complete, Section Intelligence is the lead block — before everything else.
+    if(stat==='complete'){
+      html+='<div class="card"><div class="card-title">🗂 Section Intelligence</div><div id="sections-container">Loading...</div></div>';
+    }
     html+='<div class="card">'+
       '<div class="card-title">Summary</div>'+
       '<div class="detect-row"><div class="detect-label">Retailer</div><div class="detect-val">'+esc(retailer)+'</div><div></div></div>'+
@@ -442,7 +446,6 @@ async function renderDetail(){
     '</div>';
     if(stat==='complete'){
       html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
-      html+='<div class="card"><div class="card-title">🗂 Sections</div><div id="sections-container">Loading...</div></div>';
     }
     html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
     html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
@@ -1262,25 +1265,25 @@ async function loadSections(id){
     var canOpen=(typeof openViewer==='function') && (viewerIdxById[s.section_photo_id]!=null);
     var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[s.section_photo_id]+')" style="cursor:pointer;"':'';
 
-    // Brand summary table
+    // Brand summary table: Brand | Product Type | Facings | SKUs | Notes
     var brands=Array.isArray(s.brand_summary)?s.brand_summary:[];
     var brandTable='';
     if(brands.length>0){
       brandTable='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'+
         '<thead><tr style="text-align:left;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">'+
           '<th style="padding:4px 6px;">Brand</th>'+
-          '<th style="padding:4px 6px;text-align:right;">SKUs</th>'+
+          '<th style="padding:4px 6px;">Product Type</th>'+
           '<th style="padding:4px 6px;text-align:right;">Facings</th>'+
-          '<th style="padding:4px 6px;">Price points</th>'+
+          '<th style="padding:4px 6px;text-align:right;">SKUs</th>'+
+          '<th style="padding:4px 6px;">Notes</th>'+
         '</tr></thead><tbody>'+
         brands.map(function(b){
-          var pp=b.price_points_seen;
-          var ppStr=Array.isArray(pp)?pp.map(function(x){return '$'+x;}).join(', '):(pp!=null?String(pp):'—');
           return '<tr style="border-top:0.5px solid #f0f0e8;">'+
-            '<td style="padding:4px 6px;font-weight:600;">'+esc(b.brand_name||'—')+(b.product_type?'<div style="font-weight:400;color:#888;font-size:11px;">'+esc(b.product_type)+'</div>':'')+'</td>'+
-            '<td style="padding:4px 6px;text-align:right;">'+(b.distinct_skus_visible!=null?esc(String(b.distinct_skus_visible)):'—')+'</td>'+
+            '<td style="padding:4px 6px;font-weight:600;">'+esc(b.brand_name||'—')+'</td>'+
+            '<td style="padding:4px 6px;color:#666;">'+esc(b.product_type||'—')+'</td>'+
             '<td style="padding:4px 6px;text-align:right;">'+(b.facing_count!=null?esc(String(b.facing_count)):'—')+'</td>'+
-            '<td style="padding:4px 6px;">'+esc(ppStr)+'</td>'+
+            '<td style="padding:4px 6px;text-align:right;">'+(b.distinct_skus_visible!=null?esc(String(b.distinct_skus_visible)):'—')+'</td>'+
+            '<td style="padding:4px 6px;color:#888;">'+esc(b.notes||'—')+'</td>'+
           '</tr>';
         }).join('')+
         '</tbody></table>';
@@ -1305,6 +1308,32 @@ async function loadSections(id){
       '</div>'+
     '</div>';
   }).join('');
+
+  // Totals across all sections.
+  var totalLF=0, capturedBrands={}, uncapturedSkus=0;
+  var UNCAP=/unidentified|generic|unknown/i;
+  secs.forEach(function(s){
+    if(s.estimated_linear_feet!=null && !isNaN(Number(s.estimated_linear_feet)))totalLF+=Number(s.estimated_linear_feet);
+    (Array.isArray(s.brand_summary)?s.brand_summary:[]).forEach(function(b){
+      var name=(b.brand_name||'').trim();
+      if(!name)return;
+      if(UNCAP.test(name)){
+        uncapturedSkus+=(b.distinct_skus_visible!=null && !isNaN(Number(b.distinct_skus_visible)))?Number(b.distinct_skus_visible):0;
+      } else {
+        capturedBrands[name.toLowerCase()]=true;
+      }
+    });
+  });
+  var totalBrandsCaptured=Object.keys(capturedBrands).length;
+  html+='<div style="margin-top:16px;padding-top:14px;border-top:1px solid #e0e0d8;">'+
+    '<div class="insights-block-title">Section Totals</div>'+
+    '<div class="stat-grid" style="margin-top:0;padding-top:0;border-top:none;">'+
+      '<div><div class="stat-label">Est. Linear Feet</div><div class="stat-val">≈ '+(Math.round(totalLF*10)/10)+' ft</div></div>'+
+      '<div><div class="stat-label">Sections</div><div class="stat-val">'+secs.length+'</div></div>'+
+      '<div><div class="stat-label">Brands Captured</div><div class="stat-val">'+totalBrandsCaptured+'</div></div>'+
+      '<div><div class="stat-label">Est. Uncaptured SKUs</div><div class="stat-val">'+uncapturedSkus+'</div></div>'+
+    '</div>'+
+  '</div>';
   c.innerHTML=html;
 
   // Sign + attach section thumbnails in parallel.
