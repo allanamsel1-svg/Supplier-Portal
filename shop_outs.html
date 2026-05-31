@@ -192,6 +192,7 @@ var BUCKET='shop-out-photos';
 var UPLOAD_CONCURRENCY=8;
 var MAX_UPLOAD_ATTEMPTS=4;
 var PAIR_CONCURRENCY=5;  // Parallel with 429-retry — fast & safe
+var CLASSIFY_CONCURRENCY=4;  // section-vs-product classification pass
 
 function g(id){return document.getElementById(id);}
 function h(url,opts){
@@ -441,6 +442,7 @@ async function renderDetail(){
     '</div>';
     if(stat==='complete'){
       html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
+      html+='<div class="card"><div class="card-title">🗂 Sections</div><div id="sections-container">Loading...</div></div>';
     }
     html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
     html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
@@ -470,7 +472,7 @@ async function renderDetail(){
 
   if(stat==='complete'||stat==='failed'||photoCount>0){
     loadPhotos(s.id);
-    if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);}
+    if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);loadSections(s.id);}
   }
 }
 
@@ -657,19 +659,6 @@ async function triggerProcessing(id){
   var retailerName=getRetailerName(s);
   var retailerCountry=customerMap[s.customer_id]?customerMap[s.customer_id].country:null;
 
-  // Build pairs: photos[0]+photos[1], photos[2]+photos[3], etc.
-  // If odd number, last one is solo (back=null)
-  var pairs=[];
-  for(var i=0;i<photos.length;i+=2){
-    pairs.push({
-      front:photos[i],
-      back:photos[i+1]||null,
-      index:Math.floor(i/2)
-    });
-  }
-
-  console.log('[shop_outs] '+pairs.length+' pairs to process');
-
   // Mark processing
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
     method:'PATCH',headers:{'Content-Type':'application/json'},
@@ -688,7 +677,77 @@ async function triggerProcessing(id){
   }
 
   setProcessing(true);
-  renderPairProgress(id,0,pairs.length,0,0);
+
+  // ─── PASS 0: classify every photo as 'section' or 'product' ───
+  // Clear any sections from a prior run first so re-processing doesn't pile up
+  // duplicate section rows. FK section_id columns are ON DELETE SET NULL, so
+  // this also detaches photos/observations from the stale sections.
+  try {
+    await h(SB+'/rest/v1/shop_out_sections?shop_out_id=eq.'+id,{method:'DELETE'});
+  } catch(e) { console.warn('[sections] clear prior sections failed:',e); }
+
+  renderStageProgress(id,'Classifying photos…',0,photos.length);
+  var classMap={};
+  var classifiedCount=0;
+  for(var ci=0;ci<photos.length;ci+=CLASSIFY_CONCURRENCY){
+    if(uploadCancelled){break;}
+    var cbatch=photos.slice(ci,ci+CLASSIFY_CONCURRENCY);
+    await Promise.all(cbatch.map(async function(p){
+      try {
+        var resp=await fetch('/api/classify-shop-out-photo',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({photo_id:p.id,shop_out_id:id})
+        });
+        if(resp.ok){var d=await resp.json();classMap[p.id]=(d.classification==='section')?'section':'product';}
+        else classMap[p.id]='product';
+      } catch(e){classMap[p.id]='product';}
+      classifiedCount++;
+      renderStageProgress(id,'Classifying photos…',classifiedCount,photos.length);
+    }));
+  }
+
+  // Route photos by classification (sequence order preserved from the query).
+  var sectionPhotos=photos.filter(function(p){return classMap[p.id]==='section';});
+  var productPhotos=photos.filter(function(p){return classMap[p.id]!=='section';});
+  console.log('[shop_outs] classified: '+sectionPhotos.length+' section, '+productPhotos.length+' product');
+
+  // ─── PASS 1: analyze section photos ───
+  var createdSections=[];
+  if(sectionPhotos.length>0){
+    var secDone=0;
+    renderStageProgress(id,'Analyzing sections…',0,sectionPhotos.length);
+    for(var si=0;si<sectionPhotos.length;si+=PAIR_CONCURRENCY){
+      var sbatch=sectionPhotos.slice(si,si+PAIR_CONCURRENCY);
+      await Promise.all(sbatch.map(async function(p){
+        try {
+          var resp=await fetch('/api/process-shop-out-section',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({photo_id:p.id,shop_out_id:id})
+          });
+          if(resp.ok){
+            var d=await resp.json();
+            if(d.section)createdSections.push({id:d.section.id,seq:p.photo_sequence_number,category:d.section.category_detected});
+          } else { console.error('[section] failed:',await resp.text()); }
+        } catch(e){ console.error('[section] err:',e); }
+        secDone++;
+        renderStageProgress(id,'Analyzing sections…',secDone,sectionPhotos.length);
+      }));
+    }
+  }
+
+  // ─── PASS 2: pair + extract product photos (existing pipeline) ───
+  // Build pairs from PRODUCT photos only: [0]+[1], [2]+[3], … (odd → solo back=null)
+  var pairs=[];
+  for(var i=0;i<productPhotos.length;i+=2){
+    pairs.push({
+      front:productPhotos[i],
+      back:productPhotos[i+1]||null,
+      index:Math.floor(i/2)
+    });
+  }
+  console.log('[shop_outs] '+pairs.length+' product pairs to process');
+
+  renderPairProgress(id,0,Math.max(pairs.length,1),0,0);
 
   var completed=0,failed=0,obsCount=0;
   var failedDetails=[];
@@ -748,8 +807,15 @@ async function triggerProcessing(id){
     }));
   }
 
+  // ─── PASS 3: assign section_id to product photos + their observations ───
+  if(createdSections.length>0 && productPhotos.length>0){
+    renderPairProgress(id,Math.max(pairs.length,1),Math.max(pairs.length,1),obsCount,failed,'Mapping products to sections…');
+    try { await assignSectionsToProducts(id,createdSections,productPhotos); }
+    catch(e){ console.error('[sections] assign err:',e); }
+  }
+
   // Mark complete
-  var cost=(pairs.length*0.06).toFixed(2);
+  var cost=((pairs.length+sectionPhotos.length)*0.06).toFixed(2);
   await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
     method:'PATCH',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
@@ -776,7 +842,7 @@ async function triggerProcessing(id){
 }
 
 function renderPairProgress(id,done,total,obsCount,failedCount,customStatus){
-  var pct=((done/total)*100).toFixed(0);
+  var pct=total>0?((done/total)*100).toFixed(0):100;
   var statusLine=customStatus?customStatus:'Pair <strong>'+done+' of '+total+'</strong> ('+pct+'%)';
   var html='<div class="card">'+
     '<div class="card-title">AI processing</div>'+
@@ -786,6 +852,77 @@ function renderPairProgress(id,done,total,obsCount,failedCount,customStatus){
     '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — pairs process here in the browser.</div>'+
   '</div>';
   g('shop-detail').innerHTML=html;
+}
+
+// Generic stage progress (classification, section analysis, mapping).
+function renderStageProgress(id,title,done,total){
+  var pct=total>0?((done/total)*100).toFixed(0):100;
+  var html='<div class="card">'+
+    '<div class="card-title">AI processing</div>'+
+    '<div style="font-size:13px;color:#333;margin-bottom:0.5rem;">'+esc(title)+' <strong>'+done+' of '+total+'</strong> ('+pct+'%)</div>'+
+    '<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%;transition:width 0.4s;"></div></div>'+
+    '<div style="font-size:11px;color:#664400;margin-top:10px;background:#fff8e0;padding:8px 12px;border-radius:6px;">⚠️ Don\'t close this tab — processing runs here in the browser.</div>'+
+  '</div>';
+  g('shop-detail').innerHTML=html;
+}
+
+// Assign each product photo (and its observation) to the section it sits within.
+// Primary: by capture sequence — a product photo belongs to the most recent
+// section photo before it. Fallback: match the observation's AI category to a
+// section's detected category.
+async function assignSectionsToProducts(shopOutId,sections,productPhotos){
+  if(!sections.length||!productPhotos.length)return;
+  var sorted=sections.slice().sort(function(a,b){return (a.seq||0)-(b.seq||0);});
+
+  // Pull observations for fallback matching + to stamp section_id on them too.
+  var obsByFront={};
+  try {
+    var or=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+shopOutId+'&select=id,front_photo_id,ai_suggested_category');
+    if(or.ok)(await or.json()).forEach(function(o){if(o.front_photo_id)obsByFront[o.front_photo_id]=o;});
+  } catch(e) {}
+
+  for(var k=0;k<productPhotos.length;k++){
+    var pp=productPhotos[k];
+    var pseq=pp.photo_sequence_number||0;
+    var match=null;
+
+    // Primary: section photo seq < product seq < next section photo seq
+    for(var i=0;i<sorted.length;i++){
+      var sNext=sorted[i+1];
+      if(pseq>(sorted[i].seq||0) && (!sNext || pseq<(sNext.seq||0))){match=sorted[i];break;}
+    }
+
+    // Fallback: AI category match (observation category ↔ section category_detected)
+    if(!match){
+      var obsF=obsByFront[pp.id];
+      if(obsF && obsF.ai_suggested_category){
+        var cat=String(obsF.ai_suggested_category).toLowerCase();
+        var firstSeg=cat.split('>')[0].trim();
+        for(var j=0;j<sorted.length;j++){
+          var sc=String(sorted[j].category||'').toLowerCase().trim();
+          if(sc && (cat.indexOf(sc)!==-1 || (firstSeg && sc.indexOf(firstSeg)!==-1))){match=sorted[j];break;}
+        }
+      }
+    }
+
+    if(match){
+      try {
+        await h(SB+'/rest/v1/shop_out_photos?id=eq.'+pp.id,{
+          method:'PATCH',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({section_id:match.id})
+        });
+      } catch(e) {}
+      var o2=obsByFront[pp.id];
+      if(o2){
+        try {
+          await h(SB+'/rest/v1/shop_out_observations?id=eq.'+o2.id,{
+            method:'PATCH',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({section_id:match.id})
+          });
+        } catch(e) {}
+      }
+    }
+  }
 }
 
 // ─── EDIT LOCATION (manual) ─────────────────────────────────────────
@@ -897,7 +1034,7 @@ async function loadPhotos(id){
   var container=g('photos-container');if(!container)return;
   container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
-      var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':'');
+      var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':(p.photo_type==='section'?'section':''));
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
         '<img src="'+(p.signed_url||'')+'" loading="lazy" />'+
         '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
@@ -1035,6 +1172,104 @@ async function saveMlComment(obsId){
       setTimeout(function(){ok.style.display='none';},2000);
     }
   } catch(err){alert('Error: '+err.message);}
+}
+
+// ─── SECTIONS ───────────────────────────────────────────────────────
+async function loadSections(id){
+  var c=g('sections-container');if(!c)return;
+  var r=await h(SB+'/rest/v1/shop_out_sections?shop_out_id=eq.'+id+'&order=sequence_number.asc&select=*');
+  if(!r.ok){c.innerHTML='<div style="color:#888;font-size:12px;">Could not load sections.</div>';return;}
+  var secs=await r.json();
+  if(secs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No section (wide-angle shelf) photos detected.</div>';return;}
+
+  // Batch-fetch file_path for each section photo.
+  var pathById={};
+  var photoIds=secs.map(function(s){return s.section_photo_id;}).filter(Boolean);
+  if(photoIds.length>0){
+    var uniq=photoIds.filter(function(v,i,a){return a.indexOf(v)===i;});
+    try {
+      var pr=await h(SB+'/rest/v1/shop_out_photos?id=in.('+uniq.join(',')+')&select=id,file_path');
+      if(pr.ok)(await pr.json()).forEach(function(p){pathById[p.id]=p.file_path;});
+    } catch(e) {}
+  }
+
+  // Map photo id → index in currentPhotos so the thumbnail can open the viewer.
+  var viewerIdxById={};
+  (currentPhotos||[]).forEach(function(p,i){viewerIdxById[p.id]=i;});
+
+  var thumbs=[];
+  var html=secs.map(function(s,i){
+    var conf=s.ai_confidence!=null?Number(s.ai_confidence):null;
+    var confBadge=conf!=null
+      ?'<span class="badge '+(conf>=0.75?'b-complete':(conf>=0.5?'b-processing':'b-failed'))+'">'+(conf*100).toFixed(0)+'% conf</span>'
+      :'';
+    var lf=s.estimated_linear_feet!=null?Number(s.estimated_linear_feet):null;
+
+    var thumbId='sec-thumb-'+s.id;
+    var path=pathById[s.section_photo_id];
+    if(path)thumbs.push({thumbId:thumbId,path:path});
+    var canOpen=(typeof openViewer==='function') && (viewerIdxById[s.section_photo_id]!=null);
+    var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[s.section_photo_id]+')" style="cursor:pointer;"':'';
+
+    // Brand summary table
+    var brands=Array.isArray(s.brand_summary)?s.brand_summary:[];
+    var brandTable='';
+    if(brands.length>0){
+      brandTable='<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;">'+
+        '<thead><tr style="text-align:left;color:#888;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;">'+
+          '<th style="padding:4px 6px;">Brand</th>'+
+          '<th style="padding:4px 6px;text-align:right;">SKUs</th>'+
+          '<th style="padding:4px 6px;text-align:right;">Facings</th>'+
+          '<th style="padding:4px 6px;">Price points</th>'+
+        '</tr></thead><tbody>'+
+        brands.map(function(b){
+          var pp=b.price_points_seen;
+          var ppStr=Array.isArray(pp)?pp.map(function(x){return '$'+x;}).join(', '):(pp!=null?String(pp):'—');
+          return '<tr style="border-top:0.5px solid #f0f0e8;">'+
+            '<td style="padding:4px 6px;font-weight:600;">'+esc(b.brand_name||'—')+(b.product_type?'<div style="font-weight:400;color:#888;font-size:11px;">'+esc(b.product_type)+'</div>':'')+'</td>'+
+            '<td style="padding:4px 6px;text-align:right;">'+(b.distinct_skus_visible!=null?esc(String(b.distinct_skus_visible)):'—')+'</td>'+
+            '<td style="padding:4px 6px;text-align:right;">'+(b.facing_count!=null?esc(String(b.facing_count)):'—')+'</td>'+
+            '<td style="padding:4px 6px;">'+esc(ppStr)+'</td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody></table>';
+    } else {
+      brandTable='<div style="font-size:12px;color:#888;margin-top:8px;">No brands captured.</div>';
+    }
+
+    return '<div style="display:flex;gap:14px;padding:14px 0;border-bottom:0.5px solid #f0f0e8;">'+
+      '<div style="flex-shrink:0;width:120px;height:120px;border-radius:8px;overflow:hidden;background:#f0f0e8;">'+
+        '<img id="'+thumbId+'"'+thumbClick+' style="width:120px;height:120px;object-fit:cover;display:block;" />'+
+      '</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
+          '<div>'+
+            '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Section #'+(i+1)+(s.department?' · '+esc(s.department):'')+'</div>'+
+            '<div style="font-weight:700;font-size:15px;margin-top:2px;">'+esc(s.category_detected||'Uncategorized')+'</div>'+
+            '<div style="font-size:12px;color:#666;margin-top:1px;">'+(lf!=null?'≈ '+lf+' linear ft':'linear ft unknown')+'</div>'+
+          '</div>'+
+          '<div>'+confBadge+'</div>'+
+        '</div>'+
+        brandTable+
+      '</div>'+
+    '</div>';
+  }).join('');
+  c.innerHTML=html;
+
+  // Sign + attach section thumbnails in parallel.
+  await Promise.all(thumbs.map(async function(t){
+    try {
+      var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({expiresIn:3600})
+      });
+      if(sr.ok){
+        var sd=await sr.json();
+        var img=g(t.thumbId);
+        if(img)img.src=SB+'/storage/v1'+sd.signedURL;
+      }
+    } catch(e) {}
+  }));
 }
 
 // ─── ARCHIVE + DELETE ──────────────────────────────────────────────
