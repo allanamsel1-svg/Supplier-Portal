@@ -144,7 +144,20 @@ Examine the visible shelving and return STRICTLY a single JSON object (no prose,
   "analysis_notes": "string — call out anything unusual: messy/disorganized shelf, obscured or out-of-stock product, items clearly in the wrong place, glare, partial view, etc."
 }
 
-Be conservative with counts — only count what you can actually see. Use an empty array for brands if no brands are legible. CRITICAL: output a single JSON object only.`;
+Be conservative with counts — only count what you can actually see.
+
+REQUIRED — uncaptured products: After listing every identifiable brand above, you MUST append exactly ONE final entry to the "brands" array that accounts for products you could SEE on the shelf but could NOT identify by brand (too far away, bad angle, obstructed, glare, label not facing the camera, or simply no legible branding). Use this exact shape:
+{
+  "brand_name": "Unidentified / Generic Products",
+  "product_type": "string — describe the kinds of products that were visible but not readable (e.g. 'assorted boxed skincare, unbranded bottles')",
+  "facing_count": "number — your estimate of how many shelf facings were visible but unreadable",
+  "distinct_skus_visible": "number — your estimate of how many DISTINCT SKUs could not be identified",
+  "price_points_seen": [],
+  "notes": "string — the main reason these could not be identified (distance, angle, obstruction, no label visible, glare, etc.)"
+}
+This final entry is REQUIRED on every response even when everything was readable — in that case set facing_count and distinct_skus_visible to 0 and notes to "all products on shelf were identifiable". Do NOT use the brand_name "Unidentified / Generic Products" for any other entry.
+
+CRITICAL: output a single JSON object only.`;
 }
 
 async function fetchPhotoRow(photoId) {
