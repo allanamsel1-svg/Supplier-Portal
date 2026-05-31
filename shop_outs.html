@@ -512,6 +512,16 @@ async function handleFiles(fileList){
   var files=Array.from(fileList);
   if(files.length===0)return;
 
+  // Skip video files (.mov / video/*) — this is a photo pipeline.
+  var beforeVideoFilter=files.length;
+  files=files.filter(function(f){
+    var isVideo=/\.mov$/i.test(f.name)||(f.type&&f.type.indexOf('video/')===0);
+    return !isVideo;
+  });
+  var videoSkipped=beforeVideoFilter-files.length;
+  if(videoSkipped>0)console.log('[shop_outs] skipped '+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' (.mov / video/*)');
+  if(files.length===0){alert('Only video files selected — nothing to upload.');return;}
+
   // Dedup against already-uploaded photos
   var existingNames={};
   try {
