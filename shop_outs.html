@@ -189,8 +189,8 @@ body.processing .ri-tab,body.processing .ri-top a,body.processing #new-btn { poi
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var BUCKET='shop-out-photos';
-var UPLOAD_CONCURRENCY=4;
-var MAX_UPLOAD_ATTEMPTS=3;
+var UPLOAD_CONCURRENCY=8;
+var MAX_UPLOAD_ATTEMPTS=4;
 var PAIR_CONCURRENCY=5;  // Parallel with 429-retry — fast & safe
 
 function g(id){return document.getElementById(id);}
@@ -393,7 +393,8 @@ async function renderDetail(){
   var stat=s.processing_status||'pending';
   var photoCount=getPhotoCount(s.id);
 
-  var html='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
+  var html='<div id="failed-banner"></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
       '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
       '<div style="font-size:12px;color:#888;margin-top:4px;">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
@@ -453,6 +454,12 @@ async function renderDetail(){
 
   g('shop-detail').innerHTML=html;
 
+  try {
+    var savedBanner=sessionStorage.getItem('shopout-failed-banner-'+currentId);
+    var fb=g('failed-banner');
+    if(savedBanner && fb)fb.innerHTML=savedBanner;
+  } catch(e) {}
+
   var dz=g('dropzone');
   if(dz){
     dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('dragover');});
@@ -488,6 +495,7 @@ async function resetToProcessable(id){
 }
 
 // ─── UPLOAD ─────────────────────────────────────────────────────────
+var pendingFailedFiles=[];
 function setUploadInProgress(active){
   uploadInProgress=active;
   if(active){document.body.classList.add('uploading');window.addEventListener('beforeunload',preventUnload);}
@@ -537,7 +545,7 @@ async function handleFiles(fileList){
       if(uploadCancelled)return;
       var result=await uploadOneWithRetry(file,batchStart+bi);
       if(result.success){uploaded++;photoCounts[currentId]=(photoCounts[currentId]||0)+1;}
-      else failed.push({name:file.name,err:result.error});
+      else failed.push({name:file.name,err:result.error,file:file});
       var totalDone=uploaded+failed.length;
       var fill=g('up-fill');if(fill)fill.style.width=((totalDone/files.length)*100)+'%';
       var ctr=g('up-counter');if(ctr)ctr.textContent=totalDone+' of '+files.length+(failed.length?' ('+failed.length+' failed)':'');
@@ -552,9 +560,40 @@ async function handleFiles(fileList){
     });
   } catch(e) {}
 
+  // Persist a failed-uploads banner so failures don't vanish after init() re-renders.
+  if(failed.length>0){
+    pendingFailedFiles=failed.map(function(f){return f.file;}).filter(Boolean);
+    var bannerHtml='<div class="upload-warning" style="background:#fce8e8;border-color:#f0b4b4;color:#a22;">'+
+      '⚠️ <strong>'+failed.length+' photo'+(failed.length>1?'s':'')+' failed to upload.</strong>'+
+      '<div class="failed-list" style="margin-top:6px;"><ul>'+
+        failed.slice(0,20).map(function(f){return '<li>'+esc(f.name)+': '+esc(f.err)+'</li>';}).join('')+
+      '</ul></div>'+
+      '<div style="margin-top:10px;">'+
+        '<button class="btn btn-primary" onclick="retryFailedUploads()">🔄 Retry failed</button> '+
+        '<button class="btn btn-secondary" onclick="dismissFailedBanner()">Dismiss</button>'+
+      '</div>'+
+    '</div>';
+    try{sessionStorage.setItem('shopout-failed-banner-'+currentId,bannerHtml);}catch(e){}
+  }
+
   setUploadInProgress(false);
   await init();
   selectShop(currentId);
+}
+
+function retryFailedUploads(){
+  if(pendingFailedFiles.length>0){
+    var toRetry=pendingFailedFiles.slice();
+    dismissFailedBanner();
+    handleFiles(toRetry);
+  } else {
+    alert('Re-select the files to retry — the originals are no longer available in this session.');
+  }
+}
+function dismissFailedBanner(){
+  try{sessionStorage.removeItem('shopout-failed-banner-'+currentId);}catch(e){}
+  pendingFailedFiles=[];
+  var b=g('failed-banner');if(b)b.innerHTML='';
 }
 
 function cancelUpload(){if(confirm('Stop upload?'))uploadCancelled=true;}
@@ -884,30 +923,118 @@ document.addEventListener('keydown',function(e){
 
 // ─── OBSERVATIONS ───────────────────────────────────────────────────
 async function loadObservations(id){
-  var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&order=created_at.asc');
+  var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&order=created_at.asc&select=*');
   if(!r.ok)return;
   var obs=await r.json();
   var c=g('obs-container');if(!c)return;
   if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations.</div>';return;}
-  var html='<div class="obs-row head"><div>#</div><div>Brand · Product · Size</div><div style="text-align:center;">Dept</div><div style="text-align:right;">Price</div><div style="text-align:right;">Conf.</div></div>';
-  obs.forEach(function(o,i){
+
+  // Batch-fetch the file_path for every front photo referenced by an observation.
+  var pathById={};
+  var frontIds=obs.map(function(o){return o.front_photo_id;}).filter(Boolean);
+  if(frontIds.length>0){
+    var uniq=frontIds.filter(function(v,i,a){return a.indexOf(v)===i;});
+    try {
+      var pr=await h(SB+'/rest/v1/shop_out_photos?id=in.('+uniq.join(',')+')&select=id,file_path');
+      if(pr.ok){
+        (await pr.json()).forEach(function(p){pathById[p.id]=p.file_path;});
+      }
+    } catch(e) {}
+  }
+
+  // Build a lookup from photo id → index in currentPhotos so the thumbnail can open the viewer.
+  var viewerIdxById={};
+  (currentPhotos||[]).forEach(function(p,i){viewerIdxById[p.id]=i;});
+
+  var statusOpts=['','agreed','disagreed','refined','ignored'];
+  var thumbs=[];
+
+  var html=obs.map(function(o,i){
     var sizeStr='';
     if(o.pack_size){
       sizeStr=o.pack_size;
-      if(o.pack_size_unit){
-        var unit=o.pack_size_unit.replace('_',' ');
-        sizeStr+=' '+unit;
-      }
+      if(o.pack_size_unit)sizeStr+=' '+o.pack_size_unit.replace('_',' ');
     }
-    html+='<div class="obs-row">'+
-      '<div style="color:#888;">'+(i+1)+'</div>'+
-      '<div><div class="obs-brand">'+esc(o.brand||'—')+'</div><div class="obs-product">'+esc(o.product_name||'')+(sizeStr?' · <strong>'+esc(sizeStr)+'</strong>':'')+'</div></div>'+
-      '<div style="text-align:center;"><span class="obs-dept">'+esc(o.department||'—')+'</span></div>'+
-      '<div style="text-align:right;font-weight:600;">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
-      '<div style="text-align:right;font-size:11px;color:#888;">'+(o.ai_confidence?Number(o.ai_confidence).toFixed(2):'—')+'</div>'+
+    var path=pathById[o.front_photo_id];
+    var thumbId='ml-thumb-'+o.id;
+    if(path)thumbs.push({thumbId:thumbId,path:path});
+    var canOpen=(typeof openViewer==='function') && (viewerIdxById[o.front_photo_id]!=null);
+    var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[o.front_photo_id]+')" style="cursor:pointer;"':'';
+
+    var optsHtml=statusOpts.map(function(opt){
+      var label=opt===''?'— status —':opt.charAt(0).toUpperCase()+opt.slice(1);
+      var selA=(o.ml_observation_status||'')===opt?' selected':'';
+      return '<option value="'+opt+'"'+selA+'>'+label+'</option>';
+    }).join('');
+
+    var mlText=o.ml_observation
+      ?'<div style="font-size:13px;color:#1a1a2e;line-height:1.5;margin-bottom:8px;">'+esc(o.ml_observation)+'</div>'
+      :'<div style="font-size:12px;color:#888;font-style:italic;margin-bottom:8px;">No ML observation yet — your comment below is still captured for future training.</div>';
+
+    return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid #f0f0e8;">'+
+      '<div style="flex-shrink:0;width:84px;height:84px;border-radius:8px;overflow:hidden;background:#f0f0e8;">'+
+        '<img id="'+thumbId+'"'+thumbClick+' style="width:84px;height:84px;object-fit:cover;display:block;" />'+
+      '</div>'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
+          '<div style="min-width:0;">'+
+            '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">#'+(i+1)+' · '+esc(o.department||'—')+' · conf '+(o.ai_confidence?Number(o.ai_confidence).toFixed(2):'—')+'</div>'+
+            '<div style="font-weight:700;font-size:14px;margin-top:2px;">'+esc(o.brand||'—')+'</div>'+
+            '<div style="font-size:12px;color:#666;margin-top:1px;">'+esc(o.product_name||'')+(sizeStr?' · <strong>'+esc(sizeStr)+'</strong>':'')+'</div>'+
+          '</div>'+
+          '<div style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
+        '</div>'+
+        '<div style="background:#f7f7f2;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
+          '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">ML Observation</div>'+
+          mlText+
+          '<textarea id="ml-c-'+o.id+'" placeholder="Your comment, correction, or refinement…" style="width:100%;box-sizing:border-box;min-height:54px;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+esc(o.ml_observation_comment||'')+'</textarea>'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-top:8px;">'+
+            '<select id="ml-s-'+o.id+'" style="padding:6px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;background:#fff;">'+optsHtml+'</select>'+
+            '<button class="btn btn-primary" style="font-size:12px;padding:6px 14px;" onclick="saveMlComment(\''+o.id+'\')">Save</button>'+
+            '<span id="ml-ok-'+o.id+'" style="display:none;font-size:12px;color:#1a7a1a;font-weight:600;">✓ saved</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
     '</div>';
-  });
+  }).join('');
   c.innerHTML=html;
+
+  // Sign thumbnail URLs in parallel and attach them.
+  await Promise.all(thumbs.map(async function(t){
+    try {
+      var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({expiresIn:3600})
+      });
+      if(sr.ok){
+        var sd=await sr.json();
+        var img=g(t.thumbId);
+        if(img)img.src=SB+'/storage/v1'+sd.signedURL;
+      }
+    } catch(e) {}
+  }));
+}
+
+async function saveMlComment(obsId){
+  var ta=g('ml-c-'+obsId);
+  var sel=g('ml-s-'+obsId);
+  if(!ta)return;
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_observations?id=eq.'+obsId,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        ml_observation_comment:ta.value||null,
+        ml_observation_status:(sel&&sel.value)?sel.value:null,
+        updated_at:new Date().toISOString()
+      })
+    });
+    if(!r.ok){alert('Save failed: '+await r.text());return;}
+    var ok=g('ml-ok-'+obsId);
+    if(ok){
+      ok.style.display='inline';
+      setTimeout(function(){ok.style.display='none';},2000);
+    }
+  } catch(err){alert('Error: '+err.message);}
 }
 
 // ─── ARCHIVE + DELETE ──────────────────────────────────────────────

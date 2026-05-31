@@ -82,6 +82,14 @@ export default async function handler(req, res) {
     try { extracted = JSON.parse(jsonText); }
     catch (e) { throw new Error('AI returned unparseable JSON: ' + responseText.slice(0, 500)); }
 
+    // Resolve which photo is actually the front based on the AI's assessment.
+    let resolvedFrontId = frontPhotoId;
+    let resolvedBackId = backPhotoId || null;
+    if (backPhotoId && extracted.front_image_index === 2) {
+      resolvedFrontId = backPhotoId;
+      resolvedBackId = frontPhotoId;
+    }
+
     // 5. Map category to TBG categories.id (best-effort)
     let categoryId = null;
     if (extracted.ai_suggested_category) {
@@ -102,8 +110,8 @@ export default async function handler(req, res) {
     // 6. Build observation
     const obsPayload = {
       shop_out_id: shopOutId,
-      front_photo_id: frontPhotoId,
-      back_photo_id: backPhotoId || null,
+      front_photo_id: resolvedFrontId,
+      back_photo_id: resolvedBackId,
       brand: extracted.brand || null,
       product_name: extracted.product_name || null,
       sub_brand: extracted.sub_brand || null,
@@ -147,22 +155,22 @@ export default async function handler(req, res) {
     const inserted = await insR.json();
 
     // 8. Mark photos as processed
-    await sbFetch(`/rest/v1/shop_out_photos?id=eq.${frontPhotoId}`, {
+    await sbFetch(`/rest/v1/shop_out_photos?id=eq.${resolvedFrontId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         photo_type: 'item_front',
-        paired_with_photo_id: backPhotoId || null,
+        paired_with_photo_id: resolvedBackId,
         ai_processed_at: new Date().toISOString()
       })
     });
-    if (backPhotoId) {
-      await sbFetch(`/rest/v1/shop_out_photos?id=eq.${backPhotoId}`, {
+    if (resolvedBackId) {
+      await sbFetch(`/rest/v1/shop_out_photos?id=eq.${resolvedBackId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           photo_type: 'item_back',
-          paired_with_photo_id: frontPhotoId,
+          paired_with_photo_id: resolvedFrontId,
           ai_processed_at: new Date().toISOString()
         })
       });
@@ -261,7 +269,8 @@ Schema (use null where you cannot determine a value with reasonable confidence):
   "category_confidence": "number 0.0-1.0",
   "ingredients_list": "string or null — full INCI list if visible",
   "period_after_opening": "string or null — e.g., '6M', '12M'",
-  "ai_confidence": "number 0.0-1.0"
+  "ai_confidence": "number 0.0-1.0",
+  "front_image_index": ${hasBack ? '"number — which of the two images is the FRONT of the product (1 or 2). The front is the shopper-facing branded face: product name, hero imagery, marketing copy. The back/side typically shows ingredients, fine print, the retailer price sticker, or a barcode. Pick whichever image is the clearer marketing-facing shot. If a single image shows BOTH branded front AND a price tag affixed to its front, that image is still the front. Only default to 1 if truly indistinguishable."' : '"number — 1 (only one image provided)"'}
 }
 
 CRITICAL: output a single JSON object only. No markdown fences. No prose.`;
