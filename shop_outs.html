@@ -534,7 +534,7 @@ async function handleFiles(fileList){
   var originalCount=files.length;
   files=files.filter(function(f){return !existingNames[f.name];});
   var skipped=originalCount-files.length;
-  if(files.length===0){alert('All '+originalCount+' already uploaded.');return;}
+  if(files.length===0){alert('All '+originalCount+' already uploaded.'+(videoSkipped>0?'\n('+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' skipped — Live Photo .mov sidecars are not uploaded.)':''));return;}
 
   var startSeq=getPhotoCount(currentId)+1;
   uploadCancelled=false;
@@ -542,6 +542,7 @@ async function handleFiles(fileList){
 
   g('shop-detail').innerHTML='<div class="upload-status">'+
     '<div class="upload-warning">⚠️ <strong>Don\'t switch tabs.</strong></div>'+
+    (videoSkipped>0?'<div style="background:#eef2ff;color:#003366;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;">🎬 '+videoSkipped+' video file'+(videoSkipped>1?'s':'')+' skipped (Live Photo .mov sidecars aren\'t uploaded).</div>':'')+
     (skipped>0?'<div style="background:#edfaed;color:#1a5a1a;padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:10px;">✓ '+skipped+' duplicates skipped. Uploading '+files.length+' new.</div>':'')+
     '<div style="font-weight:700;margin-bottom:6px;">Uploading '+files.length+' photos…</div>'+
     '<div class="progress-bar"><div class="progress-fill" id="up-fill" style="width:0%;"></div></div>'+
