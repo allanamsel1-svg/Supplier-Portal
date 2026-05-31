@@ -1021,18 +1021,26 @@ async function loadPhotos(id){
   if(!r.ok)return;
   currentPhotos=await r.json();
   await Promise.all(currentPhotos.map(async function(p){
-    var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
+    // Sign two transformed URLs: a small thumbnail for the grid and a larger
+    // one for the full viewer. Requesting a transform makes Supabase decode the
+    // stored file server-side, so HEIC/HEIF render in-browser regardless.
+    var thumbReq=h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({expiresIn:3600})
+      body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
     });
-    if(sr.ok){var sd=await sr.json();p.signed_url=SB+'/storage/v1'+sd.signedURL;}
+    var fullReq=h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
+    });
+    var tr=await thumbReq;if(tr.ok){var td=await tr.json();p.signed_thumb_url=SB+'/storage/v1'+td.signedURL;}
+    var fr=await fullReq;if(fr.ok){var fd=await fr.json();p.signed_url=SB+'/storage/v1'+fd.signedURL;}
   }));
   var container=g('photos-container');if(!container)return;
   container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
       var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':(p.photo_type==='section'?'section':''));
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
-        '<img src="'+(p.signed_url||'')+'" loading="lazy" />'+
+        '<img src="'+(p.signed_thumb_url||p.signed_url||'')+'" loading="lazy" />'+
         '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
         (role?'<span class="photo-role">'+role+'</span>':'')+
       '</div>';
@@ -1137,7 +1145,7 @@ async function loadObservations(id){
     try {
       var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:3600})
+        body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
       });
       if(sr.ok){
         var sd=await sr.json();
@@ -1257,7 +1265,7 @@ async function loadSections(id){
     try {
       var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:3600})
+        body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
       });
       if(sr.ok){
         var sd=await sr.json();
