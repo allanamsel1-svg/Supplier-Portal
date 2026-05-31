@@ -1422,11 +1422,17 @@ async function patchSection(id,patch){
   patch.updated_at=new Date().toISOString();
   try {
     var r=await h(SB+'/rest/v1/shop_out_sections?id=eq.'+id,{
-      method:'PATCH',headers:{'Content-Type':'application/json'},
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(patch)
     });
-    return r.ok;
-  } catch(e){ return false; }
+    if(!r.ok){console.error('[section] PATCH '+id+' failed: HTTP '+r.status);return false;}
+    // Verify a row actually changed — a 0-row result means the write was
+    // silently rejected (e.g. by RLS) and nothing persisted.
+    var rows=await r.json();
+    if(!Array.isArray(rows)||rows.length===0){console.error('[section] PATCH '+id+' updated 0 rows');return false;}
+    return true;
+  } catch(e){ console.error('[section] PATCH '+id+' error',e); return false; }
 }
 function flashSecSaved(elId){
   var el=g(elId);if(!el)return;
