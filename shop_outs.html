@@ -1070,40 +1070,74 @@ async function loadPhotos(id){
   var r=await h(SB+'/rest/v1/shop_out_photos?shop_out_id=eq.'+id+'&order=photo_sequence_number.asc&select=*');
   if(!r.ok)return;
   currentPhotos=await r.json();
-  await Promise.all(currentPhotos.map(async function(p){
-    // Sign two transformed URLs: a small thumbnail for the grid and a larger
-    // one for the full viewer. Requesting a transform makes Supabase decode the
-    // stored file server-side, so HEIC/HEIF render in-browser regardless.
-    var thumbReq=h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
-    });
-    var fullReq=h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
-    });
-    var tr=await thumbReq;if(tr.ok){var td=await tr.json();p.signed_thumb_url=SB+'/storage/v1'+td.signedURL;}
-    var fr=await fullReq;if(fr.ok){var fd=await fr.json();p.signed_url=SB+'/storage/v1'+fd.signedURL;}
-  }));
   var container=g('photos-container');if(!container)return;
   container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
       var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':(p.photo_type==='section'?'section':''));
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
-        '<img src="'+(p.signed_thumb_url||p.signed_url||'')+'" loading="lazy" />'+
+        '<img id="grid-img-'+i+'" loading="lazy" alt="" />'+
         '<span class="photo-num">'+(p.photo_sequence_number||i+1)+'</span>'+
         (role?'<span class="photo-role">'+role+'</span>':'')+
       '</div>';
-    }).join('')+'</div>';
+    }).join('')+'</div>'+
+    '<div id="photo-sentinel" style="height:1px;"></div>';
+
+  // Lazily sign 400px thumbnail URLs — first batch now, the rest as the user
+  // scrolls. Avoids signing 500+ URLs up front. Viewer signs full-res on demand.
+  var signedCount=0;
+  async function signThumbBatch(n){
+    var end=Math.min(signedCount+n,currentPhotos.length);
+    var batch=[];for(var i=signedCount;i<end;i++)batch.push(i);
+    signedCount=end;
+    await Promise.all(batch.map(async function(i){
+      var p=currentPhotos[i];
+      if(!p.signed_thumb_url){
+        try {
+          var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
+          });
+          if(sr.ok)p.signed_thumb_url=SB+'/storage/v1'+(await sr.json()).signedURL;
+        } catch(e) {}
+      }
+      var im=g('grid-img-'+i);if(im && p.signed_thumb_url)im.src=p.signed_thumb_url;
+    }));
+  }
+  await signThumbBatch(20);
+
+  var sentinel=g('photo-sentinel');
+  if(sentinel && 'IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(entries){
+      if(entries[0] && entries[0].isIntersecting && signedCount<currentPhotos.length){
+        signThumbBatch(20).then(function(){ if(signedCount>=currentPhotos.length)io.disconnect(); });
+      }
+    },{root:document.querySelector('.detail')||null,rootMargin:'300px'});
+    io.observe(sentinel);
+  } else {
+    while(signedCount<currentPhotos.length){ await signThumbBatch(50); }
+  }
 }
 
-function openViewer(idx){viewerIdx=idx;showCurrentPhoto();g('viewer').classList.add('show');}
+function openViewer(idx){viewerIdx=idx;g('viewer').classList.add('show');showCurrentPhoto();}
 function closeViewer(){g('viewer').classList.remove('show');}
 function navViewer(dir){viewerIdx=Math.max(0,Math.min(currentPhotos.length-1,viewerIdx+dir));showCurrentPhoto();}
-function showCurrentPhoto(){
+async function showCurrentPhoto(){
   var p=currentPhotos[viewerIdx];if(!p)return;
-  g('viewer-img').src=p.signed_url||'';
   g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length;
+  var img=g('viewer-img');
+  // Show the thumbnail instantly (if signed), then swap in the full-res image.
+  img.src=p.signed_full_url||p.signed_thumb_url||'';
+  if(!p.signed_full_url){
+    try {
+      var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
+      });
+      if(sr.ok)p.signed_full_url=SB+'/storage/v1'+(await sr.json()).signedURL;
+    } catch(e) {}
+  }
+  // Guard against fast navigation: only apply if still viewing this photo.
+  if(currentPhotos[viewerIdx]===p && p.signed_full_url)img.src=p.signed_full_url;
 }
 document.addEventListener('keydown',function(e){
   if(!g('viewer').classList.contains('show'))return;
@@ -1291,20 +1325,33 @@ async function loadSections(id){
       brandTable='<div style="font-size:12px;color:#888;margin-top:8px;">No brands captured.</div>';
     }
 
+    var cat=s.category_detected||'Uncategorized';
+    var override=s.category_override||'';
+    var displayCat=override||cat;
+    var flag=s.ai_accuracy_flag||'';
+    var comment=s.section_comment||'';
+
     return '<div style="display:flex;gap:14px;padding:14px 0;border-bottom:0.5px solid #f0f0e8;">'+
       '<div style="flex-shrink:0;width:120px;height:120px;border-radius:8px;overflow:hidden;background:#f0f0e8;">'+
         '<img id="'+thumbId+'"'+thumbClick+' style="width:120px;height:120px;object-fit:cover;display:block;" />'+
       '</div>'+
       '<div style="flex:1;min-width:0;">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
-          '<div>'+
+          '<div style="min-width:0;">'+
             '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Section #'+(i+1)+(s.department?' · '+esc(s.department):'')+'</div>'+
-            '<div style="font-weight:700;font-size:15px;margin-top:2px;">'+esc(s.category_detected||'Uncategorized')+'</div>'+
-            '<div style="font-size:12px;color:#666;margin-top:1px;">'+(lf!=null?'≈ '+lf+' linear ft':'linear ft unknown')+'</div>'+
+            '<div id="sec-catd-'+s.id+'" data-ai="'+esc(cat)+'" style="font-weight:700;font-size:15px;margin-top:2px;">'+esc(displayCat)+'</div>'+
+            '<div id="sec-catai-'+s.id+'" style="font-size:11px;color:#888;'+(override?'':'display:none;')+'">AI: '+esc(cat)+'</div>'+
+            '<div style="margin-top:4px;"><input id="sec-catin-'+s.id+'" value="'+esc(override)+'" placeholder="Override category…" onblur="saveSectionCategory(\''+s.id+'\')" style="font-size:12px;padding:3px 7px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;width:170px;max-width:100%;" /> <span id="sec-catok-'+s.id+'" style="display:none;font-size:11px;color:#1a7a1a;font-weight:600;">✓ saved</span></div>'+
+            '<div style="font-size:12px;color:#666;margin-top:4px;">'+(lf!=null?'≈ '+lf+' linear ft':'linear ft unknown')+'</div>'+
+            '<div id="sec-flag-'+s.id+'" style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">'+secFlagGroup(s.id,flag)+'</div>'+
           '</div>'+
-          '<div>'+confBadge+'</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'+confBadge+'<span id="sec-flagb-'+s.id+'">'+secFlagBadge(flag)+'</span></div>'+
         '</div>'+
         brandTable+
+        '<div style="margin-top:10px;">'+
+          '<textarea id="sec-com-'+s.id+'" onblur="saveSectionComment(\''+s.id+'\')" placeholder="Add notes (e.g. shelf header says K Beauty, clearance end cap, bottom shelf obscured)" style="width:100%;box-sizing:border-box;min-height:46px;padding:7px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+esc(comment)+'</textarea>'+
+          ' <span id="sec-com-ok-'+s.id+'" style="display:none;font-size:11px;color:#1a7a1a;font-weight:600;">✓ saved</span>'+
+        '</div>'+
       '</div>'+
     '</div>';
   }).join('');
@@ -1335,6 +1382,7 @@ async function loadSections(id){
     '</div>'+
   '</div>';
   c.innerHTML=html;
+  secs.forEach(function(s){secFlagState[s.id]=s.ai_accuracy_flag||'';});
 
   // Sign + attach section thumbnails in parallel.
   await Promise.all(thumbs.map(async function(t){
@@ -1350,6 +1398,62 @@ async function loadSections(id){
       }
     } catch(e) {}
   }));
+}
+
+// ─── SECTION ANNOTATIONS (manual review layer) ─────────────────────
+var secFlagState={};
+function secFlagBadge(flag){
+  if(flag==='correct')return '<span class="badge b-complete">✓ AI correct</span>';
+  if(flag==='close')return '<span class="badge b-processing">~ AI close</span>';
+  if(flag==='missed')return '<span class="badge b-failed">✗ AI missed</span>';
+  return '';
+}
+function secFlagGroup(id,flag){
+  function btn(val,label){
+    var active=flag===val;
+    var bg=active?(val==='correct'?'#1a7a1a':(val==='close'?'#a07000':'#a22')):'#f0f0e8';
+    var col=active?'#fff':'#666';
+    return '<button onclick="setSectionFlag(\''+id+'\',\''+val+'\')" style="font-size:11px;padding:4px 8px;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;background:'+bg+';color:'+col+';">'+label+'</button>';
+  }
+  return btn('correct','✓ AI correct')+btn('close','~ AI close')+btn('missed','✗ AI missed');
+}
+async function patchSection(id,patch){
+  patch.updated_at=new Date().toISOString();
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_sections?id=eq.'+id,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(patch)
+    });
+    return r.ok;
+  } catch(e){ return false; }
+}
+function flashSecSaved(elId){
+  var el=g(elId);if(!el)return;
+  el.style.display='inline';
+  setTimeout(function(){el.style.display='none';},1500);
+}
+async function saveSectionComment(id){
+  var ta=g('sec-com-'+id);if(!ta)return;
+  if(await patchSection(id,{section_comment:ta.value.trim()||null}))flashSecSaved('sec-com-ok-'+id);
+  else alert('Could not save comment.');
+}
+async function saveSectionCategory(id){
+  var inp=g('sec-catin-'+id);if(!inp)return;
+  var val=inp.value.trim();
+  if(!(await patchSection(id,{category_override:val||null}))){alert('Could not save category.');return;}
+  var disp=g('sec-catd-'+id), ai=g('sec-catai-'+id);
+  var aiCat=disp?(disp.getAttribute('data-ai')||''):'';
+  if(disp)disp.textContent=val||aiCat||'Uncategorized';
+  if(ai){ if(val){ai.textContent='AI: '+aiCat;ai.style.display='block';} else {ai.style.display='none';} }
+  flashSecSaved('sec-catok-'+id);
+}
+async function setSectionFlag(id,val){
+  var cur=secFlagState[id]||'';
+  var next=(cur===val)?null:val;
+  if(!(await patchSection(id,{ai_accuracy_flag:next}))){alert('Could not save flag.');return;}
+  secFlagState[id]=next||'';
+  var grp=g('sec-flag-'+id);if(grp)grp.innerHTML=secFlagGroup(id,next||'');
+  var bdg=g('sec-flagb-'+id);if(bdg)bdg.innerHTML=secFlagBadge(next||'');
 }
 
 // ─── ARCHIVE + DELETE ──────────────────────────────────────────────
