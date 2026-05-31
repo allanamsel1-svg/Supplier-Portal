@@ -641,8 +641,20 @@ async function uploadOne(file,seq,attempt){
   var uploadBlob=file;
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
   var contentType=file.type||'image/jpeg';
+  var MAX_EDGE=2048;
   try {
-    var bmp=await createImageBitmap(file);
+    // Decode at native size first to learn dimensions.
+    var src=await createImageBitmap(file);
+    var w=src.width,h=src.height;
+    var longEdge=Math.max(w,h);
+    var bmp=src;
+    if(longEdge>MAX_EDGE){
+      // Scale the long edge down to MAX_EDGE, preserving aspect ratio.
+      var scale=MAX_EDGE/longEdge;
+      var rw=Math.round(w*scale),rh=Math.round(h*scale);
+      bmp=await createImageBitmap(file,{resizeWidth:rw,resizeHeight:rh,resizeQuality:'high'});
+      if(src.close)src.close();
+    }
     var canvas=document.createElement('canvas');
     canvas.width=bmp.width;
     canvas.height=bmp.height;
@@ -651,7 +663,7 @@ async function uploadOne(file,seq,attempt){
     var jpeg=await new Promise(function(resolve){canvas.toBlob(resolve,'image/jpeg',0.85);});
     if(jpeg){
       uploadBlob=jpeg;ext='jpg';contentType='image/jpeg';
-      console.log('[upload]    canvas re-encode seq '+seq+': '+file.size+' → '+jpeg.size+' bytes (jpeg q0.85)');
+      console.log('[upload]    canvas re-encode seq '+seq+': '+w+'x'+h+' → '+canvas.width+'x'+canvas.height+', '+file.size+' → '+jpeg.size+' bytes (jpeg q0.85, cap '+MAX_EDGE+'px)');
     } else {
       console.warn('[upload]    canvas toBlob returned null for "'+file.name+'", uploading original');
     }
