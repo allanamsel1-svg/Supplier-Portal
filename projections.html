@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Projections — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+body{background:#f5f5f0;}
+.wrap{padding:1.5rem;max-width:1400px;margin:0 auto;}
+.tabpane{display:none;}
+.tabpane.active{display:block;}
+.group-title{font-size:13px;font-weight:700;color:#1a1a2e;text-transform:uppercase;letter-spacing:0.05em;margin:1.5rem 0 0.5rem;}
+.sku-table{background:#fff;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;}
+.sku-row-head,.sku-row{display:grid;grid-template-columns:2.4fr 0.9fr 0.8fr 0.9fr 0.9fr 0.9fr 0.8fr 0.8fr 1fr;gap:8px;align-items:center;padding:9px 14px;font-size:12px;}
+.sku-row-head{background:#fafaf8;border-bottom:1px solid #e0e0d8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;}
+.sku-row{border-bottom:0.5px solid #f0f0e8;cursor:pointer;}
+.sku-row:hover{background:#fafbff;}
+.sku-row .num{text-align:right;font-variant-numeric:tabular-nums;}
+.sku-name{font-weight:600;color:#1a1a2e;}
+.sku-size{font-size:11px;color:#888;}
+.badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;display:inline-block;}
+.b-proposed{background:#e8f0ff;color:#2244cc;}
+.b-active{background:#edfaed;color:#1a7a1a;}
+.b-archived{background:#e8e8e0;color:#888;}
+.m-green{color:#1a7a1a;font-weight:700;}
+.m-amber{color:#9a6a00;font-weight:700;}
+.m-red{color:#a22;font-weight:700;}
+.detail{background:#f7f7f2;border-bottom:0.5px solid #f0f0e8;padding:14px 18px;}
+.detail-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 18px;}
+.fld{display:flex;flex-direction:column;gap:3px;}
+.fld label{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;}
+.fld input{padding:6px 9px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;}
+.calc-row{display:flex;gap:24px;margin-top:14px;padding-top:12px;border-top:1px solid #e0e0d8;align-items:center;flex-wrap:wrap;}
+.calc{font-size:12px;color:#666;}
+.calc strong{font-size:16px;color:#1a1a2e;display:block;}
+.btn{padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:inherit;}
+.btn-primary{background:#2244cc;color:#fff;}
+.btn-primary:hover{background:#3355dd;}
+.saved{display:none;font-size:12px;color:#1a7a1a;font-weight:600;}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;}
+.card h3{font-size:15px;margin:0 0 12px;}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+.stat-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;}
+.stat-val{font-size:18px;font-weight:700;margin-top:3px;}
+.health-table{background:#fff;border:1px solid #e0e0d8;border-radius:10px;margin-top:1.5rem;overflow:hidden;}
+.health-row{display:grid;grid-template-columns:2.6fr 1.2fr 0.9fr 0.9fr 14px;gap:10px;align-items:center;padding:8px 14px;font-size:12px;border-bottom:0.5px solid #f0f0e8;}
+.health-row.head{background:#fafaf8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;}
+.dot{width:12px;height:12px;border-radius:50%;}
+.dot.green{background:#1a7a1a;}.dot.amber{background:#d89000;}.dot.red{background:#cc2222;}
+.empty{padding:3rem;text-align:center;color:#bbb;}
+</style>
+</head>
+<body>
+
+<div class="ri-top">
+  <div class="ri-top-title">📊 Projections</div>
+  <div class="ri-top-actions">
+    <a href="admin.html">← Admin</a>
+  </div>
+</div>
+
+<div class="ri-tabs">
+  <a href="#" class="ri-tab active" id="tab-skus" onclick="showTab('skus');return false;"><span class="ri-tab-icon">🧾</span> SKUs</a>
+  <a href="#" class="ri-tab" id="tab-summary" onclick="showTab('summary');return false;"><span class="ri-tab-icon">📈</span> Summary</a>
+</div>
+
+<div class="wrap">
+  <div id="pane-skus" class="tabpane active"><div class="empty">Loading…</div></div>
+  <div id="pane-summary" class="tabpane"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function h(url,opts){opts=opts||{};opts.headers=opts.headers||{};opts.headers.apikey=KEY;opts.headers.Authorization='Bearer '+KEY;return fetch(url,opts);}
+function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
+function num(v){var n=Number(v);return isFinite(n)?n:0;}
+function money(v){return '$'+num(v).toFixed(2);}
+function pct(v){return (num(v)*100).toFixed(1)+'%';}
+
+// Editable cost-build fields (mirror the DB generated-column inputs).
+var EDIT_FIELDS=['bulk_unit_cost','packaging','duty_rate','tariff_rate','estimated_freight','wholesale_price','proposed_sell_price','comp_retail_price'];
+var FIELD_LABELS={bulk_unit_cost:'Bulk Unit Cost',packaging:'Packaging',duty_rate:'Duty Rate',tariff_rate:'Tariff Rate',estimated_freight:'Est. Freight',wholesale_price:'Wholesale Price',proposed_sell_price:'Proposed Sell',comp_retail_price:'Comp Retail'};
+var STATUSES=['proposed','active','archived'];
+
+var skus=[];
+
+// ─── formulas (mirror DB generated columns) ───
+function calcElc(s){return (num(s.bulk_unit_cost)+num(s.packaging))*(1+num(s.duty_rate)+num(s.tariff_rate))+num(s.estimated_freight);}
+function calcCustomerMargin(s){var c=num(s.comp_retail_price);return c>0?(c-num(s.wholesale_price))/c:0;}
+function calcTbgMargin(s){var w=num(s.wholesale_price);return w>0?(w-calcElc(s))/w:0;}
+function marginClass(m){return m>0.40?'m-green':(m>=0.25?'m-amber':'m-red');}
+function marginDot(m){return m>0.40?'green':(m>=0.25?'amber':'red');}
+
+async function load(){
+  try {
+    var r=await h(SB+'/rest/v1/projection_skus?select=*&order=product_line.asc,item_description.asc');
+    if(!r.ok){g('pane-skus').innerHTML='<div class="empty">Failed to load ('+r.status+').</div>';return;}
+    skus=await r.json();
+  } catch(e){ g('pane-skus').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
+  renderSkus();
+  renderSummary();
+}
+
+function showTab(t){
+  g('tab-skus').classList.toggle('active',t==='skus');
+  g('tab-summary').classList.toggle('active',t==='summary');
+  g('pane-skus').classList.toggle('active',t==='skus');
+  g('pane-summary').classList.toggle('active',t==='summary');
+}
+
+// ─── SKUs TAB ───
+function groupByLine(){
+  var groups={};
+  skus.forEach(function(s){(groups[s.product_line||'—']=groups[s.product_line||'—']||[]).push(s);});
+  Object.keys(groups).forEach(function(k){groups[k].sort(function(a,b){return (a.item_description||'').localeCompare(b.item_description||'');});});
+  return groups;
+}
+
+function rowSummaryCells(s){
+  var cm=calcCustomerMargin(s), tm=calcTbgMargin(s);
+  return '<div><div class="sku-name">'+esc(s.item_description||'—')+'</div><div class="sku-size">'+esc(s.size_unit||'')+'</div></div>'+
+    '<div class="num" id="cell-elc-'+s.id+'">'+money(calcElc(s))+'</div>'+
+    '<div class="num">'+money(s.wholesale_price)+'</div>'+
+    '<div class="num">'+money(s.proposed_sell_price)+'</div>'+
+    '<div class="num">'+money(s.comp_retail_price)+'</div>'+
+    '<div class="num '+marginClass(cm)+'" id="cell-cm-'+s.id+'">'+pct(cm)+'</div>'+
+    '<div class="num '+marginClass(tm)+'" id="cell-tm-'+s.id+'">'+pct(tm)+'</div>'+
+    '<div><span class="badge b-'+esc(s.status||'proposed')+'" id="badge-'+s.id+'">'+esc(s.status||'proposed')+'</span></div>';
+}
+
+function renderSkus(){
+  var groups=groupByLine();
+  if(skus.length===0){g('pane-skus').innerHTML='<div class="empty">No SKUs yet.</div>';return;}
+  var html='';
+  Object.keys(groups).sort().forEach(function(line){
+    html+='<div class="group-title">'+esc(line)+' <span style="color:#aaa;font-weight:400;">· '+groups[line].length+' SKUs</span></div>';
+    html+='<div class="sku-table">'+
+      '<div class="sku-row-head">'+
+        '<div>Item</div><div class="num">ELC</div><div class="num">Wholesale</div><div class="num">Proposed</div>'+
+        '<div class="num">Comp Retail</div><div class="num">Cust %</div><div class="num">TBG %</div><div>Status</div>'+
+      '</div>';
+    groups[line].forEach(function(s){
+      html+='<div class="sku-row" onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>';
+      html+='<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
+    });
+    html+='</div>';
+  });
+  g('pane-skus').innerHTML=html;
+}
+
+function toggleDetail(id){
+  var d=g('detail-'+id);if(!d)return;
+  if(d.style.display!=='none'){d.style.display='none';d.innerHTML='';return;}
+  var s=skus.find(function(x){return x.id===id;});if(!s)return;
+  var fields=EDIT_FIELDS.map(function(f){
+    return '<div class="fld"><label>'+FIELD_LABELS[f]+'</label>'+
+      '<input type="number" step="any" id="inp-'+f+'-'+id+'" value="'+(s[f]!=null?s[f]:'')+'" oninput="recalc(\''+id+'\')" /></div>';
+  }).join('');
+  var statusOpts=STATUSES.map(function(st){return '<option value="'+st+'"'+((s.status||'proposed')===st?' selected':'')+'>'+st+'</option>';}).join('');
+  d.innerHTML='<div class="detail-grid">'+fields+'</div>'+
+    '<div class="calc-row">'+
+      '<div class="calc">ELC<strong id="calc-elc-'+id+'">'+money(calcElc(s))+'</strong></div>'+
+      '<div class="calc">Customer Margin<strong id="calc-cm-'+id+'" class="'+marginClass(calcCustomerMargin(s))+'">'+pct(calcCustomerMargin(s))+'</strong></div>'+
+      '<div class="calc">TBG Margin<strong id="calc-tm-'+id+'" class="'+marginClass(calcTbgMargin(s))+'">'+pct(calcTbgMargin(s))+'</strong></div>'+
+      '<div class="calc">Status<select id="inp-status-'+id+'" onchange="saveStatus(\''+id+'\')" style="display:block;margin-top:3px;padding:6px 9px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;">'+statusOpts+'</select></div>'+
+      '<div style="margin-left:auto;display:flex;align-items:center;gap:10px;">'+
+        '<span class="saved" id="saved-'+id+'">✓ saved</span>'+
+        '<button class="btn btn-primary" onclick="saveSku(\''+id+'\')">Save</button>'+
+      '</div>'+
+    '</div>';
+  d.style.display='block';
+}
+
+// live recompute from the detail inputs
+function readInputs(id){
+  var s=skus.find(function(x){return x.id===id;})||{};
+  var draft={};
+  EDIT_FIELDS.forEach(function(f){var el=g('inp-'+f+'-'+id);draft[f]=el?num(el.value):num(s[f]);});
+  return draft;
+}
+function recalc(id){
+  var d=readInputs(id);
+  var elc=calcElc(d), cm=calcCustomerMargin(d), tm=calcTbgMargin(d);
+  var setTxt=function(el,txt,cls){if(!el)return;el.textContent=txt;if(cls){el.className=el.id.indexOf('cell-')===0?('num '+cls):cls;}};
+  setTxt(g('calc-elc-'+id),money(elc));
+  setTxt(g('calc-cm-'+id),pct(cm),marginClass(cm));
+  setTxt(g('calc-tm-'+id),pct(tm),marginClass(tm));
+  // mirror into the collapsed row summary cells
+  setTxt(g('cell-elc-'+id),money(elc));
+  setTxt(g('cell-cm-'+id),pct(cm),marginClass(cm));
+  setTxt(g('cell-tm-'+id),pct(tm),marginClass(tm));
+}
+
+async function patchSku(id,patch){
+  patch.updated_at=new Date().toISOString();
+  var r=await h(SB+'/rest/v1/projection_skus?id=eq.'+id,{
+    method:'PATCH',headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(patch)
+  });
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  var rows=await r.json();
+  if(!rows.length)throw new Error('0 rows updated');
+  return rows[0];
+}
+
+async function saveSku(id){
+  var draft=readInputs(id);
+  try {
+    var updated=await patchSku(id,draft);
+    var idx=skus.findIndex(function(x){return x.id===id;});
+    if(idx>=0)skus[idx]=updated;          // adopt authoritative generated values from DB
+    var fresh=skus[idx];
+    var setTxt=function(el,txt,cls){if(!el)return;el.textContent=txt;if(cls)el.className='num '+cls;};
+    setTxt(g('cell-elc-'+id),money(fresh.elc));
+    setTxt(g('cell-cm-'+id),pct(fresh.customer_margin),marginClass(num(fresh.customer_margin)));
+    setTxt(g('cell-tm-'+id),pct(fresh.tbg_margin),marginClass(num(fresh.tbg_margin)));
+    var ok=g('saved-'+id);if(ok){ok.style.display='inline';setTimeout(function(){ok.style.display='none';},1500);}
+    renderSummary();
+  } catch(e){ alert('Save failed: '+e.message); }
+}
+
+async function saveStatus(id){
+  var sel=g('inp-status-'+id);if(!sel)return;
+  try {
+    var updated=await patchSku(id,{status:sel.value});
+    var idx=skus.findIndex(function(x){return x.id===id;});if(idx>=0)skus[idx]=updated;
+    var b=g('badge-'+id);if(b){b.textContent=sel.value;b.className='badge b-'+sel.value;}
+  } catch(e){ alert('Status save failed: '+e.message); }
+}
+
+// ─── SUMMARY TAB ───
+function avg(arr){return arr.length?arr.reduce(function(a,b){return a+b;},0)/arr.length:0;}
+function renderSummary(){
+  if(skus.length===0){g('pane-summary').innerHTML='<div class="empty">No SKUs yet.</div>';return;}
+  var groups=groupByLine();
+  var html='<div class="cards">';
+  Object.keys(groups).sort().forEach(function(line){
+    var list=groups[line];
+    var elcs=list.map(calcElc), tms=list.map(calcTbgMargin), cms=list.map(calcCustomerMargin);
+    var sells=list.map(function(s){return num(s.proposed_sell_price);});
+    html+='<div class="card"><h3>'+esc(line)+'</h3>'+
+      '<div class="stat-grid">'+
+        '<div><div class="stat-label">Total SKUs</div><div class="stat-val">'+list.length+'</div></div>'+
+        '<div><div class="stat-label">Avg ELC</div><div class="stat-val">'+money(avg(elcs))+'</div></div>'+
+        '<div><div class="stat-label">Avg TBG Margin</div><div class="stat-val '+marginClass(avg(tms))+'">'+pct(avg(tms))+'</div></div>'+
+        '<div><div class="stat-label">Avg Cust Margin</div><div class="stat-val">'+pct(avg(cms))+'</div></div>'+
+        '<div><div class="stat-label">ELC Range</div><div class="stat-val">'+money(Math.min.apply(null,elcs))+'–'+money(Math.max.apply(null,elcs))+'</div></div>'+
+        '<div><div class="stat-label">Proposed Sell Range</div><div class="stat-val">'+money(Math.min.apply(null,sells))+'–'+money(Math.max.apply(null,sells))+'</div></div>'+
+      '</div></div>';
+  });
+  html+='</div>';
+
+  // Margin health table — every SKU, color-coded by TBG margin.
+  var all=skus.slice().sort(function(a,b){return calcTbgMargin(a)-calcTbgMargin(b);});
+  html+='<div class="health-table"><div class="health-row head"><div>Item</div><div>Product Line</div><div class="num" style="text-align:right;">ELC</div><div class="num" style="text-align:right;">TBG %</div><div></div></div>';
+  all.forEach(function(s){
+    var tm=calcTbgMargin(s);
+    html+='<div class="health-row">'+
+      '<div class="sku-name">'+esc(s.item_description||'—')+'</div>'+
+      '<div style="color:#888;">'+esc(s.product_line||'')+'</div>'+
+      '<div class="num" style="text-align:right;">'+money(calcElc(s))+'</div>'+
+      '<div class="num '+marginClass(tm)+'" style="text-align:right;">'+pct(tm)+'</div>'+
+      '<div class="dot '+marginDot(tm)+'"></div>'+
+    '</div>';
+  });
+  html+='</div>';
+  g('pane-summary').innerHTML=html;
+}
+
+load();
+</script>
+</body>
+</html>
