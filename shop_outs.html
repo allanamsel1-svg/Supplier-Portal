@@ -1095,7 +1095,7 @@ async function loadPhotos(id){
         try {
           var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
             method:'POST',headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
+            body:JSON.stringify({expiresIn:3600,transform:{width:400,height:400,resize:'contain',format:'origin'}})
           });
           if(sr.ok)p.signed_thumb_url=SB+'/storage/v1'+(await sr.json()).signedURL;
         } catch(e) {}
@@ -1133,7 +1133,7 @@ async function showCurrentPhoto(){
   try {
     var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
+      body:JSON.stringify({expiresIn:3600,transform:{width:1568,height:1568,resize:'contain',format:'origin'}})
     });
     if(sr.ok)p.signed_full_url=SB+'/storage/v1'+(await sr.json()).signedURL;
   } catch(e) {}
@@ -1230,7 +1230,7 @@ async function loadObservations(id){
     try {
       var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
+        body:JSON.stringify({expiresIn:3600,transform:{width:400,height:400,resize:'contain',format:'origin'}})
       });
       if(sr.ok){
         var sd=await sr.json();
@@ -1390,7 +1390,7 @@ async function loadSections(id){
     try {
       var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+t.path,{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:3600,transform:{width:400,format:'origin'}})
+        body:JSON.stringify({expiresIn:3600,transform:{width:400,height:400,resize:'contain',format:'origin'}})
       });
       if(sr.ok){
         var sd=await sr.json();
