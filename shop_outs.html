@@ -610,6 +610,22 @@ async function uploadOneWithRetry(file,seq){
   }
 }
 
+// Resolves true once heic2any has loaded, false if it failed or didn't load
+// within maxWaitMs. Lets uploadOne convert HEICs even when a file is selected
+// before the async-loaded library has finished downloading.
+function waitForHeic2any(maxWaitMs){
+  if(window.heic2anyReady)return Promise.resolve(true);
+  if(window.heic2anyFailed)return Promise.resolve(false);
+  return new Promise(function(resolve){
+    var waited=0,step=50;
+    var iv=setInterval(function(){
+      if(window.heic2anyReady){clearInterval(iv);resolve(true);}
+      else if(window.heic2anyFailed){clearInterval(iv);resolve(false);}
+      else{waited+=step;if(waited>=maxWaitMs){clearInterval(iv);resolve(window.heic2anyReady===true);}}
+    },step);
+  });
+}
+
 async function uploadOne(file,seq,attempt){
   var uploadBlob=file;
   var ext=(file.name.split('.').pop()||'jpg').toLowerCase();
@@ -617,8 +633,15 @@ async function uploadOne(file,seq,attempt){
   var arr=new Uint8Array(bytes);
   var isHeic=(arr[4]===0x66&&arr[5]===0x74&&arr[6]===0x79&&arr[7]===0x70)
     &&((arr[8]===0x68&&arr[9]===0x65&&(arr[10]===0x69||arr[10]===0x76))||(arr[8]===0x6d&&arr[9]===0x69&&arr[10]===0x66));
-  if(isHeic&&window.heic2anyReady){
-    try{uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});ext='jpg';}catch(e){ console.warn('HEIC conversion failed, uploading original', e); }
+  if(isHeic){
+    // Wait for heic2any to finish loading before deciding — guarantees
+    // conversion regardless of how soon after page load files were selected.
+    var ready=await waitForHeic2any(15000);
+    if(ready&&typeof heic2any!=='undefined'){
+      try{uploadBlob=await heic2any({blob:file,toType:'image/jpeg',quality:0.85});ext='jpg';}catch(e){ console.warn('HEIC conversion failed, uploading original', e); }
+    } else {
+      console.warn('heic2any unavailable; uploading original HEIC (server-side transform will handle it)');
+    }
   }
   var path=currentId+'/'+Date.now()+'-'+Math.random().toString(36).substring(2,8)+'.'+ext;
   var sr=await fetch(SB+'/storage/v1/object/'+BUCKET+'/'+path,{
@@ -1311,10 +1334,11 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 window.heic2anyReady=false;
+window.heic2anyFailed=false;
 var s=document.createElement('script');
 s.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 s.onload=function(){window.heic2anyReady=true;};
-s.onerror=function(){console.warn('heic2any failed to load; HEICs will upload unconverted');};
+s.onerror=function(){window.heic2anyFailed=true;console.warn('heic2any failed to load; HEICs will upload unconverted');};
 document.head.appendChild(s);
 
 init();
