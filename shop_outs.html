@@ -471,7 +471,9 @@ async function renderDetail(){
   g('file-input').onchange=function(e){handleFiles(e.target.files);};
 
   if(stat==='complete'||stat==='failed'||photoCount>0){
-    loadPhotos(s.id);
+    // Await loadPhotos so currentPhotos is populated before the observation and
+    // section cards render — they map photo ids to viewer indices off it.
+    await loadPhotos(s.id);
     if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);loadSections(s.id);}
   }
 }
