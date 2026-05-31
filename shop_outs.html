@@ -57,7 +57,7 @@
 .photo-role{position:absolute;bottom:4px;left:4px;background:rgba(255,255,255,0.92);color:#333;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600;}
 .viewer{position:fixed;inset:0;background:rgba(0,0,0,0.92);display:none;align-items:center;justify-content:center;z-index:200;}
 .viewer.show{display:flex;}
-.viewer img{max-width:90vw;max-height:85vh;object-fit:contain;}
+.viewer img{width:100%;height:auto;max-height:90vh;object-fit:contain;}
 .viewer-meta{position:absolute;top:20px;left:20px;color:#fff;font-size:13px;background:rgba(0,0,0,0.6);padding:10px 14px;border-radius:8px;}
 .viewer-close{position:absolute;top:20px;right:20px;background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:24px;width:40px;height:40px;border-radius:20px;cursor:pointer;}
 .viewer-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);color:#fff;border:none;font-size:24px;width:50px;height:50px;border-radius:25px;cursor:pointer;}
@@ -1125,17 +1125,18 @@ async function showCurrentPhoto(){
   var p=currentPhotos[viewerIdx];if(!p)return;
   g('viewer-meta').innerHTML='Photo '+(viewerIdx+1)+' of '+currentPhotos.length;
   var img=g('viewer-img');
-  // Show the thumbnail instantly (if signed), then swap in the full-res image.
-  img.src=p.signed_full_url||p.signed_thumb_url||'';
-  if(!p.signed_full_url){
-    try {
-      var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
-      });
-      if(sr.ok)p.signed_full_url=SB+'/storage/v1'+(await sr.json()).signedURL;
-    } catch(e) {}
-  }
+  // Go straight to the full-res (1568px) image — never show the 400px thumbnail
+  // in the viewer (it would flash a tiny/narrow image). Clear src while signing
+  // so a stale frame doesn't linger.
+  if(p.signed_full_url){img.src=p.signed_full_url;return;}
+  img.removeAttribute('src');
+  try {
+    var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({expiresIn:3600,transform:{width:1568,format:'origin'}})
+    });
+    if(sr.ok)p.signed_full_url=SB+'/storage/v1'+(await sr.json()).signedURL;
+  } catch(e) {}
   // Guard against fast navigation: only apply if still viewing this photo.
   if(currentPhotos[viewerIdx]===p && p.signed_full_url)img.src=p.signed_full_url;
 }
