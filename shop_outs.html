@@ -1410,7 +1410,7 @@ async function buildCrossIndex(){
   if(crossIndex)return crossIndex;
   crossIndex={};
   try {
-    var r=await h(SB+'/rest/v1/shop_out_observations?select=brand,product_name,retail_price,shop_out_id&retail_price=not.is.null&limit=10000');
+    var r=await h(SB+'/rest/v1/shop_out_observations?select=brand,product_name,retail_price,unit_price,normalized_unit,shop_out_id&retail_price=not.is.null&limit=10000');
     if(!r.ok)return crossIndex;
     var all=await r.json();
     var custBySO={};
@@ -1420,8 +1420,10 @@ async function buildCrossIndex(){
       var so=custBySO[o.shop_out_id];if(!so||!so.cust)return;
       var key=o.brand.toLowerCase().trim()+'|'+o.product_name.toLowerCase().trim();
       var e=crossIndex[key]||(crossIndex[key]={brand:o.brand,product:o.product_name,byCust:{}});
-      var c=e.byCust[so.cust]||(e.byCust[so.cust]={name:so.name,prices:[]});
+      var c=e.byCust[so.cust]||(e.byCust[so.cust]={name:so.name,prices:[],unitPrices:[],unit:null});
       c.prices.push(Number(o.retail_price));
+      if(o.unit_price!=null)c.unitPrices.push(Number(o.unit_price));
+      if(!c.unit&&o.normalized_unit)c.unit=o.normalized_unit;
     });
   } catch(e){}
   return crossIndex;
@@ -1433,18 +1435,28 @@ function crossInfo(brand,product){
   if(!e)return null;
   var custs=Object.keys(e.byCust);
   if(custs.length<2)return null;
-  var all=[];
-  var retailers=custs.map(function(c){var pr=e.byCust[c];all=all.concat(pr.prices);return {name:pr.name,price:med(pr.prices)};});
+  var all=[], allUnit=[], unit=null;
+  var retailers=custs.map(function(c){
+    var pr=e.byCust[c];all=all.concat(pr.prices);
+    if(pr.unitPrices.length)allUnit=allUnit.concat(pr.unitPrices);
+    if(!unit&&pr.unit)unit=pr.unit;
+    return {name:pr.name,price:med(pr.prices),unitPrice:pr.unitPrices.length?med(pr.unitPrices):null};
+  });
   retailers.sort(function(a,b){return a.price-b.price;});
   var min=Math.min.apply(null,all), max=Math.max.apply(null,all);
-  return {min:min,max:max,count:custs.length,retailers:retailers,variance:max-min};
+  var uMin=allUnit.length?Math.min.apply(null,allUnit):null, uMax=allUnit.length?Math.max.apply(null,allUnit):null;
+  return {min:min,max:max,count:custs.length,retailers:retailers,variance:max-min,unitMin:uMin,unitMax:uMax,unit:unit};
 }
+function uLabel(nu){return SKU_UNIT_LABEL[nu]||nu||'unit';}
+function unitPriceTxt(v,nu){return v!=null?'$'+Number(v).toFixed(2)+'/'+uLabel(nu):null;}
 function crossBadge(o){
   var ci=crossInfo(o.brand,o.product_name);
   if(!ci)return '';
+  var uRange=(ci.unitMin!=null)?' · '+unitPriceTxt(ci.unitMin,ci.unit)+' – '+unitPriceTxt(ci.unitMax,ci.unit):'';
+  var thisU=(o.unit_price!=null&&o.normalized_unit)?' ('+unitPriceTxt(o.unit_price,o.normalized_unit)+')':'';
   return '<div style="margin-top:6px;display:inline-block;font-size:11px;background:#eef6ff;color:#2244cc;border:1px solid #cfe0fb;border-radius:8px;padding:3px 9px;">'+
-    '🌐 Cross-Retailer: '+priceCell(ci.min)+' – '+priceCell(ci.max)+' across '+ci.count+' retailers'+
-    (o.retail_price!=null?' · this visit: '+priceCell(o.retail_price):'')+'</div>';
+    '🌐 Cross-Retailer: '+priceCell(ci.min)+' – '+priceCell(ci.max)+uRange+' across '+ci.count+' retailers'+
+    (o.retail_price!=null?' · this visit: '+priceCell(o.retail_price)+thisU:'')+'</div>';
 }
 function renderCrossRetailer(obs){
   var cc=g('crossretailer-card');if(!cc)return;
@@ -1458,11 +1470,12 @@ function renderCrossRetailer(obs){
   if(!items.length){cc.innerHTML='';return;}
   items.sort(function(a,b){return b.ci.variance-a.ci.variance;});
   var body=items.map(function(it){
-    var retail=it.ci.retailers.map(function(r){return esc(r.name)+' '+priceCell(r.price);}).join(' · ');
+    var retail=it.ci.retailers.map(function(r){return esc(r.name)+' '+priceCell(r.price)+(r.unitPrice!=null?' ('+unitPriceTxt(r.unitPrice,it.ci.unit)+')':'');}).join(' · ');
+    var unitRange=(it.ci.unitMin!=null)?'<div style="font-size:11px;color:#2244cc;font-weight:600;white-space:nowrap;">'+unitPriceTxt(it.ci.unitMin,it.ci.unit)+' – '+unitPriceTxt(it.ci.unitMax,it.ci.unit)+'</div>':'';
     return '<div style="padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
       '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;">'+
         '<div style="min-width:0;"><span style="font-weight:700;font-size:13px;">'+esc(it.brand||'—')+'</span> <span style="font-size:12px;color:#666;">'+esc(it.product||'')+'</span></div>'+
-        '<div style="font-weight:700;font-size:13px;white-space:nowrap;">'+priceCell(it.ci.min)+' – '+priceCell(it.ci.max)+'</div>'+
+        '<div style="text-align:right;"><div style="font-weight:700;font-size:13px;white-space:nowrap;">'+priceCell(it.ci.min)+' – '+priceCell(it.ci.max)+'</div>'+unitRange+'</div>'+
       '</div>'+
       '<div style="font-size:11px;color:#888;margin-top:3px;">'+retail+(it.thisPrice!=null?' · <strong style="color:#2244cc;">this visit '+priceCell(it.thisPrice)+'</strong>':'')+'</div>'+
     '</div>';
@@ -1699,6 +1712,28 @@ async function loadPriceChanges(id){
   } catch(e){ pc.innerHTML=''; return; }
   if(!rows.length){pc.innerHTML='';return;}
   var reviewN=rows.filter(function(p){return p.needs_review;}).length;
+
+  // Fetch the referenced observations (current + previous) for pack size + unit
+  // price on both sides, and the matched Projections SKUs for TBG comparison.
+  var obsMap={}, skuMap={};
+  var oids=[];
+  rows.forEach(function(p){ if(p.observation_id)oids.push(p.observation_id); if(p.previous_observation_id)oids.push(p.previous_observation_id); });
+  oids=oids.filter(function(v,i,a){return v&&a.indexOf(v)===i;});
+  if(oids.length){
+    try {
+      var or=await h(SB+'/rest/v1/shop_out_observations?id=in.('+oids.join(',')+')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id');
+      if(or.ok)(await or.json()).forEach(function(o){obsMap[o.id]=o;});
+    } catch(e){}
+  }
+  var skuIds=rows.map(function(p){var c=obsMap[p.observation_id];return c&&c.projection_sku_id;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
+  if(skuIds.length){
+    try {
+      var sr=await h(SB+'/rest/v1/projection_skus?id=in.('+skuIds.join(',')+')&select=id,item_description,size_unit,proposed_sell_price');
+      if(sr.ok)(await sr.json()).forEach(function(sk){skuMap[sk.id]=sk;});
+    } catch(e){}
+  }
+  function packStr(o){ if(!o||o.pack_size==null)return '—'; return o.pack_size+(o.pack_size_unit?(' '+String(o.pack_size_unit).replace(/_/g,' ')):''); }
+
   var body=rows.map(function(p){
     var pct=Number(p.price_change_pct);
     var changeCell;
@@ -1710,14 +1745,51 @@ async function loadPriceChanges(id){
       var up=pct>=0, col=up?'#1a7a1a':'#a22', arrow=up?'▲':'▼';
       changeCell='<div style="font-weight:700;font-size:13px;color:'+col+';white-space:nowrap;min-width:74px;text-align:right;">'+arrow+' '+(up?'+':'')+pct.toFixed(1)+'%</div>';
     }
-    return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
-      '<div style="flex:1;min-width:0;">'+
-        '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
-        '<div style="font-size:12px;color:#666;">'+esc(p.product_name||'')+'</div>'+
+
+    var curr=obsMap[p.observation_id]||{}, prev=obsMap[p.previous_observation_id]||{};
+    var nu=curr.normalized_unit||p.pack_size_unit||null;
+    var newU=curr.unit_price!=null?Number(curr.unit_price):(p.unit_price!=null?Number(p.unit_price):null);
+    var oldU=prev.unit_price!=null?Number(prev.unit_price):null;
+
+    // Pack size + unit-price change line.
+    var packLine='<span style="color:#888;">Pack:</span> '+esc(packStr(prev))+' → '+esc(packStr(Object.keys(curr).length?curr:{pack_size:p.pack_size,pack_size_unit:p.pack_size_unit}));
+    var unitLine=(oldU!=null||newU!=null)
+      ? '<span style="color:#888;">Unit:</span> '+(oldU!=null?esc(unitPriceTxt(oldU,prev.normalized_unit||nu)):'—')+' → <strong>'+(newU!=null?esc(unitPriceTxt(newU,nu)):'—')+'</strong>'
+      : '';
+
+    // TBG comparison.
+    var tbgLine='', ctxLine='';
+    var sku=curr.projection_sku_id?skuMap[curr.projection_sku_id]:null;
+    var tbg=sku?tbgUnitPrice(sku):null;
+    if(tbg&&newU!=null){
+      var sameUnit=(tbg.unit===nu);
+      var better=newU>tbg.price;  // competitor more expensive per unit → TBG better value
+      var tcol=better?'#1a7a1a':'#a22';
+      tbgLine='<span style="color:#888;">vs TBG '+esc(sku.item_description||'')+':</span> <strong style="color:'+tcol+';">'+esc(unitPriceTxt(tbg.price,tbg.unit))+'</strong>';
+      if(sameUnit){
+        var verdict=better?'TBG is better value':'Competitor is better value';
+        ctxLine='<div style="font-size:11px;color:'+tcol+';margin-top:2px;font-weight:600;">'+
+          esc((p.brand||'')+' '+(p.product_name||'')+' '+packStr(curr.pack_size!=null?curr:{pack_size:p.pack_size,pack_size_unit:p.pack_size_unit}))+
+          ' at '+esc(unitPriceTxt(newU,nu))+' vs TBG '+esc(sku.item_description||'')+' '+esc(sku.size_unit||'')+' at '+esc(unitPriceTxt(tbg.price,tbg.unit))+' — '+verdict+'</div>';
+      } else {
+        tbgLine+=' <span style="color:#bbb;">(diff unit)</span>';
+      }
+    }
+
+    var detailLine='<div style="font-size:11px;color:#555;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;">'+
+      '<span>'+packLine+'</span>'+(unitLine?'<span>'+unitLine+'</span>':'')+(tbgLine?'<span>'+tbgLine+'</span>':'')+'</div>';
+
+    return '<div style="padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
+      '<div style="display:flex;gap:10px;align-items:center;">'+
+        '<div style="flex:1;min-width:0;">'+
+          '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
+          '<div style="font-size:12px;color:#666;">'+esc(p.product_name||'')+'</div>'+
+        '</div>'+
+        '<div style="font-size:13px;white-space:nowrap;color:#666;">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
+        changeCell+
+        '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
       '</div>'+
-      '<div style="font-size:13px;white-space:nowrap;color:#666;">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
-      changeCell+
-      '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
+      detailLine+ctxLine+
     '</div>';
   }).join('');
   // Dynamic header + context from the actual rows.
