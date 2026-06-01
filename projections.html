@@ -98,6 +98,10 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .fp-cell:hover{border-color:#cfd8f0;background:#fafbff;}
 .fp-cell:focus{border-color:#2244cc;outline:none;background:#fff;}
 .fp-ro{font-size:11px;color:#555;display:inline-block;text-align:right;}
+.fp-del{opacity:0;border:none;background:none;color:#cc2222;font-size:14px;cursor:pointer;margin-right:4px;font-family:inherit;line-height:1;}
+.fp-row:hover .fp-del{opacity:1;}
+.fp-lname{cursor:default;}
+.fp-lname:hover{text-decoration:underline dotted #aaa;}
 .fp-expand{cursor:pointer;border:none;background:#eef2ff;color:#2244cc;border-radius:4px;font-size:10px;font-weight:700;padding:2px 6px;margin-right:6px;font-family:inherit;}
 .fp-viewtoggle{display:inline-flex;border:1px solid #e0e0d8;border-radius:7px;overflow:hidden;margin-left:12px;vertical-align:middle;}
 .fp-viewtoggle button{border:none;background:#fff;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:#666;}
@@ -512,7 +516,7 @@ var REF_REVENUE=['Gross Sales','Closeout Discount','Trade Allowances'];  // show
 var SALARY_LINES=['Payroll','Contract Labor (Fractional CFO / Controller)'];
 var openSalaryPanels={};
 var MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
-var currentYear=1, finMode='year', allFinData=[];
+var currentYear=1, finMode='year', allFinData=[], fpAdd=null;
 
 async function loadFinPlan(){
   try {
@@ -561,8 +565,13 @@ function inventoryOutflow(m){
   var s=0;activeSkus().forEach(function(k){s+=calcElc(k)*num(k[f]);});return s;
 }
 function skuAnnualRevenue(k){var s=0;for(var m=1;m<=12;m++){if(num(k.sales_start_month||6)<=m)s+=num(k.wholesale_price)*num(k.sales_units_per_month);}return s;}
-// Gross Sales feeding variable expenses is now the active-SKU computed value.
-function grossForMonth(m){return grossSalesActive(m);}
+// Gross Sales feeding variable expenses: Year 1 from active SKUs; Years 2-4 from
+// that year's seeded Gross Sales row.
+function grossForMonth(m){
+  if(currentYear===1)return grossSalesActive(m);
+  var row=finData.find(function(r){return r.line_item==='Gross Sales'&&r.month_number===m;});
+  return row?num(row.amount_projected):0;
+}
 function positionsByLine(line){return positionsData.filter(function(p){return p.line_item===line;});}
 function hasPositions(line){return positionsByLine(line).length>0;}
 function salaryLineMonthly(line,m){var s=0;positionsByLine(line).forEach(function(p){if(p.is_active!==false&&num(p.start_month)<=m)s+=num(p.annual_salary)/12;});return s;}
@@ -675,9 +684,10 @@ function finLineRowHtml(L){
   var badge='';
   if(L.sales_rate!=null){var pctTxt=(L.sales_rate*100).toFixed((L.sales_rate*100)%1?1:0);badge='<span class="fp-badge var" title="Click to edit % of Gross Sales" onclick="editRate('+idx+')">'+pctTxt+'% of sales</span>';}
   else if(REF_REVENUE.indexOf(ln)!==-1)badge='<span class="fp-badge ref" title="Reference only — excluded from Total Revenue">ref</span>';
-  var lbl='<td class="lbl"><button class="fp-toggle" onclick="toggleFinLine('+idx+')">'+(L.active?'On':'Off')+'</button>'+
+  var del=(L.category!=='Revenue')?'<button class="fp-del" title="Delete line" onclick="deleteLine('+idx+')">×</button>':'';
+  var lbl='<td class="lbl">'+del+'<button class="fp-toggle" onclick="toggleFinLine('+idx+')">'+(L.active?'On':'Off')+'</button>'+
     (isSalary?'<button class="fp-expand" title="Positions" onclick="toggleSalaryPanel('+idx+')">'+(openSalaryPanels[ln]?'▾':'＋')+'</button>':'')+
-    esc(ln)+badge+(L.edited?'<span class="fp-dot" title="edited vs baseline"></span>':'')+'</td>';
+    '<span class="fp-lname" id="lname-'+idx+'" title="Double-click to rename" ondblclick="startRename('+idx+')">'+esc(ln)+'</span>'+badge+(L.edited?'<span class="fp-dot" title="edited vs baseline"></span>':'')+'</td>';
   var row='<tr class="fp-row'+(L.active?'':' off')+'">'+lbl+MONTHS.map(function(m){return finCellHtml(L.cells[m]);}).join('')+'<td class="fp-total">'+money0(lineYearTotal(L))+'</td></tr>';
   if(isSalary&&openSalaryPanels[ln])row+='<tr><td colspan="14" style="background:#f7f7f2;text-align:left;">'+salaryPanelHtml(ln,idx)+'</td></tr>';
   return row;
@@ -709,11 +719,11 @@ function renderFinPlan(){
 
   body+=catHdr('Fixed Operating Expenses');
   fixedLs.forEach(function(L){body+=finLineRowHtml(L);});
+  body+=addRowHtml('fixed');
 
-  if(varLs.length){
-    body+=catHdr('Variable Expenses (% of Sales)');
-    varLs.forEach(function(L){body+=finLineRowHtml(L);});
-  }
+  body+=catHdr('Variable Expenses (% of Sales)');
+  varLs.forEach(function(L){body+=finLineRowHtml(L);});
+  body+=addRowHtml('variable');
 
   body+=catHdr('Inventory');
   body+=virtualRow('Inventory Purchasing', y1?inventoryOutflow:dbInventory);
@@ -732,12 +742,31 @@ function renderFinPlan(){
   body+=sumRow('Net Cash Flow',function(m){return revMonth(m)-fixedMonth(m)-varMonth(m)-invMonth(m);});
 
   var toggle='<span class="fp-viewtoggle">'+['projected','actual','variance'].map(function(v){return '<button class="'+(finView===v?'on':'')+'" onclick="setFinView(\''+v+'\')">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>';}).join('')+'</span>';
+  var copySel='<select onchange="copyYear(this.value);this.value=\'\';" style="margin-left:10px;font-size:11px;padding:5px 8px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;"><option value="">Copy to…</option>'+[1,2,3,4].filter(function(y){return y!==currentYear;}).map(function(y){return '<option value="'+y+'">Copy Year '+currentYear+' → Year '+y+'</option>';}).join('')+'</select>';
   var hint=y1
-    ? 'Year 1 · 🧮 Gross Sales &amp; Inventory driven by <strong>active</strong> SKUs · variable rows: edit the % badge · fixed cells: click to edit (type 0 to clear)'
-    : 'Year '+currentYear+' · fixed cells editable (type 0 to clear) · Gross/Closeout/Trade are ref-only; Net Realized feeds Total Revenue';
-  g('pane-finplan').innerHTML='<div style="margin-bottom:8px;">'+yearPills()+'</div>'+
+    ? 'Year 1 · 🧮 Gross Sales &amp; Inventory driven by <strong>active</strong> SKUs · variable rows: edit the % badge · fixed cells: click to edit (type 0 to clear) · double-click a name to rename · × to delete'
+    : 'Year '+currentYear+' · fixed cells editable (type 0 to clear) · double-click a name to rename · × to delete · Gross/Closeout/Trade are ref-only';
+  g('pane-finplan').innerHTML='<div style="margin-bottom:8px;">'+yearPills()+copySel+'</div>'+
     '<div style="font-size:12px;color:#888;margin-bottom:8px;">'+hint+' · Show: '+toggle+'</div>'+
     '<div class="fp-wrap"><table class="fp-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+}
+function addRowHtml(type){
+  if(fpAdd!==type){
+    return '<tr><td colspan="14" style="text-align:left;padding:6px 10px;"><button class="fp-expand" onclick="startAdd(\''+type+'\')">+ Add '+(type==='fixed'?'Fixed':'Variable')+' Expense</button></td></tr>';
+  }
+  if(type==='fixed'){
+    var ins=MONTHS.map(function(m){return '<input class="fp-cell" id="add-fixed-m'+m+'" value="0" title="M'+m+'" style="width:46px;border:1px solid #e0e0d8;margin:1px;" />';}).join('');
+    return '<tr><td colspan="14" style="text-align:left;padding:8px 10px;background:#fafbff;">'+
+      '<input id="add-fixed-name" placeholder="New fixed expense name" style="font-size:12px;padding:5px 8px;border:1px solid #e0e0d8;border-radius:6px;width:190px;" /> '+
+      '<span style="font-size:10px;color:#888;">monthly</span> '+ins+' '+
+      '<button class="btn btn-primary" style="padding:4px 10px;font-size:12px;" onclick="saveAddFixed()">Save</button> '+
+      '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="cancelAdd()">Cancel</button></td></tr>';
+  }
+  return '<tr><td colspan="14" style="text-align:left;padding:8px 10px;background:#fafbff;">'+
+    '<input id="add-var-name" placeholder="New variable expense name" style="font-size:12px;padding:5px 8px;border:1px solid #e0e0d8;border-radius:6px;width:190px;" /> '+
+    '<input id="add-var-rate" type="number" step="any" placeholder="% of sales" style="font-size:12px;padding:5px 8px;border:1px solid #e0e0d8;border-radius:6px;width:110px;" /> '+
+    '<button class="btn btn-primary" style="padding:4px 10px;font-size:12px;" onclick="saveAddVariable()">Save</button> '+
+    '<button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="cancelAdd()">Cancel</button></td></tr>';
 }
 async function saveFinCellInline(id){
   var inp=g('fpc-'+id);if(!inp)return;
@@ -755,6 +784,72 @@ async function saveFinCellInline(id){
     Object.assign(row,updated);
     renderFinPlan();
   } catch(e){ alert('Save failed: '+e.message); }
+}
+
+// ── Add / delete / rename expense lines + copy a year ──
+async function reloadFinData(){
+  try{var r=await h(SB+'/rest/v1/financial_plan?select=*&order=plan_year.asc,category.asc,line_item.asc,month_number.asc');if(r.ok)allFinData=await r.json();}catch(e){}
+}
+function startAdd(type){fpAdd=type;renderFinPlan();var el=g(type==='fixed'?'add-fixed-name':'add-var-name');if(el)el.focus();}
+function cancelAdd(){fpAdd=null;renderFinPlan();}
+async function saveAddFixed(){
+  var name=(g('add-fixed-name').value||'').trim();if(!name){alert('Enter a name.');return;}
+  var rows=MONTHS.map(function(m){var v=num(g('add-fixed-m'+m).value);return {plan_year:currentYear,month_number:m,line_item:name,category:'Operating Expense',amount_projected:v,baseline_amount:v,is_active:true,is_edited:false};});
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)});
+    if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
+    fpAdd=null;await reloadFinData();renderFinPlan();showToast('Added "'+name+'" to Year '+currentYear);
+  } catch(e){ alert('Add failed: '+e.message); }
+}
+async function saveAddVariable(){
+  var name=(g('add-var-name').value||'').trim();if(!name){alert('Enter a name.');return;}
+  var rate=num(g('add-var-rate').value)/100;
+  var rows=MONTHS.map(function(m){var amt=Math.round(rate*grossForMonth(m));return {plan_year:currentYear,month_number:m,line_item:name,category:'Operating Expense',amount_projected:amt,baseline_amount:amt,sales_rate:rate,is_active:true,is_edited:false};});
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)});
+    if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
+    fpAdd=null;await reloadFinData();renderFinPlan();showToast('Added "'+name+'" ('+(rate*100)+'% of sales) to Year '+currentYear);
+  } catch(e){ alert('Add failed: '+e.message); }
+}
+async function deleteLine(idx){
+  if(!finModel)return;
+  var line=finModel.order[idx];if(line==null)return;
+  if(finModel.byLine[line].category==='Revenue'){alert('Revenue rows cannot be deleted.');return;}
+  if(!confirm('Delete '+line+' for Year '+currentYear+'? This cannot be undone.'))return;
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.'+currentYear+'&line_item=eq.'+encodeURIComponent(line),{method:'DELETE'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await reloadFinData();renderFinPlan();showToast('Deleted "'+line+'" from Year '+currentYear);
+  } catch(e){ alert('Delete failed: '+e.message); }
+}
+function startRename(idx){
+  var sp=g('lname-'+idx);if(!sp||!finModel)return;
+  var cur=finModel.order[idx];
+  sp.innerHTML='<input id="lname-in-'+idx+'" value="'+esc(cur)+'" style="width:170px;font-size:12px;padding:3px 6px;border:1px solid #2244cc;border-radius:5px;font-family:inherit;" onkeydown="if(event.key===\'Enter\')this.blur()" onblur="renameLine('+idx+')" />';
+  var inp=g('lname-in-'+idx);if(inp){inp.focus();inp.select();}
+}
+async function renameLine(idx){
+  if(!finModel)return;
+  var old=finModel.order[idx], inp=g('lname-in-'+idx);if(!inp)return;
+  var nn=(inp.value||'').trim();
+  if(!nn||nn===old){renderFinPlan();return;}
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.'+currentYear+'&line_item=eq.'+encodeURIComponent(old),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({line_item:nn})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await reloadFinData();renderFinPlan();showToast('Renamed to "'+nn+'"');
+  } catch(e){ alert('Rename failed: '+e.message);renderFinPlan(); }
+}
+async function copyYear(target){
+  target=parseInt(target,10);if(!target||target===currentYear)return;
+  var src=finForYear(currentYear);
+  if(!src.length){alert('Year '+currentYear+' has no rows to copy.');return;}
+  if(finForYear(target).length && !confirm('Year '+target+' already has data — overwrite?'))return;
+  var rows=src.map(function(r){return {plan_year:target,month_number:r.month_number,line_item:r.line_item,category:r.category,amount_projected:r.amount_projected,amount_actual:r.amount_actual,baseline_amount:r.baseline_amount,sales_rate:r.sales_rate,is_active:r.is_active,is_edited:r.is_edited,notes:r.notes};});
+  try {
+    var r2=await h(SB+'/rest/v1/financial_plan?on_conflict=plan_year,month_number,line_item',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});
+    if(!r2.ok)throw new Error('HTTP '+r2.status+': '+await r2.text());
+    await reloadFinData();currentYear=target;finMode='year';renderFinPlan();showToast('Copied into Year '+target);
+  } catch(e){ alert('Copy failed: '+e.message); }
 }
 
 async function toggleFinLine(idx){
