@@ -4,10 +4,11 @@
 //   node scripts/backfill-price-history.mjs
 //
 // Groups priced observations by retailer (shop_outs.customer_id = same retailer
-// chain) + brand + product_name, sorts each group by shop_date, and for each
-// consecutive pair on different dates flags a >5% change. Logs a summary.
+// chain) + brand + product_name + normalized_unit, sorts each group by
+// shop_date, and pairs each sighting with its most recent prior whose
+// normalized_size is within 30% (same item); flags a >5% change. Logs a summary.
 
-import { buildPriceChangeRow, retailerKey } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey, unitSizeComparable } from '../lib/price-change.mjs';
 
 const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const KEY = process.env.SUPABASE_KEY
@@ -24,39 +25,45 @@ const shopById = {};
 shops.forEach(s => { shopById[s.id] = s; });
 
 // All priced observations.
-const obs = await (await h('/rest/v1/shop_out_observations?select=id,brand,product_name,retail_price,unit_price,pack_size,pack_size_unit,shop_out_id&retail_price=not.is.null&limit=10000')).json();
+const obs = await (await h('/rest/v1/shop_out_observations?select=id,brand,product_name,retail_price,unit_price,pack_size,pack_size_unit,normalized_unit,normalized_size,shop_out_id&retail_price=not.is.null&limit=10000')).json();
 
 // Attach shop customer + date + location; keep only rows with a retailer
-// (customer_id), date, brand, product.
+// (customer_id), date, brand, product, and a normalized_unit (required to
+// establish "same item").
 const recs = obs.map(o => {
   const s = shopById[o.shop_out_id] || {};
   return { ...o, customer_id: s.customer_id, shop_date: s.shop_date, store_location_text: s.store_location_text };
-}).filter(r => retailerKey(r) && r.shop_date && r.brand && r.product_name);
+}).filter(r => retailerKey(r) && r.shop_date && r.brand && r.product_name && r.normalized_unit);
 
-// Group by retailer chain (customer_id) + brand + product (case-insensitive).
+// Group by retailer chain (customer_id) + brand + product + normalized_unit.
 const groups = {};
 recs.forEach(r => {
-  const k = retailerKey(r) + '|' + r.brand.toLowerCase().trim() + '|' + r.product_name.toLowerCase().trim();
+  const k = retailerKey(r) + '|' + r.brand.toLowerCase().trim() + '|' + r.product_name.toLowerCase().trim() + '|' + r.normalized_unit;
   (groups[k] = groups[k] || []).push(r);
 });
 
-// Compare consecutive sightings (different dates) within each group.
+// Within each group, pair each sighting with its most recent prior (earlier
+// date) whose normalized_size is within 30% — the same item, not a size variant.
 const changes = [];
 let multiSightingGroups = 0;
 for (const k of Object.keys(groups)) {
   const arr = groups[k].slice().sort((a, b) => (a.shop_date < b.shop_date ? -1 : (a.shop_date > b.shop_date ? 1 : 0)));
-  const dates = new Set(arr.map(r => r.shop_date));
-  if (dates.size > 1) multiSightingGroups++;
-  for (let i = 1; i < arr.length; i++) {
-    const prev = arr[i - 1], curr = arr[i];
-    if (prev.shop_date === curr.shop_date) continue;           // same trip, not a change over time
+  if (new Set(arr.map(r => r.shop_date)).size > 1) multiSightingGroups++;
+  for (let i = 0; i < arr.length; i++) {
+    const curr = arr[i];
+    let prev = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (arr[j].shop_date < curr.shop_date && unitSizeComparable(arr[j], curr)) { prev = arr[j]; break; }
+    }
+    if (!prev) continue;
     const row = buildPriceChangeRow(
-      { retail_price: prev.retail_price, shop_date: prev.shop_date, observation_id: prev.id },
+      { retail_price: prev.retail_price, shop_date: prev.shop_date, observation_id: prev.id, normalized_unit: prev.normalized_unit, normalized_size: prev.normalized_size },
       {
         retail_price: curr.retail_price, unit_price: curr.unit_price, shop_date: curr.shop_date,
         observation_id: curr.id, shop_out_id: curr.shop_out_id, brand: curr.brand, product_name: curr.product_name,
         retailer: curr.store_location_text, store_location_text: curr.store_location_text,
-        pack_size: curr.pack_size, pack_size_unit: curr.pack_size_unit
+        pack_size: curr.pack_size, pack_size_unit: curr.pack_size_unit,
+        normalized_unit: curr.normalized_unit, normalized_size: curr.normalized_size
       }
     );
     if (row) changes.push(row);

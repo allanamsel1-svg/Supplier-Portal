@@ -15,7 +15,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
 import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
-import { buildPriceChangeRow, retailerKey } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey, unitSizeComparable } from '../lib/price-change.mjs';
 
 const PLACEMENT_TYPES = ['main_floor', 'clearance', 'checkout_register', 'end_cap', 'display'];
 
@@ -312,23 +312,28 @@ async function checkPriceChange(newId, obsPayload, norm, shopOutId) {
   const dateById = {};
   priorShops.forEach(p => { dateById[p.id] = p.shop_date; });
 
-  // Same brand+product observations within those prior shop-outs.
-  const obR = await sbFetch(`/rest/v1/shop_out_observations?select=id,product_name,retail_price,shop_out_id&shop_out_id=in.(${priorShops.map(p => p.id).join(',')})&brand=ilike.${ilikeQuoted(brand)}&retail_price=not.is.null`);
+  // Same brand+product observations within those prior shop-outs, restricted to
+  // the same item (same normalized_unit + size within 30%).
+  const obR = await sbFetch(`/rest/v1/shop_out_observations?select=id,product_name,retail_price,shop_out_id,normalized_unit,normalized_size&shop_out_id=in.(${priorShops.map(p => p.id).join(',')})&brand=ilike.${ilikeQuoted(brand)}&retail_price=not.is.null`);
   if (!obR.ok) return;
-  const cands = (await obR.json()).filter(o => (o.product_name || '').toLowerCase().trim() === product.toLowerCase().trim());
+  const cands = (await obR.json()).filter(o =>
+    (o.product_name || '').toLowerCase().trim() === product.toLowerCase().trim() &&
+    unitSizeComparable({ normalized_unit: o.normalized_unit, normalized_size: o.normalized_size }, norm)
+  );
   if (!cands.length) return;
 
-  // Most recent prior by shop_date.
+  // Most recent comparable prior by shop_date.
   cands.sort((a, b) => (dateById[b.shop_out_id] < dateById[a.shop_out_id] ? -1 : 1));
   const prev = cands[0];
 
   const row = buildPriceChangeRow(
-    { retail_price: prev.retail_price, shop_date: dateById[prev.shop_out_id], observation_id: prev.id },
+    { retail_price: prev.retail_price, shop_date: dateById[prev.shop_out_id], observation_id: prev.id, normalized_unit: prev.normalized_unit, normalized_size: prev.normalized_size },
     {
       retail_price: price, unit_price: norm.unit_price, shop_date: so.shop_date,
       observation_id: newId, shop_out_id: shopOutId, brand, product_name: product,
       retailer: so.store_location_text, store_location_text: so.store_location_text,
-      pack_size: numOrNull(obsPayload.pack_size), pack_size_unit: obsPayload.pack_size_unit
+      pack_size: numOrNull(obsPayload.pack_size), pack_size_unit: obsPayload.pack_size_unit,
+      normalized_unit: norm.normalized_unit, normalized_size: norm.normalized_size
     }
   );
   if (!row) return;
