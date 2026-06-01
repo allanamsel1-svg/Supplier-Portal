@@ -154,6 +154,19 @@ export default async function handler(req, res) {
     }
     const inserted = await insR.json();
 
+    // 7b. Normalize unit + compute per-unit price, then PATCH onto the new row.
+    const newId = inserted[0] && inserted[0].id;
+    if (newId) {
+      const norm = computeNormalization(obsPayload.pack_size, obsPayload.pack_size_unit, obsPayload.retail_price);
+      const normR = await sbFetch(`/rest/v1/shop_out_observations?id=eq.${newId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(norm)
+      });
+      if (normR.ok) Object.assign(inserted[0], norm);
+      else console.warn(`Normalization PATCH failed (${normR.status}) for observation ${newId}`);
+    }
+
     // 8. Mark photos as processed
     await sbFetch(`/rest/v1/shop_out_photos?id=eq.${resolvedFrontId}`, {
       method: 'PATCH',
@@ -238,6 +251,40 @@ function numOrNull(v) {
   if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// ─── UNIT NORMALIZATION ──────────────────────────────────────────────
+// Categorize a pack_size_unit into a canonical unit + multiply factor so that
+// sizes across products can be compared on a single per-unit basis.
+// NOTE: keep this in lockstep with the backfill SQL (same token lists/factors).
+// 'fl oz'/'floz' → volume_oz (liquid); bare 'oz' → weight_oz (solid).
+function unitCategory(unitRaw) {
+  if (unitRaw == null) return { unit: null, factor: 1 };
+  const u = String(unitRaw).toLowerCase().replace(/\./g, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+  if (['ml'].includes(u)) return { unit: 'volume_ml', factor: 1 };
+  if (['l', 'liter', 'litre'].includes(u)) return { unit: 'volume_ml', factor: 1000 };
+  if (['fl oz', 'floz', 'fluid ounce', 'fluid ounces'].includes(u)) return { unit: 'volume_oz', factor: 1 };
+  if (['g', 'gr', 'gram', 'grams'].includes(u)) return { unit: 'weight_g', factor: 1 };
+  if (['kg', 'kilogram', 'kilograms'].includes(u)) return { unit: 'weight_g', factor: 1000 };
+  if (['oz', 'ounce', 'ounces'].includes(u)) return { unit: 'weight_oz', factor: 1 };
+  if (['lb', 'lbs', 'pound', 'pounds'].includes(u)) return { unit: 'weight_oz', factor: 16 };
+  if (['ct', 'count', 'pc', 'pcs', 'pair', 'pairs', 'pack', 'pk', 'piece', 'pieces'].includes(u)) return { unit: 'count', factor: 1 };
+  return { unit: null, factor: 1 };
+}
+
+// Returns { normalized_unit, normalized_size, unit_price } for an observation.
+// unit_price = retail_price / normalized_size, rounded to 4 dp; null if size is 0/null.
+function computeNormalization(packSizeRaw, unitRaw, retailPriceRaw) {
+  const { unit, factor } = unitCategory(unitRaw);
+  if (!unit) return { normalized_unit: null, normalized_size: null, unit_price: null };
+  const size = numOrNull(packSizeRaw);
+  const normSize = size != null ? size * factor : null;
+  const rp = numOrNull(retailPriceRaw);
+  let unitPrice = null;
+  if (normSize != null && normSize !== 0 && rp != null) {
+    unitPrice = Math.round((rp / normSize) * 10000) / 10000;
+  }
+  return { normalized_unit: unit, normalized_size: normSize, unit_price: unitPrice };
 }
 
 function buildPrompt(retailerName, retailerCountry, hasBack) {
