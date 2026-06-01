@@ -1219,8 +1219,21 @@ function tbgUnitPrice(sku){
 }
 
 var skuById={}, activeSkuList=[], obsShopOutId=null;
+// RULE 6: matched → comparison · category gap → amber RFQ prompt · else nothing.
+// NEVER show a cross-category comparison.
+function gapCatLabel(o){
+  var segs=(o.ai_suggested_category?String(o.ai_suggested_category).split('>'):[]).map(function(x){return x.trim();}).filter(Boolean);
+  // drop a generic top-level segment, prefer the meaningful category
+  if(segs.length>=2 && /^(beauty|health\s*&?\s*beauty|apparel|apparel\s*&?\s*accessories|hbc)$/i.test(segs[0]))return segs[1];
+  return segs[1]||segs[0]||'This category';
+}
 function matchPanelHtml(o){
-  if(!o.projection_sku_id)return '<div style="margin-top:8px;font-size:11px;color:#aaa;">No SKU match</div>';
+  if(!o.projection_sku_id){
+    if(o.is_category_gap){
+      return '<div style="margin-top:8px;display:inline-block;font-size:11px;font-weight:600;background:#fff4e0;color:#9a6a00;border:1px solid #f0d9a8;border-radius:8px;padding:3px 9px;">📋 '+esc(gapCatLabel(o))+' not in Projections — Prepare RFQ?</div>';
+    }
+    return '';  // null and not a gap → show nothing (silence beats wrong data)
+  }
   var sku=skuById[o.projection_sku_id];
   var lowConf=o.sku_match_method==='ai_low_confidence';
   var name=sku?sku.item_description:'(unknown SKU)';

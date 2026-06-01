@@ -68,6 +68,7 @@ for (const shopOut of SHOP_OUTS) {
       patch.projection_sku_id = m.projection_sku_id;
       patch.sku_match_method = m.sku_match_method;
       patch.sku_match_confidence = m.sku_match_confidence;
+      patch.is_category_gap = m.is_category_gap;
       if (m.sku_match_method === 'ai_suggested') matched++;
       else if (m.sku_match_method === 'ai_low_confidence') low++;
       else unmatched++;
