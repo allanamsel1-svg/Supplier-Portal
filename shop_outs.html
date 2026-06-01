@@ -432,8 +432,11 @@ async function renderDetail(){
         '<button class="btn btn-primary" style="margin-top:10px;" onclick="triggerProcessing(\''+s.id+'\')">🔄 Retry</button>'+
       '</div>';
     }
-    // When complete, Section Intelligence is the lead block — before everything else.
+    // High-signal blocks lead the complete view, before Section Intelligence.
     if(stat==='complete'){
+      html+='<div id="clearance-card"></div>';
+      html+='<div id="register-card"></div>';
+      html+='<div id="pricechange-card"></div>';
       html+='<div class="card"><div class="card-title">🗂 Section Intelligence</div><div id="sections-container">Loading...</div></div>';
     }
     html+='<div class="card">'+
@@ -477,7 +480,7 @@ async function renderDetail(){
     // Await loadPhotos so currentPhotos is populated before the observation and
     // section cards render — they map photo ids to viewer indices off it.
     await loadPhotos(s.id);
-    if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);loadSections(s.id);}
+    if(stat==='complete'){loadObservations(s.id);loadInsights(s.id);loadSections(s.id);loadPriceChanges(s.id);}
   }
 }
 
@@ -1299,7 +1302,7 @@ async function loadObservations(id){
       '<div style="flex:1;min-width:0;">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
           '<div style="min-width:0;">'+
-            '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">#'+(i+1)+' · '+esc(o.department||'—')+' · conf '+(o.ai_confidence?Number(o.ai_confidence).toFixed(2):'—')+'</div>'+
+            '<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">#'+(i+1)+' · '+esc(o.department||'—')+' · conf '+(o.ai_confidence?Number(o.ai_confidence).toFixed(2):'—')+placementBadge(o)+'</div>'+
             '<div style="font-weight:700;font-size:14px;margin-top:2px;">'+esc(o.brand||'—')+'</div>'+
             '<div style="font-size:12px;color:#666;margin-top:1px;">'+esc(o.product_name||'')+(sizeStr?' · <strong>'+esc(sizeStr)+'</strong>':'')+'</div>'+
           '</div>'+
@@ -1320,6 +1323,7 @@ async function loadObservations(id){
     '</div>';
   }).join('');
   c.innerHTML=html;
+  renderSignalCards(obs);
 
   // Sign thumbnail URLs in parallel and attach them.
   await Promise.all(thumbs.map(async function(t){
@@ -1335,6 +1339,103 @@ async function loadObservations(id){
       }
     } catch(e) {}
   }));
+}
+
+// Small grey placement badge — only when not main_floor; plus a clearance tag.
+function placementBadge(o){
+  var out='';
+  if(o.placement_type && o.placement_type!=='main_floor')
+    out+=' <span style="font-size:9px;font-weight:600;background:#ececec;color:#777;border-radius:8px;padding:1px 6px;">'+esc(o.placement_type.replace(/_/g,' '))+'</span>';
+  if(o.is_clearance)
+    out+=' <span style="font-size:9px;font-weight:700;background:#fdecec;color:#a22;border-radius:8px;padding:1px 6px;">CLEARANCE</span>';
+  return out;
+}
+function priceCell(p){return p!=null?'$'+Number(p).toFixed(2):'—';}
+
+// Clearance + Checkout/Register high-signal cards, rendered above Section Intelligence.
+function renderSignalCards(obs){
+  var clear=obs.filter(function(o){return o.is_clearance===true;});
+  var reg=obs.filter(function(o){return o.placement_type==='checkout_register';});
+
+  var cc=g('clearance-card');
+  if(cc){
+    if(clear.length){
+      var rows=clear.map(function(o){
+        return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid #f6e0e0;">'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-weight:700;font-size:13px;">'+esc(o.brand||'—')+'</div>'+
+            '<div style="font-size:12px;color:#666;">'+esc(o.product_name||'')+'</div>'+
+          '</div>'+
+          '<div style="font-weight:700;font-size:13px;white-space:nowrap;">'+priceCell(o.retail_price)+'</div>'+
+          '<input id="clr-note-'+o.id+'" value="'+esc(o.reviewer_notes||'')+'" placeholder="note…" onblur="saveClearanceNote(\''+o.id+'\')" style="width:150px;font-size:12px;padding:5px 8px;border:1px solid #e7c8c8;border-radius:6px;font-family:inherit;" />'+
+        '</div>';
+      }).join('');
+      cc.innerHTML='<div class="card" style="border:1.5px solid #e0a0a0;background:#fffafa;">'+
+        '<div class="card-title" style="color:#a22;">🚩 Clearance Items ('+clear.length+')</div>'+
+        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Clearance = brand exit signal or category wind-down.</div>'+
+        rows+'</div>';
+    } else cc.innerHTML='';
+  }
+
+  var rc=g('register-card');
+  if(rc){
+    if(reg.length){
+      var rrows=reg.map(function(o){
+        return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:0.5px solid #f3e7cf;">'+
+          '<div style="flex:1;min-width:0;">'+
+            '<div style="font-weight:700;font-size:13px;">'+esc(o.brand||'—')+'</div>'+
+            '<div style="font-size:12px;color:#666;">'+esc(o.product_name||'')+'</div>'+
+          '</div>'+
+          '<div style="font-weight:700;font-size:13px;white-space:nowrap;">'+priceCell(o.retail_price)+'</div>'+
+        '</div>';
+      }).join('');
+      rc.innerHTML='<div class="card" style="border:1.5px solid #e0c080;background:#fffdf7;">'+
+        '<div class="card-title" style="color:#9a6a00;">🛒 Checkout / Impulse Items ('+reg.length+')</div>'+
+        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Register placement = impulse category signal — high velocity, small format.</div>'+
+        rrows+'</div>';
+    } else rc.innerHTML='';
+  }
+}
+async function saveClearanceNote(obsId){
+  var inp=g('clr-note-'+obsId);if(!inp)return;
+  try {
+    await h(SB+'/rest/v1/shop_out_observations?id=eq.'+obsId,{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({reviewer_notes:inp.value.trim()||null})
+    });
+  } catch(e){}
+}
+
+// Price Changes Detected card (from shop_out_price_history), after the signal cards.
+async function loadPriceChanges(id){
+  var pc=g('pricechange-card');if(!pc)return;
+  var rows;
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_price_history?shop_out_id=eq.'+id+'&is_flagged=eq.true&order=price_change_pct.desc&select=*');
+    if(!r.ok){pc.innerHTML='';return;}
+    rows=await r.json();
+  } catch(e){ pc.innerHTML=''; return; }
+  if(!rows.length){pc.innerHTML='';return;}
+  var body=rows.map(function(p){
+    var up=Number(p.price_change_pct)>=0;
+    var col=up?'#1a7a1a':'#a22';
+    var arrow=up?'▲':'▼';
+    return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
+      '<div style="flex:1;min-width:0;">'+
+        '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
+        '<div style="font-size:12px;color:#666;">'+esc(p.product_name||'')+'</div>'+
+      '</div>'+
+      '<div style="font-size:13px;white-space:nowrap;color:#666;">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
+      '<div style="font-weight:700;font-size:13px;color:'+col+';white-space:nowrap;min-width:74px;text-align:right;">'+arrow+' '+(up?'+':'')+Number(p.price_change_pct).toFixed(1)+'%</div>'+
+      '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
+    '</div>';
+  }).join('');
+  pc.innerHTML='<div class="card" style="border:1.5px solid #b9c8e8;background:#fbfcff;">'+
+    '<div class="card-title" style="color:#2244cc;">📈 Price Changes Detected ('+rows.length+')</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:8px;">vs the most recent prior sighting of the same item at this retailer. '+
+      '<span style="color:#1a7a1a;font-weight:600;">▲ competitor up</span> = good for TBG · '+
+      '<span style="color:#a22;font-weight:600;">▼ competitor down</span> = margin pressure.</div>'+
+    body+'</div>';
 }
 
 async function saveMlComment(obsId){

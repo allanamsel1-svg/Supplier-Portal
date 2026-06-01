@@ -15,6 +15,9 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
 import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
+import { buildPriceChangeRow } from '../lib/price-change.mjs';
+
+const PLACEMENT_TYPES = ['main_floor', 'clearance', 'checkout_register', 'end_cap', 'display'];
 
 export const config = { runtime: 'nodejs' };
 export const maxDuration = 60;
@@ -174,7 +177,14 @@ export default async function handler(req, res) {
         }
       } catch (e) { console.warn('SKU auto-match failed:', e.message); }
 
-      const patch = { ...norm, ...match };
+      // 7d. Clearance + placement classification (extracted by the AI).
+      const placement = {
+        is_clearance: extracted.is_clearance === true,
+        clearance_confidence: numOrNull(extracted.clearance_confidence),
+        placement_type: PLACEMENT_TYPES.includes(extracted.placement_type) ? extracted.placement_type : 'main_floor'
+      };
+
+      const patch = { ...norm, ...match, ...placement };
       const normR = await sbFetch(`/rest/v1/shop_out_observations?id=eq.${newId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -182,6 +192,11 @@ export default async function handler(req, res) {
       });
       if (normR.ok) Object.assign(inserted[0], patch);
       else console.warn(`Normalization/match PATCH failed (${normR.status}) for observation ${newId}`);
+
+      // 7e. Price-change detection vs the most recent prior sighting at this retailer.
+      try {
+        await checkPriceChange(newId, obsPayload, norm, shopOutId);
+      } catch (e) { console.warn('Price-change check failed:', e.message); }
     }
 
     // 8. Mark photos as processed
@@ -270,6 +285,60 @@ function numOrNull(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Quote a value for a PostgREST ilike filter (handles spaces/commas via quoting).
+function ilikeQuoted(s) {
+  return encodeURIComponent('"' + String(s == null ? '' : s).replace(/"/g, '').trim() + '"');
+}
+
+// Find the most recent prior sighting of the same brand+product at the same
+// retailer (shop_outs.store_location_text) on an earlier shop_date; if the price
+// moved >5%, insert a flagged shop_out_price_history row.
+async function checkPriceChange(newId, obsPayload, norm, shopOutId) {
+  const brand = obsPayload.brand, product = obsPayload.product_name, price = numOrNull(obsPayload.retail_price);
+  if (!brand || !product || price == null) return;
+
+  // Current shop-out's retailer + date.
+  const soR = await sbFetch(`/rest/v1/shop_outs?id=eq.${shopOutId}&select=shop_date,store_location_text`);
+  if (!soR.ok) return;
+  const so = (await soR.json())[0];
+  if (!so || !so.store_location_text || !so.shop_date) return;   // no retailer/timeline → cannot compare
+
+  // Prior shop-outs at the same retailer, earlier date.
+  const psR = await sbFetch(`/rest/v1/shop_outs?select=id,shop_date&store_location_text=ilike.${ilikeQuoted(so.store_location_text)}&shop_date=lt.${so.shop_date}`);
+  if (!psR.ok) return;
+  const priorShops = await psR.json();
+  if (!priorShops.length) return;
+  const dateById = {};
+  priorShops.forEach(p => { dateById[p.id] = p.shop_date; });
+
+  // Same brand+product observations within those prior shop-outs.
+  const obR = await sbFetch(`/rest/v1/shop_out_observations?select=id,product_name,retail_price,shop_out_id&shop_out_id=in.(${priorShops.map(p => p.id).join(',')})&brand=ilike.${ilikeQuoted(brand)}&retail_price=not.is.null`);
+  if (!obR.ok) return;
+  const cands = (await obR.json()).filter(o => (o.product_name || '').toLowerCase().trim() === product.toLowerCase().trim());
+  if (!cands.length) return;
+
+  // Most recent prior by shop_date.
+  cands.sort((a, b) => (dateById[b.shop_out_id] < dateById[a.shop_out_id] ? -1 : 1));
+  const prev = cands[0];
+
+  const row = buildPriceChangeRow(
+    { retail_price: prev.retail_price, shop_date: dateById[prev.shop_out_id], observation_id: prev.id },
+    {
+      retail_price: price, unit_price: norm.unit_price, shop_date: so.shop_date,
+      observation_id: newId, shop_out_id: shopOutId, brand, product_name: product,
+      retailer: so.store_location_text, store_location_text: so.store_location_text,
+      pack_size: numOrNull(obsPayload.pack_size), pack_size_unit: obsPayload.pack_size_unit
+    }
+  );
+  if (!row) return;
+  const ins = await sbFetch('/rest/v1/shop_out_price_history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+    body: JSON.stringify(row)
+  });
+  if (!ins.ok) console.warn('price_history insert failed', ins.status, await ins.text());
+}
+
 function buildPrompt(retailerName, retailerCountry, hasBack) {
   return `You're analyzing photos from a competitive intelligence shop-out at ${retailerName || 'an unknown retailer'}${retailerCountry ? ` in ${retailerCountry}` : ''}. The retailer is typically an off-price chain (TJ Maxx, Marshalls, Burlington, Ross-style), so each item has a custom retailer-applied price sticker with structured fields (SEA, WK, MFG, STYLE, CLASS, COLOR, plus the price).
 
@@ -295,6 +364,9 @@ Schema (use null where you cannot determine a value with reasonable confidence):
   "country_of_origin": "string — country name as printed",
   "country_confidence": "one of: stated, inferred, unknown",
   "department": "one of: Beauty, HBC, Apparel, Home, Food, Toys, Electronics, Other",
+  "is_clearance": "boolean — true if clearance signage, a red clearance tag, a percentage-off sticker, or a clearance bin is visible for this item; otherwise false",
+  "clearance_confidence": "number 0.0-1.0 — confidence in the is_clearance call",
+  "placement_type": "one of: main_floor, clearance, checkout_register, end_cap, display. checkout_register = small-format impulse items at the POS / register lanes (candy, gum, travel/trial sizes adjacent to checkout). end_cap = product displayed at the end of an aisle. display = a standalone promotional display or stand. clearance = clearance bin / clearance section. main_floor = a normal in-line shelf (use this as the default when no special placement is evident).",
   "ai_suggested_category": "string — category path 'Beauty > Skincare > Body Scrubs'",
   "category_confidence": "number 0.0-1.0",
   "ingredients_list": "string or null — full INCI list if visible",
