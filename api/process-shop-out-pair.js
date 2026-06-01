@@ -16,6 +16,7 @@ const MODEL = 'claude-sonnet-4-6';
 
 import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
 import { buildPriceChangeRow, retailerKey, unitSizeComparable, dedupWithinTrip } from '../lib/price-change.mjs';
+import { bestFactoryMatch } from '../lib/factory-match.mjs';
 
 const PLACEMENT_TYPES = ['main_floor', 'clearance', 'checkout_register', 'end_cap', 'display'];
 
@@ -177,6 +178,25 @@ export default async function handler(req, res) {
         }
       } catch (e) { console.warn('SKU auto-match failed:', e.message); }
 
+      // 7c2. Factory match — "who already makes this" — against indexed
+      //      factory_product_attributes (after the SKU match).
+      let factoryMatch = { factory_match_id: null, factory_match_confidence: null };
+      try {
+        const faR = await sbFetch('/rest/v1/factory_product_attributes?select=*');
+        if (faR.ok) {
+          const attrs = await faR.json();
+          if (attrs.length) {
+            const facIds = [...new Set(attrs.map(a => a.factory_id).filter(Boolean))];
+            const facById = {};
+            if (facIds.length) {
+              const fR = await sbFetch(`/rest/v1/factories?id=in.(${facIds.join(',')})&select=id,factory_name_english`);
+              if (fR.ok) (await fR.json()).forEach(f => { facById[f.id] = f; });
+            }
+            factoryMatch = bestFactoryMatch({ ...obsPayload, ...norm }, attrs, facById);
+          }
+        }
+      } catch (e) { console.warn('Factory match failed:', e.message); }
+
       // 7d. Clearance + placement classification (extracted by the AI).
       const placement = {
         is_clearance: extracted.is_clearance === true,
@@ -184,7 +204,7 @@ export default async function handler(req, res) {
         placement_type: PLACEMENT_TYPES.includes(extracted.placement_type) ? extracted.placement_type : 'main_floor'
       };
 
-      const patch = { ...norm, ...match, ...placement };
+      const patch = { ...norm, ...match, ...placement, ...factoryMatch };
       const normR = await sbFetch(`/rest/v1/shop_out_observations?id=eq.${newId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

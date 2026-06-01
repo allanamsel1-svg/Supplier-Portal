@@ -172,6 +172,18 @@ body.processing .ri-tab,body.processing .ri-top a,body.processing #new-btn { poi
   <img id="viewer-img" />
 </div>
 
+<div id="rfq-modal-bg" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:600;">
+  <div style="background:#fff;border-radius:12px;width:540px;max-width:94vw;max-height:90vh;overflow:auto;padding:1.25rem;">
+    <h3 style="margin:0 0 4px;font-size:17px;">📋 Prepare RFQ from Spotted Item</h3>
+    <div id="rfq-modal-body"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+      <button onclick="closeRfqModal()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+      <button id="rfq-submit-btn" onclick="submitRfq()" style="background:#2244cc;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Create Draft RFQ</button>
+    </div>
+  </div>
+</div>
+<div id="so-toast" style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,0.25);z-index:700;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;"></div>
+
 <div class="overlay" id="confirm-modal">
   <div class="modal">
     <div class="modal-head"><div id="confirm-title">Confirm</div></div>
@@ -1278,6 +1290,15 @@ async function loadObservations(id){
   // Cross-retailer price index (all shop-outs), for badges + the summary card.
   await buildCrossIndex();
 
+  // Factory index + RFQ pipeline statuses for this shop-out.
+  await buildFactoryIndex();
+  obsCache=obs;
+  rfqPipelineByObs={};
+  try {
+    var pipR=await h(SB+'/rest/v1/shop_out_rfq_pipeline?shop_out_id=eq.'+id+'&select=observation_id,status');
+    if(pipR.ok)(await pipR.json()).forEach(function(p){rfqPipelineByObs[p.observation_id]=p.status;});
+  } catch(e){}
+
   // Batch-fetch the file_path for every front photo referenced by an observation.
   var pathById={};
   var frontIds=obs.map(function(o){return o.front_photo_id;}).filter(Boolean);
@@ -1335,6 +1356,8 @@ async function loadObservations(id){
         '</div>'+
         matchPanelHtml(o)+
         crossBadge(o)+
+        factoryBadge(o)+
+        '<div style="margin-top:4px;">'+rfqButton(o)+rfqStatusBadge(o)+'</div>'+
         '<div style="background:#f7f7f2;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
           '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">ML Observation</div>'+
           mlText+
@@ -1448,6 +1471,166 @@ function renderCrossRetailer(obs){
     '<div class="card-title" style="color:#2244cc;">🌐 CROSS-RETAILER PRICE INTELLIGENCE ('+items.length+' items)</div>'+
     '<div style="font-size:11px;color:#888;margin-bottom:8px;">Items seen at 2+ retailer chains, sorted by price spread (biggest competitive signal first).</div>'+
     body+'</div>';
+}
+
+// ── Factory match ("who already makes this") — client mirror of lib/factory-match.mjs ──
+var factoryAttrs=null, factoryById={}, obsCache=[], rfqPipelineByObs={};
+async function buildFactoryIndex(){
+  if(factoryAttrs)return;
+  factoryAttrs=[];
+  try {
+    var r=await h(SB+'/rest/v1/factory_product_attributes?select=*');
+    if(r.ok)factoryAttrs=await r.json();
+    var ids=factoryAttrs.map(function(a){return a.factory_id;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
+    if(ids.length){
+      var fr=await h(SB+'/rest/v1/factories?id=in.('+ids.join(',')+')&select=id,factory_name_english');
+      if(fr.ok)(await fr.json()).forEach(function(f){factoryById[f.id]=f;});
+    }
+  } catch(e){}
+}
+function fNormKey(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+function fTokens(s){return String(s==null?'':s).toLowerCase().split(/[^a-z0-9]+/).filter(function(w){return w.length>=3;});}
+function fAttrUnitNorm(u){
+  if(u==null)return null;var s=String(u).toLowerCase();
+  if(/fl\s*oz|fluid/.test(s))return 'volume_oz';
+  if(/\bml\b|milli|\bl\b|liter|litre/.test(s))return 'volume_ml';
+  if(/\bg\b|gram|\bkg\b|kilogram/.test(s))return 'weight_g';
+  if(/\boz\b|ounce/.test(s))return 'weight_oz';
+  if(/count|piece|\bpc\b|\bpcs\b|pair|pack|\bpk\b|sheet|wipe|set|kit|unit|bottle|tube|jar/.test(s))return 'count';
+  return null;
+}
+function scoreFactory(o,a){
+  var score=0, segs={};
+  (o.ai_suggested_category?String(o.ai_suggested_category).split('>'):[]).map(fNormKey).filter(Boolean).forEach(function(x){segs[x]=1;});
+  var ac=fNormKey(a.category),asub=fNormKey(a.sub_category);
+  if((ac&&segs[ac])||(asub&&segs[asub]))score+=3;
+  var pt=fNormKey(a.product_type);
+  if(pt&&pt.length>=3){var hay=fNormKey((o.product_name||'')+' '+(o.ai_suggested_category||''));if(hay.indexOf(pt)!==-1)score+=2;}
+  var au=fAttrUnitNorm(a.unit_type);
+  if(au&&o.normalized_unit&&au===o.normalized_unit)score+=2;
+  var kws=Array.isArray(a.extracted_keywords)?a.extracted_keywords:[];
+  var ot={};fTokens((o.product_name||'')+' '+(o.ai_suggested_category||'')).forEach(function(t){ot[t]=1;});
+  var hits=0,seen={};kws.forEach(function(k){var nk=fNormKey(k);if(nk&&!seen[nk]&&ot[nk]){seen[nk]=1;hits++;}});
+  score+=Math.min(hits,3);
+  return score;
+}
+function rankFactory(o){
+  return (factoryAttrs||[]).map(function(a){return {a:a,score:scoreFactory(o,a)};})
+    .filter(function(x){return x.score>0;}).sort(function(x,y){return y.score-x.score;}).slice(0,5);
+}
+function factoryBadge(o){
+  if(!o.factory_match_id)return '';
+  var f=factoryById[o.factory_match_id];
+  var name=f?f.factory_name_english:'A factory';
+  var conf=o.factory_match_confidence!=null?' · '+Math.round(Number(o.factory_match_confidence)*100)+'%':'';
+  return '<div style="margin-top:6px;">'+
+    '<button onclick="toggleFactory(\''+o.id+'\')" style="cursor:pointer;border:1px solid #d8c9a0;background:#fffaf0;color:#8a6d00;border-radius:8px;padding:3px 9px;font-size:11px;font-weight:600;font-family:inherit;">🏭 '+esc(name)+' may make this'+conf+' ▾</button>'+
+    '<div id="fac-exp-'+o.id+'" style="display:none;margin-top:6px;background:#fffdf7;border:1px solid #efe4c8;border-radius:8px;padding:8px 10px;"></div></div>';
+}
+async function toggleFactory(obsId){
+  var box=g('fac-exp-'+obsId);if(!box)return;
+  if(box.style.display!=='none'){box.style.display='none';return;}
+  var o=obsCache.find(function(x){return x.id===obsId;});if(!o)return;
+  var top=rankFactory(o);
+  if(!top.length){box.innerHTML='<div style="font-size:11px;color:#999;">No factory candidates.</div>';box.style.display='block';return;}
+  var docIds=top.map(function(t){return t.a.product_document_id;}).filter(Boolean);
+  var docById={};
+  if(docIds.length){try{var dr=await h(SB+'/rest/v1/product_documents?id=in.('+docIds.join(',')+')&select=id,file_path,file_name');if(dr.ok)(await dr.json()).forEach(function(d){docById[d.id]=d;});}catch(e){}}
+  box.innerHTML='<div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Top factory matches</div>'+
+    top.map(function(t,i){var f=factoryById[t.a.factory_id];
+      return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:0.5px solid #efe4c8;">'+
+        '<div style="width:42px;height:42px;border-radius:6px;background:#f0f0e8;overflow:hidden;flex-shrink:0;"><img id="fac-th-'+obsId+'-'+i+'" style="width:42px;height:42px;object-fit:cover;display:block;" /></div>'+
+        '<div style="flex:1;min-width:0;font-size:11px;"><div style="font-weight:700;">'+esc(f?f.factory_name_english:'—')+'</div>'+
+          '<div style="color:#666;">'+esc(t.a.product_name||'')+(t.a.price_usd!=null?' · $'+Number(t.a.price_usd).toFixed(2):'')+'</div></div>'+
+        '<div style="font-size:11px;font-weight:700;color:#8a6d00;white-space:nowrap;">score '+t.score+'</div>'+
+      '</div>';
+    }).join('');
+  box.style.display='block';
+  top.forEach(async function(t,i){
+    var d=docById[t.a.product_document_id];if(!d)return;
+    var n=(d.file_name||'').toLowerCase();
+    if(/\.[a-z0-9]{2,4}$/.test(n)&&!/\.(png|jpg|jpeg|webp|gif)$/.test(n))return;  // skip non-image (pdf etc)
+    try{var sr=await h(SB+'/storage/v1/object/sign/factory-documents/'+d.file_path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:3600})});
+      if(sr.ok){var sd=await sr.json();var img=g('fac-th-'+obsId+'-'+i);if(img)img.src=SB+'/storage/v1'+sd.signedURL;}}catch(e){}
+  });
+}
+
+// ── Spot → RFQ ──
+function rfqStatusBadge(o){
+  var st=rfqPipelineByObs[o.id];
+  if(!st)return '';
+  var label=st==='sent'?'📋 RFQ Sent':(st==='prepared'?'📋 RFQ Prepared':'📋 RFQ '+st);
+  return '<span style="margin-left:8px;font-size:11px;font-weight:700;background:#eef2ff;color:#2244cc;border-radius:8px;padding:2px 8px;">'+esc(label)+'</span>';
+}
+function rfqButton(o){
+  if(rfqPipelineByObs[o.id])return '';  // already in pipeline → badge instead
+  return '<button onclick="openRfqModal(\''+o.id+'\')" style="cursor:pointer;border:none;background:#2244cc;color:#fff;border-radius:6px;padding:4px 11px;font-size:11px;font-weight:600;font-family:inherit;margin-top:6px;">📋 Prepare RFQ</button>';
+}
+var rfqModalObs=null;
+function openRfqModal(obsId){
+  var o=obsCache.find(function(x){return x.id===obsId;});if(!o)return;
+  rfqModalObs=o;
+  var s=shopById(obsShopOutId), retailer=chainName(s), sdate=(s&&s.shop_date)||'—';
+  var rp=o.retail_price!=null?Number(o.retail_price):null;
+  var wholesale=rp!=null?Math.round(rp*0.625*100)/100:'';
+  var elc=rp!=null?Math.round(rp*0.625*0.65*100)/100:'';
+  var sku=skuById[o.projection_sku_id];
+  var upTxt=(o.unit_price!=null&&o.normalized_unit)?(' ($'+Number(o.unit_price).toFixed(2)+'/'+(SKU_UNIT_LABEL[o.normalized_unit]||o.normalized_unit)+')'):'';
+  var skuTxt=sku?(' Matched SKU: '+(sku.item_description||'')+(sku.proposed_sell_price!=null?' at $'+Number(sku.proposed_sell_price).toFixed(2):'')+'.'):'';
+  var notes='Spotted at '+retailer+' on '+sdate+' — shelf price '+(rp!=null?'$'+rp.toFixed(2):'—')+upTxt+'.'+skuTxt;
+  var fac=o.factory_match_id?factoryById[o.factory_match_id]:null;
+  var facTxt=fac?fac.factory_name_english:'(none matched)';
+  g('rfq-modal-body').innerHTML=
+    '<div style="font-size:11px;color:#888;margin-bottom:10px;">Spotted: <strong>'+esc(o.brand||'')+' '+esc(o.product_name||'')+'</strong> · '+esc(retailer)+' · '+esc(sdate)+'</div>'+
+    fld('Item description','rfq-f-desc',o.product_name||'')+
+    fld('Category','rfq-f-cat',o.ai_suggested_category||'')+
+    '<div style="display:flex;gap:10px;">'+fld('Target wholesale (×0.625)','rfq-f-whole',wholesale,'flex:1;')+fld('Target ELC (×0.65)','rfq-f-elc',elc,'flex:1;')+'</div>'+
+    '<div style="margin-bottom:8px;"><label style="font-size:10px;text-transform:uppercase;color:#888;font-weight:600;display:block;margin-bottom:3px;">Matched factory</label><div style="font-size:13px;">🏭 '+esc(facTxt)+'</div></div>'+
+    '<div style="margin-bottom:8px;"><label style="font-size:10px;text-transform:uppercase;color:#888;font-weight:600;display:block;margin-bottom:3px;">Notes</label><textarea id="rfq-f-notes" style="width:100%;box-sizing:border-box;min-height:64px;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;">'+esc(notes)+'</textarea></div>';
+  g('rfq-modal-bg').style.display='flex';
+}
+function fld(label,id,val,extra){
+  return '<div style="margin-bottom:8px;'+(extra||'')+'"><label style="font-size:10px;text-transform:uppercase;color:#888;font-weight:600;display:block;margin-bottom:3px;">'+esc(label)+'</label>'+
+    '<input id="'+id+'" value="'+esc(String(val))+'" style="width:100%;box-sizing:border-box;padding:7px 9px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /></div>';
+}
+function closeRfqModal(){g('rfq-modal-bg').style.display='none';rfqModalObs=null;}
+async function submitRfq(){
+  var o=rfqModalObs;if(!o)return;
+  var btn=g('rfq-submit-btn');if(btn){btn.disabled=true;btn.textContent='Creating…';}
+  try {
+    var desc=(g('rfq-f-desc').value||'').trim()||(o.product_name||'Spotted item');
+    var catPath=(g('rfq-f-cat').value||'').trim();
+    var segs=catPath.split('>').map(function(x){return x.trim();});
+    var wholesale=Number(g('rfq-f-whole').value)||null;
+    var elc=Number(g('rfq-f-elc').value)||null;
+    var notes=(g('rfq-f-notes').value||'').trim();
+    var rp=o.retail_price!=null?Number(o.retail_price):null;
+    var rfqPayload={
+      item_description:desc, category:segs[0]||null, sub_category:segs[1]||null, sub_sub_category:segs[2]||null,
+      status:'draft', target_retail_price:rp, comp_retail_price:rp,
+      target_wholesale_price:wholesale, customer_margin_pct:37.5, est_landed_cost:elc,
+      unit_type:o.normalized_unit||null, admin_notes:notes,
+      factories_to_send:o.factory_match_id?[o.factory_match_id]:null
+    };
+    var rr=await h(SB+'/rest/v1/rfqs',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(rfqPayload)});
+    if(!rr.ok)throw new Error('RFQ create failed: '+await rr.text());
+    var rfq=(await rr.json())[0];
+    var pipePayload={observation_id:o.id,shop_out_id:obsShopOutId,rfq_id:rfq.id,status:'prepared',
+      spotted_brand:o.brand||null,spotted_product:o.product_name||null,
+      spotted_retail_price:rp,spotted_unit_price:o.unit_price!=null?Number(o.unit_price):null,
+      target_wholesale:wholesale,target_elc:elc,notes:notes};
+    var pr=await h(SB+'/rest/v1/shop_out_rfq_pipeline',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(pipePayload)});
+    if(!pr.ok)throw new Error('Pipeline insert failed: '+await pr.text());
+    rfqPipelineByObs[o.id]='prepared';
+    closeRfqModal();
+    soToast('RFQ prepared — review in RFQ module.');
+    if(obsShopOutId)loadObservations(obsShopOutId);
+  } catch(e){ alert(e.message); if(btn){btn.disabled=false;btn.textContent='Create Draft RFQ';} }
+}
+function soToast(msg){
+  var t=g('so-toast');if(!t)return;
+  t.textContent=msg;t.style.opacity='1';
+  setTimeout(function(){t.style.opacity='0';},3500);
 }
 
 // Clearance + Checkout/Register high-signal cards, rendered above Section Intelligence.
