@@ -7,7 +7,7 @@
 //   GET/POST ?shopOutId=<uuid>&limit=<n>   → one shop-out (re-detect all)
 //   GET/POST ?limit=<n>                    → observations with placement_type IS NULL
 
-import { runBackfill } from '../scripts/backfill-clearance-placement.mjs';
+import { runBackfill } from '../lib/clearance-detect.mjs';
 
 export const config = { runtime: 'nodejs' };
 export const maxDuration = 300;
