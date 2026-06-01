@@ -1714,6 +1714,90 @@ async function saveClearanceNote(obsId){
   } catch(e){}
 }
 
+// ── Price-change validation layer ──
+var pcData={}, pcSel={};
+function pcValBadge(st){
+  if(st==='confirmed')return '<span style="font-size:10px;font-weight:700;background:#edfaed;color:#1a7a1a;border-radius:8px;padding:2px 7px;">✓ Confirmed</span>';
+  if(st==='rejected')return '<span style="font-size:10px;font-weight:700;background:#fdecec;color:#a22;border-radius:8px;padding:2px 7px;">✗ Rejected</span>';
+  if(st==='adjusted')return '<span style="font-size:10px;font-weight:700;background:#fff4e0;color:#9a6a00;border-radius:8px;padding:2px 7px;">~ Adjusted</span>';
+  return '<span style="font-size:10px;color:#bbb;">Unreviewed</span>';
+}
+async function togglePcExpand(rowId){
+  var box=g('pc-panel-'+rowId);if(!box)return;
+  if(box.style.display!=='none'){box.style.display='none';box.innerHTML='';return;}
+  var d=pcData[rowId];if(!d)return;
+  var p=d.p, sku=d.sku, tbg=d.tbg, imgId='pc-img-'+rowId;
+  var mpct=function(v){return v!=null?(Number(v)*100).toFixed(1)+'%':'—';};
+  var unitNew=(d.newU!=null&&d.nu)?unitPriceTxt(d.newU,d.nu):'—';
+
+  var left='<div style="flex:1;min-width:200px;">'+
+    '<div style="width:100%;max-width:300px;border-radius:8px;overflow:hidden;background:#f0f0e8;"><img id="'+imgId+'" style="width:100%;display:block;" /></div>'+
+    '<div style="font-size:12px;margin-top:8px;line-height:1.7;">'+
+      '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
+      '<div style="color:#555;">'+esc(p.product_name||'')+'</div>'+
+      '<div style="color:#888;">Pack '+esc(d.packCurr||'—')+' · Retail '+priceCell(p.retail_price)+' · Unit '+esc(unitNew)+'</div>'+
+      '<div style="color:#888;">'+esc(p.shop_date||'—')+' · '+d.chain+(d.storeLoc?' · '+esc(d.storeLoc):'')+'</div>'+
+    '</div></div>';
+
+  var right;
+  if(sku){
+    var tbgU=tbg?unitPriceTxt(tbg.price,tbg.unit):'—';
+    right='<div style="flex:1;min-width:200px;font-size:12px;line-height:1.8;">'+
+      '<div style="font-size:10px;text-transform:uppercase;color:#888;font-weight:600;letter-spacing:0.04em;margin-bottom:4px;">Matched TBG SKU</div>'+
+      '<div style="font-weight:700;font-size:13px;">'+esc(sku.item_description||'—')+'</div>'+
+      '<div style="color:#888;">Size '+esc(sku.size_unit||'—')+'</div>'+
+      '<div>Proposed sell '+priceCell(sku.proposed_sell_price)+' · Comp retail '+priceCell(sku.comp_retail_price)+'</div>'+
+      '<div>TBG margin '+mpct(sku.tbg_margin)+' · Customer margin '+mpct(sku.customer_margin)+'</div>'+
+      '<div style="margin-top:4px;font-weight:700;color:#2244cc;">TBG unit price: '+esc(tbgU)+'</div>'+
+    '</div>';
+  } else {
+    right='<div style="flex:1;min-width:200px;font-size:12px;color:#bbb;display:flex;align-items:center;">No valid same-category TBG match — nothing to compare.</div>';
+  }
+
+  var st=p.ml_validation_status||''; pcSel[rowId]=st||null;
+  function vbtn(val,label,bg,fg){
+    return '<button id="pc-btn-'+rowId+'-'+val+'" onclick="pcSelect(\''+rowId+'\',\''+val+'\')" style="cursor:pointer;border:none;background:'+bg+';color:'+fg+';font-weight:700;border-radius:7px;padding:6px 12px;font-size:12px;font-family:inherit;outline:'+(st===val?'2px solid #1a1a2e':'none')+';outline-offset:1px;">'+label+'</button>';
+  }
+  var bottom='<div style="margin-top:12px;border-top:1px solid #eef;padding-top:10px;">'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">'+
+      vbtn('confirmed','✓ Confirmed','#edfaed','#1a7a1a')+
+      vbtn('rejected','✗ Rejected — bad data','#fdecec','#a22')+
+      vbtn('adjusted','~ Adjusted','#fff4e0','#9a6a00')+
+    '</div>'+
+    '<textarea id="pc-note-'+rowId+'" placeholder="Validation note — explain why this was rejected or adjusted" style="width:100%;box-sizing:border-box;min-height:48px;padding:8px 10px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+esc(p.ml_validation_note||'')+'</textarea>'+
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">'+
+      '<button onclick="savePcValidation(\''+rowId+'\')" style="font-size:12px;padding:6px 16px;background:#2244cc;color:#fff;border:none;border-radius:7px;font-weight:600;cursor:pointer;font-family:inherit;">Save validation</button>'+
+      (p.ml_validated_at?'<span style="font-size:11px;color:#999;">last: '+esc(p.ml_validation_status||'')+' · '+esc(String(p.ml_validated_at).slice(0,10))+' · '+esc(p.ml_validated_by||'')+'</span>':'')+
+    '</div></div>';
+
+  box.innerHTML='<div style="margin-top:10px;padding:12px;background:#fff;border:1px solid #e0e6f0;border-radius:8px;">'+
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;">'+left+right+'</div>'+bottom+'</div>';
+  box.style.display='block';
+
+  if(d.photoPath){
+    try {
+      var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+d.photoPath,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:3600,transform:{width:800,height:800,resize:'contain',format:'origin'}})});
+      if(sr.ok){var sd=await sr.json();var img=g(imgId);if(img)img.src=SB+'/storage/v1'+sd.signedURL;}
+    } catch(e){}
+  }
+}
+function pcSelect(rowId,st){
+  pcSel[rowId]=st;
+  ['confirmed','rejected','adjusted'].forEach(function(x){var b=g('pc-btn-'+rowId+'-'+x);if(b)b.style.outline=(x===st?'2px solid #1a1a2e':'none');});
+}
+async function savePcValidation(rowId){
+  var st=pcSel[rowId];
+  if(!st){alert('Choose ✓ Confirmed, ✗ Rejected, or ~ Adjusted first.');return;}
+  var noteEl=g('pc-note-'+rowId), note=noteEl?noteEl.value.trim():'';
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_price_history?id=eq.'+rowId,{method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ml_validation_status:st,ml_validation_note:note||null,ml_validated_at:new Date().toISOString(),ml_validated_by:'admin'})});
+    if(!r.ok)throw new Error(await r.text());
+    soToast('Validation saved');
+    if(obsShopOutId)loadPriceChanges(obsShopOutId);
+  } catch(e){ alert('Save failed: '+e.message); }
+}
+
 // Price Changes Detected card (from shop_out_price_history), after the signal cards.
 async function loadPriceChanges(id){
   var pc=g('pricechange-card');if(!pc)return;
@@ -1724,28 +1808,40 @@ async function loadPriceChanges(id){
     rows=await r.json();
   } catch(e){ pc.innerHTML=''; return; }
   if(!rows.length){pc.innerHTML='';return;}
-  var reviewN=rows.filter(function(p){return p.needs_review;}).length;
+  // Rejected rows are excluded from the confirmed / needs-review tallies.
+  var rejectedN=rows.filter(function(p){return p.ml_validation_status==='rejected';}).length;
+  var nonRej=rows.filter(function(p){return p.ml_validation_status!=='rejected';});
+  var reviewN=nonRej.filter(function(p){return p.needs_review;}).length;
 
   // Fetch the referenced observations (current + previous) for pack size + unit
-  // price on both sides, and the matched Projections SKUs for TBG comparison.
-  var obsMap={}, skuMap={};
+  // price, the current front photo, and the matched Projections SKUs.
+  var obsMap={}, skuMap={}, photoPathById={};
   var oids=[];
   rows.forEach(function(p){ if(p.observation_id)oids.push(p.observation_id); if(p.previous_observation_id)oids.push(p.previous_observation_id); });
   oids=oids.filter(function(v,i,a){return v&&a.indexOf(v)===i;});
   if(oids.length){
     try {
-      var or=await h(SB+'/rest/v1/shop_out_observations?id=in.('+oids.join(',')+')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id,sku_match_method,is_category_gap');
+      var or=await h(SB+'/rest/v1/shop_out_observations?id=in.('+oids.join(',')+')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id,sku_match_method,is_category_gap,front_photo_id');
       if(or.ok)(await or.json()).forEach(function(o){obsMap[o.id]=o;});
+    } catch(e){}
+  }
+  var fpids=rows.map(function(p){var c=obsMap[p.observation_id];return c&&c.front_photo_id;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
+  if(fpids.length){
+    try {
+      var fr=await h(SB+'/rest/v1/shop_out_photos?id=in.('+fpids.join(',')+')&select=id,file_path');
+      if(fr.ok)(await fr.json()).forEach(function(ph){photoPathById[ph.id]=ph.file_path;});
     } catch(e){}
   }
   var skuIds=rows.map(function(p){var c=obsMap[p.observation_id];return c&&c.projection_sku_id;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
   if(skuIds.length){
     try {
-      var sr=await h(SB+'/rest/v1/projection_skus?id=in.('+skuIds.join(',')+')&select=id,item_description,size_unit,proposed_sell_price');
+      var sr=await h(SB+'/rest/v1/projection_skus?id=in.('+skuIds.join(',')+')&select=id,item_description,size_unit,proposed_sell_price,comp_retail_price,customer_margin,tbg_margin');
       if(sr.ok)(await sr.json()).forEach(function(sk){skuMap[sk.id]=sk;});
     } catch(e){}
   }
   function packStr(o){ if(!o||o.pack_size==null)return '—'; return o.pack_size+(o.pack_size_unit?(' '+String(o.pack_size_unit).replace(/_/g,' ')):''); }
+  var sObj=shopById(id), chain=esc(chainName(sObj)), storeLoc=(sObj&&sObj.store_location_text)||'';
+  pcData={};
 
   var body=rows.map(function(p){
     var pct=Number(p.price_change_pct);
@@ -1787,37 +1883,46 @@ async function loadPriceChanges(id){
         ' at '+esc(unitPriceTxt(newU,nu))+' vs TBG '+esc(sku.item_description||'')+' '+esc(sku.size_unit||'')+' at '+esc(unitPriceTxt(tbg.price,tbg.unit))+' — '+verdict+'</div>';
     }
 
-    var detailLine='<div style="font-size:11px;color:#555;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;">'+
+    var packCurr=packStr(Object.keys(curr).length?curr:{pack_size:p.pack_size,pack_size_unit:p.pack_size_unit});
+    var rejected = p.ml_validation_status==='rejected';
+    var strike = rejected ? 'text-decoration:line-through;opacity:0.55;' : '';
+
+    var detailLine='<div style="font-size:11px;color:#555;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;'+strike+'">'+
       '<span>'+packLine+'</span>'+(unitLine?'<span>'+unitLine+'</span>':'')+(tbgLine?'<span>'+tbgLine+'</span>':'')+'</div>';
 
+    // Stash what the expand/validation panel needs.
+    pcData[p.id]={ p:p, newU:newU, nu:nu, packCurr:packCurr,
+      photoPath: curr.front_photo_id?photoPathById[curr.front_photo_id]:null,
+      sku:sku, tbg:tbg, chain:chain, storeLoc:storeLoc };
+
     return '<div style="padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
-      '<div style="display:flex;gap:10px;align-items:center;">'+
-        '<div style="flex:1;min-width:0;">'+
+      '<div onclick="togglePcExpand(\''+p.id+'\')" style="display:flex;gap:10px;align-items:center;cursor:pointer;">'+
+        '<div style="flex:1;min-width:0;'+strike+'">'+
           '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
           '<div style="font-size:12px;color:#666;">'+esc(p.product_name||'')+'</div>'+
         '</div>'+
-        '<div style="font-size:13px;white-space:nowrap;color:#666;">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
-        changeCell+
-        '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
+        '<div style="font-size:13px;white-space:nowrap;color:#666;'+strike+'">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
+        '<div style="'+strike+'">'+changeCell+'</div>'+
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap;">'+pcValBadge(p.ml_validation_status)+'<span style="font-size:11px;color:#999;">prev '+esc(p.previous_shop_date||'—')+' ▾</span></div>'+
       '</div>'+
-      detailLine+ctxLine+
+      detailLine+(rejected?'':ctxLine)+
+      '<div id="pc-panel-'+p.id+'" style="display:none;"></div>'+
     '</div>';
   }).join('');
-  // Dynamic header + context from the actual rows.
-  var s=shopById(id), chain=esc(chainName(s));
   var dates=[];
   rows.forEach(function(p){if(p.shop_date)dates.push(p.shop_date);if(p.previous_shop_date)dates.push(p.previous_shop_date);});
   dates.sort();
   var earliest=dates.length?dates[0]:'—', latest=dates.length?dates[dates.length-1]:'—';
   var nVisits=new Set(dates).size;
   var nProducts=new Set(rows.map(function(p){return (p.brand||'').toLowerCase()+'|'+(p.product_name||'').toLowerCase();})).size;
-  var confirmed=rows.length-reviewN;
+  var confirmed=nonRej.length-reviewN;
   pc.innerHTML='<div class="card" style="border:1.5px solid #b9c8e8;background:#fbfcff;">'+
     '<div class="card-title" style="color:#2244cc;">📈 COMPETITOR PRICE CHANGES — '+chain+' ('+esc(earliest)+' → '+esc(latest)+')</div>'+
     '<div style="font-size:11px;color:#888;margin-bottom:8px;">Comparing '+nProducts+' products seen across '+nVisits+' visits · '+
-      confirmed+' confirmed moves · '+reviewN+' needs review · '+
+      confirmed+' confirmed moves · '+reviewN+' needs review'+(rejectedN?' · <span style="color:#a22;font-weight:600;">'+rejectedN+' rejected as bad data</span>':'')+' · '+
       '<span style="color:#1a7a1a;font-weight:600;">▲ competitor up = good for TBG margin</span> · '+
-      '<span style="color:#a22;font-weight:600;">▼ competitor down = margin pressure on TBG</span></div>'+
+      '<span style="color:#a22;font-weight:600;">▼ competitor down = margin pressure on TBG</span> · '+
+      '<span style="color:#aaa;">click a row to validate</span></div>'+
     body+'</div>';
 }
 
