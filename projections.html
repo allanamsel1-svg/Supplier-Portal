@@ -132,6 +132,15 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .modal input,.modal select{width:100%;box-sizing:border-box;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;}
 .modal .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
 .addbtn{background:#2244cc;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.hnode{cursor:pointer;display:flex;align-items:center;gap:8px;}
+.hchev{font-size:10px;color:#888;width:10px;flex-shrink:0;}
+.hstat{font-size:11px;color:#888;font-weight:500;margin-left:auto;white-space:nowrap;}
+.hcat{font-size:14px;font-weight:700;color:#1a1a2e;padding:10px 12px;background:#eef2ff;border-radius:8px;margin-top:14px;}
+.hsub{font-size:13px;font-weight:600;color:#333;padding:7px 12px 7px 26px;background:#f7f7f2;border-radius:6px;margin-top:6px;}
+.hssc{font-size:12px;font-weight:600;color:#555;padding:6px 12px 6px 44px;margin-top:3px;}
+.cat-break{font-size:12px;color:#555;margin:-4px 0 12px;}
+.cat-break b{color:#1a7a1a;}
+.summary-sub{font-size:13px;font-weight:700;color:#1a1a2e;margin:1.25rem 0 0.4rem;}
 </style>
 </head>
 <body>
@@ -171,6 +180,9 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
     <h3>Add SKU</h3>
     <div class="mf"><label>Item description</label><input id="as-desc" placeholder="e.g. Charcoal Face Mask" /></div>
     <div class="mf"><label>Product line</label><select id="as-line"></select></div>
+    <div class="mf"><label>Category</label><input id="as-cat" list="dl-cat" oninput="refreshAddSub()" placeholder="e.g. Health & Beauty" /></div>
+    <div class="mf"><label>Sub category</label><input id="as-sub" list="dl-sub" oninput="refreshAddSsc()" placeholder="e.g. Skin Care" /></div>
+    <div class="mf"><label>Sub-sub category</label><input id="as-ssc" list="dl-ssc" placeholder="e.g. Face Masks" /></div>
     <div class="mf"><label>Size / unit</label><input id="as-size" placeholder="e.g. 100ml" /></div>
     <div class="mf" style="display:flex;gap:10px;">
       <div style="flex:1;"><label>Bulk unit cost</label><input id="as-bulk" type="number" step="any" /></div>
@@ -181,6 +193,8 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
     <div class="mfoot"><button class="btn btn-secondary" onclick="closeAddSku()">Cancel</button><button class="btn btn-primary" onclick="createSku()">Add SKU</button></div>
   </div>
 </div>
+<datalist id="dl-cat"></datalist><datalist id="dl-sub"></datalist><datalist id="dl-ssc"></datalist>
+<datalist id="dl-cat-all"></datalist><datalist id="dl-sub-all"></datalist><datalist id="dl-ssc-all"></datalist>
 
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
@@ -225,6 +239,7 @@ async function load(){
     if(!r.ok){g('pane-skus').innerHTML='<div class="empty">Failed to load ('+r.status+').</div>';return;}
     skus=await r.json();
   } catch(e){ g('pane-skus').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
+  populateAllDatalists();
   renderSkus();
   renderSummary();
   loadFinPlan();
@@ -260,9 +275,24 @@ function rowSummaryCells(s){
     '<div><span class="badge b-'+esc(s.status||'proposed')+'" id="badge-'+s.id+'">'+esc(s.status||'proposed')+'</span></div>';
 }
 
-var tabledOpen={};
+// ── three-level category hierarchy ──
+var expandedState={}, hierReg=[], tabledOpen=false;
+function regNode(key,def){var i=hierReg.length;hierReg.push({key:key,def:def});return i;}
+function isOpenReg(i){var n=hierReg[i];return expandedState[n.key]!==undefined?expandedState[n.key]:n.def;}
+function toggleNode(i){var n=hierReg[i];var cur=expandedState[n.key]!==undefined?expandedState[n.key]:n.def;expandedState[n.key]=!cur;renderSkus();}
+function toggleTabledAll(){tabledOpen=!tabledOpen;renderSkus();}
+function nodeStats(arr){var active=0,tm=0;arr.forEach(function(s){if(s.status==='active')active++;tm+=calcTbgMargin(s);});return {active:active,total:arr.length,avgm:arr.length?tm/arr.length:0};}
+function flatTree(node){var out=[];Object.keys(node).forEach(function(k){var v=node[k];if(Array.isArray(v))out=out.concat(v);else out=out.concat(flatTree(v));});return out;}
+var SKU_COLS='<div class="sku-row-head"><div>Item</div><div class="num">ELC</div><div class="num">Wholesale</div><div class="num">Proposed</div><div class="num">Comp Retail</div><div class="num">Cust %</div><div class="num">TBG %</div><div>Status</div></div>';
+function skuRowsHtml(arr,dim){
+  return arr.slice().sort(function(a,b){return (a.item_description||'').localeCompare(b.item_description||'');}).map(function(s){
+    return '<div class="sku-row"'+(dim?' style="opacity:0.6;"':'')+' onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>'+
+      '<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
+  }).join('');
+}
 function renderSkus(){
   if(skus.length===0){g('pane-skus').innerHTML='<div class="empty">No SKUs yet. <button class="addbtn" onclick="openAddSku()">+ Add SKU</button></div>';return;}
+  hierReg=[];
   var act=skus.filter(function(s){return s.status==='active';});
   var prop=skus.filter(function(s){return s.status==='proposed';});
   var tab=skus.filter(function(s){return s.status==='tabled';});
@@ -279,34 +309,46 @@ function renderSkus(){
     '<div style="margin-left:auto;display:flex;align-items:center;"><button class="addbtn" onclick="openAddSku()">+ Add SKU</button></div>'+
   '</div>';
 
-  var groups=groupByLine();
-  Object.keys(groups).sort().forEach(function(line){
-    var all=groups[line];
-    var main=all.filter(function(s){return s.status!=='tabled';});
-    var tabled=all.filter(function(s){return s.status==='tabled';});
-    html+='<div class="group-title">'+esc(line)+' <span style="color:#aaa;font-weight:400;">· '+main.length+' SKUs'+(tabled.length?' · '+tabled.length+' tabled':'')+'</span></div>';
-    html+='<div class="sku-table">'+
-      '<div class="sku-row-head">'+
-        '<div>Item</div><div class="num">ELC</div><div class="num">Wholesale</div><div class="num">Proposed</div>'+
-        '<div class="num">Comp Retail</div><div class="num">Cust %</div><div class="num">TBG %</div><div>Status</div>'+
-      '</div>';
-    main.forEach(function(s){
-      html+='<div class="sku-row" onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>';
-      html+='<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
-    });
-    if(tabled.length){
-      var open=!!tabledOpen[line];
-      html+='<div class="tabled-head" onclick="toggleTabled('+JSON.stringify(line).replace(/"/g,'&quot;')+')">'+(open?'▾':'▸')+' Tabled ('+tabled.length+')</div>';
-      if(open)tabled.forEach(function(s){
-        html+='<div class="sku-row" style="opacity:0.6;" onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>';
-        html+='<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
-      });
-    }
-    html+='</div>';
+  // breakdown of active SKUs by category
+  var catCount={};
+  skus.filter(function(s){return s.status!=='tabled';}).forEach(function(s){var c=s.category||'Uncategorized';catCount[c]=catCount[c]||{a:0,t:0};catCount[c].t++;if(s.status==='active')catCount[c].a++;});
+  var breakdown=Object.keys(catCount).sort().map(function(c){return esc(c)+': <b>'+catCount[c].a+'</b> active / '+catCount[c].t;}).join(' &nbsp;·&nbsp; ');
+  html+='<div class="cat-break">'+(breakdown||'No SKUs')+'</div>';
+
+  // build category → sub_category → sub_sub_category → [SKUs]
+  var list=skus.filter(function(s){return s.status!=='tabled';});
+  var tree={};
+  list.forEach(function(s){
+    var c=s.category||'Uncategorized', sc=s.sub_category||'Uncategorized', ss=s.sub_sub_category||'Uncategorized';
+    tree[c]=tree[c]||{}; tree[c][sc]=tree[c][sc]||{}; tree[c][sc][ss]=tree[c][sc][ss]||[]; tree[c][sc][ss].push(s);
   });
+  Object.keys(tree).sort().forEach(function(c){
+    var cstat=nodeStats(flatTree(tree[c]));
+    var ci=regNode('c|'+c,true), cOpen=isOpenReg(ci);   // top level open by default
+    html+='<div class="hcat hnode" onclick="toggleNode('+ci+')"><span class="hchev">'+(cOpen?'▾':'▸')+'</span>'+esc(c)+'<span class="hstat">'+cstat.active+' active · '+cstat.total+' SKUs · TBG '+pct(cstat.avgm)+'</span></div>';
+    if(!cOpen)return;
+    Object.keys(tree[c]).sort().forEach(function(sc){
+      var sstat=nodeStats(flatTree(tree[c][sc]));
+      var si=regNode('s|'+c+'|'+sc,false), sOpen=isOpenReg(si);
+      html+='<div class="hsub hnode" onclick="toggleNode('+si+')"><span class="hchev">'+(sOpen?'▾':'▸')+'</span>'+esc(sc)+'<span class="hstat">'+sstat.active+' active · TBG '+pct(sstat.avgm)+'</span></div>';
+      if(!sOpen)return;
+      Object.keys(tree[c][sc]).sort().forEach(function(ss){
+        var arr=tree[c][sc][ss]; var st=nodeStats(arr);
+        var ssi=regNode('ss|'+c+'|'+sc+'|'+ss,false), ssOpen=isOpenReg(ssi);
+        html+='<div class="hssc hnode" onclick="toggleNode('+ssi+')"><span class="hchev">'+(ssOpen?'▾':'▸')+'</span>'+esc(ss)+'<span class="hstat">'+st.active+' active · TBG '+pct(st.avgm)+'</span></div>';
+        if(!ssOpen)return;
+        html+='<div class="sku-table" style="margin-top:4px;">'+SKU_COLS+skuRowsHtml(arr,false)+'</div>';
+      });
+    });
+  });
+
+  // Tabled SKUs (global, collapsed) — excluded from hierarchy / summary / financials
+  if(tab.length){
+    html+='<div class="tabled-head" onclick="toggleTabledAll()" style="border-radius:6px;margin-top:14px;border-top:none;">'+(tabledOpen?'▾':'▸')+' Tabled ('+tab.length+')</div>';
+    if(tabledOpen)html+='<div class="sku-table">'+SKU_COLS+skuRowsHtml(tab,true)+'</div>';
+  }
   g('pane-skus').innerHTML=html;
 }
-function toggleTabled(line){tabledOpen[line]=!tabledOpen[line];renderSkus();}
 
 function toggleDetail(id){
   var d=g('detail-'+id);if(!d)return;
@@ -318,6 +360,11 @@ function toggleDetail(id){
   }).join('');
   var statusOpts=STATUSES.map(function(st){return '<option value="'+st+'"'+((s.status||'proposed')===st?' selected':'')+'>'+st+'</option>';}).join('');
   d.innerHTML='<div class="detail-grid">'+fields+'</div>'+
+    '<div style="display:flex;gap:10px;margin-top:10px;">'+
+      '<div class="fld" style="flex:1;"><label>Category</label><input id="cat-'+id+'" list="dl-cat-all" value="'+esc(s.category||'')+'" /></div>'+
+      '<div class="fld" style="flex:1;"><label>Sub Category</label><input id="subcat-'+id+'" list="dl-sub-all" value="'+esc(s.sub_category||'')+'" /></div>'+
+      '<div class="fld" style="flex:1;"><label>Sub-Sub Category</label><input id="subsub-'+id+'" list="dl-ssc-all" value="'+esc(s.sub_sub_category||'')+'" /></div>'+
+    '</div>'+
     '<div class="calc-row">'+
       '<div class="calc">ELC<strong id="calc-elc-'+id+'">'+money(calcElc(s))+'</strong></div>'+
       '<div class="calc">Customer Margin<strong id="calc-cm-'+id+'" class="'+marginClass(calcCustomerMargin(s))+'">'+pct(calcCustomerMargin(s))+'</strong></div>'+
@@ -365,6 +412,11 @@ async function patchSku(id,patch){
 
 async function saveSku(id){
   var draft=readInputs(id);
+  // include category hierarchy reclassification, if those inputs are present
+  var cEl=g('cat-'+id), scEl=g('subcat-'+id), ssEl=g('subsub-'+id);
+  if(cEl)draft.category=(cEl.value||'').trim()||null;
+  if(scEl)draft.sub_category=(scEl.value||'').trim()||null;
+  if(ssEl)draft.sub_sub_category=(ssEl.value||'').trim()||null;
   try {
     var updated=await patchSku(id,draft);
     var idx=skus.findIndex(function(x){return x.id===id;});
@@ -405,7 +457,7 @@ function renderSummary(){
   var vis=skus.filter(function(s){return s.status!=='tabled';});  // tabled SKUs excluded
   if(vis.length===0){g('pane-summary').innerHTML='<div class="empty">No active/proposed SKUs.</div>';return;}
   var groups={};
-  vis.forEach(function(s){(groups[s.product_line||'—']=groups[s.product_line||'—']||[]).push(s);});
+  vis.forEach(function(s){var k=s.category||s.product_line||'—';(groups[k]=groups[k]||[]).push(s);});
   Object.keys(groups).forEach(function(k){groups[k].sort(function(a,b){return (a.item_description||'').localeCompare(b.item_description||'');});});
   var html='<div class="cards">';
   Object.keys(groups).sort().forEach(function(line){
@@ -424,20 +476,27 @@ function renderSummary(){
   });
   html+='</div>';
 
-  // Margin health table — every non-tabled SKU, color-coded by TBG margin.
-  var all=vis.slice().sort(function(a,b){return calcTbgMargin(a)-calcTbgMargin(b);});
-  html+='<div class="health-table"><div class="health-row head"><div>Item</div><div>Product Line</div><div class="num" style="text-align:right;">ELC</div><div class="num" style="text-align:right;">TBG %</div><div></div></div>';
-  all.forEach(function(s){
-    var tm=calcTbgMargin(s);
-    html+='<div class="health-row">'+
-      '<div class="sku-name">'+esc(s.item_description||'—')+'</div>'+
-      '<div style="color:#888;">'+esc(s.product_line||'')+'</div>'+
-      '<div class="num" style="text-align:right;">'+money(calcElc(s))+'</div>'+
-      '<div class="num '+marginClass(tm)+'" style="text-align:right;">'+pct(tm)+'</div>'+
-      '<div class="dot '+marginDot(tm)+'"></div>'+
-    '</div>';
+  // Margin health — one section per sub_category, SKUs listed underneath (worst margin first).
+  html+='<div style="margin-top:1.75rem;"><div class="insights-block-title">Margin Health by Sub Category</div></div>';
+  var subGroups={};
+  vis.forEach(function(s){var sc=s.sub_category||'Uncategorized';(subGroups[sc]=subGroups[sc]||[]).push(s);});
+  Object.keys(subGroups).sort().forEach(function(sc){
+    var arr=subGroups[sc].slice().sort(function(a,b){return calcTbgMargin(a)-calcTbgMargin(b);});
+    var savg=avg(arr.map(calcTbgMargin));
+    html+='<div class="summary-sub">'+esc(sc)+' <span style="font-weight:400;color:#888;font-size:11px;">· '+arr.length+' SKUs · avg TBG '+pct(savg)+'</span></div>';
+    html+='<div class="health-table"><div class="health-row head"><div>Item</div><div>Sub-Sub Category</div><div class="num" style="text-align:right;">ELC</div><div class="num" style="text-align:right;">TBG %</div><div></div></div>';
+    arr.forEach(function(s){
+      var tm=calcTbgMargin(s);
+      html+='<div class="health-row">'+
+        '<div class="sku-name">'+esc(s.item_description||'—')+'</div>'+
+        '<div style="color:#888;">'+esc(s.sub_sub_category||'')+'</div>'+
+        '<div class="num" style="text-align:right;">'+money(calcElc(s))+'</div>'+
+        '<div class="num '+marginClass(tm)+'" style="text-align:right;">'+pct(tm)+'</div>'+
+        '<div class="dot '+marginDot(tm)+'"></div>'+
+      '</div>';
+    });
+    html+='</div>';
   });
-  html+='</div>';
   g('pane-summary').innerHTML=html;
 }
 
@@ -812,12 +871,23 @@ function showToast(msg){
   if(toastTimer)clearTimeout(toastTimer);
   toastTimer=setTimeout(function(){t.classList.remove('show');},4000);
 }
+function distinctVals(field,filter){var set={};skus.forEach(function(s){if(filter&&!filter(s))return;var v=s[field];if(v)set[v]=true;});return Object.keys(set).sort();}
+function fillDL(id,vals){var el=g(id);if(el)el.innerHTML=vals.map(function(v){return '<option value="'+esc(v)+'"></option>';}).join('');}
+function populateAllDatalists(){
+  fillDL('dl-cat-all',distinctVals('category'));
+  fillDL('dl-sub-all',distinctVals('sub_category'));
+  fillDL('dl-ssc-all',distinctVals('sub_sub_category'));
+}
+function refreshAddSub(){var cat=g('as-cat').value;fillDL('dl-sub',distinctVals('sub_category',function(s){return !cat||s.category===cat;}));refreshAddSsc();}
+function refreshAddSsc(){var cat=g('as-cat').value,sub=g('as-sub').value;fillDL('dl-ssc',distinctVals('sub_sub_category',function(s){return (!cat||s.category===cat)&&(!sub||s.sub_category===sub);}));}
 function openAddSku(){
   var sel=g('as-line');
   var lines=skus.map(function(s){return s.product_line;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
   if(lines.length===0)lines=['Fashion Secrets','Health & Beauty'];
   sel.innerHTML=lines.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('');
-  ['as-desc','as-size','as-bulk','as-sell','as-comp'].forEach(function(i){var el=g(i);if(el)el.value='';});
+  ['as-desc','as-size','as-bulk','as-sell','as-comp','as-cat','as-sub','as-ssc'].forEach(function(i){var el=g(i);if(el)el.value='';});
+  fillDL('dl-cat',distinctVals('category'));
+  refreshAddSub();   // sub + sub-sub start unfiltered
   g('addsku-bg').classList.add('show');
 }
 function closeAddSku(){g('addsku-bg').classList.remove('show');}
@@ -827,6 +897,9 @@ async function createSku(){
   var payload={
     projection_group:'TBG Year 1 Consumables',
     product_line:g('as-line').value,
+    category:(g('as-cat').value||'').trim()||g('as-line').value||null,
+    sub_category:(g('as-sub').value||'').trim()||null,
+    sub_sub_category:(g('as-ssc').value||'').trim()||null,
     item_description:desc,
     size_unit:(g('as-size').value||'').trim()||null,
     coo:'China',
@@ -848,6 +921,7 @@ async function createSku(){
     var rows=await r.json();
     if(rows&&rows.length)skus.push(rows[0]);
     closeAddSku();
+    populateAllDatalists();
     showToast('SKU added — "'+desc+'" (proposed)');
     renderSkus(); renderSummary(); renderFinPlan();
   } catch(e){ alert('Add SKU failed: '+e.message); }
