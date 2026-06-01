@@ -99,7 +99,7 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .fp-cell:focus{border-color:#2244cc;outline:none;background:#fff;}
 .fp-ro{font-size:11px;color:#555;display:inline-block;text-align:right;}
 .fp-del{opacity:0;border:none;background:none;color:#cc2222;font-size:14px;cursor:pointer;margin-right:4px;font-family:inherit;line-height:1;}
-.fp-row:hover .fp-del{opacity:1;}
+.fp-row:hover .fp-del,.su-row:hover .fp-del{opacity:1;}
 .fp-lname{cursor:default;}
 .fp-lname:hover{text-decoration:underline dotted #aaa;}
 .fp-expand{cursor:pointer;border:none;background:#eef2ff;color:#2244cc;border-radius:4px;font-size:10px;font-weight:700;padding:2px 6px;margin-right:6px;font-family:inherit;}
@@ -985,9 +985,8 @@ async function loadStartup(){
   renderStartup();
 }
 
-var openStartupNotes={};
+var openStartupNotes={}, suAdd=false;
 function renderStartup(){
-  if(startupData.length===0){g('pane-startup').innerHTML='<div class="empty">No startup costs.</div>';return;}
   var totalProj=0,totalAct=0,activeCost=0;
   startupData.forEach(function(s){
     if(s.is_active===false)return;
@@ -1003,11 +1002,12 @@ function renderStartup(){
     var hasAct=s.amount_actual!=null;
     var variance=hasAct?(num(s.amount_actual)-num(s.amount_projected)):null;
     var main='<tr class="su-row'+(off?' off':'')+'">'+
-      '<td class="lbl"><button class="fp-toggle" onclick="toggleStartup(\''+s.id+'\')">'+(off?'Off':'On')+'</button>'+
+      '<td class="lbl"><button class="fp-del" title="Delete" onclick="deleteStartup(\''+s.id+'\')">×</button>'+
+        '<button class="fp-toggle" onclick="toggleStartup(\''+s.id+'\')">'+(off?'Off':'On')+'</button>'+
         '<button class="fp-expand" title="Add detail / notes" onclick="toggleStartupNotes(\''+s.id+'\')">'+(openStartupNotes[s.id]?'▾':'＋')+'</button>'+
         esc(s.item_description||'—')+(s.is_edited?'<span class="fp-dot" title="edited"></span>':'')+'</td>'+
-      '<td><span class="su-cellbtn" onclick="openCell(\'startup_costs\',\''+s.id+'\',event)">'+money0(s.amount_projected)+'</span></td>'+
-      '<td><span class="su-cellbtn" onclick="openCell(\'startup_costs\',\''+s.id+'\',event)">'+(hasAct?money0(s.amount_actual):'<span class="aa-none">—</span>')+'</span></td>'+
+      '<td><input class="su-input" id="su-proj-'+s.id+'" value="'+(s.amount_projected!=null?num(s.amount_projected):'')+'" onblur="saveStartupCell(\''+s.id+'\',\'amount_projected\')" /></td>'+
+      '<td><input class="su-input" id="su-act-'+s.id+'" value="'+(hasAct?num(s.amount_actual):'')+'" placeholder="—" onblur="saveStartupCell(\''+s.id+'\',\'amount_actual\')" /></td>'+
       '<td class="'+(variance!=null&&variance>0?'over':'')+'">'+(variance!=null?money0(variance):'—')+'</td>'+
     '</tr>';
     if(openStartupNotes[s.id]){
@@ -1019,21 +1019,70 @@ function renderStartup(){
     return main;
   }).join('');
 
+  var addForm = suAdd
+    ? '<div style="margin-top:10px;background:#fafbff;border:1px solid #e0e0d8;border-radius:8px;padding:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'+
+        '<input id="su-add-desc" placeholder="Expense description" style="font-size:13px;padding:6px 9px;border:1px solid #e0e0d8;border-radius:6px;width:240px;font-family:inherit;" /> '+
+        '<input id="su-add-proj" type="number" step="any" placeholder="Projected $" style="font-size:13px;padding:6px 9px;border:1px solid #e0e0d8;border-radius:6px;width:130px;font-family:inherit;" /> '+
+        '<input id="su-add-act" type="number" step="any" placeholder="Actual $ (optional)" style="font-size:13px;padding:6px 9px;border:1px solid #e0e0d8;border-radius:6px;width:160px;font-family:inherit;" /> '+
+        '<button class="btn btn-primary" style="padding:6px 14px;font-size:12px;" onclick="saveAddStartup()">Save</button> '+
+        '<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px;" onclick="cancelAddStartup()">Cancel</button>'+
+      '</div>'
+    : '<div style="margin-top:10px;"><button class="addbtn" onclick="startAddStartup()">+ Add Expense</button></div>';
+
   g('pane-startup').innerHTML=
     '<div class="kpi">'+
       '<div class="box"><div class="lab">Opening Investment</div><div class="val">'+money0(OPENING_INVESTMENT)+'</div></div>'+
       '<div class="box big"><div class="lab">Remaining Working Capital</div><div class="val">'+money0(remaining)+'</div></div>'+
     '</div>'+
     '<h3 style="font-size:15px;margin:0 0 6px;">One-Time Startup Costs</h3>'+
-    '<div style="font-size:12px;color:#888;margin-bottom:8px;">Click a Projected or Actual amount to edit both · ＋ adds a detail/notes row</div>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:8px;">Click a Projected or Actual amount to edit · ＋ detail/notes · × deletes a row</div>'+
     '<table class="su-table"><thead><tr><th class="lbl">Item</th><th>Projected</th><th>Actual</th><th>Variance</th></tr></thead><tbody>'+
-      rows+
+      (rows||'<tr><td colspan="4" style="text-align:center;color:#bbb;padding:1.5rem;">No startup costs yet.</td></tr>')+
       '<tr class="su-row" style="font-weight:700;"><td class="lbl" style="border-top:2px solid #d8d8d0;">Total (active)</td>'+
         '<td style="border-top:2px solid #d8d8d0;">'+money0(totalProj)+'</td>'+
         '<td style="border-top:2px solid #d8d8d0;">'+money0(totalAct)+'</td>'+
         '<td class="'+(totalVar>0?'over':'')+'" style="border-top:2px solid #d8d8d0;">'+money0(totalVar)+'</td></tr>'+
     '</tbody></table>'+
+    addForm+
     '<div style="font-size:11px;color:#888;margin-top:8px;">Remaining Working Capital = '+money0(OPENING_INVESTMENT)+' − total active startup costs (actual where entered, otherwise projected).</div>';
+}
+async function saveStartupCell(id,field){
+  var inp=g((field==='amount_projected'?'su-proj-':'su-act-')+id);if(!inp)return;
+  var s=startupData.find(function(x){return x.id===id;});if(!s)return;
+  var raw=inp.value.trim();
+  var val=raw===''?(field==='amount_actual'?null:0):num(raw);
+  var cur=s[field];
+  if((val==null&&cur==null)||(val!=null&&cur!=null&&num(cur)===val))return;  // no-op
+  var patch={is_edited:true};patch[field]=val;
+  try {
+    var updated=await patchTable('startup_costs',id,patch);
+    Object.assign(s,updated);
+    renderStartup();
+  } catch(e){ alert('Save failed: '+e.message); }
+}
+function startAddStartup(){suAdd=true;renderStartup();var el=g('su-add-desc');if(el)el.focus();}
+function cancelAddStartup(){suAdd=false;renderStartup();}
+async function saveAddStartup(){
+  var desc=(g('su-add-desc').value||'').trim();if(!desc){alert('Enter a description.');return;}
+  var proj=num(g('su-add-proj').value);
+  var actRaw=(g('su-add-act').value||'').trim();
+  var payload={item_description:desc,category:'One-Time',amount_projected:proj,amount_actual:(actRaw===''?null:num(actRaw)),baseline_amount:proj,is_active:true,is_edited:false};
+  try {
+    var r=await h(SB+'/rest/v1/startup_costs',{method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(payload)});
+    if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
+    var rows=await r.json();if(rows&&rows.length)startupData.push(rows[0]);
+    suAdd=false;renderStartup();showToast('Added "'+desc+'"');
+  } catch(e){ alert('Add failed: '+e.message); }
+}
+async function deleteStartup(id){
+  var s=startupData.find(function(x){return x.id===id;});if(!s)return;
+  if(!confirm('Delete "'+(s.item_description||'this item')+'"? This cannot be undone.'))return;
+  try {
+    var r=await h(SB+'/rest/v1/startup_costs?id=eq.'+id,{method:'DELETE'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    startupData=startupData.filter(function(x){return x.id!==id;});
+    renderStartup();showToast('Deleted "'+(s.item_description||'item')+'"');
+  } catch(e){ alert('Delete failed: '+e.message); }
 }
 function toggleStartupNotes(id){openStartupNotes[id]=!openStartupNotes[id];renderStartup();}
 async function saveStartupNotes(id){
