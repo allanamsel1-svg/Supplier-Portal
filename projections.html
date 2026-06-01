@@ -80,6 +80,37 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .su-input{width:90px;text-align:right;padding:5px 7px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;font-size:12px;}
 .su-row.off td,.su-row.off input{color:#c4c4c4;text-decoration:line-through;}
 .over{color:#a22;font-weight:700;}
+.btn-secondary{background:#f0f0e8;color:#444;}
+/* Fin cell projected/actual + badges + view toggle */
+.fp-cellbtn{width:66px;border:1px solid transparent;background:none;text-align:right;padding:2px 4px;border-radius:4px;cursor:pointer;line-height:1.2;display:inline-block;}
+.fp-cellbtn:hover{border-color:#cfd8f0;background:#fafbff;}
+.fp-cellbtn .pa{display:block;}
+.fp-cellbtn .pp{color:#1a1a2e;font-size:11px;}
+.fp-cellbtn .aa{font-size:9px;}
+.aa-none{color:#bbb;}
+.aa-under{color:#1a7a1a;}
+.aa-over{color:#a22;}
+.fp-badge{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;margin-left:6px;vertical-align:middle;}
+.fp-badge.var{background:#eef2ff;color:#2244cc;cursor:pointer;}
+.fp-badge.ref{background:#ededed;color:#999;}
+.fp-calcicon{font-size:9px;margin-left:3px;}
+.fp-expand{cursor:pointer;border:none;background:#eef2ff;color:#2244cc;border-radius:4px;font-size:10px;font-weight:700;padding:2px 6px;margin-right:6px;font-family:inherit;}
+.fp-viewtoggle{display:inline-flex;border:1px solid #e0e0d8;border-radius:7px;overflow:hidden;margin-left:12px;vertical-align:middle;}
+.fp-viewtoggle button{border:none;background:#fff;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;color:#666;}
+.fp-viewtoggle button.on{background:#2244cc;color:#fff;}
+.pos-panel{background:#fff;border:1px solid #d8d8d0;border-radius:8px;padding:12px;margin:6px 0;}
+.pos-row{display:grid;grid-template-columns:2.2fr 1fr 0.8fr 1fr 30px;gap:8px;align-items:center;font-size:12px;padding:5px 0;border-bottom:0.5px solid #f0f0e8;}
+.pos-row.head{font-size:10px;text-transform:uppercase;color:#888;font-weight:600;border-bottom:1px solid #e0e0d8;}
+.pos-row input{padding:5px 7px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;}
+.pos-x{cursor:pointer;color:#a22;background:none;border:none;font-size:14px;}
+.popover{position:fixed;z-index:300;background:#fff;border:1px solid #c8c8c0;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,0.18);padding:12px;width:210px;display:none;}
+.popover.show{display:block;}
+.popover label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;margin-bottom:3px;}
+.popover .hint{font-size:10px;color:#9a6a00;margin:-4px 0 8px;}
+.popover input{width:100%;box-sizing:border-box;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;margin-bottom:8px;}
+.popover input:disabled{background:#f5f5f0;color:#888;}
+.popover .pf{display:flex;gap:6px;justify-content:flex-end;}
+.su-cellbtn{cursor:pointer;border-bottom:1px dotted #cfd8f0;}
 </style>
 </head>
 <body>
@@ -92,17 +123,24 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 </div>
 
 <div class="ri-tabs">
-  <a href="#" class="ri-tab active" id="tab-skus" onclick="showTab('skus');return false;"><span class="ri-tab-icon">🧾</span> SKUs</a>
+  <a href="#" class="ri-tab active" id="tab-startup" onclick="showTab('startup');return false;"><span class="ri-tab-icon">🏗</span> Startup &amp; Expenses</a>
+  <a href="#" class="ri-tab" id="tab-skus" onclick="showTab('skus');return false;"><span class="ri-tab-icon">🧾</span> SKUs</a>
   <a href="#" class="ri-tab" id="tab-summary" onclick="showTab('summary');return false;"><span class="ri-tab-icon">📈</span> Summary</a>
   <a href="#" class="ri-tab" id="tab-finplan" onclick="showTab('finplan');return false;"><span class="ri-tab-icon">💵</span> Financial Plan</a>
-  <a href="#" class="ri-tab" id="tab-startup" onclick="showTab('startup');return false;"><span class="ri-tab-icon">🏗</span> Startup &amp; Expenses</a>
 </div>
 
 <div class="wrap">
-  <div id="pane-skus" class="tabpane active"><div class="empty">Loading…</div></div>
+  <div id="pane-startup" class="tabpane active"><div class="empty">Loading…</div></div>
+  <div id="pane-skus" class="tabpane"><div class="empty">Loading…</div></div>
   <div id="pane-summary" class="tabpane"><div class="empty">Loading…</div></div>
   <div id="pane-finplan" class="tabpane"><div class="empty">Loading…</div></div>
-  <div id="pane-startup" class="tabpane"><div class="empty">Loading…</div></div>
+</div>
+
+<div class="popover" id="cell-pop">
+  <label>Projected</label><input type="number" step="any" id="pop-proj" />
+  <div class="hint" id="pop-hint" style="display:none;">calculated — read-only</div>
+  <label>Actual</label><input type="number" step="any" id="pop-act" placeholder="—" />
+  <div class="pf"><button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="closePop()">Cancel</button><button class="btn btn-primary" style="padding:5px 10px;font-size:12px;" onclick="savePop()">Save</button></div>
 </div>
 
 <script>
@@ -264,12 +302,8 @@ async function saveSku(id){
     var updated=await patchSku(id,draft);
     var idx=skus.findIndex(function(x){return x.id===id;});
     if(idx>=0)skus[idx]=updated;          // adopt authoritative generated values from DB
-    var fresh=skus[idx];
-    var setTxt=function(el,txt,cls){if(!el)return;el.textContent=txt;if(cls)el.className='num '+cls;};
-    setTxt(g('cell-elc-'+id),money(fresh.elc));
-    setTxt(g('cell-cm-'+id),pct(fresh.customer_margin),marginClass(num(fresh.customer_margin)));
-    setTxt(g('cell-tm-'+id),pct(fresh.tbg_margin),marginClass(num(fresh.tbg_margin)));
-    var ok=g('saved-'+id);if(ok){ok.style.display='inline';setTimeout(function(){ok.style.display='none';},1500);}
+    // Collapse the edit panel back to the summary row after a successful save.
+    renderSkus();
     renderSummary();
   } catch(e){ alert('Save failed: '+e.message); }
 }
@@ -323,8 +357,13 @@ function renderSummary(){
 }
 
 // ─── FINANCIAL PLAN TAB ───
-var finData=[], finModel=null;
+var finData=[], finModel=null, positionsData=[];
+var finView='projected';                 // projected | actual | variance
 var CAT_ORDER=['Revenue','Operating Expense'];
+var REF_REVENUE=['Gross Sales','Closeout Discount','Trade Allowances'];  // shown for ref, NOT in Total Revenue
+var SALARY_LINES=['Payroll','Contract Labor (Fractional CFO / Controller)'];
+var openSalaryPanels={};
+var MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
 
 async function loadFinPlan(){
   try {
@@ -332,32 +371,97 @@ async function loadFinPlan(){
     if(!r.ok){g('pane-finplan').innerHTML='<div class="empty">Failed to load ('+r.status+').</div>';return;}
     finData=await r.json();
   } catch(e){ g('pane-finplan').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
+  await loadPositionsData();
   renderFinPlan();
+}
+async function loadPositionsData(){
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan_positions?plan_year=eq.1&select=*&order=created_at.asc');
+    if(r.ok)positionsData=await r.json();
+  } catch(e){ positionsData=[]; }
 }
 
 function buildFinModel(){
   var byLine={}, order=[];
   finData.forEach(function(row){
     var L=byLine[row.line_item];
-    if(!L){L=byLine[row.line_item]={line_item:row.line_item,category:row.category,cells:{},edited:false,active:true};order.push(row.line_item);}
+    if(!L){L=byLine[row.line_item]={line_item:row.line_item,category:row.category,cells:{},edited:false,active:true,sales_rate:null};order.push(row.line_item);}
     L.cells[row.month_number]=row;
     if(row.is_edited)L.edited=true;
     if(row.is_active===false)L.active=false;
+    if(row.sales_rate!=null)L.sales_rate=num(row.sales_rate);
   });
   return {byLine:byLine,order:order};
 }
-function lineYearTotal(L){var s=0;for(var m=1;m<=12;m++){var c=L.cells[m];if(c)s+=num(c.amount_projected);}return s;}
-function catMonthTotal(model,cat,m){var s=0;model.order.forEach(function(ln){var L=model.byLine[ln];if(L.category===cat&&L.active){var c=L.cells[m];if(c)s+=num(c.amount_projected);}});return s;}
 
+// ── value helpers (projected can be calculated: variable rate or salary positions) ──
+function grossForMonth(m){var row=finData.find(function(r){return r.line_item==='Gross Sales'&&r.month_number===m;});return row?num(row.amount_projected):0;}
+function positionsByLine(line){return positionsData.filter(function(p){return p.line_item===line;});}
+function hasPositions(line){return positionsByLine(line).length>0;}
+function salaryLineMonthly(line,m){var s=0;positionsByLine(line).forEach(function(p){if(p.is_active!==false&&num(p.start_month)<=m)s+=num(p.annual_salary)/12;});return s;}
+function projectedForRow(row){
+  if(row.sales_rate!=null)return Math.round(num(row.sales_rate)*grossForMonth(row.month_number));
+  if(SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item))return salaryLineMonthly(row.line_item,row.month_number);
+  return num(row.amount_projected);
+}
+function isCalcRow(row){return row.sales_rate!=null||(SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item));}
+function actualForRow(row){return row.amount_actual!=null?num(row.amount_actual):null;}
+function effVal(row,view){
+  var p=projectedForRow(row), a=actualForRow(row);
+  if(view==='actual')return a!=null?a:p;
+  if(view==='variance')return (a!=null?a:p)-p;
+  return p;
+}
+function lineYearTotal(L){var s=0;MONTHS.forEach(function(m){var c=L.cells[m];if(c)s+=effVal(c,finView);});return s;}
+function catMonthTotal(model,cat,m){
+  var s=0;
+  model.order.forEach(function(ln){
+    var L=model.byLine[ln];
+    if(L.category!==cat||!L.active)return;
+    if(cat==='Revenue'&&REF_REVENUE.indexOf(ln)!==-1)return;  // ref lines excluded from Total Revenue
+    var c=L.cells[m];if(c)s+=effVal(c,finView);
+  });
+  return s;
+}
+
+function setFinView(v){finView=v;renderFinPlan();}
+function cellInner(c){
+  var p=projectedForRow(c), a=actualForRow(c), calc=isCalcRow(c);
+  if(finView==='variance'){
+    var v=a!=null?a-p:null, cls=v==null?'aa-none':(v>0?'aa-over':'aa-under');
+    return '<span class="pa pp '+cls+'">'+(v!=null?money0(v):'—')+'</span>';
+  }
+  if(finView==='actual'){
+    return '<span class="pa pp">'+(a!=null?money0(a):'<span class="aa-none">—</span>')+'</span><span class="pa aa aa-none">'+money0(p)+'</span>';
+  }
+  var acls=a==null?'aa-none':(a<=p?'aa-under':'aa-over');
+  return '<span class="pa pp">'+money0(p)+(calc?'<span class="fp-calcicon" title="calculated">🧮</span>':'')+'</span><span class="pa aa '+acls+'">'+(a!=null?money0(a):'—')+'</span>';
+}
+function salaryPanelHtml(line,idx){
+  var poss=positionsByLine(line);
+  var rows=poss.map(function(p){
+    return '<div class="pos-row"><div>'+esc(p.position_title||'—')+'</div><div style="text-align:right;">'+money0(p.annual_salary)+'/yr</div><div style="text-align:center;">M'+num(p.start_month)+'</div><div style="text-align:right;">'+money0(num(p.annual_salary)/12)+'/mo</div><button class="pos-x" title="Remove" onclick="removePosition(\''+p.id+'\','+idx+')">×</button></div>';
+  }).join('');
+  return '<div class="pos-panel">'+
+    '<div style="font-weight:700;font-size:12px;margin-bottom:6px;">'+esc(line)+' — Positions</div>'+
+    '<div class="pos-row head"><div>Position</div><div style="text-align:right;">Annual</div><div style="text-align:center;">Start</div><div style="text-align:right;">Monthly</div><div></div></div>'+
+    (rows||'<div style="font-size:12px;color:#888;padding:6px 0;">No positions yet — the line uses its entered monthly values until you add one.</div>')+
+    '<div class="pos-row" style="border-bottom:none;margin-top:6px;">'+
+      '<input id="pos-title-'+idx+'" placeholder="Position title" />'+
+      '<input id="pos-salary-'+idx+'" type="number" step="any" placeholder="Annual $" style="text-align:right;" />'+
+      '<input id="pos-start-'+idx+'" type="number" min="1" max="12" placeholder="Start M" style="text-align:center;" />'+
+      '<div style="text-align:right;color:#888;font-size:11px;">auto</div>'+
+      '<button class="fp-expand" onclick="addPosition('+idx+')">Add</button>'+
+    '</div></div>';
+}
 function renderFinPlan(){
   if(finData.length===0){g('pane-finplan').innerHTML='<div class="empty">No financial plan rows.</div>';return;}
   finModel=buildFinModel();
   var cats=[];
   CAT_ORDER.forEach(function(c){if(finModel.order.some(function(ln){return finModel.byLine[ln].category===c;}))cats.push(c);});
   finModel.order.forEach(function(ln){var c=finModel.byLine[ln].category;if(cats.indexOf(c)===-1)cats.push(c);});
-  var months=[1,2,3,4,5,6,7,8,9,10,11,12];
 
-  var head='<tr><th class="lbl">Line Item</th>'+months.map(function(m){return '<th>M'+m+'</th>';}).join('')+'<th>Year</th></tr>';
+  var head='<tr><th class="lbl">Line Item</th>'+MONTHS.map(function(m){return '<th>M'+m+'</th>';}).join('')+'<th>Year</th></tr>';
   var body='';
   cats.forEach(function(cat){
     body+='<tr><td class="fp-cat" colspan="14">'+esc(cat)+'</td></tr>';
@@ -365,36 +469,34 @@ function renderFinPlan(){
       var L=finModel.byLine[ln];
       if(L.category!==cat)return;
       var idx=finModel.order.indexOf(ln);
-      body+='<tr class="fp-row'+(L.active?'':' off')+'">'+
-        '<td class="lbl"><button class="fp-toggle" onclick="toggleFinLine('+idx+')">'+(L.active?'On':'Off')+'</button>'+esc(ln)+(L.edited?'<span class="fp-dot" title="edited"></span>':'')+'</td>'+
-        months.map(function(m){
+      var isSalary=SALARY_LINES.indexOf(ln)!==-1;
+      var badge='';
+      if(L.sales_rate!=null){var pctTxt=(L.sales_rate*100).toFixed((L.sales_rate*100)%1?1:0);badge='<span class="fp-badge var" title="Edit % of Gross Sales" onclick="editRate('+idx+')">'+pctTxt+'% sales</span>';}
+      else if(REF_REVENUE.indexOf(ln)!==-1)badge='<span class="fp-badge ref" title="Reference only — excluded from Total Revenue">ref</span>';
+      var lbl='<td class="lbl"><button class="fp-toggle" onclick="toggleFinLine('+idx+')">'+(L.active?'On':'Off')+'</button>'+
+        (isSalary?'<button class="fp-expand" title="Positions" onclick="toggleSalaryPanel('+idx+')">'+(openSalaryPanels[ln]?'▾':'＋')+'</button>':'')+
+        esc(ln)+badge+(L.edited?'<span class="fp-dot" title="edited"></span>':'')+'</td>';
+      body+='<tr class="fp-row'+(L.active?'':' off')+'">'+lbl+
+        MONTHS.map(function(m){
           var c=L.cells[m];
           if(!c)return '<td></td>';
-          return '<td><input class="fp-cell" id="fp-'+c.id+'" value="'+num(c.amount_projected)+'"'+(L.active?'':' disabled')+' onchange="saveFinCell(\''+c.id+'\')" /></td>';
+          return '<td><span class="fp-cellbtn" onclick="openCell(\'financial_plan\',\''+c.id+'\',event)">'+cellInner(c)+'</span></td>';
         }).join('')+
         '<td class="fp-total">'+money0(lineYearTotal(L))+'</td>'+
       '</tr>';
+      if(isSalary&&openSalaryPanels[ln])body+='<tr><td colspan="14" style="background:#f7f7f2;text-align:left;">'+salaryPanelHtml(ln,idx)+'</td></tr>';
     });
   });
   function sumRow(label,fn){
-    return '<tr class="fp-sumrow"><td class="lbl">'+label+'</td>'+months.map(function(m){return '<td>'+money0(fn(m))+'</td>';}).join('')+'<td>'+money0(months.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
+    return '<tr class="fp-sumrow"><td class="lbl">'+label+'</td>'+MONTHS.map(function(m){return '<td>'+money0(fn(m))+'</td>';}).join('')+'<td>'+money0(MONTHS.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
   }
   body+=sumRow('Total Revenue',function(m){return catMonthTotal(finModel,'Revenue',m);});
   body+=sumRow('Total Expenses',function(m){return catMonthTotal(finModel,'Operating Expense',m);});
   body+=sumRow('Net Cash Flow',function(m){return catMonthTotal(finModel,'Revenue',m)-catMonthTotal(finModel,'Operating Expense',m);});
 
-  g('pane-finplan').innerHTML='<div style="font-size:12px;color:#888;margin-bottom:8px;">Year 1 monthly P&amp;L · click any cell to edit · toggle a line Off to exclude it from totals</div>'+
+  var toggle='<span class="fp-viewtoggle">'+['projected','actual','variance'].map(function(v){return '<button class="'+(finView===v?'on':'')+'" onclick="setFinView(\''+v+'\')">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>';}).join('')+'</span>';
+  g('pane-finplan').innerHTML='<div style="font-size:12px;color:#888;margin-bottom:8px;">Year 1 monthly P&amp;L · click a cell to edit Projected/Actual · only Net Realized Sales feeds Total Revenue · Show: '+toggle+'</div>'+
     '<div class="fp-wrap"><table class="fp-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
-}
-
-async function saveFinCell(rowId){
-  var inp=g('fp-'+rowId);if(!inp)return;
-  var row=finData.find(function(r){return r.id===rowId;});if(!row)return;
-  try {
-    var updated=await patchTable('financial_plan',rowId,{amount_projected:num(inp.value),is_edited:true});
-    Object.assign(row,updated);
-    renderFinPlan();
-  } catch(e){ alert('Save failed: '+e.message); }
 }
 
 async function toggleFinLine(idx){
@@ -412,6 +514,111 @@ async function toggleFinLine(idx){
   } catch(e){ alert('Toggle failed: '+e.message); }
 }
 
+// Variable rows: edit the % of Gross Sales (PATCHes all 12 months of the line).
+async function editRate(idx){
+  if(!finModel)return;
+  var line=finModel.order[idx];if(line==null)return;
+  var cur=finModel.byLine[line].sales_rate;
+  var input=prompt('Set '+line+' as % of Gross Sales (e.g. 6 for 6%):',(num(cur)*100));
+  if(input==null)return;
+  var rate=num(input)/100;
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.1&line_item=eq.'+encodeURIComponent(line),{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sales_rate:rate,is_edited:true})
+    });
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    finData.forEach(function(row){if(row.line_item===line){row.sales_rate=rate;row.is_edited=true;}});
+    renderFinPlan();
+  } catch(e){ alert('Rate save failed: '+e.message); }
+}
+
+// ── Salary positions ──
+function toggleSalaryPanel(idx){
+  if(!finModel)return;
+  var line=finModel.order[idx];if(line==null)return;
+  openSalaryPanels[line]=!openSalaryPanels[line];
+  renderFinPlan();
+}
+async function recomputeSalary(line){
+  for(var m=1;m<=12;m++){
+    var val=salaryLineMonthly(line,m);
+    var row=finData.find(function(r){return r.line_item===line&&r.month_number===m;});
+    if(!row)continue;
+    try { var u=await patchTable('financial_plan',row.id,{amount_projected:val,is_edited:true}); Object.assign(row,u); } catch(e){}
+  }
+}
+async function addPosition(idx){
+  if(!finModel)return;
+  var line=finModel.order[idx];if(line==null)return;
+  var t=g('pos-title-'+idx),s=g('pos-salary-'+idx),sm=g('pos-start-'+idx);
+  var title=(t&&t.value||'').trim();
+  if(!title){alert('Enter a position title.');return;}
+  var sal=s?num(s.value):0;
+  var start=Math.max(1,Math.min(12,parseInt((sm&&sm.value)||'1',10)||1));
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan_positions',{
+      method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({plan_year:1,line_item:line,position_title:title,annual_salary:sal,start_month:start,is_active:true})
+    });
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await loadPositionsData();
+    await recomputeSalary(line);
+    renderFinPlan();
+  } catch(e){ alert('Add position failed: '+e.message); }
+}
+async function removePosition(posId,idx){
+  var line=finModel?finModel.order[idx]:null;
+  try {
+    var r=await h(SB+'/rest/v1/financial_plan_positions?id=eq.'+posId,{method:'DELETE'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await loadPositionsData();
+    if(line)await recomputeSalary(line);
+    renderFinPlan();
+  } catch(e){ alert('Remove position failed: '+e.message); }
+}
+
+// ── Shared Projected/Actual popover (financial_plan + startup_costs) ──
+var currentPop=null;
+function openCell(table,id,ev){
+  ev.stopPropagation();
+  var row,proj,act,calc=false;
+  if(table==='financial_plan'){
+    row=finData.find(function(r){return r.id===id;});if(!row)return;
+    proj=projectedForRow(row);act=actualForRow(row);calc=isCalcRow(row);
+  } else {
+    row=startupData.find(function(r){return r.id===id;});if(!row)return;
+    proj=num(row.amount_projected);act=row.amount_actual!=null?num(row.amount_actual):null;
+  }
+  currentPop={table:table,id:id,calc:calc};
+  var pj=g('pop-proj'), ac=g('pop-act');
+  pj.value=proj; pj.disabled=calc;
+  g('pop-hint').style.display=calc?'block':'none';
+  ac.value=act!=null?act:'';
+  var pop=g('cell-pop');pop.classList.add('show');
+  var x=Math.min(ev.clientX, window.innerWidth-225), y=Math.min(ev.clientY+8, window.innerHeight-180);
+  pop.style.left=Math.max(8,x)+'px'; pop.style.top=Math.max(8,y)+'px';
+  setTimeout(function(){(calc?ac:pj).focus();},0);
+}
+function closePop(){var p=g('cell-pop');if(p)p.classList.remove('show');currentPop=null;}
+async function savePop(){
+  if(!currentPop)return;
+  var pj=g('pop-proj'), ac=g('pop-act');
+  var actVal=ac.value.trim()===''?null:num(ac.value);
+  var patch={amount_actual:actVal,is_edited:true};
+  if(!currentPop.calc)patch.amount_projected=num(pj.value);
+  try {
+    var updated=await patchTable(currentPop.table,currentPop.id,patch);
+    if(currentPop.table==='financial_plan'){
+      var row=finData.find(function(r){return r.id===currentPop.id;});if(row)Object.assign(row,updated);
+      closePop();renderFinPlan();
+    } else {
+      var s=startupData.find(function(r){return r.id===currentPop.id;});if(s)Object.assign(s,updated);
+      closePop();renderStartup();
+    }
+  } catch(e){ alert('Save failed: '+e.message); }
+}
+
 // ─── STARTUP & EXPENSES TAB ───
 var OPENING_INVESTMENT=2000000;
 var startupData=[];
@@ -425,6 +632,7 @@ async function loadStartup(){
   renderStartup();
 }
 
+var openStartupNotes={};
 function renderStartup(){
   if(startupData.length===0){g('pane-startup').innerHTML='<div class="empty">No startup costs.</div>';return;}
   var totalProj=0,totalAct=0,activeCost=0;
@@ -441,12 +649,21 @@ function renderStartup(){
     var off=s.is_active===false;
     var hasAct=s.amount_actual!=null;
     var variance=hasAct?(num(s.amount_actual)-num(s.amount_projected)):null;
-    return '<tr class="su-row'+(off?' off':'')+'">'+
-      '<td class="lbl"><button class="fp-toggle" onclick="toggleStartup(\''+s.id+'\')">'+(off?'Off':'On')+'</button>'+esc(s.item_description||'—')+(s.is_edited?'<span class="fp-dot" title="edited"></span>':'')+'</td>'+
-      '<td><input class="su-input" id="su-amount_projected-'+s.id+'" value="'+(s.amount_projected!=null?num(s.amount_projected):'')+'" onchange="saveStartupField(\''+s.id+'\',\'amount_projected\')" /></td>'+
-      '<td><input class="su-input" id="su-amount_actual-'+s.id+'" value="'+(hasAct?num(s.amount_actual):'')+'" placeholder="—" onchange="saveStartupField(\''+s.id+'\',\'amount_actual\')" /></td>'+
+    var main='<tr class="su-row'+(off?' off':'')+'">'+
+      '<td class="lbl"><button class="fp-toggle" onclick="toggleStartup(\''+s.id+'\')">'+(off?'Off':'On')+'</button>'+
+        '<button class="fp-expand" title="Add detail / notes" onclick="toggleStartupNotes(\''+s.id+'\')">'+(openStartupNotes[s.id]?'▾':'＋')+'</button>'+
+        esc(s.item_description||'—')+(s.is_edited?'<span class="fp-dot" title="edited"></span>':'')+'</td>'+
+      '<td><span class="su-cellbtn" onclick="openCell(\'startup_costs\',\''+s.id+'\',event)">'+money0(s.amount_projected)+'</span></td>'+
+      '<td><span class="su-cellbtn" onclick="openCell(\'startup_costs\',\''+s.id+'\',event)">'+(hasAct?money0(s.amount_actual):'<span class="aa-none">—</span>')+'</span></td>'+
       '<td class="'+(variance!=null&&variance>0?'over':'')+'">'+(variance!=null?money0(variance):'—')+'</td>'+
     '</tr>';
+    if(openStartupNotes[s.id]){
+      main+='<tr><td colspan="4" style="text-align:left;background:#f7f7f2;">'+
+        '<div style="padding:8px 4px;"><label style="font-size:10px;text-transform:uppercase;color:#888;font-weight:600;display:block;margin-bottom:4px;">Detail / receipts / notes</label>'+
+        '<textarea id="su-notes-'+s.id+'" onblur="saveStartupNotes(\''+s.id+'\')" placeholder="e.g. paid via AmEx, invoice #1234, vendor name" style="width:100%;box-sizing:border-box;min-height:46px;padding:7px 9px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;resize:vertical;">'+esc(s.notes||'')+'</textarea>'+
+        ' <span id="su-notes-ok-'+s.id+'" style="display:none;font-size:11px;color:#1a7a1a;font-weight:600;">✓ saved</span></div></td></tr>';
+    }
+    return main;
   }).join('');
 
   g('pane-startup').innerHTML=
@@ -454,7 +671,8 @@ function renderStartup(){
       '<div class="box"><div class="lab">Opening Investment</div><div class="val">'+money0(OPENING_INVESTMENT)+'</div></div>'+
       '<div class="box big"><div class="lab">Remaining Working Capital</div><div class="val">'+money0(remaining)+'</div></div>'+
     '</div>'+
-    '<h3 style="font-size:15px;margin:0 0 10px;">One-Time Startup Costs</h3>'+
+    '<h3 style="font-size:15px;margin:0 0 6px;">One-Time Startup Costs</h3>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:8px;">Click a Projected or Actual amount to edit both · ＋ adds a detail/notes row</div>'+
     '<table class="su-table"><thead><tr><th class="lbl">Item</th><th>Projected</th><th>Actual</th><th>Variance</th></tr></thead><tbody>'+
       rows+
       '<tr class="su-row" style="font-weight:700;"><td class="lbl" style="border-top:2px solid #d8d8d0;">Total (active)</td>'+
@@ -464,17 +682,15 @@ function renderStartup(){
     '</tbody></table>'+
     '<div style="font-size:11px;color:#888;margin-top:8px;">Remaining Working Capital = '+money0(OPENING_INVESTMENT)+' − total active startup costs (actual where entered, otherwise projected).</div>';
 }
-
-async function saveStartupField(id,field){
-  var inp=g('su-'+field+'-'+id);if(!inp)return;
-  var val=inp.value.trim()===''?null:num(inp.value);
+function toggleStartupNotes(id){openStartupNotes[id]=!openStartupNotes[id];renderStartup();}
+async function saveStartupNotes(id){
+  var ta=g('su-notes-'+id);if(!ta)return;
   var s=startupData.find(function(x){return x.id===id;});if(!s)return;
-  var patch={is_edited:true};patch[field]=val;
   try {
-    var updated=await patchTable('startup_costs',id,patch);
+    var updated=await patchTable('startup_costs',id,{notes:ta.value.trim()||null,is_edited:true});
     Object.assign(s,updated);
-    renderStartup();
-  } catch(e){ alert('Save failed: '+e.message); }
+    var ok=g('su-notes-ok-'+id);if(ok){ok.style.display='inline';setTimeout(function(){ok.style.display='none';},1500);}
+  } catch(e){ alert('Notes save failed: '+e.message); }
 }
 
 async function toggleStartup(id){
