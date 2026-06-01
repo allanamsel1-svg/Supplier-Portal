@@ -1734,7 +1734,7 @@ async function loadPriceChanges(id){
   oids=oids.filter(function(v,i,a){return v&&a.indexOf(v)===i;});
   if(oids.length){
     try {
-      var or=await h(SB+'/rest/v1/shop_out_observations?id=in.('+oids.join(',')+')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id');
+      var or=await h(SB+'/rest/v1/shop_out_observations?id=in.('+oids.join(',')+')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id,sku_match_method,is_category_gap');
       if(or.ok)(await or.json()).forEach(function(o){obsMap[o.id]=o;});
     } catch(e){}
   }
@@ -1770,23 +1770,21 @@ async function loadPriceChanges(id){
       ? '<span style="color:#888;">Unit:</span> '+(oldU!=null?esc(unitPriceTxt(oldU,prev.normalized_unit||nu)):'—')+' → <strong>'+(newU!=null?esc(unitPriceTxt(newU,nu)):'—')+'</strong>'
       : '';
 
-    // TBG comparison.
+    // TBG comparison — ONLY for a confirmed, valid, same-category match.
+    // If the current observation is a category gap, has no projection_sku_id, or
+    // no sku_match_method, show NO TBG reference of any kind (no line, no note).
     var tbgLine='', ctxLine='';
-    var sku=curr.projection_sku_id?skuMap[curr.projection_sku_id]:null;
+    var validMatch = !!(curr.projection_sku_id && curr.sku_match_method && !curr.is_category_gap);
+    var sku=validMatch?skuMap[curr.projection_sku_id]:null;
     var tbg=sku?tbgUnitPrice(sku):null;
-    if(tbg&&newU!=null){
-      var sameUnit=(tbg.unit===nu);
+    if(validMatch&&tbg&&newU!=null&&tbg.unit===nu){
       var better=newU>tbg.price;  // competitor more expensive per unit → TBG better value
       var tcol=better?'#1a7a1a':'#a22';
       tbgLine='<span style="color:#888;">vs TBG '+esc(sku.item_description||'')+':</span> <strong style="color:'+tcol+';">'+esc(unitPriceTxt(tbg.price,tbg.unit))+'</strong>';
-      if(sameUnit){
-        var verdict=better?'TBG is better value':'Competitor is better value';
-        ctxLine='<div style="font-size:11px;color:'+tcol+';margin-top:2px;font-weight:600;">'+
-          esc((p.brand||'')+' '+(p.product_name||'')+' '+packStr(curr.pack_size!=null?curr:{pack_size:p.pack_size,pack_size_unit:p.pack_size_unit}))+
-          ' at '+esc(unitPriceTxt(newU,nu))+' vs TBG '+esc(sku.item_description||'')+' '+esc(sku.size_unit||'')+' at '+esc(unitPriceTxt(tbg.price,tbg.unit))+' — '+verdict+'</div>';
-      } else {
-        tbgLine+=' <span style="color:#bbb;">(diff unit)</span>';
-      }
+      var verdict=better?'TBG is better value':'Competitor is better value';
+      ctxLine='<div style="font-size:11px;color:'+tcol+';margin-top:2px;font-weight:600;">'+
+        esc((p.brand||'')+' '+(p.product_name||'')+' '+packStr(curr.pack_size!=null?curr:{pack_size:p.pack_size,pack_size_unit:p.pack_size_unit}))+
+        ' at '+esc(unitPriceTxt(newU,nu))+' vs TBG '+esc(sku.item_description||'')+' '+esc(sku.size_unit||'')+' at '+esc(unitPriceTxt(tbg.price,tbg.unit))+' — '+verdict+'</div>';
     }
 
     var detailLine='<div style="font-size:11px;color:#555;margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;">'+
