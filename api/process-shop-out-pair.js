@@ -15,7 +15,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
 import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
-import { buildPriceChangeRow } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey } from '../lib/price-change.mjs';
 
 const PLACEMENT_TYPES = ['main_floor', 'clearance', 'checkout_register', 'end_cap', 'display'];
 
@@ -291,20 +291,21 @@ function ilikeQuoted(s) {
 }
 
 // Find the most recent prior sighting of the same brand+product at the same
-// retailer (shop_outs.store_location_text) on an earlier shop_date; if the price
-// moved >5%, insert a flagged shop_out_price_history row.
+// retailer (shop_outs.customer_id = same retailer chain) on an earlier
+// shop_date; if the price moved >5%, insert a flagged shop_out_price_history row.
 async function checkPriceChange(newId, obsPayload, norm, shopOutId) {
   const brand = obsPayload.brand, product = obsPayload.product_name, price = numOrNull(obsPayload.retail_price);
   if (!brand || !product || price == null) return;
 
-  // Current shop-out's retailer + date.
-  const soR = await sbFetch(`/rest/v1/shop_outs?id=eq.${shopOutId}&select=shop_date,store_location_text`);
+  // Current shop-out's retailer (customer) + date.
+  const soR = await sbFetch(`/rest/v1/shop_outs?id=eq.${shopOutId}&select=customer_id,shop_date,store_location_text`);
   if (!soR.ok) return;
   const so = (await soR.json())[0];
-  if (!so || !so.store_location_text || !so.shop_date) return;   // no retailer/timeline → cannot compare
+  const custKey = retailerKey(so);
+  if (!so || !custKey || !so.shop_date) return;   // no retailer/timeline → cannot compare
 
-  // Prior shop-outs at the same retailer, earlier date.
-  const psR = await sbFetch(`/rest/v1/shop_outs?select=id,shop_date&store_location_text=ilike.${ilikeQuoted(so.store_location_text)}&shop_date=lt.${so.shop_date}`);
+  // Prior shop-outs for the same retailer chain, earlier date.
+  const psR = await sbFetch(`/rest/v1/shop_outs?select=id,shop_date&customer_id=eq.${custKey}&shop_date=lt.${so.shop_date}`);
   if (!psR.ok) return;
   const priorShops = await psR.json();
   if (!priorShops.length) return;

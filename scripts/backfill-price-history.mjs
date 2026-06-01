@@ -3,11 +3,11 @@
 //
 //   node scripts/backfill-price-history.mjs
 //
-// Groups priced observations by retailer (shop_outs.store_location_text,
-// case-insensitive) + brand + product_name, sorts each group by shop_date, and
-// for each consecutive pair on different dates flags a >5% change. Logs a summary.
+// Groups priced observations by retailer (shop_outs.customer_id = same retailer
+// chain) + brand + product_name, sorts each group by shop_date, and for each
+// consecutive pair on different dates flags a >5% change. Logs a summary.
 
-import { buildPriceChangeRow } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey } from '../lib/price-change.mjs';
 
 const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const KEY = process.env.SUPABASE_KEY
@@ -19,23 +19,24 @@ function h(path, opts = {}) {
 }
 
 // Shop-out retailer + date map.
-const shops = await (await h('/rest/v1/shop_outs?select=id,shop_date,store_location_text')).json();
+const shops = await (await h('/rest/v1/shop_outs?select=id,customer_id,shop_date,store_location_text')).json();
 const shopById = {};
 shops.forEach(s => { shopById[s.id] = s; });
 
 // All priced observations.
 const obs = await (await h('/rest/v1/shop_out_observations?select=id,brand,product_name,retail_price,unit_price,pack_size,pack_size_unit,shop_out_id&retail_price=not.is.null&limit=10000')).json();
 
-// Attach shop date + location; keep only rows with a retailer, date, brand, product.
+// Attach shop customer + date + location; keep only rows with a retailer
+// (customer_id), date, brand, product.
 const recs = obs.map(o => {
   const s = shopById[o.shop_out_id] || {};
-  return { ...o, shop_date: s.shop_date, store_location_text: s.store_location_text };
-}).filter(r => r.store_location_text && r.shop_date && r.brand && r.product_name);
+  return { ...o, customer_id: s.customer_id, shop_date: s.shop_date, store_location_text: s.store_location_text };
+}).filter(r => retailerKey(r) && r.shop_date && r.brand && r.product_name);
 
-// Group by retailer + brand + product (case-insensitive).
+// Group by retailer chain (customer_id) + brand + product (case-insensitive).
 const groups = {};
 recs.forEach(r => {
-  const k = r.store_location_text.toLowerCase().trim() + '|' + r.brand.toLowerCase().trim() + '|' + r.product_name.toLowerCase().trim();
+  const k = retailerKey(r) + '|' + r.brand.toLowerCase().trim() + '|' + r.product_name.toLowerCase().trim();
   (groups[k] = groups[k] || []).push(r);
 });
 
@@ -73,10 +74,10 @@ if (changes.length) {
   else inserted = changes.length;
 }
 
-const distinctRetailers = new Set(recs.map(r => r.store_location_text.toLowerCase().trim()));
+const distinctRetailers = new Set(recs.map(r => retailerKey(r)));
 console.log('\nPrice-history backfill');
 console.log(`  priced observations considered: ${recs.length}`);
-console.log(`  distinct retailers (store_location_text): ${distinctRetailers.size}`);
+console.log(`  distinct retailers (customer_id): ${distinctRetailers.size}`);
 console.log(`  brand×product×retailer groups: ${Object.keys(groups).length}`);
 console.log(`  groups sighted on >1 date (comparable): ${multiSightingGroups}`);
 console.log(`  price changes (>5%) detected & inserted: ${inserted}`);
