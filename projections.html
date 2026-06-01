@@ -508,15 +508,24 @@ var REF_REVENUE=['Gross Sales','Closeout Discount','Trade Allowances'];  // show
 var SALARY_LINES=['Payroll','Contract Labor (Fractional CFO / Controller)'];
 var openSalaryPanels={};
 var MONTHS=[1,2,3,4,5,6,7,8,9,10,11,12];
+var currentYear=1, finMode='year', allFinData=[];
 
 async function loadFinPlan(){
   try {
-    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.1&select=*&order=category.asc,line_item.asc,month_number.asc');
+    var r=await h(SB+'/rest/v1/financial_plan?select=*&order=plan_year.asc,category.asc,line_item.asc,month_number.asc');
     if(!r.ok){g('pane-finplan').innerHTML='<div class="empty">Failed to load ('+r.status+').</div>';return;}
-    finData=await r.json();
+    allFinData=await r.json();
   } catch(e){ g('pane-finplan').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
   await loadPositionsData();
   renderFinPlan();
+}
+function finForYear(y){return allFinData.filter(function(r){return r.plan_year===y;});}
+function setFinYear(y){finMode='year';currentYear=y;renderFinPlan();}
+function setFinMode(m){finMode=m;renderFinPlan();}
+function yearPills(){
+  var pills=[1,2,3,4].map(function(y){return '<button class="'+(finMode==='year'&&currentYear===y?'on':'')+'" onclick="setFinYear('+y+')">Year '+y+'</button>';}).join('');
+  pills+='<button class="'+(finMode==='multi'?'on':'')+'" onclick="setFinMode(\'multi\')">Multi-Year View</button>';
+  return '<span class="fp-viewtoggle">'+pills+'</span>';
 }
 async function loadPositionsData(){
   try {
@@ -555,10 +564,10 @@ function hasPositions(line){return positionsByLine(line).length>0;}
 function salaryLineMonthly(line,m){var s=0;positionsByLine(line).forEach(function(p){if(p.is_active!==false&&num(p.start_month)<=m)s+=num(p.annual_salary)/12;});return s;}
 function projectedForRow(row){
   if(row.sales_rate!=null)return Math.round(num(row.sales_rate)*grossForMonth(row.month_number));
-  if(SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item))return salaryLineMonthly(row.line_item,row.month_number);
+  if(currentYear===1&&SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item))return salaryLineMonthly(row.line_item,row.month_number);
   return num(row.amount_projected);
 }
-function isCalcRow(row){return row.sales_rate!=null||(SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item));}
+function isCalcRow(row){return row.sales_rate!=null||(currentYear===1&&SALARY_LINES.indexOf(row.line_item)!==-1&&hasPositions(row.line_item));}
 function actualForRow(row){return row.amount_actual!=null?num(row.amount_actual):null;}
 function effVal(row,view){
   var p=projectedForRow(row), a=actualForRow(row);
@@ -613,12 +622,44 @@ function virtualRow(label,fn){
     MONTHS.map(function(m){return '<td><span class="pp" style="font-size:11px;">'+money0(fn(m))+'</span></td>';}).join('')+
     '<td class="fp-total">'+money0(MONTHS.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
 }
+function projForRowYear(r,y){
+  if(r.sales_rate!=null)return Math.round(num(r.sales_rate)*grossSalesActive(r.month_number));
+  if(y===1&&SALARY_LINES.indexOf(r.line_item)!==-1&&hasPositions(r.line_item))return salaryLineMonthly(r.line_item,r.month_number);
+  return num(r.amount_projected);
+}
+function annualTotals(y){
+  var rows=finForYear(y), rev=0, opex=0, inv=0;
+  if(y===1){for(var m=1;m<=12;m++){rev+=grossSalesActive(m);inv+=inventoryOutflow(m);}}
+  rows.forEach(function(r){
+    if(r.is_active===false)return;
+    if(r.category==='Operating Expense'){
+      if(r.line_item==='Inventory Purchasing'){inv+=num(r.amount_projected);return;}
+      opex+=projForRowYear(r,y);
+    } else if(r.category==='Revenue' && y!==1 && REF_REVENUE.indexOf(r.line_item)===-1){
+      rev+=num(r.amount_projected);   // Net Realized Sales
+    }
+  });
+  return {rev:rev,opex:opex,inv:inv,net:rev-opex-inv};
+}
+function renderMultiYear(){
+  var years=[1,2,3,4], t=years.map(annualTotals);
+  var head='<tr><th class="lbl">Line Item</th>'+years.map(function(y){return '<th style="text-align:right;">Year '+y+'</th>';}).join('')+'</tr>';
+  function row(label,key){return '<tr><td class="lbl">'+label+'</td>'+years.map(function(y,i){return '<td style="text-align:right;">'+money0(t[i][key])+'</td>';}).join('')+'</tr>';}
+  var body=row('Net Realized Sales','rev')+row('Total Operating Expenses','opex')+row('Inventory Purchasing','inv')+
+    '<tr class="fp-sumrow"><td class="lbl">Net Cash Flow</td>'+years.map(function(y,i){var v=t[i].net;return '<td style="text-align:right;color:'+(v<0?'#a22':'#1a7a1a')+';">'+money0(v)+'</td>';}).join('')+'</tr>';
+  g('pane-finplan').innerHTML='<div style="margin-bottom:8px;">'+yearPills()+'</div>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:8px;">4-year annual totals for investor view · Year 1 revenue &amp; inventory are driven by <strong>active</strong> SKUs; Years 2–4 from the seeded plan.</div>'+
+    '<div class="fp-wrap"><table class="fp-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
+}
 function renderFinPlan(){
+  if(finMode==='multi'){renderMultiYear();return;}
+  finData=finForYear(currentYear);
   finModel=buildFinModel();
-  var cats=CAT_ORDER.slice();   // always show Revenue + Operating Expense (Revenue is computed)
+  var y1=currentYear===1;
+  var cats=CAT_ORDER.slice();
   finModel.order.forEach(function(ln){var c=finModel.byLine[ln].category;if(cats.indexOf(c)===-1)cats.push(c);});
 
-  var head='<tr><th class="lbl">Line Item</th>'+MONTHS.map(function(m){return '<th>M'+m+'</th>';}).join('')+'<th>Year</th></tr>';
+  var head='<tr><th class="lbl">Line Item</th>'+MONTHS.map(function(m){return '<th>M'+m+'</th>';}).join('')+'<th>Year Total</th></tr>';
   var body='';
   cats.forEach(function(cat){
     body+='<tr><td class="fp-cat" colspan="14">'+esc(cat)+'</td></tr>';
@@ -626,7 +667,7 @@ function renderFinPlan(){
       var L=finModel.byLine[ln];
       if(L.category!==cat)return;
       var idx=finModel.order.indexOf(ln);
-      var isSalary=SALARY_LINES.indexOf(ln)!==-1;
+      var isSalary=y1&&SALARY_LINES.indexOf(ln)!==-1;
       var badge='';
       if(L.sales_rate!=null){var pctTxt=(L.sales_rate*100).toFixed((L.sales_rate*100)%1?1:0);badge='<span class="fp-badge var" title="Edit % of Gross Sales" onclick="editRate('+idx+')">'+pctTxt+'% sales</span>';}
       else if(REF_REVENUE.indexOf(ln)!==-1)badge='<span class="fp-badge ref" title="Reference only — excluded from Total Revenue">ref</span>';
@@ -643,20 +684,25 @@ function renderFinPlan(){
       '</tr>';
       if(isSalary&&openSalaryPanels[ln])body+='<tr><td colspan="14" style="background:#f7f7f2;text-align:left;">'+salaryPanelHtml(ln,idx)+'</td></tr>';
     });
-    if(cat==='Revenue')body+=virtualRow('Gross Sales (Active SKUs)',grossSalesActive);
-    if(cat==='Operating Expense')body+=virtualRow('Inventory Purchasing',inventoryOutflow);
+    // Dynamic SKU-driven rows only exist for Year 1.
+    if(y1&&cat==='Revenue')body+=virtualRow('Gross Sales (Active SKUs)',grossSalesActive);
+    if(y1&&cat==='Operating Expense')body+=virtualRow('Inventory Purchasing',inventoryOutflow);
   });
   function sumRow(label,fn){
     return '<tr class="fp-sumrow"><td class="lbl">'+label+'</td>'+MONTHS.map(function(m){return '<td>'+money0(fn(m))+'</td>';}).join('')+'<td>'+money0(MONTHS.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
   }
-  function revMonth(m){return grossSalesActive(m);}
-  function expMonth(m){return catMonthTotal(finModel,'Operating Expense',m)+inventoryOutflow(m);}
+  function revMonth(m){return y1?grossSalesActive(m):catMonthTotal(finModel,'Revenue',m);}
+  function expMonth(m){return catMonthTotal(finModel,'Operating Expense',m)+(y1?inventoryOutflow(m):0);}
   body+=sumRow('Total Revenue',revMonth);
   body+=sumRow('Total Expenses',expMonth);
   body+=sumRow('Net Cash Flow',function(m){return revMonth(m)-expMonth(m);});
 
   var toggle='<span class="fp-viewtoggle">'+['projected','actual','variance'].map(function(v){return '<button class="'+(finView===v?'on':'')+'" onclick="setFinView(\''+v+'\')">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>';}).join('')+'</span>';
-  g('pane-finplan').innerHTML='<div style="font-size:12px;color:#888;margin-bottom:8px;">Year 1 monthly P&amp;L · 🧮 Gross Sales &amp; Inventory Purchasing are driven by <strong>active</strong> SKUs · variable expenses key off Gross Sales · click a cell to edit Projected/Actual · Show: '+toggle+'</div>'+
+  var hint=y1
+    ? 'Year 1 · 🧮 Gross Sales &amp; Inventory Purchasing driven by <strong>active</strong> SKUs; variable expenses key off Gross Sales'
+    : 'Year '+currentYear+' · static plan (Gross Sales/Closeout/Trade are ref-only; Net Realized feeds Total Revenue)';
+  g('pane-finplan').innerHTML='<div style="margin-bottom:8px;">'+yearPills()+'</div>'+
+    '<div style="font-size:12px;color:#888;margin-bottom:8px;">'+hint+' · click a cell to edit Projected/Actual · Show: '+toggle+'</div>'+
     '<div class="fp-wrap"><table class="fp-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
 }
 
@@ -665,12 +711,12 @@ async function toggleFinLine(idx){
   var line=finModel.order[idx];if(line==null)return;
   var newActive=!finModel.byLine[line].active;
   try {
-    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.1&line_item=eq.'+encodeURIComponent(line),{
+    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.'+currentYear+'&line_item=eq.'+encodeURIComponent(line),{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({is_active:newActive})
     });
     if(!r.ok)throw new Error('HTTP '+r.status);
-    finData.forEach(function(row){if(row.line_item===line)row.is_active=newActive;});
+    allFinData.forEach(function(row){if(row.line_item===line&&row.plan_year===currentYear)row.is_active=newActive;});
     renderFinPlan();
   } catch(e){ alert('Toggle failed: '+e.message); }
 }
@@ -684,12 +730,12 @@ async function editRate(idx){
   if(input==null)return;
   var rate=num(input)/100;
   try {
-    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.1&line_item=eq.'+encodeURIComponent(line),{
+    var r=await h(SB+'/rest/v1/financial_plan?plan_year=eq.'+currentYear+'&line_item=eq.'+encodeURIComponent(line),{
       method:'PATCH',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sales_rate:rate,is_edited:true})
     });
     if(!r.ok)throw new Error('HTTP '+r.status);
-    finData.forEach(function(row){if(row.line_item===line){row.sales_rate=rate;row.is_edited=true;}});
+    allFinData.forEach(function(row){if(row.line_item===line&&row.plan_year===currentYear){row.sales_rate=rate;row.is_edited=true;}});
     renderFinPlan();
   } catch(e){ alert('Rate save failed: '+e.message); }
 }
