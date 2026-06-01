@@ -1416,25 +1416,34 @@ async function loadPriceChanges(id){
     rows=await r.json();
   } catch(e){ pc.innerHTML=''; return; }
   if(!rows.length){pc.innerHTML='';return;}
+  var reviewN=rows.filter(function(p){return p.needs_review;}).length;
   var body=rows.map(function(p){
-    var up=Number(p.price_change_pct)>=0;
-    var col=up?'#1a7a1a':'#a22';
-    var arrow=up?'▲':'▼';
+    var pct=Number(p.price_change_pct);
+    var changeCell;
+    if(p.needs_review){
+      changeCell='<div style="white-space:nowrap;min-width:74px;text-align:right;">'+
+        '<span style="font-size:10px;font-weight:700;background:#fff4e0;color:#9a6a00;border-radius:8px;padding:2px 7px;">⚠ Needs Review</span>'+
+        '<div style="font-size:10px;color:#9a6a00;margin-top:2px;">'+(pct>=0?'+':'')+pct.toFixed(1)+'%</div></div>';
+    } else {
+      var up=pct>=0, col=up?'#1a7a1a':'#a22', arrow=up?'▲':'▼';
+      changeCell='<div style="font-weight:700;font-size:13px;color:'+col+';white-space:nowrap;min-width:74px;text-align:right;">'+arrow+' '+(up?'+':'')+pct.toFixed(1)+'%</div>';
+    }
     return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
       '<div style="flex:1;min-width:0;">'+
         '<div style="font-weight:700;font-size:13px;">'+esc(p.brand||'—')+'</div>'+
         '<div style="font-size:12px;color:#666;">'+esc(p.product_name||'')+'</div>'+
       '</div>'+
       '<div style="font-size:13px;white-space:nowrap;color:#666;">'+priceCell(p.previous_price)+' → <strong style="color:#1a1a2e;">'+priceCell(p.retail_price)+'</strong></div>'+
-      '<div style="font-weight:700;font-size:13px;color:'+col+';white-space:nowrap;min-width:74px;text-align:right;">'+arrow+' '+(up?'+':'')+Number(p.price_change_pct).toFixed(1)+'%</div>'+
+      changeCell+
       '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
     '</div>';
   }).join('');
   pc.innerHTML='<div class="card" style="border:1.5px solid #b9c8e8;background:#fbfcff;">'+
     '<div class="card-title" style="color:#2244cc;">📈 Price Changes Detected ('+rows.length+')</div>'+
-    '<div style="font-size:11px;color:#888;margin-bottom:8px;">vs the most recent prior sighting of the same item at this retailer. '+
+    '<div style="font-size:11px;color:#888;margin-bottom:8px;">vs the most recent prior sighting of the same item at this retailer (median price per trip). '+
       '<span style="color:#1a7a1a;font-weight:600;">▲ competitor up</span> = good for TBG · '+
-      '<span style="color:#a22;font-weight:600;">▼ competitor down</span> = margin pressure.</div>'+
+      '<span style="color:#a22;font-weight:600;">▼ competitor down</span> = margin pressure'+
+      (reviewN?' · <span style="color:#9a6a00;font-weight:600;">⚠ '+reviewN+' need review</span> (|Δ| &gt; 75%)':'')+'.</div>'+
     body+'</div>';
 }
 

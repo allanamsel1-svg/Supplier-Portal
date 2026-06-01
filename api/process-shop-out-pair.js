@@ -15,7 +15,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
 import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
-import { buildPriceChangeRow, retailerKey, unitSizeComparable } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey, unitSizeComparable, dedupWithinTrip } from '../lib/price-change.mjs';
 
 const PLACEMENT_TYPES = ['main_floor', 'clearance', 'checkout_register', 'end_cap', 'display'];
 
@@ -316,13 +316,15 @@ async function checkPriceChange(newId, obsPayload, norm, shopOutId) {
   // the same item (same normalized_unit + size within 30%).
   const obR = await sbFetch(`/rest/v1/shop_out_observations?select=id,product_name,retail_price,shop_out_id,normalized_unit,normalized_size&shop_out_id=in.(${priorShops.map(p => p.id).join(',')})&brand=ilike.${ilikeQuoted(brand)}&retail_price=not.is.null`);
   if (!obR.ok) return;
-  const cands = (await obR.json()).filter(o =>
+  const rawCands = (await obR.json()).filter(o =>
     (o.product_name || '').toLowerCase().trim() === product.toLowerCase().trim() &&
     unitSizeComparable({ normalized_unit: o.normalized_unit, normalized_size: o.normalized_size }, norm)
   );
-  if (!cands.length) return;
+  if (!rawCands.length) return;
 
-  // Most recent comparable prior by shop_date.
+  // Collapse multiple readings within each prior trip to a median, then take the
+  // most recent prior trip by shop_date.
+  const cands = dedupWithinTrip(rawCands.map(o => ({ ...o, observation_id: o.id })));
   cands.sort((a, b) => (dateById[b.shop_out_id] < dateById[a.shop_out_id] ? -1 : 1));
   const prev = cands[0];
 

@@ -8,7 +8,7 @@
 // shop_date, and pairs each sighting with its most recent prior whose
 // normalized_size is within 30% (same item); flags a >5% change. Logs a summary.
 
-import { buildPriceChangeRow, retailerKey, unitSizeComparable } from '../lib/price-change.mjs';
+import { buildPriceChangeRow, retailerKey, unitSizeComparable, dedupWithinTrip } from '../lib/price-change.mjs';
 
 const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const KEY = process.env.SUPABASE_KEY
@@ -42,12 +42,13 @@ recs.forEach(r => {
   (groups[k] = groups[k] || []).push(r);
 });
 
-// Within each group, pair each sighting with its most recent prior (earlier
-// date) whose normalized_size is within 30% — the same item, not a size variant.
+// Within each group: dedup multiple readings within a single trip to one median
+// record, then pair each trip with its most recent prior (earlier date) whose
+// normalized_size is within 30% — the same item, not a size variant.
 const changes = [];
-let multiSightingGroups = 0;
+let multiSightingGroups = 0, reviewCount = 0;
 for (const k of Object.keys(groups)) {
-  const arr = groups[k].slice().sort((a, b) => (a.shop_date < b.shop_date ? -1 : (a.shop_date > b.shop_date ? 1 : 0)));
+  const arr = dedupWithinTrip(groups[k]).sort((a, b) => (a.shop_date < b.shop_date ? -1 : (a.shop_date > b.shop_date ? 1 : 0)));
   if (new Set(arr.map(r => r.shop_date)).size > 1) multiSightingGroups++;
   for (let i = 0; i < arr.length; i++) {
     const curr = arr[i];
@@ -66,7 +67,7 @@ for (const k of Object.keys(groups)) {
         normalized_unit: curr.normalized_unit, normalized_size: curr.normalized_size
       }
     );
-    if (row) changes.push(row);
+    if (row) { changes.push(row); if (row.needs_review) reviewCount++; }
   }
 }
 
@@ -88,3 +89,5 @@ console.log(`  distinct retailers (customer_id): ${distinctRetailers.size}`);
 console.log(`  brand×product×retailer groups: ${Object.keys(groups).length}`);
 console.log(`  groups sighted on >1 date (comparable): ${multiSightingGroups}`);
 console.log(`  price changes (>5%) detected & inserted: ${inserted}`);
+console.log(`    of which confirmed (|Δ| ≤ 75%):       ${inserted - reviewCount}`);
+console.log(`    of which needs_review (|Δ| > 75%):    ${reviewCount}`);
