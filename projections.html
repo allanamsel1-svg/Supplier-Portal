@@ -149,6 +149,19 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .cat-break{font-size:12px;color:#555;margin:-4px 0 12px;}
 .cat-break b{color:#1a7a1a;}
 .summary-sub{font-size:13px;font-weight:700;color:#1a1a2e;margin:1.25rem 0 0.4rem;}
+/* Gap Analysis */
+.gap-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;}
+.gap-table th,.gap-table td{padding:9px 12px;border-bottom:0.5px solid #f0f0e8;text-align:right;vertical-align:top;}
+.gap-table th{background:#fafaf8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;white-space:nowrap;}
+.gap-table th.lbl,.gap-table td.lbl{text-align:left;}
+.gap-pill{font-size:10px;font-weight:700;padding:2px 9px;border-radius:10px;display:inline-block;text-transform:uppercase;letter-spacing:0.03em;}
+.gap-cov{background:#edfaed;color:#1a7a1a;}
+.gap-part{background:#fff4e0;color:#9a6a00;}
+.gap-none{background:#fdecec;color:#a22;}
+.gap-paths{font-size:11px;color:#888;text-align:left;margin-top:3px;}
+.gap-section-h{font-size:15px;font-weight:700;margin:1.75rem 0 0.6rem;}
+.gap-addbtn{background:#2244cc;color:#fff;border:none;border-radius:6px;padding:4px 11px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.gap-addbtn:hover{background:#3355dd;}
 </style>
 </head>
 <body>
@@ -164,6 +177,7 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
   <a href="#" class="ri-tab active" id="tab-startup" onclick="showTab('startup');return false;"><span class="ri-tab-icon">🏗</span> Startup &amp; Expenses</a>
   <a href="#" class="ri-tab" id="tab-skus" onclick="showTab('skus');return false;"><span class="ri-tab-icon">🧾</span> SKUs</a>
   <a href="#" class="ri-tab" id="tab-summary" onclick="showTab('summary');return false;"><span class="ri-tab-icon">📈</span> Summary</a>
+  <a href="#" class="ri-tab" id="tab-gap" onclick="showTab('gap');return false;"><span class="ri-tab-icon">🎯</span> Gap Analysis</a>
   <a href="#" class="ri-tab" id="tab-finplan" onclick="showTab('finplan');return false;"><span class="ri-tab-icon">💵</span> Financial Plan</a>
 </div>
 
@@ -171,6 +185,7 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
   <div id="pane-startup" class="tabpane active"><div class="empty">Loading…</div></div>
   <div id="pane-skus" class="tabpane"><div class="empty">Loading…</div></div>
   <div id="pane-summary" class="tabpane"><div class="empty">Loading…</div></div>
+  <div id="pane-gap" class="tabpane"><div class="empty">Loading…</div></div>
   <div id="pane-finplan" class="tabpane"><div class="empty">Loading…</div></div>
 </div>
 
@@ -252,9 +267,10 @@ async function load(){
   renderSummary();
   loadFinPlan();
   loadStartup();
+  loadGap();
 }
 
-var TABS=['skus','summary','finplan','startup'];
+var TABS=['skus','summary','gap','finplan','startup'];
 function showTab(t){
   TABS.forEach(function(id){
     var tb=g('tab-'+id), pn=g('pane-'+id);
@@ -506,6 +522,170 @@ function renderSummary(){
     html+='</div>';
   });
   g('pane-summary').innerHTML=html;
+}
+
+// ─── GAP ANALYSIS TAB ───
+// Cross-reference floor sections (shop_out_sections) against active Projections
+// SKUs. Floor category_detected strings are messy free text; SKU taxonomy is
+// clean — so matching is heuristic (alnum-key containment + significant-token
+// overlap, case-insensitive). Covered = a clean sub/sub-sub match; Partial =
+// looser token overlap; Gap = none.
+var sectionsData=[], gapCatList=[];
+var GAP_STOP={care:1,body:1,'with':1,mixed:1,mix:1,multi:1,category:1,categories:1,other:1,assorted:1,products:1,product:1,items:1,item:1,store:1,storefront:1,exterior:1,interior:1,retail:1,price:1,'off':1,clearance:1,health:1,beauty:1,personal:1,'and':1,the:1,'for':1,section:1,aisle:1,endcap:1,wall:1,shelf:1,display:1,misc:1,miscellaneous:1,general:1,various:1,mixed:1};
+function gapKey(s){return String(s==null?'':s).toLowerCase().replace(/[^a-z0-9]/g,'');}
+function gapTokens(s){return String(s==null?'':s).toLowerCase().split(/[^a-z]+/).filter(function(w){return w.length>=4 && !GAP_STOP[w];});}
+// Tier one SKU against a detected category: 'strong' | 'weak' | null.
+function skuTier(s,dKey,dTok){
+  if(dKey.length<4)return null;
+  var best=null;
+  [s.sub_sub_category,s.sub_category].forEach(function(v){
+    if(!v)return;
+    var fKey=gapKey(v), fTok=gapTokens(v);
+    if(fKey && fKey.length>=4 && (dKey.indexOf(fKey)!==-1 || fKey.indexOf(dKey)!==-1)){best='strong';return;}
+    if(fTok.length){
+      var ov=0;fTok.forEach(function(t){if(dTok[t])ov++;});
+      if(ov/fTok.length>=0.5)best='strong';
+      else if(ov>=1 && best!=='strong')best=best||'weak';
+    }
+  });
+  return best;
+}
+function matchCategory(detected,askus){
+  var dKey=gapKey(detected), dTok={};
+  gapTokens(detected).forEach(function(t){dTok[t]=1;});
+  var coveredPaths={}, partialSubs={}, matchedSubs={};
+  askus.forEach(function(s){
+    var tier=skuTier(s,dKey,dTok);
+    if(tier==='strong'){
+      var path=(s.sub_category||'—')+(s.sub_sub_category?(' › '+s.sub_sub_category):'');
+      coveredPaths[path]=1;
+      if(s.sub_category)matchedSubs[s.sub_category]=1;
+    } else if(tier==='weak'){
+      if(s.sub_category){partialSubs[s.sub_category]=1;matchedSubs[s.sub_category]=1;}
+    }
+  });
+  var cov=Object.keys(coveredPaths);
+  return {
+    status: cov.length?'covered':(Object.keys(partialSubs).length?'partial':'gap'),
+    paths: cov.length?cov:Object.keys(partialSubs),
+    matchedSubs: Object.keys(matchedSubs)
+  };
+}
+function gapPathsHtml(paths){
+  if(!paths.length)return '<span style="color:#bbb;">—</span>';
+  var shown=paths.slice(0,4).map(esc).join(', ');
+  if(paths.length>4)shown+=' <span style="color:#aaa;">+'+(paths.length-4)+' more</span>';
+  return shown;
+}
+async function loadGap(){
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_sections?select=shop_out_id,category_detected,category_override,estimated_linear_feet');
+    if(!r.ok){g('pane-gap').innerHTML='<div class="empty">Failed to load sections ('+r.status+').</div>';return;}
+    sectionsData=await r.json();
+  } catch(e){ g('pane-gap').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
+  renderGap();
+}
+function renderGap(){
+  var askus=skus.filter(function(s){return s.status==='active';});
+  if(!sectionsData.length){g('pane-gap').innerHTML='<div class="empty">No shop-out section data yet.</div>';return;}
+
+  // Aggregate floor sections by effective category (override wins).
+  var agg={};
+  sectionsData.forEach(function(sec){
+    var cat=((sec.category_override&&sec.category_override.trim())||sec.category_detected||'Uncategorized').trim();
+    if(!agg[cat])agg[cat]={lf:0,sections:0,shops:{}};
+    agg[cat].lf+=num(sec.estimated_linear_feet);
+    agg[cat].sections++;
+    if(sec.shop_out_id)agg[cat].shops[sec.shop_out_id]=1;
+  });
+
+  var floorMatchedSubs={};
+  var rows=Object.keys(agg).map(function(cat){
+    var m=matchCategory(cat,askus);
+    m.matchedSubs.forEach(function(sc){floorMatchedSubs[sc]=1;});
+    var a=agg[cat];
+    return {cat:cat,lf:a.lf,sections:a.sections,shops:Object.keys(a.shops).length,status:m.status,paths:m.paths};
+  }).sort(function(a,b){return b.lf-a.lf;});
+
+  var PILL={covered:'<span class="gap-pill gap-cov">Covered</span>',partial:'<span class="gap-pill gap-part">Partial</span>',gap:'<span class="gap-pill gap-none">Gap</span>'};
+
+  // ── Section 1: Floor Coverage Table ──
+  var html='<div style="font-size:12px;color:#888;margin-bottom:10px;">Floor categories detected across all shop-outs, cross-referenced against <strong>active</strong> Projections SKUs. Matching is heuristic (fuzzy category text).</div>';
+  html+='<table class="gap-table"><thead><tr>'+
+    '<th class="lbl">Category (detected on floor)</th>'+
+    '<th>Total Lin. Ft</th><th>Sections</th><th>Shop-outs</th>'+
+    '<th class="lbl">Coverage</th><th class="lbl">Matched TBG SKU groups</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html+='<tr>'+
+      '<td class="lbl" style="font-weight:600;color:#1a1a2e;">'+esc(r.cat)+'</td>'+
+      '<td>'+r.lf.toFixed(1)+'</td>'+
+      '<td>'+r.sections+'</td>'+
+      '<td>'+r.shops+'</td>'+
+      '<td class="lbl">'+PILL[r.status]+'</td>'+
+      '<td class="lbl">'+(r.paths.length?'<span style="color:#666;">'+r.paths.length+'</span> · ':'')+'<span class="gap-paths" style="display:inline;">'+gapPathsHtml(r.paths)+'</span></td>'+
+    '</tr>';
+  });
+  html+='</tbody></table>';
+
+  // ── Section 2: Top Gaps by shelf space ──
+  var totalLf=rows.reduce(function(s,r){return s+r.lf;},0);
+  var coveredLf=rows.filter(function(r){return r.status==='covered';}).reduce(function(s,r){return s+r.lf;},0);
+  var partialLf=rows.filter(function(r){return r.status==='partial';}).reduce(function(s,r){return s+r.lf;},0);
+  var gapRows=rows.filter(function(r){return r.status==='gap';}).slice().sort(function(a,b){return b.lf-a.lf;});
+  var pctCov=totalLf>0?coveredLf/totalLf:0;
+  gapCatList=gapRows.map(function(r){return r.cat;});
+
+  html+='<div class="gap-section-h">Top Gaps by Shelf Space</div>';
+  html+='<div class="kpi">'+
+    '<div class="box"><div class="lab">Total Floor Linear Feet</div><div class="val">'+totalLf.toFixed(0)+' ft</div></div>'+
+    '<div class="box big"><div class="lab">% Covered by Projections</div><div class="val">'+(pctCov*100).toFixed(0)+'%</div></div>'+
+    '<div class="box"><div class="lab">Gap Categories</div><div class="val">'+gapRows.length+'</div></div>'+
+  '</div>';
+  html+='<div style="font-size:11px;color:#888;margin:-6px 0 10px;">Covered '+coveredLf.toFixed(0)+' ft · Partial '+partialLf.toFixed(0)+' ft · Gap '+(totalLf-coveredLf-partialLf).toFixed(0)+' ft of '+totalLf.toFixed(0)+' ft total.</div>';
+  if(gapRows.length){
+    html+='<table class="gap-table"><thead><tr><th class="lbl">Gap Category — no active TBG SKU</th><th>Total Lin. Ft</th><th>Sections</th><th>Shop-outs</th><th></th></tr></thead><tbody>';
+    gapRows.forEach(function(r,i){
+      html+='<tr>'+
+        '<td class="lbl" style="font-weight:600;color:#1a1a2e;">'+esc(r.cat)+'</td>'+
+        '<td>'+r.lf.toFixed(1)+'</td>'+
+        '<td>'+r.sections+'</td>'+
+        '<td>'+r.shops+'</td>'+
+        '<td style="text-align:right;"><button class="gap-addbtn" onclick="addGapToProjections('+i+')">+ Add to Projections</button></td>'+
+      '</tr>';
+    });
+    html+='</tbody></table>';
+  } else {
+    html+='<div class="empty" style="padding:1.5rem;">No gaps — every detected floor category maps to an active Projections SKU.</div>';
+  }
+
+  // ── Section 3: SKU Whitespace (active SKU sub-categories with no floor sighting) ──
+  var subAgg={};
+  askus.forEach(function(s){var sc=s.sub_category||'Uncategorized';subAgg[sc]=(subAgg[sc]||0)+1;});
+  var whitespace=Object.keys(subAgg).filter(function(sc){return !floorMatchedSubs[sc];})
+    .map(function(sc){return {sub:sc,count:subAgg[sc]};}).sort(function(a,b){return b.count-a.count;});
+
+  html+='<div class="gap-section-h">SKU Whitespace</div>';
+  html+='<div style="font-size:12px;color:#888;margin-bottom:10px;">Active Projections sub-categories with <strong>no</strong> floor sightings in any shop-out — what we are modeling that the market has not yet validated.</div>';
+  if(whitespace.length){
+    html+='<table class="gap-table"><thead><tr><th class="lbl">TBG Sub-Category (no floor presence)</th><th>Active SKUs</th></tr></thead><tbody>';
+    whitespace.forEach(function(w){
+      html+='<tr><td class="lbl" style="font-weight:600;color:#1a1a2e;">'+esc(w.sub)+'</td><td>'+w.count+'</td></tr>';
+    });
+    html+='</tbody></table>';
+  } else {
+    html+='<div class="empty" style="padding:1.5rem;">Every active sub-category has been sighted on a floor.</div>';
+  }
+
+  g('pane-gap').innerHTML=html;
+}
+function addGapToProjections(i){
+  var cat=gapCatList[i]||'';
+  if(typeof openAddSku!=='function')return;
+  openAddSku();
+  // Seed the category field with a cleaned version of the detected label.
+  var clean=cat.split(/[\(\/—]| - /)[0].trim();
+  var el=g('as-cat');
+  if(el){el.value=clean;if(typeof refreshAddSub==='function')refreshAddSub();}
 }
 
 // ─── FINANCIAL PLAN TAB ───
