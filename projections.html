@@ -111,6 +111,27 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .popover input:disabled{background:#f5f5f0;color:#888;}
 .popover .pf{display:flex;gap:6px;justify-content:flex-end;}
 .su-cellbtn{cursor:pointer;border-bottom:1px dotted #cfd8f0;}
+.b-tabled{background:#fff0e0;color:#9a6a00;}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,0.25);z-index:400;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;}
+.toast.show{opacity:1;}
+.pipeline{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 1rem;align-items:stretch;}
+.pipeline .pbox{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:9px 14px;min-width:110px;}
+.pipeline .pnum{font-size:20px;font-weight:700;}
+.pipeline .plab{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;}
+.pipeline .pbox.act .pnum{color:#1a7a1a;}
+.pipeline .pbox.tab .pnum{color:#9a6a00;}
+.tabled-head{cursor:pointer;font-size:12px;font-weight:600;color:#9a6a00;padding:8px 14px;background:#fff8ef;border-top:1px solid #f0e0c8;}
+.fp-virtual td{background:#eef2ff;}
+.fp-virtual .lbl{font-weight:600;}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:center;justify-content:center;z-index:350;}
+.modal-bg.show{display:flex;}
+.modal{background:#fff;border-radius:12px;width:480px;max-width:94vw;padding:1.25rem;}
+.modal h3{margin:0 0 12px;font-size:16px;}
+.modal .mf{margin-bottom:10px;}
+.modal label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;margin-bottom:3px;}
+.modal input,.modal select{width:100%;box-sizing:border-box;padding:8px 10px;font-size:13px;border:1px solid #e0e0d8;border-radius:7px;font-family:inherit;}
+.modal .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+.addbtn{background:#2244cc;color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
 </style>
 </head>
 <body>
@@ -143,6 +164,24 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
   <div class="pf"><button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="closePop()">Cancel</button><button class="btn btn-primary" style="padding:5px 10px;font-size:12px;" onclick="savePop()">Save</button></div>
 </div>
 
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="addsku-bg">
+  <div class="modal">
+    <h3>Add SKU</h3>
+    <div class="mf"><label>Item description</label><input id="as-desc" placeholder="e.g. Charcoal Face Mask" /></div>
+    <div class="mf"><label>Product line</label><select id="as-line"></select></div>
+    <div class="mf"><label>Size / unit</label><input id="as-size" placeholder="e.g. 100ml" /></div>
+    <div class="mf" style="display:flex;gap:10px;">
+      <div style="flex:1;"><label>Bulk unit cost</label><input id="as-bulk" type="number" step="any" /></div>
+      <div style="flex:1;"><label>Proposed sell</label><input id="as-sell" type="number" step="any" /></div>
+      <div style="flex:1;"><label>Comp retail</label><input id="as-comp" type="number" step="any" /></div>
+    </div>
+    <div style="font-size:11px;color:#888;">Status defaults to proposed · order qty 8000/9000/8000 · 2000 units/mo from month 6 · edit the rest in the full panel later.</div>
+    <div class="mfoot"><button class="btn btn-secondary" onclick="closeAddSku()">Cancel</button><button class="btn btn-primary" onclick="createSku()">Add SKU</button></div>
+  </div>
+</div>
+
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
@@ -169,7 +208,7 @@ async function patchTable(table,id,patch){
 // Editable cost-build fields (mirror the DB generated-column inputs).
 var EDIT_FIELDS=['bulk_unit_cost','packaging','duty_rate','tariff_rate','estimated_freight','wholesale_price','proposed_sell_price','comp_retail_price'];
 var FIELD_LABELS={bulk_unit_cost:'Bulk Unit Cost',packaging:'Packaging',duty_rate:'Duty Rate',tariff_rate:'Tariff Rate',estimated_freight:'Est. Freight',wholesale_price:'Wholesale Price',proposed_sell_price:'Proposed Sell',comp_retail_price:'Comp Retail'};
-var STATUSES=['proposed','active','archived'];
+var STATUSES=['proposed','active','tabled','archived'];
 
 var skus=[];
 
@@ -221,25 +260,53 @@ function rowSummaryCells(s){
     '<div><span class="badge b-'+esc(s.status||'proposed')+'" id="badge-'+s.id+'">'+esc(s.status||'proposed')+'</span></div>';
 }
 
+var tabledOpen={};
 function renderSkus(){
+  if(skus.length===0){g('pane-skus').innerHTML='<div class="empty">No SKUs yet. <button class="addbtn" onclick="openAddSku()">+ Add SKU</button></div>';return;}
+  var act=skus.filter(function(s){return s.status==='active';});
+  var prop=skus.filter(function(s){return s.status==='proposed';});
+  var tab=skus.filter(function(s){return s.status==='tabled';});
+  var openOrder=inventoryOutflow(3);
+  var annualRev=MONTHS.reduce(function(a,m){return a+grossSalesActive(m);},0);
+  var avgTbg=act.length?avg(act.map(calcTbgMargin)):0;
+  var html='<div class="pipeline">'+
+    '<div class="pbox act"><div class="pnum">'+act.length+'</div><div class="plab">Active</div></div>'+
+    '<div class="pbox"><div class="pnum">'+prop.length+'</div><div class="plab">Proposed</div></div>'+
+    '<div class="pbox tab"><div class="pnum">'+tab.length+'</div><div class="plab">Tabled</div></div>'+
+    '<div class="pbox"><div class="pnum">'+money0(openOrder)+'</div><div class="plab">Opening Order Value</div></div>'+
+    '<div class="pbox"><div class="pnum">'+money0(annualRev)+'</div><div class="plab">Proj. Annual Revenue</div></div>'+
+    '<div class="pbox"><div class="pnum '+marginClass(avgTbg)+'">'+pct(avgTbg)+'</div><div class="plab">Avg TBG Margin (active)</div></div>'+
+    '<div style="margin-left:auto;display:flex;align-items:center;"><button class="addbtn" onclick="openAddSku()">+ Add SKU</button></div>'+
+  '</div>';
+
   var groups=groupByLine();
-  if(skus.length===0){g('pane-skus').innerHTML='<div class="empty">No SKUs yet.</div>';return;}
-  var html='';
   Object.keys(groups).sort().forEach(function(line){
-    html+='<div class="group-title">'+esc(line)+' <span style="color:#aaa;font-weight:400;">· '+groups[line].length+' SKUs</span></div>';
+    var all=groups[line];
+    var main=all.filter(function(s){return s.status!=='tabled';});
+    var tabled=all.filter(function(s){return s.status==='tabled';});
+    html+='<div class="group-title">'+esc(line)+' <span style="color:#aaa;font-weight:400;">· '+main.length+' SKUs'+(tabled.length?' · '+tabled.length+' tabled':'')+'</span></div>';
     html+='<div class="sku-table">'+
       '<div class="sku-row-head">'+
         '<div>Item</div><div class="num">ELC</div><div class="num">Wholesale</div><div class="num">Proposed</div>'+
         '<div class="num">Comp Retail</div><div class="num">Cust %</div><div class="num">TBG %</div><div>Status</div>'+
       '</div>';
-    groups[line].forEach(function(s){
+    main.forEach(function(s){
       html+='<div class="sku-row" onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>';
       html+='<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
     });
+    if(tabled.length){
+      var open=!!tabledOpen[line];
+      html+='<div class="tabled-head" onclick="toggleTabled('+JSON.stringify(line).replace(/"/g,'&quot;')+')">'+(open?'▾':'▸')+' Tabled ('+tabled.length+')</div>';
+      if(open)tabled.forEach(function(s){
+        html+='<div class="sku-row" style="opacity:0.6;" onclick="toggleDetail(\''+s.id+'\')">'+rowSummaryCells(s)+'</div>';
+        html+='<div class="detail" id="detail-'+s.id+'" style="display:none;"></div>';
+      });
+    }
     html+='</div>';
   });
   g('pane-skus').innerHTML=html;
 }
+function toggleTabled(line){tabledOpen[line]=!tabledOpen[line];renderSkus();}
 
 function toggleDetail(id){
   var d=g('detail-'+id);if(!d)return;
@@ -310,18 +377,36 @@ async function saveSku(id){
 
 async function saveStatus(id){
   var sel=g('inp-status-'+id);if(!sel)return;
+  var sku=skus.find(function(x){return x.id===id;});if(!sku)return;
+  var was=sku.status, newStatus=sel.value;
+  var patch={status:newStatus};
+  if(newStatus==='tabled'){
+    var reason=prompt('Reason for tabling "'+(sku.item_description||'')+'"?', sku.tabled_reason||'');
+    patch.tabled_reason=(reason||'').trim()||null;
+  }
+  var impact=skuAnnualRevenue(sku);  // annual revenue this SKU would contribute if active
   try {
-    var updated=await patchSku(id,{status:sel.value});
+    var updated=await patchSku(id,patch);
     var idx=skus.findIndex(function(x){return x.id===id;});if(idx>=0)skus[idx]=updated;
-    var b=g('badge-'+id);if(b){b.textContent=sel.value;b.className='badge b-'+sel.value;}
+    var wasActive=was==='active', nowActive=newStatus==='active';
+    var msg='Financial Plan updated';
+    if(newStatus==='tabled')msg='Financial Plan updated — 1 SKU tabled'+(wasActive?', '+money0(impact)+' removed from projections':'');
+    else if(nowActive&&!wasActive)msg='Financial Plan updated — 1 SKU activated, '+money0(impact)+' added to projections';
+    else if(wasActive&&!nowActive)msg='Financial Plan updated — '+money0(impact)+' removed from projections';
+    showToast(msg);
+    // Active-SKU set may have changed → refresh dependent views without a full reload.
+    renderSkus(); renderSummary(); renderFinPlan();
   } catch(e){ alert('Status save failed: '+e.message); }
 }
 
 // ─── SUMMARY TAB ───
 function avg(arr){return arr.length?arr.reduce(function(a,b){return a+b;},0)/arr.length:0;}
 function renderSummary(){
-  if(skus.length===0){g('pane-summary').innerHTML='<div class="empty">No SKUs yet.</div>';return;}
-  var groups=groupByLine();
+  var vis=skus.filter(function(s){return s.status!=='tabled';});  // tabled SKUs excluded
+  if(vis.length===0){g('pane-summary').innerHTML='<div class="empty">No active/proposed SKUs.</div>';return;}
+  var groups={};
+  vis.forEach(function(s){(groups[s.product_line||'—']=groups[s.product_line||'—']||[]).push(s);});
+  Object.keys(groups).forEach(function(k){groups[k].sort(function(a,b){return (a.item_description||'').localeCompare(b.item_description||'');});});
   var html='<div class="cards">';
   Object.keys(groups).sort().forEach(function(line){
     var list=groups[line];
@@ -339,8 +424,8 @@ function renderSummary(){
   });
   html+='</div>';
 
-  // Margin health table — every SKU, color-coded by TBG margin.
-  var all=skus.slice().sort(function(a,b){return calcTbgMargin(a)-calcTbgMargin(b);});
+  // Margin health table — every non-tabled SKU, color-coded by TBG margin.
+  var all=vis.slice().sort(function(a,b){return calcTbgMargin(a)-calcTbgMargin(b);});
   html+='<div class="health-table"><div class="health-row head"><div>Item</div><div>Product Line</div><div class="num" style="text-align:right;">ELC</div><div class="num" style="text-align:right;">TBG %</div><div></div></div>';
   all.forEach(function(s){
     var tm=calcTbgMargin(s);
@@ -395,7 +480,17 @@ function buildFinModel(){
 }
 
 // ── value helpers (projected can be calculated: variable rate or salary positions) ──
-function grossForMonth(m){var row=finData.find(function(r){return r.line_item==='Gross Sales'&&r.month_number===m;});return row?num(row.amount_projected):0;}
+// ── SKU-driven dynamic inputs (only status='active' SKUs count) ──
+function activeSkus(){return skus.filter(function(s){return s.status==='active';});}
+function grossSalesActive(m){var s=0;activeSkus().forEach(function(k){if(num(k.sales_start_month||6)<=m)s+=num(k.wholesale_price)*num(k.sales_units_per_month);});return s;}
+function inventoryOutflow(m){
+  var f=m===3?'order_qty_month3':(m===7?'order_qty_month7':(m===12?'order_qty_month12':null));
+  if(!f)return 0;
+  var s=0;activeSkus().forEach(function(k){s+=calcElc(k)*num(k[f]);});return s;
+}
+function skuAnnualRevenue(k){var s=0;for(var m=1;m<=12;m++){if(num(k.sales_start_month||6)<=m)s+=num(k.wholesale_price)*num(k.sales_units_per_month);}return s;}
+// Gross Sales feeding variable expenses is now the active-SKU computed value.
+function grossForMonth(m){return grossSalesActive(m);}
 function positionsByLine(line){return positionsData.filter(function(p){return p.line_item===line;});}
 function hasPositions(line){return positionsByLine(line).length>0;}
 function salaryLineMonthly(line,m){var s=0;positionsByLine(line).forEach(function(p){if(p.is_active!==false&&num(p.start_month)<=m)s+=num(p.annual_salary)/12;});return s;}
@@ -454,11 +549,14 @@ function salaryPanelHtml(line,idx){
       '<button class="fp-expand" onclick="addPosition('+idx+')">Add</button>'+
     '</div></div>';
 }
+function virtualRow(label,fn){
+  return '<tr class="fp-row fp-virtual"><td class="lbl"><span class="fp-calcicon" title="calculated from active SKUs">🧮</span> '+esc(label)+'</td>'+
+    MONTHS.map(function(m){return '<td><span class="pp" style="font-size:11px;">'+money0(fn(m))+'</span></td>';}).join('')+
+    '<td class="fp-total">'+money0(MONTHS.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
+}
 function renderFinPlan(){
-  if(finData.length===0){g('pane-finplan').innerHTML='<div class="empty">No financial plan rows.</div>';return;}
   finModel=buildFinModel();
-  var cats=[];
-  CAT_ORDER.forEach(function(c){if(finModel.order.some(function(ln){return finModel.byLine[ln].category===c;}))cats.push(c);});
+  var cats=CAT_ORDER.slice();   // always show Revenue + Operating Expense (Revenue is computed)
   finModel.order.forEach(function(ln){var c=finModel.byLine[ln].category;if(cats.indexOf(c)===-1)cats.push(c);});
 
   var head='<tr><th class="lbl">Line Item</th>'+MONTHS.map(function(m){return '<th>M'+m+'</th>';}).join('')+'<th>Year</th></tr>';
@@ -486,16 +584,20 @@ function renderFinPlan(){
       '</tr>';
       if(isSalary&&openSalaryPanels[ln])body+='<tr><td colspan="14" style="background:#f7f7f2;text-align:left;">'+salaryPanelHtml(ln,idx)+'</td></tr>';
     });
+    if(cat==='Revenue')body+=virtualRow('Gross Sales (Active SKUs)',grossSalesActive);
+    if(cat==='Operating Expense')body+=virtualRow('Inventory Purchasing',inventoryOutflow);
   });
   function sumRow(label,fn){
     return '<tr class="fp-sumrow"><td class="lbl">'+label+'</td>'+MONTHS.map(function(m){return '<td>'+money0(fn(m))+'</td>';}).join('')+'<td>'+money0(MONTHS.reduce(function(a,m){return a+fn(m);},0))+'</td></tr>';
   }
-  body+=sumRow('Total Revenue',function(m){return catMonthTotal(finModel,'Revenue',m);});
-  body+=sumRow('Total Expenses',function(m){return catMonthTotal(finModel,'Operating Expense',m);});
-  body+=sumRow('Net Cash Flow',function(m){return catMonthTotal(finModel,'Revenue',m)-catMonthTotal(finModel,'Operating Expense',m);});
+  function revMonth(m){return grossSalesActive(m);}
+  function expMonth(m){return catMonthTotal(finModel,'Operating Expense',m)+inventoryOutflow(m);}
+  body+=sumRow('Total Revenue',revMonth);
+  body+=sumRow('Total Expenses',expMonth);
+  body+=sumRow('Net Cash Flow',function(m){return revMonth(m)-expMonth(m);});
 
   var toggle='<span class="fp-viewtoggle">'+['projected','actual','variance'].map(function(v){return '<button class="'+(finView===v?'on':'')+'" onclick="setFinView(\''+v+'\')">'+v.charAt(0).toUpperCase()+v.slice(1)+'</button>';}).join('')+'</span>';
-  g('pane-finplan').innerHTML='<div style="font-size:12px;color:#888;margin-bottom:8px;">Year 1 monthly P&amp;L · click a cell to edit Projected/Actual · only Net Realized Sales feeds Total Revenue · Show: '+toggle+'</div>'+
+  g('pane-finplan').innerHTML='<div style="font-size:12px;color:#888;margin-bottom:8px;">Year 1 monthly P&amp;L · 🧮 Gross Sales &amp; Inventory Purchasing are driven by <strong>active</strong> SKUs · variable expenses key off Gross Sales · click a cell to edit Projected/Actual · Show: '+toggle+'</div>'+
     '<div class="fp-wrap"><table class="fp-table"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
 }
 
@@ -700,6 +802,55 @@ async function toggleStartup(id){
     Object.assign(s,updated);
     renderStartup();
   } catch(e){ alert('Toggle failed: '+e.message); }
+}
+
+// ─── Toast + Add SKU ───
+var toastTimer=null;
+function showToast(msg){
+  var t=g('toast');if(!t)return;
+  t.textContent=msg;t.classList.add('show');
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show');},4000);
+}
+function openAddSku(){
+  var sel=g('as-line');
+  var lines=skus.map(function(s){return s.product_line;}).filter(function(v,i,a){return v&&a.indexOf(v)===i;});
+  if(lines.length===0)lines=['Fashion Secrets','Health & Beauty'];
+  sel.innerHTML=lines.map(function(l){return '<option value="'+esc(l)+'">'+esc(l)+'</option>';}).join('');
+  ['as-desc','as-size','as-bulk','as-sell','as-comp'].forEach(function(i){var el=g(i);if(el)el.value='';});
+  g('addsku-bg').classList.add('show');
+}
+function closeAddSku(){g('addsku-bg').classList.remove('show');}
+async function createSku(){
+  var desc=(g('as-desc').value||'').trim();
+  if(!desc){alert('Enter an item description.');return;}
+  var payload={
+    projection_group:'TBG Year 1 Consumables',
+    product_line:g('as-line').value,
+    item_description:desc,
+    size_unit:(g('as-size').value||'').trim()||null,
+    coo:'China',
+    bulk_unit_cost:num(g('as-bulk').value),
+    proposed_sell_price:num(g('as-sell').value),
+    comp_retail_price:num(g('as-comp').value),
+    // default the remaining cost inputs to 0 so the generated columns (elc, margins) compute (NULLs would yield NULL)
+    packaging:0, duty_rate:0, tariff_rate:0, estimated_freight:0, wholesale_price:num(g('as-sell').value),
+    status:'proposed',
+    order_qty_month3:8000, order_qty_month7:9000, order_qty_month12:8000,
+    sales_units_per_month:2000, sales_start_month:6
+  };
+  try {
+    var r=await h(SB+'/rest/v1/projection_skus',{
+      method:'POST',headers:{'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok)throw new Error('HTTP '+r.status+': '+await r.text());
+    var rows=await r.json();
+    if(rows&&rows.length)skus.push(rows[0]);
+    closeAddSku();
+    showToast('SKU added — "'+desc+'" (proposed)');
+    renderSkus(); renderSummary(); renderFinPlan();
+  } catch(e){ alert('Add SKU failed: '+e.message); }
 }
 
 load();
