@@ -1148,12 +1148,107 @@ document.addEventListener('keydown',function(e){
 });
 
 // ─── OBSERVATIONS ───────────────────────────────────────────────────
+// Client-side mirror of lib/sku-match.mjs token lists, used to parse a SKU's
+// size_unit text and derive the TBG per-unit price. Keep in sync with the lib.
+var SKU_UNIT_LABEL={volume_ml:'ml',volume_oz:'fl oz',weight_g:'g',weight_oz:'oz',count:'ct'};
+function ucat(unitRaw){
+  if(unitRaw==null)return {unit:null,factor:1};
+  var u=String(unitRaw).toLowerCase().replace(/\./g,'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+  if(u==='ml')return {unit:'volume_ml',factor:1};
+  if(['l','liter','litre'].indexOf(u)!==-1)return {unit:'volume_ml',factor:1000};
+  if(['fl oz','floz','fluid ounce','fluid ounces'].indexOf(u)!==-1)return {unit:'volume_oz',factor:1};
+  if(['g','gr','gram','grams'].indexOf(u)!==-1)return {unit:'weight_g',factor:1};
+  if(['kg','kilogram','kilograms'].indexOf(u)!==-1)return {unit:'weight_g',factor:1000};
+  if(['oz','ounce','ounces'].indexOf(u)!==-1)return {unit:'weight_oz',factor:1};
+  if(['lb','lbs','pound','pounds'].indexOf(u)!==-1)return {unit:'weight_oz',factor:16};
+  if(['ct','count','pc','pcs','pair','pairs','pack','pk','piece','pieces'].indexOf(u)!==-1)return {unit:'count',factor:1};
+  return {unit:null,factor:1};
+}
+function parseSize(text){
+  if(text==null)return {unit:null,size:null};
+  var s=String(text).toLowerCase().replace(/_/g,' ');
+  var m=s.match(/(\d+(?:\.\d+)?)\s*(fl\s*oz|floz|fluid\s*ounces?|kg|ml|lb|gr|grams?|ounces?|oz|ct|count|pcs|pc|pairs|pair|packs|pack|pk|pieces|piece|g|l)\b/);
+  if(!m)return {unit:null,size:null};
+  var c=ucat(m[2]);if(!c.unit)return {unit:null,size:null};
+  var n=Number(m[1]);
+  return {unit:c.unit,size:isFinite(n)?n*c.factor:null};
+}
+function tbgUnitPrice(sku){
+  if(!sku)return null;
+  var p=parseSize(sku.size_unit);
+  var sell=Number(sku.proposed_sell_price);
+  if(!p.unit||!p.size||p.size<=0||!isFinite(sell))return null;
+  return {unit:p.unit,size:p.size,price:Math.round(sell/p.size*10000)/10000};
+}
+
+var skuById={}, activeSkuList=[], obsShopOutId=null;
+function matchPanelHtml(o){
+  if(!o.projection_sku_id)return '<div style="margin-top:8px;font-size:11px;color:#aaa;">No SKU match</div>';
+  var sku=skuById[o.projection_sku_id];
+  var lowConf=o.sku_match_method==='ai_low_confidence';
+  var name=sku?sku.item_description:'(unknown SKU)';
+  var bg=lowConf?'#fff4e0':'#edfaed', fg=lowConf?'#9a6a00':'#1a7a1a';
+  var badge='<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:'+bg+';color:'+fg+';">🎯 Matched: '+esc(name)+'</span>';
+
+  var cmp='', sizeMismatch=false;
+  var oUnit=o.normalized_unit, oUp=o.unit_price!=null?Number(o.unit_price):null;
+  var tbg=tbgUnitPrice(sku);
+  if(oUp!=null&&oUnit){
+    var lab=SKU_UNIT_LABEL[oUnit]||oUnit;
+    var parts='<span>Shelf: $'+oUp.toFixed(2)+'/'+lab+'</span>';
+    if(tbg&&tbg.unit===oUnit){
+      parts+='<span style="color:#666;">TBG: $'+tbg.price.toFixed(2)+'/'+lab+'</span>';
+      var d=oUp-tbg.price, col=d>=0?'#1a7a1a':'#a22';
+      parts+='<span style="color:'+col+';font-weight:700;">Δ '+(d>=0?'+':'−')+'$'+Math.abs(d).toFixed(2)+'</span>';
+      if(o.normalized_size!=null&&tbg.size>0){
+        var sz=Number(o.normalized_size), diff=Math.abs(sz-tbg.size)/Math.max(sz,tbg.size);
+        if(diff>0.30)sizeMismatch=true;
+      }
+    }
+    cmp='<div style="margin-top:4px;font-size:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;">'+parts+'</div>';
+  }
+  var mismatchHtml=sizeMismatch?'<div style="margin-top:3px;font-size:11px;color:#9a6a00;font-weight:600;">⚠ Size mismatch — unit price only</div>':'';
+
+  var actions='';
+  if(lowConf){
+    actions='<div style="margin-top:6px;font-size:11px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">'+
+      '<span style="color:#9a6a00;">AI suggested —</span>'+
+      '<button onclick="confirmSkuMatch(\''+o.id+'\')" style="cursor:pointer;border:none;background:#edfaed;color:#1a7a1a;font-weight:700;border-radius:6px;padding:3px 9px;font-family:inherit;font-size:11px;">✓ Confirm</button>'+
+      '<button onclick="toggleReassign(\''+o.id+'\')" style="cursor:pointer;border:none;background:#f0f0e8;color:#444;font-weight:600;border-radius:6px;padding:3px 9px;font-family:inherit;font-size:11px;">✗ Reassign</button>'+
+      '<span id="reassign-'+o.id+'"></span></div>';
+  }
+  return '<div style="margin-top:8px;padding:8px 10px;background:#fbfbf7;border:1px solid #ececdf;border-radius:8px;">'+badge+cmp+mismatchHtml+actions+'</div>';
+}
+function toggleReassign(obsId){
+  var sp=g('reassign-'+obsId);if(!sp)return;
+  if(sp.innerHTML){sp.innerHTML='';return;}
+  var opts='<option value="">— pick SKU —</option>'+activeSkuList.map(function(s){return '<option value="'+s.id+'">'+esc(s.item_description)+(s.size_unit?' ('+esc(s.size_unit)+')':'')+'</option>';}).join('');
+  sp.innerHTML='<select onchange="reassignSku(\''+obsId+'\',this.value)" style="font-size:11px;padding:3px 6px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;max-width:260px;">'+opts+'</select>';
+}
+async function patchObsMatch(obsId,patch){
+  var r=await h(SB+'/rest/v1/shop_out_observations?id=eq.'+obsId,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+  if(!r.ok){alert('Save failed: '+await r.text());return false;}
+  if(obsShopOutId)await loadObservations(obsShopOutId);
+  return true;
+}
+function confirmSkuMatch(obsId){return patchObsMatch(obsId,{sku_match_method:'confirmed',sku_match_confidence:1.0});}
+function reassignSku(obsId,skuId){if(!skuId)return;return patchObsMatch(obsId,{projection_sku_id:skuId,sku_match_method:'confirmed',sku_match_confidence:1.0});}
+
 async function loadObservations(id){
+  obsShopOutId=id;
   var r=await h(SB+'/rest/v1/shop_out_observations?shop_out_id=eq.'+id+'&order=created_at.asc&select=*');
   if(!r.ok)return;
   var obs=await r.json();
   var c=g('obs-container');if(!c)return;
   if(obs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No observations.</div>';return;}
+
+  // Active Projections SKUs (fetched once) → id map for match display + reassign picker.
+  if(!activeSkuList.length){
+    try {
+      var skr=await h(SB+'/rest/v1/projection_skus?status=eq.active&select=id,item_description,size_unit,proposed_sell_price,category,sub_category,sub_sub_category&order=item_description.asc');
+      if(skr.ok){activeSkuList=await skr.json();activeSkuList.forEach(function(s){skuById[s.id]=s;});}
+    } catch(e) {}
+  }
 
   // Batch-fetch the file_path for every front photo referenced by an observation.
   var pathById={};
@@ -1210,6 +1305,7 @@ async function loadObservations(id){
           '</div>'+
           '<div style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
         '</div>'+
+        matchPanelHtml(o)+
         '<div style="background:#f7f7f2;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
           '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">ML Observation</div>'+
           mlText+

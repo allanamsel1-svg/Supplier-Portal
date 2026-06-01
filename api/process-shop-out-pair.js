@@ -14,6 +14,8 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = 'claude-sonnet-4-6';
 
+import { computeNormalization, matchSku } from '../lib/sku-match.mjs';
+
 export const config = { runtime: 'nodejs' };
 export const maxDuration = 60;
 
@@ -154,17 +156,32 @@ export default async function handler(req, res) {
     }
     const inserted = await insR.json();
 
-    // 7b. Normalize unit + compute per-unit price, then PATCH onto the new row.
+    // 7b. Normalize unit + per-unit price, then auto-match to a Projections SKU,
+    //     and PATCH both onto the new row in one call.
     const newId = inserted[0] && inserted[0].id;
     if (newId) {
       const norm = computeNormalization(obsPayload.pack_size, obsPayload.pack_size_unit, obsPayload.retail_price);
+
+      // 7c. Score the observation against all active Projections SKUs.
+      let match = { projection_sku_id: null, sku_match_method: null, sku_match_confidence: null };
+      try {
+        const skuR = await sbFetch('/rest/v1/projection_skus?status=eq.active&select=id,item_description,size_unit,category,sub_category,sub_sub_category');
+        if (skuR.ok) {
+          const skus = await skuR.json();
+          match = matchSku({ ...obsPayload, ...norm }, skus);
+        } else {
+          console.warn(`Active SKU fetch failed (${skuR.status}); skipping auto-match`);
+        }
+      } catch (e) { console.warn('SKU auto-match failed:', e.message); }
+
+      const patch = { ...norm, ...match };
       const normR = await sbFetch(`/rest/v1/shop_out_observations?id=eq.${newId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(norm)
+        body: JSON.stringify(patch)
       });
-      if (normR.ok) Object.assign(inserted[0], norm);
-      else console.warn(`Normalization PATCH failed (${normR.status}) for observation ${newId}`);
+      if (normR.ok) Object.assign(inserted[0], patch);
+      else console.warn(`Normalization/match PATCH failed (${normR.status}) for observation ${newId}`);
     }
 
     // 8. Mark photos as processed
@@ -251,40 +268,6 @@ function numOrNull(v) {
   if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
-}
-
-// ─── UNIT NORMALIZATION ──────────────────────────────────────────────
-// Categorize a pack_size_unit into a canonical unit + multiply factor so that
-// sizes across products can be compared on a single per-unit basis.
-// NOTE: keep this in lockstep with the backfill SQL (same token lists/factors).
-// 'fl oz'/'floz' → volume_oz (liquid); bare 'oz' → weight_oz (solid).
-function unitCategory(unitRaw) {
-  if (unitRaw == null) return { unit: null, factor: 1 };
-  const u = String(unitRaw).toLowerCase().replace(/\./g, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
-  if (['ml'].includes(u)) return { unit: 'volume_ml', factor: 1 };
-  if (['l', 'liter', 'litre'].includes(u)) return { unit: 'volume_ml', factor: 1000 };
-  if (['fl oz', 'floz', 'fluid ounce', 'fluid ounces'].includes(u)) return { unit: 'volume_oz', factor: 1 };
-  if (['g', 'gr', 'gram', 'grams'].includes(u)) return { unit: 'weight_g', factor: 1 };
-  if (['kg', 'kilogram', 'kilograms'].includes(u)) return { unit: 'weight_g', factor: 1000 };
-  if (['oz', 'ounce', 'ounces'].includes(u)) return { unit: 'weight_oz', factor: 1 };
-  if (['lb', 'lbs', 'pound', 'pounds'].includes(u)) return { unit: 'weight_oz', factor: 16 };
-  if (['ct', 'count', 'pc', 'pcs', 'pair', 'pairs', 'pack', 'pk', 'piece', 'pieces'].includes(u)) return { unit: 'count', factor: 1 };
-  return { unit: null, factor: 1 };
-}
-
-// Returns { normalized_unit, normalized_size, unit_price } for an observation.
-// unit_price = retail_price / normalized_size, rounded to 4 dp; null if size is 0/null.
-function computeNormalization(packSizeRaw, unitRaw, retailPriceRaw) {
-  const { unit, factor } = unitCategory(unitRaw);
-  if (!unit) return { normalized_unit: null, normalized_size: null, unit_price: null };
-  const size = numOrNull(packSizeRaw);
-  const normSize = size != null ? size * factor : null;
-  const rp = numOrNull(retailPriceRaw);
-  let unitPrice = null;
-  if (normSize != null && normSize !== 0 && rp != null) {
-    unitPrice = Math.round((rp / normSize) * 10000) / 10000;
-  }
-  return { normalized_unit: unit, normalized_size: normSize, unit_price: unitPrice };
 }
 
 function buildPrompt(retailerName, retailerCountry, hasBack) {
