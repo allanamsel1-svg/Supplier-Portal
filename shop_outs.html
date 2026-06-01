@@ -217,11 +217,11 @@ async function init(){
 
 async function loadCustomers(){
   try {
-    var r=await h(SB+'/rest/v1/customers?select=id,customer_name,country&order=customer_name&limit=2000');
+    var r=await h(SB+'/rest/v1/customers?select=id,customer_name,country,customer_type&order=customer_name&limit=2000');
     if(r.ok){
       customerList=await r.json();
       customerMap={};
-      customerList.forEach(function(c){customerMap[c.id]={name:c.customer_name,country:c.country};});
+      customerList.forEach(function(c){customerMap[c.id]={name:c.customer_name,country:c.country,type:c.customer_type};});
     }
   } catch(e) { console.error(e); }
 }
@@ -247,6 +247,21 @@ async function loadPhotoCounts(){
 
 function getPhotoCount(shopId){return photoCounts[shopId]||0;}
 function getRetailerName(shop){var c=customerMap[shop.customer_id];return c?c.name:'(unknown)';}
+// Retailer chain name: explicit column → customer name → location text → fallback.
+function chainName(shop){
+  if(!shop)return 'Unknown retailer';
+  if(shop.retailer_chain_name)return shop.retailer_chain_name;
+  var rn=getRetailerName(shop);
+  if(rn && rn!=='(unknown)')return rn;
+  return shop.store_location_text||'Unknown retailer';
+}
+function chainType(shop){
+  var c=shop&&customerMap[shop.customer_id];
+  if(!c||!c.type)return '';
+  return c.type.replace(/_/g,' ').replace(/\b\w/g,function(m){return m.toUpperCase();});
+}
+function shopById(id){return (allShops||[]).find(function(x){return x.id===id;});}
+function med(nums){var a=nums.map(Number).filter(function(n){return isFinite(n);}).sort(function(x,y){return x-y;});if(!a.length)return null;var m=Math.floor(a.length/2);return a.length%2?a[m]:(a[m-1]+a[m])/2;}
 
 function renderList(){
   var q=(g('q-search').value||'').toLowerCase();
@@ -398,7 +413,10 @@ async function renderDetail(){
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
     '<div>'+
       '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
-      '<div style="font-size:12px;color:#888;margin-top:4px;">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
+      '<div style="font-size:12px;color:#888;margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+        '<span>'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</span>'+
+        '<span style="background:#1a1a2e;color:#fff;border-radius:10px;padding:2px 9px;font-size:10px;font-weight:700;letter-spacing:0.02em;">'+esc(chainName(s))+(chainType(s)?' · '+esc(chainType(s)):'')+'</span>'+
+      '</div>'+
     '</div>'+
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
   '</div>';
@@ -437,7 +455,10 @@ async function renderDetail(){
       html+='<div id="clearance-card"></div>';
       html+='<div id="register-card"></div>';
       html+='<div id="pricechange-card"></div>';
-      html+='<div class="card"><div class="card-title">🗂 Section Intelligence</div><div id="sections-container">Loading...</div></div>';
+      html+='<div class="card">'+
+        '<div class="card-title" id="sec-title">🗺 SECTION INTELLIGENCE — '+esc(chainName(s))+' · '+esc(s.shop_date||'—')+'</div>'+
+        '<div style="font-size:11px;color:#888;margin:-4px 0 8px;">AI-analyzed shelf sections showing category allocation, brand density, and estimated uncaptured SKUs.</div>'+
+        '<div id="sections-container">Loading...</div></div>';
     }
     html+='<div class="card">'+
       '<div class="card-title">Summary</div>'+
@@ -451,6 +472,7 @@ async function renderDetail(){
       html+='<div class="card"><div class="card-title">📊 Insights</div><div id="insights-container">Computing...</div></div>';
     }
     html+='<div class="card"><div class="card-title">Photos</div><div id="photos-container">Loading...</div></div>';
+    html+='<div id="crossretailer-card"></div>';
     html+='<div class="card"><div class="card-title">Observations</div><div id="obs-container">Loading...</div></div>';
   }
 
@@ -1253,6 +1275,9 @@ async function loadObservations(id){
     } catch(e) {}
   }
 
+  // Cross-retailer price index (all shop-outs), for badges + the summary card.
+  await buildCrossIndex();
+
   // Batch-fetch the file_path for every front photo referenced by an observation.
   var pathById={};
   var frontIds=obs.map(function(o){return o.front_photo_id;}).filter(Boolean);
@@ -1309,6 +1334,7 @@ async function loadObservations(id){
           '<div style="text-align:right;font-weight:700;font-size:14px;white-space:nowrap;">'+(o.retail_price?'$'+Number(o.retail_price).toFixed(2):'—')+'</div>'+
         '</div>'+
         matchPanelHtml(o)+
+        crossBadge(o)+
         '<div style="background:#f7f7f2;border-radius:8px;padding:10px 12px;margin-top:10px;">'+
           '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">ML Observation</div>'+
           mlText+
@@ -1324,6 +1350,7 @@ async function loadObservations(id){
   }).join('');
   c.innerHTML=html;
   renderSignalCards(obs);
+  renderCrossRetailer(obs);
 
   // Sign thumbnail URLs in parallel and attach them.
   await Promise.all(thumbs.map(async function(t){
@@ -1352,10 +1379,82 @@ function placementBadge(o){
 }
 function priceCell(p){return p!=null?'$'+Number(p).toFixed(2):'—';}
 
+// ── Cross-retailer price intelligence ──
+// Index every priced observation across ALL shop-outs by brand+product, grouped
+// by retailer chain (customer_id). Built once per page session.
+var crossIndex=null;
+async function buildCrossIndex(){
+  if(crossIndex)return crossIndex;
+  crossIndex={};
+  try {
+    var r=await h(SB+'/rest/v1/shop_out_observations?select=brand,product_name,retail_price,shop_out_id&retail_price=not.is.null&limit=10000');
+    if(!r.ok)return crossIndex;
+    var all=await r.json();
+    var custBySO={};
+    (allShops||[]).forEach(function(s){custBySO[s.id]={cust:s.customer_id,name:chainName(s)};});
+    all.forEach(function(o){
+      if(!o.brand||!o.product_name)return;
+      var so=custBySO[o.shop_out_id];if(!so||!so.cust)return;
+      var key=o.brand.toLowerCase().trim()+'|'+o.product_name.toLowerCase().trim();
+      var e=crossIndex[key]||(crossIndex[key]={brand:o.brand,product:o.product_name,byCust:{}});
+      var c=e.byCust[so.cust]||(e.byCust[so.cust]={name:so.name,prices:[]});
+      c.prices.push(Number(o.retail_price));
+    });
+  } catch(e){}
+  return crossIndex;
+}
+// Cross-retailer summary for an item, or null if seen at fewer than 2 chains.
+function crossInfo(brand,product){
+  if(!crossIndex||!brand||!product)return null;
+  var e=crossIndex[brand.toLowerCase().trim()+'|'+product.toLowerCase().trim()];
+  if(!e)return null;
+  var custs=Object.keys(e.byCust);
+  if(custs.length<2)return null;
+  var all=[];
+  var retailers=custs.map(function(c){var pr=e.byCust[c];all=all.concat(pr.prices);return {name:pr.name,price:med(pr.prices)};});
+  retailers.sort(function(a,b){return a.price-b.price;});
+  var min=Math.min.apply(null,all), max=Math.max.apply(null,all);
+  return {min:min,max:max,count:custs.length,retailers:retailers,variance:max-min};
+}
+function crossBadge(o){
+  var ci=crossInfo(o.brand,o.product_name);
+  if(!ci)return '';
+  return '<div style="margin-top:6px;display:inline-block;font-size:11px;background:#eef6ff;color:#2244cc;border:1px solid #cfe0fb;border-radius:8px;padding:3px 9px;">'+
+    '🌐 Cross-Retailer: '+priceCell(ci.min)+' – '+priceCell(ci.max)+' across '+ci.count+' retailers'+
+    (o.retail_price!=null?' · this visit: '+priceCell(o.retail_price):'')+'</div>';
+}
+function renderCrossRetailer(obs){
+  var cc=g('crossretailer-card');if(!cc)return;
+  var seen={}, items=[];
+  obs.forEach(function(o){
+    var ci=crossInfo(o.brand,o.product_name);if(!ci)return;
+    var key=(o.brand||'').toLowerCase()+'|'+(o.product_name||'').toLowerCase();
+    if(seen[key])return; seen[key]=1;
+    items.push({brand:o.brand,product:o.product_name,thisPrice:o.retail_price,ci:ci});
+  });
+  if(!items.length){cc.innerHTML='';return;}
+  items.sort(function(a,b){return b.ci.variance-a.ci.variance;});
+  var body=items.map(function(it){
+    var retail=it.ci.retailers.map(function(r){return esc(r.name)+' '+priceCell(r.price);}).join(' · ');
+    return '<div style="padding:8px 0;border-bottom:0.5px solid #e6edf6;">'+
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;">'+
+        '<div style="min-width:0;"><span style="font-weight:700;font-size:13px;">'+esc(it.brand||'—')+'</span> <span style="font-size:12px;color:#666;">'+esc(it.product||'')+'</span></div>'+
+        '<div style="font-weight:700;font-size:13px;white-space:nowrap;">'+priceCell(it.ci.min)+' – '+priceCell(it.ci.max)+'</div>'+
+      '</div>'+
+      '<div style="font-size:11px;color:#888;margin-top:3px;">'+retail+(it.thisPrice!=null?' · <strong style="color:#2244cc;">this visit '+priceCell(it.thisPrice)+'</strong>':'')+'</div>'+
+    '</div>';
+  }).join('');
+  cc.innerHTML='<div class="card" style="border:1.5px solid #b9c8e8;background:#fbfcff;">'+
+    '<div class="card-title" style="color:#2244cc;">🌐 CROSS-RETAILER PRICE INTELLIGENCE ('+items.length+' items)</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:8px;">Items seen at 2+ retailer chains, sorted by price spread (biggest competitive signal first).</div>'+
+    body+'</div>';
+}
+
 // Clearance + Checkout/Register high-signal cards, rendered above Section Intelligence.
 function renderSignalCards(obs){
   var clear=obs.filter(function(o){return o.is_clearance===true;});
   var reg=obs.filter(function(o){return o.placement_type==='checkout_register';});
+  var s=shopById(obsShopOutId), chain=esc(chainName(s)), sdate=esc((s&&s.shop_date)||'—');
 
   var cc=g('clearance-card');
   if(cc){
@@ -1371,8 +1470,8 @@ function renderSignalCards(obs){
         '</div>';
       }).join('');
       cc.innerHTML='<div class="card" style="border:1.5px solid #e0a0a0;background:#fffafa;">'+
-        '<div class="card-title" style="color:#a22;">🚩 Clearance Items ('+clear.length+')</div>'+
-        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Clearance = brand exit signal or category wind-down.</div>'+
+        '<div class="card-title" style="color:#a22;">🚩 CLEARANCE ITEMS — '+chain+' · '+sdate+' ('+clear.length+')</div>'+
+        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Products on clearance = potential brand exit or category wind-down signal. Review before sourcing.</div>'+
         rows+'</div>';
     } else cc.innerHTML='';
   }
@@ -1390,8 +1489,8 @@ function renderSignalCards(obs){
         '</div>';
       }).join('');
       rc.innerHTML='<div class="card" style="border:1.5px solid #e0c080;background:#fffdf7;">'+
-        '<div class="card-title" style="color:#9a6a00;">🛒 Checkout / Impulse Items ('+reg.length+')</div>'+
-        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Register placement = impulse category signal — high velocity, small format.</div>'+
+        '<div class="card-title" style="color:#9a6a00;">🛒 CHECKOUT &amp; IMPULSE PLACEMENT — '+chain+' · '+sdate+' ('+reg.length+')</div>'+
+        '<div style="font-size:11px;color:#9a6a00;margin-bottom:8px;">Products at register = impulse/high-velocity category signal. Consider small-format SKUs.</div>'+
         rrows+'</div>';
     } else rc.innerHTML='';
   }
@@ -1438,12 +1537,21 @@ async function loadPriceChanges(id){
       '<div style="font-size:11px;color:#999;white-space:nowrap;">prev '+esc(p.previous_shop_date||'—')+'</div>'+
     '</div>';
   }).join('');
+  // Dynamic header + context from the actual rows.
+  var s=shopById(id), chain=esc(chainName(s));
+  var dates=[];
+  rows.forEach(function(p){if(p.shop_date)dates.push(p.shop_date);if(p.previous_shop_date)dates.push(p.previous_shop_date);});
+  dates.sort();
+  var earliest=dates.length?dates[0]:'—', latest=dates.length?dates[dates.length-1]:'—';
+  var nVisits=new Set(dates).size;
+  var nProducts=new Set(rows.map(function(p){return (p.brand||'').toLowerCase()+'|'+(p.product_name||'').toLowerCase();})).size;
+  var confirmed=rows.length-reviewN;
   pc.innerHTML='<div class="card" style="border:1.5px solid #b9c8e8;background:#fbfcff;">'+
-    '<div class="card-title" style="color:#2244cc;">📈 Price Changes Detected ('+rows.length+')</div>'+
-    '<div style="font-size:11px;color:#888;margin-bottom:8px;">vs the most recent prior sighting of the same item at this retailer (median price per trip). '+
-      '<span style="color:#1a7a1a;font-weight:600;">▲ competitor up</span> = good for TBG · '+
-      '<span style="color:#a22;font-weight:600;">▼ competitor down</span> = margin pressure'+
-      (reviewN?' · <span style="color:#9a6a00;font-weight:600;">⚠ '+reviewN+' need review</span> (|Δ| &gt; 75%)':'')+'.</div>'+
+    '<div class="card-title" style="color:#2244cc;">📈 COMPETITOR PRICE CHANGES — '+chain+' ('+esc(earliest)+' → '+esc(latest)+')</div>'+
+    '<div style="font-size:11px;color:#888;margin-bottom:8px;">Comparing '+nProducts+' products seen across '+nVisits+' visits · '+
+      confirmed+' confirmed moves · '+reviewN+' needs review · '+
+      '<span style="color:#1a7a1a;font-weight:600;">▲ competitor up = good for TBG margin</span> · '+
+      '<span style="color:#a22;font-weight:600;">▼ competitor down = margin pressure on TBG</span></div>'+
     body+'</div>';
 }
 
@@ -1475,6 +1583,11 @@ async function loadSections(id){
   var r=await h(SB+'/rest/v1/shop_out_sections?shop_out_id=eq.'+id+'&order=sequence_number.asc&select=*');
   if(!r.ok){c.innerHTML='<div style="color:#888;font-size:12px;">Could not load sections.</div>';return;}
   var secs=await r.json();
+  // Finalize the dynamic Section Intelligence header with section + linear-foot counts.
+  var secShop=shopById(id);
+  var totLf=secs.reduce(function(a,x){return a+(x.estimated_linear_feet!=null?Number(x.estimated_linear_feet):0);},0);
+  var st=g('sec-title');
+  if(st)st.innerHTML='🗺 SECTION INTELLIGENCE — '+esc(chainName(secShop))+' · '+esc((secShop&&secShop.shop_date)||'—')+' · '+secs.length+' sections · '+(Math.round(totLf*10)/10)+' linear feet';
   if(secs.length===0){c.innerHTML='<div style="color:#888;font-size:12px;">No section (wide-angle shelf) photos detected.</div>';return;}
 
   // Batch-fetch file_path for each section photo.
