@@ -982,7 +982,14 @@ async function loadStartup(){
     if(!r.ok){g('pane-startup').innerHTML='<div class="empty">Failed to load ('+r.status+').</div>';return;}
     startupData=await r.json();
   } catch(e){ g('pane-startup').innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; return; }
+  await loadOpeningInvestment();
   renderStartup();
+}
+async function loadOpeningInvestment(){
+  try {
+    var r=await h(SB+'/rest/v1/plan_settings?key=eq.opening_investment&select=value');
+    if(r.ok){var rows=await r.json();if(rows&&rows.length)OPENING_INVESTMENT=num(rows[0].value);}
+  } catch(e){ /* keep default */ }
 }
 
 var openStartupNotes={}, suAdd=false;
@@ -1031,7 +1038,7 @@ function renderStartup(){
 
   g('pane-startup').innerHTML=
     '<div class="kpi">'+
-      '<div class="box"><div class="lab">Opening Investment</div><div class="val">'+money0(OPENING_INVESTMENT)+'</div></div>'+
+      '<div class="box"><div class="lab">Opening Investment</div><div class="val"><span id="oi-display" class="su-cellbtn" title="Click to edit" onclick="editOpeningInvestment()">'+money0(OPENING_INVESTMENT)+'</span></div></div>'+
       '<div class="box big"><div class="lab">Remaining Working Capital</div><div class="val">'+money0(remaining)+'</div></div>'+
     '</div>'+
     '<h3 style="font-size:15px;margin:0 0 6px;">One-Time Startup Costs</h3>'+
@@ -1059,6 +1066,25 @@ async function saveStartupCell(id,field){
     Object.assign(s,updated);
     renderStartup();
   } catch(e){ alert('Save failed: '+e.message); }
+}
+function editOpeningInvestment(){
+  var d=g('oi-display');if(!d)return;
+  d.outerHTML='<input id="oi-input" value="'+OPENING_INVESTMENT+'" style="width:150px;font-size:22px;font-weight:700;padding:2px 6px;border:1px solid #2244cc;border-radius:6px;font-family:inherit;" onkeydown="if(event.key===\'Enter\')this.blur()" onblur="saveOpeningInvestment()" />';
+  var inp=g('oi-input');if(inp){inp.focus();inp.select();}
+}
+async function saveOpeningInvestment(){
+  var inp=g('oi-input');if(!inp)return;
+  var val=num(inp.value);
+  if(val===OPENING_INVESTMENT){renderStartup();return;}  // no-op
+  try {
+    var r=await h(SB+'/rest/v1/plan_settings?key=eq.opening_investment',{
+      method:'PATCH',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({value:String(val)})
+    });
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    OPENING_INVESTMENT=val;            // Remaining Working Capital recalcs on re-render
+    renderStartup();showToast('Opening Investment updated to '+money0(val));
+  } catch(e){ alert('Save failed: '+e.message);renderStartup(); }
 }
 function startAddStartup(){suAdd=true;renderStartup();var el=g('su-add-desc');if(el)el.focus();}
 function cancelAddStartup(){suAdd=false;renderStartup();}
