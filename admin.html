@@ -1282,6 +1282,7 @@
               <div class="mf"><label>Tariff % (AI suggested)</label><input type="number" id="rfq-est-tariff" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             </div>
             <div id="rfq-duty-note" style="display:none;background:#fff8e0;border:1px solid #e0c840;border-radius:6px;padding:8px;font-size:12px;color:#665500;margin-bottom:6px;"></div>
+            <input type="hidden" id="rfq-est-hts" />
             <div style="margin-bottom:10px;"><button onclick="suggestDutyTariff()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button></div>
 
             <!-- ROW 7: Deductions -->
@@ -5468,6 +5469,7 @@ async function populateRFQEditForm(rfq){
   if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
   if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
   if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
+  if(g('rfq-est-hts'))g('rfq-est-hts').value=rfq.est_hts_code||'';
   if(g('rfq-est-returns'))g('rfq-est-returns').value=rfq.est_returns_pct||0;
   if(g('rfq-est-dilution'))g('rfq-est-dilution').value=rfq.est_dilution_pct||0;
   if(g('rfq-est-commission'))g('rfq-est-commission').value=rfq.est_commission_pct||0;
@@ -5567,6 +5569,7 @@ async function openRFQForm(id){
   if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
   if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
   if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
+  if(g('rfq-est-hts'))g('rfq-est-hts').value=rfq.est_hts_code||'';
   if(g('rfq-est-returns'))g('rfq-est-returns').value=rfq.est_returns_pct||0;
   if(g('rfq-est-dilution'))g('rfq-est-dilution').value=rfq.est_dilution_pct||0;
   if(g('rfq-est-commission'))g('rfq-est-commission').value=rfq.est_commission_pct||0;
@@ -6622,7 +6625,8 @@ async function suggestDutyTariff(){
       var result=JSON.parse(raw);
       if(result.duty_pct!=null)g('rfq-est-duty').value=result.duty_pct;
       if(result.tariff_pct!=null)g('rfq-est-tariff').value=result.tariff_pct;
-      noteEl.textContent='⚠ AI Estimate (verify before use): '+result.notes;
+      if(result.hts_code&&g('rfq-est-hts'))g('rfq-est-hts').value=result.hts_code;
+      noteEl.textContent='⚠ AI Estimate (verify before use)'+(result.hts_code?' — HTS '+result.hts_code:'')+': '+result.notes;
       calcMargins();
     }
   }catch(e){
@@ -6704,6 +6708,7 @@ async function saveRFQ(action){
     fob_port:g('rfq-fob-port')?g('rfq-fob-port').value.trim()||null:null,
     est_duty_pct:parseFloat(g('rfq-est-duty').value)||null,
     est_tariff_pct:parseFloat(g('rfq-est-tariff').value)||null,
+    est_hts_code:(g('rfq-est-hts')&&g('rfq-est-hts').value.trim())||null,
     max_fob_price:parseFloat(g('res-max-fob').textContent.replace('$',''))||null,
     min_gross_margin_pct:null,
     min_net_margin_pct:null,
