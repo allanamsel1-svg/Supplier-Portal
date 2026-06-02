@@ -188,7 +188,7 @@
   <div class="tab" onclick="switchTab('freight');loadFreightTab();">🚢 Freight Rates</div>
   <div class="tab" onclick="switchTab('upc');loadUpcPool();">🏷 UPC Pool</div>
   <div class="tab" onclick="switchTab('packaging');loadPackagingTypes();">📦 Kit Packaging</div>
-  <div class="tab" onclick="switchTab('hts')">📊 HTS Lookup</div>
+  <div class="tab" onclick="switchTab('hts')">📊 HTS &amp; Rulings</div>
 </div>
 
 <!-- ══════════════════════════════════════ -->
@@ -742,6 +742,17 @@
       </div>
       <div id="hts-tab-status" style="font-size:12px;color:#888;margin-bottom:10px;min-height:16px;"></div>
       <div id="hts-tab-results" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-title">⚖️ CBP CROSS Rulings</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px;line-height:1.5;">Search CBP CROSS for U.S. import classification precedent by keyword (e.g. <em>cosmetic set</em>) or HTS code (e.g. <em>3304</em>). Returns ruling number, date, subject, classified HTS, and a link to the full ruling.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="cross-tab-q" placeholder="Keyword or HTS code" onkeydown="if(event.key==='Enter')crossTabSearch()" style="flex:1;min-width:0;padding:9px 12px;font-size:13px;border:1px solid #d8d8d0;border-radius:8px;font-family:inherit;box-sizing:border-box;" />
+        <button id="cross-tab-btn" onclick="crossTabSearch()" style="flex-shrink:0;padding:9px 18px;background:#5a2db8;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Search</button>
+      </div>
+      <div id="cross-tab-status" style="font-size:12px;color:#888;margin-bottom:10px;min-height:16px;"></div>
+      <div id="cross-tab-results" style="display:flex;flex-direction:column;gap:10px;"></div>
     </div>
   </div>
 </div>
@@ -3139,6 +3150,7 @@ async function htsTabSearch(){
   var q=((g('hts-tab-q')&&g('hts-tab-q').value)||'').trim();
   var st=g('hts-tab-status'),box=g('hts-tab-results'),btn=g('hts-tab-btn');
   if(!q){if(st)st.textContent='Enter a keyword or HTS code.';return;}
+  logTradeSearch(looksLikeHts(q)?{hts_code:q}:{keyword:q});
   if(btn)btn.disabled=true; if(st){st.style.color='#888';st.textContent='Searching USITC…';} if(box)box.innerHTML='';
   try{
     var rows=await htsUsitcSearch(q);
@@ -3154,6 +3166,34 @@ async function htsTabSearch(){
         '<div style="font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700;color:#1a1a2e;">'+esc(x.htsno||'—')+'</div>'+
         '<div style="font-size:13px;color:#333;line-height:1.5;margin:6px 0 8px;">'+esc(x.description||'')+'</div>'+
         '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:#555;">'+segs.join('')+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){if(st){st.style.color='#c0392b';st.textContent='Lookup failed: '+esc(e.message);}}
+  finally{if(btn)btn.disabled=false;}
+}
+
+// Setup → HTS & Rulings tab: CBP CROSS rulings search via the shared htsCrossSearch().
+async function crossTabSearch(){
+  var q=((g('cross-tab-q')&&g('cross-tab-q').value)||'').trim();
+  var st=g('cross-tab-status'),box=g('cross-tab-results'),btn=g('cross-tab-btn');
+  if(!q){if(st)st.textContent='Enter a keyword or HTS code.';return;}
+  logTradeSearch(looksLikeHts(q)?{hts_code:q}:{keyword:q});
+  if(btn)btn.disabled=true; if(st){st.style.color='#888';st.textContent='Searching CROSS…';} if(box)box.innerHTML='';
+  try{
+    var data=await htsCrossSearch(q);
+    var rows=data.results||[];
+    if(!rows.length){box.innerHTML='<div style="color:#bbb;padding:1rem;text-align:center;">No rulings found.</div>';if(st)st.textContent='';return;}
+    if(st)st.textContent=rows.length+' of '+(data.totalHits||rows.length)+' ruling'+(data.totalHits===1?'':'s');
+    box.innerHTML=rows.map(function(x){
+      var tariffs=(x.tariffs&&x.tariffs.length)?'<div style="margin-top:8px;">'+x.tariffs.map(function(t){return '<span style="display:inline-block;font-family:ui-monospace,Menlo,monospace;font-size:11px;padding:2px 7px;border-radius:6px;background:#f0f0e8;color:#444;margin:0 4px 4px 0;">'+esc(t)+'</span>';}).join('')+'</div>':'';
+      var coll=x.collection?'<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#2244cc;">'+esc(String(x.collection).toUpperCase())+'</span> ':'';
+      var link=x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener" onclick="logTradeSearch({ruling_number:\''+esc(x.rulingNumber)+'\'})" style="font-size:12px;font-weight:600;color:#5a2db8;text-decoration:none;">View full ruling →</a>':'';
+      return '<div style="border:1px solid #e8e8e0;border-radius:9px;padding:12px;background:#fcfcfa;">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap;"><span style="font-size:14px;font-weight:700;color:#1a1a2e;">'+coll+esc(x.rulingNumber||'—')+'</span><span style="font-size:11px;color:#999;white-space:nowrap;">'+esc(x.rulingDate||'')+'</span></div>'+
+        '<div style="font-size:13px;color:#333;line-height:1.5;margin:6px 0 4px;">'+esc(x.subject||'')+'</div>'+
+        (x.categories?'<div style="font-size:12px;color:#777;">'+esc(x.categories)+'</div>':'')+
+        tariffs+
+        '<div style="margin-top:8px;">'+link+'</div>'+
       '</div>';
     }).join('');
   }catch(e){if(st){st.style.color='#c0392b';st.textContent='Lookup failed: '+esc(e.message);}}

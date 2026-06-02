@@ -38,6 +38,30 @@ async function htsUsitcSearch(query) {
   return d.results || [];
 }
 
+// CBP CROSS rulings search (keyword or HTS code) via the same proxy.
+// Returns { totalHits, results:[{ rulingNumber, rulingDate, subject, categories,
+// collection, tariffs, url }] }.
+async function htsCrossSearch(query, page) {
+  var r = await fetch('/api/trade-lookup?source=cross&q=' + encodeURIComponent(query) + (page ? '&page=' + page : ''));
+  var d = await r.json().catch(function () { return {}; });
+  if (!r.ok) throw new Error((d && d.error) || ('HTTP ' + r.status));
+  return { totalHits: d.totalHits || (d.results || []).length, results: d.results || [] };
+}
+
+// A query looks like an HTS code if it is only digits and dots.
+function looksLikeHts(q) { return /^[0-9][0-9.]{2,}$/.test((q || '').trim()); }
+
+// Log a manual search to trade_intelligence_searches (fire-and-forget).
+// fields: { hts_code?, keyword?, ruling_number? }
+function logTradeSearch(fields) {
+  try {
+    var SB_URL = (typeof SB !== 'undefined' && SB) || 'https://mjkjubctswjwjihxjpnd.supabase.co';
+    var SB_KEY = (typeof KEY !== 'undefined' && KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+    var admin = 'admin'; try { admin = localStorage.getItem('admin_user') || 'admin'; } catch (e) {}
+    fetch(SB_URL + '/rest/v1/trade_intelligence_searches', { method: 'POST', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(Object.assign({ admin_id: admin }, fields)) }).catch(function () {});
+  } catch (e) {}
+}
+
 // Cross-check an AI-estimated HTS code against real USITC data. Returns
 // { ok, matched, row, msg }.
 async function usitcVerify(htsCode) {
