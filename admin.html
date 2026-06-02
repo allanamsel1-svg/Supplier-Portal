@@ -5068,6 +5068,28 @@ function renderQuoteCard(q,rfq,idx,versions,peerStats){
       // Formulation Analysis panel (admin-only view; only shown when analysis has been run)
       (q.formulation_analysis?'<div id="fapanel-'+q.id+'" style="margin-bottom:12px;">'+renderFormulationAnalysisPanel(q)+'</div>':'<div id="fapanel-'+q.id+'"></div>')+
 
+      // Tariff & HTS classification (wires rfq_quotes hts/duty columns)
+      '<div style="background:#fafaf8;border:1px solid #e8e8e0;border-radius:8px;padding:12px 14px;margin-bottom:12px;">'+
+        '<div style="font-size:12px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">Tariff &amp; HTS Classification</div>'+
+        '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;">'+
+          '<div class="qdet-item"><div class="qdet-label">HTS (factory)</div><div class="qdet-val">'+(q.hts_code_factory?esc(q.hts_code_factory):'—')+'</div></div>'+
+          '<div class="qdet-item"><div class="qdet-label">HTS (AI estimate)</div><div class="qdet-val" id="qhtsai-'+q.id+'">'+(q.hts_ai_estimate?esc(q.hts_ai_estimate):'—')+'</div></div>'+
+          '<div class="qdet-item"><div class="qdet-label">HTS (verified)</div><input id="qhtsver-'+q.id+'" type="text" value="'+esc(q.hts_code_verified||q.hts_code_factory||'')+'" placeholder="e.g. 3304.10.0000" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;" /></div>'+
+          '<div class="qdet-item"><div class="qdet-label">Status</div><div id="qhtsstatus-'+q.id+'">'+qHtsStatusBadge(q.hts_code_status)+'</div></div>'+
+          '<div class="qdet-item"><div class="qdet-label">Est. Duty %</div><input id="qdutyest-'+q.id+'" type="number" step="0.1" value="'+(q.duty_rate_estimated!=null?q.duty_rate_estimated:'')+'" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;" /></div>'+
+          '<div class="qdet-item"><div class="qdet-label">Est. Tariff %</div><input id="qtariffest-'+q.id+'" type="number" step="0.1" value="'+(q.tariff_rate_estimated!=null?q.tariff_rate_estimated:'')+'" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;" /></div>'+
+          '<div class="qdet-item"><div class="qdet-label">Actual Duty % (paid)</div><input id="qactduty-'+q.id+'" type="number" step="0.1" value="'+(q.act_duty_pct!=null?q.act_duty_pct:'')+'" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;" /></div>'+
+          '<div class="qdet-item"><div class="qdet-label">Actual Tariff % (paid)</div><input id="qacttariff-'+q.id+'" type="number" step="0.1" value="'+(q.act_tariff_pct!=null?q.act_tariff_pct:'')+'" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;" /></div>'+
+          '<div class="qdet-item" style="grid-column:span 2;"><div class="qdet-label">Duty / Tariff Notes</div><textarea id="qdtnotes-'+q.id+'" rows="2" style="width:100%;padding:5px 7px;font-size:12px;border:1px solid #d8d8d0;border-radius:5px;font-family:inherit;box-sizing:border-box;resize:vertical;">'+esc(q.duty_tariff_notes||'')+'</textarea></div>'+
+        '</div>'+
+        '<div id="qhtsmsg-'+q.id+'" style="font-size:11px;margin-top:6px;line-height:1.4;"></div>'+
+        '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">'+
+          '<button data-qid="'+q.id+'" onclick="aiEstimateQuoteHTS(this.dataset.qid)" style="padding:6px 12px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✦ AI Estimate HTS</button>'+
+          '<button data-qid="'+q.id+'" onclick="usitcVerifyQuote(this.dataset.qid)" style="padding:6px 12px;background:#eef4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🛃 Verify in USITC</button>'+
+          '<button data-qid="'+q.id+'" onclick="saveQuoteTariff(this.dataset.qid)" style="padding:6px 12px;background:#f5f5f0;color:#555;border:1px solid #e0e0d8;border-radius:6px;font-size:11px;cursor:pointer;">💾 Save Tariff Info</button>'+
+        '</div>'+
+      '</div>'+
+
       // Action buttons
       '<div style="display:flex;gap:8px;flex-wrap:wrap;">'+
         '<button data-qid="'+q.id+'" onclick="scoreQuoteWithAI(this.dataset.qid)" style="padding:8px 16px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;">'+(hasScore?'✦ Re-score with AI':'✦ Score with AI')+'</button>'+
@@ -5430,6 +5452,97 @@ async function saveQuoteToFactory(quoteId,rfqId){
     await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({saved_to_factory:true})});
     alert('Quote saved to factory record. View it in the factory detail page under Quote History.');
   }catch(e){alert('Error: '+e.message);}
+}
+
+// ── Quote-level Tariff & HTS management (wires rfq_quotes hts/duty columns) ──
+function qHtsStatusBadge(s){
+  var map={ai_estimate:{bg:'#fff8e0',col:'#886600',lbl:'AI estimate'},usitc_verified:{bg:'#e8f8e8',col:'#1a7a1a',lbl:'USITC verified'},manually_confirmed:{bg:'#e8f0ff',col:'#2244cc',lbl:'Manually confirmed'}};
+  var x=map[s];
+  if(!x)return '<span style="font-size:11px;color:#bbb;">—</span>';
+  return '<span style="display:inline-block;font-size:9px;padding:2px 7px;background:'+x.bg+';color:'+x.col+';border-radius:9px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">'+x.lbl+'</span>';
+}
+// Parse a USITC "general" duty string into a numeric percent ("Free"→0, "3.4%"→3.4).
+function parseDutyPct(general){
+  if(general==null)return null;
+  var s=String(general).trim();
+  if(!s)return null;
+  if(/free/i.test(s))return 0;
+  var m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+  return m?parseFloat(m[1]):null;
+}
+// Run the AI HTS/duty estimate for a specific quote and persist to hts_ai_estimate etc.
+async function aiEstimateQuoteHTS(quoteId){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  var msg=g('qhtsmsg-'+quoteId);
+  if(!apiKey){if(msg){msg.style.color='#b00';msg.textContent='Add your Anthropic API key in Settings to use AI HTS estimate.';}return;}
+  if(msg){msg.style.color='#886600';msg.textContent='✦ AI estimating HTS…';}
+  try{
+    var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,rfqs(item_description,detailed_specifications,category)&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var qrows=await qr.json(); var q=qrows&&qrows[0]; if(!q)throw new Error('Quote not found');
+    var rfq=q.rfqs||{};
+    var country=Array.isArray(q.country_of_manufacture)?(q.country_of_manufacture[0]||''):(q.country_of_manufacture||'');
+    var prompt='I am importing the following product into the USA:\n'+
+      'Product description: '+(rfq.item_description||'')+'\n'+
+      'Category: '+(rfq.category||'')+'\n'+
+      'Specifications: '+(q.factory_specifications||rfq.detailed_specifications||'N/A')+'\n'+
+      'Country of manufacture: '+(country||'China (assumed)')+'\n\n'+
+      'As of April 2026, return ONLY a JSON object (no markdown):\n'+
+      '{"hts_code":"XXXX.XX.XXXX","duty_pct":number,"tariff_pct":number,"notes":"brief explanation"}';
+    var r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:300,messages:[{role:'user',content:prompt}]})});
+    var d=await r.json();
+    if(!(d.content&&d.content[0]))throw new Error((d.error&&d.error.message)||'No AI response');
+    var raw=d.content[0].text.trim().replace(/^```json\s*/,'').replace(/```$/,'').trim();
+    var result=JSON.parse(raw);
+    if(g('qhtsai-'+quoteId))g('qhtsai-'+quoteId).textContent=result.hts_code||'—';
+    if(result.duty_pct!=null&&g('qdutyest-'+quoteId))g('qdutyest-'+quoteId).value=result.duty_pct;
+    if(result.tariff_pct!=null&&g('qtariffest-'+quoteId))g('qtariffest-'+quoteId).value=result.tariff_pct;
+    if(g('qhtsver-'+quoteId)&&!g('qhtsver-'+quoteId).value&&result.hts_code)g('qhtsver-'+quoteId).value=result.hts_code;
+    if(g('qhtsstatus-'+quoteId))g('qhtsstatus-'+quoteId).innerHTML=qHtsStatusBadge('ai_estimate');
+    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({hts_ai_estimate:result.hts_code||null,duty_rate_estimated:result.duty_pct!=null?result.duty_pct:null,tariff_rate_estimated:result.tariff_pct!=null?result.tariff_pct:null,hts_code_status:'ai_estimate'})});
+    if(msg){msg.style.color='#886600';msg.textContent='⚠ AI estimate (verify before use)'+(result.hts_code?' — HTS '+result.hts_code:'')+': '+(result.notes||'');}
+  }catch(e){ if(msg){msg.style.color='#b00';msg.textContent='AI estimate failed: '+e.message;} }
+}
+// Verify the quote's entered HTS against USITC; on match, record verified HTS + real duty.
+async function usitcVerifyQuote(quoteId){
+  var inp=g('qhtsver-'+quoteId); var hts=inp?inp.value.trim():'';
+  var msg=g('qhtsmsg-'+quoteId);
+  if(!hts){if(msg){msg.style.color='#b00';msg.textContent='Enter an HTS code to verify.';}return;}
+  if(msg){msg.style.color='#886600';msg.textContent='🛃 Checking USITC…';}
+  var uv=await usitcVerify(hts);
+  if(msg){msg.style.color=usitcColor(uv);msg.textContent=uv.msg;}
+  if(uv.matched){
+    var dutyPct=parseDutyPct(uv.row.general);
+    if(dutyPct!=null&&g('qdutyest-'+quoteId))g('qdutyest-'+quoteId).value=dutyPct;
+    if(g('qhtsver-'+quoteId))g('qhtsver-'+quoteId).value=uv.row.htsno;
+    if(g('qhtsstatus-'+quoteId))g('qhtsstatus-'+quoteId).innerHTML=qHtsStatusBadge('usitc_verified');
+    var payload={hts_code_verified:uv.row.htsno,hts_code_status:'usitc_verified'};
+    if(dutyPct!=null)payload.duty_rate_estimated=dutyPct;
+    try{await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});}catch(e){}
+  }
+}
+// Save the editable tariff/HTS fields (actuals, notes, est rates, verified HTS) on a quote.
+async function saveQuoteTariff(quoteId){
+  var num=function(id){var el=g(id);if(!el||el.value==='')return null;var v=parseFloat(el.value);return isNaN(v)?null:v;};
+  var ver=g('qhtsver-'+quoteId)?g('qhtsver-'+quoteId).value.trim():'';
+  var statusEl=g('qhtsstatus-'+quoteId);
+  // Keep USITC-verified status if set this session; otherwise a present verified HTS = manually confirmed.
+  var newStatus=(statusEl&&/usitc/i.test(statusEl.textContent))?'usitc_verified':(ver?'manually_confirmed':null);
+  var payload={
+    hts_code_verified:ver||null,
+    duty_rate_estimated:num('qdutyest-'+quoteId),
+    tariff_rate_estimated:num('qtariffest-'+quoteId),
+    act_duty_pct:num('qactduty-'+quoteId),
+    act_tariff_pct:num('qacttariff-'+quoteId),
+    duty_tariff_notes:(g('qdtnotes-'+quoteId)&&g('qdtnotes-'+quoteId).value.trim())||null
+  };
+  if(newStatus)payload.hts_code_status=newStatus;
+  var msg=g('qhtsmsg-'+quoteId);
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    if(statusEl&&newStatus)statusEl.innerHTML=qHtsStatusBadge(newStatus);
+    if(msg){msg.style.color='#1a7a1a';msg.textContent='✓ Tariff info saved.';}
+  }catch(e){ if(msg){msg.style.color='#b00';msg.textContent='Save failed: '+e.message;} }
 }
 
 
