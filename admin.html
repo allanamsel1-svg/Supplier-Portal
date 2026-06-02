@@ -3910,11 +3910,15 @@ async function createVariantRfq(sourceRfqId, trueParentId){
     }
 
     msgEl.style.display='block';msgEl.style.color='#1a7a1a';msgEl.textContent='✓ Variant created. Opening in edit mode...';
-    setTimeout(function(){
+    setTimeout(async function(){
       closeVariantModal();
-      // Open the new RFQ in the edit form
-      if(typeof showRFQForm==='function')showRFQForm();
-      if(typeof loadRFQById==='function')loadRFQById(newRfq.id);
+      // Open the new variant in the edit form via editRFQ, which sequences
+      // showRFQForm (resets the kit toggle + KitBuilder) strictly BEFORE
+      // loadRFQById restores the kit. The previous fire-and-forget
+      // showRFQForm()/loadRFQById() raced — resetRFQForm clobbered loadKitForEdit
+      // and a cloned kit variant reopened as a standard (non-kit) RFQ.
+      if(typeof editRFQ==='function'){ await editRFQ(newRfq.id); }
+      else if(typeof loadRFQById==='function'){ if(typeof showRFQForm==='function')await showRFQForm(); await loadRFQById(newRfq.id); }
     },800);
   }catch(e){
     msgEl.style.display='block';msgEl.style.color='#b00';msgEl.textContent='Error: '+(e.message||e);
@@ -5464,7 +5468,10 @@ async function populateRFQEditForm(rfq){
   // Restore kit mode + components if this is a kit RFQ. (This is the edit path used
   // by the detail-pane Edit button — openRFQForm is a separate, older path.)
   // Awaited so callers (loadRFQById / editRFQ) can sequence around a fully-loaded form.
-  if(rfq.is_kit_rfq){
+  // Restore kit mode whenever the RFQ has kit data — keyed off kit_sku_id as well
+  // as is_kit_rfq, so a kit whose boolean flag didn't persist still reopens as a
+  // kit (BOM intact) instead of silently degrading to a standard RFQ.
+  if(rfq.is_kit_rfq || rfq.kit_sku_id){
     await loadKitForEdit(rfq);
   } else {
     // Ensure non-kit RFQs show as single product (toggle may persist from a prior kit edit).
