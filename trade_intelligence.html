@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trade Intelligence — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+  /* ── Admin login gate (matches admin.html) ── */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .lb { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
+  .lb p { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .lb input { width: 100%; padding: 9px 11px; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; color: #1a1a2e; font-size: 14px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box; }
+  .lb input:focus { outline: none; border-color: #1a1a2e; }
+  .lb-btn { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .lb-btn:hover { opacity: 0.87; }
+  .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
+
+  #main { display: none; }
+
+  /* ── Lookup UI ── */
+  .ti-wrap { max-width: 1140px; margin: 0 auto; padding: 1.5rem; }
+  .ti-intro { font-size: 13px; color: #777; margin-bottom: 1.25rem; line-height: 1.55; }
+  .ti-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1.5rem; align-items: start; }
+  @media (max-width: 880px) { .ti-grid { grid-template-columns: minmax(0,1fr); } }
+  .ti-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1.25rem; min-width: 0; }
+  .ti-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .ti-card-title { font-size: 15px; font-weight: 700; color: #1a1a2e; }
+  .ti-card-src { font-size: 11px; color: #aaa; margin-bottom: 12px; }
+  .ti-search { display: flex; gap: 8px; margin-bottom: 14px; }
+  .ti-search input { flex: 1; min-width: 0; padding: 9px 12px; font-size: 13px; border: 1px solid #d8d8d0; border-radius: 8px; font-family: inherit; background: #fafaf8; box-sizing: border-box; }
+  .ti-search input:focus { outline: none; border-color: #2244cc; background: #fff; }
+  .ti-search button { flex-shrink: 0; padding: 9px 18px; background: #2244cc; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .ti-search button:hover { background: #3355dd; }
+  .ti-search button:disabled { background: #aaa; cursor: not-allowed; }
+  .ti-status { font-size: 12px; color: #888; margin-bottom: 10px; min-height: 16px; }
+  .ti-status.err { color: #c0392b; }
+  .ti-results { display: flex; flex-direction: column; gap: 10px; max-height: 620px; overflow-y: auto; }
+
+  .ti-res { border: 1px solid #e8e8e0; border-radius: 9px; padding: 12px; background: #fcfcfa; }
+  .ti-res-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .ti-hts { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; font-weight: 700; color: #1a1a2e; }
+  .ti-rno { font-size: 14px; font-weight: 700; color: #1a1a2e; }
+  .ti-date { font-size: 11px; color: #999; white-space: nowrap; }
+  .ti-desc { font-size: 13px; color: #333; line-height: 1.5; margin: 6px 0 8px; }
+  .ti-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: #555; }
+  .ti-meta b { color: #1a1a2e; font-weight: 600; }
+  .ti-duty { display: inline-flex; align-items: center; gap: 5px; }
+  .ti-pill { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 10px; background: #eef2ff; color: #2244cc; }
+  .ti-chip { display: inline-block; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; padding: 2px 7px; border-radius: 6px; background: #f0f0e8; color: #444; margin: 2px 4px 2px 0; }
+  .ti-link { font-size: 12px; font-weight: 600; color: #2244cc; text-decoration: none; }
+  .ti-link:hover { text-decoration: underline; }
+  .ti-empty { font-size: 13px; color: #bbb; padding: 1.25rem 0; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- ── Admin login gate ── -->
+<div id="login">
+  <div class="lb">
+    <h1>Trade Intelligence</h1>
+    <p>Admin access required</p>
+    <input type="text" id="l-user" placeholder="Username" />
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
+      <button type="button" id="l-pass-toggle" onclick="togglePw('l-pass','l-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+    </div>
+    <button class="lb-btn" onclick="doLogin()">Sign In</button>
+    <div class="lb-err" id="l-err">Incorrect username or password.</div>
+  </div>
+</div>
+
+<!-- ── Main app ── -->
+<div id="main">
+  <div class="ri-top">
+    <div class="ri-top-title">🎯 Retail Intelligence</div>
+    <div class="ri-top-actions">
+      <a href="admin.html">← Admin</a>
+      <button onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+
+  <div class="ri-tabs">
+    <a href="intel_daily.html" class="ri-tab"><span class="ri-tab-icon">📋</span> Daily Intel</a>
+    <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
+    <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
+    <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+    <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
+    <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+    <a href="retailer_intel.html" class="ri-tab"><span class="ri-tab-icon">🏬</span> Retailer Intel <span class="ri-tab-badge beta">BETA</span></a>
+    <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+    <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
+    <a href="trade_intelligence.html" class="ri-tab active"><span class="ri-tab-icon">🛃</span> Trade Intel <span class="ri-tab-badge beta">BETA</span></a>
+  </div>
+
+  <div class="ti-wrap">
+    <div class="ti-intro">
+      Look up current U.S. import classification and precedent. <b>HTS Lookup</b> pulls live duty rates and units from the
+      USITC Harmonized Tariff Schedule; <b>CROSS Rulings</b> searches CBP classification rulings for precedent on a product or HTS code.
+    </div>
+
+    <div class="ti-grid">
+      <!-- HTS Lookup -->
+      <div class="ti-card">
+        <div class="ti-card-head"><span style="font-size:18px;">📊</span><span class="ti-card-title">USITC HTS Lookup</span></div>
+        <div class="ti-card-src">Source: hts.usitc.gov — duty rate &amp; unit of quantity</div>
+        <div class="ti-search">
+          <input type="text" id="hts-q" placeholder="Keyword (e.g. lipstick) or HTS code (e.g. 3304.10.00.00)" onkeydown="if(event.key==='Enter')htsSearch()" />
+          <button id="hts-btn" onclick="htsSearch()">Search</button>
+        </div>
+        <div class="ti-status" id="hts-status"></div>
+        <div class="ti-results" id="hts-results"></div>
+      </div>
+
+      <!-- CROSS Rulings -->
+      <div class="ti-card">
+        <div class="ti-card-head"><span style="font-size:18px;">⚖️</span><span class="ti-card-title">CBP CROSS Rulings</span></div>
+        <div class="ti-card-src">Source: rulings.cbp.gov — classification precedent</div>
+        <div class="ti-search">
+          <input type="text" id="cross-q" placeholder="Keyword (e.g. cosmetic set) or HTS code (e.g. 3304)" onkeydown="if(event.key==='Enter')crossSearch()" />
+          <button id="cross-btn" onclick="crossSearch()">Search</button>
+        </div>
+        <div class="ti-status" id="cross-status"></div>
+        <div class="ti-results" id="cross-results"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
+function looksLikeCode(q){return /^[0-9][0-9.]{2,}$/.test((q||'').trim());}
+
+// ── Admin auth gate (same pattern as admin.html) ──
+function enter(){ g('login').style.display='none'; g('main').style.display='block'; }
+async function doLogin(){
+  var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){
+      localStorage.setItem('admin_session',d.token);
+      localStorage.setItem('admin_user',u||'admin');
+      if(errEl)errEl.style.display='none';
+      enter(); return;
+    }
+    if(errEl){ errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.'; errEl.style.display='block'; }
+  }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
+}
+function doLogout(){ localStorage.removeItem('admin_session'); g('main').style.display='none'; g('login').style.display='flex'; g('l-user').value=''; g('l-pass').value=''; }
+function togglePw(inputId,btnId){
+  var inp=g(inputId),btn=g(btnId);if(!inp)return;
+  if(inp.type==='password'){inp.type='text';if(btn){btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}}
+  else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
+}
+(async function(){
+  var tok=localStorage.getItem('admin_session');
+  if(!tok)return;
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&(d.ok||d.unconfigured))enter();
+    else localStorage.removeItem('admin_session');
+  }catch(e){ enter(); }   // network error → don't lock out an existing session
+})();
+
+// ── Log a search to trade_intelligence_searches (fire-and-forget) ──
+function logSearch(fields){
+  try{
+    var payload=Object.assign({admin_id:localStorage.getItem('admin_user')||'admin'},fields);
+    fetch(SB+'/rest/v1/trade_intelligence_searches',{
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(payload)
+    }).catch(function(){});
+  }catch(e){}
+}
+
+// ── USITC HTS Lookup ──
+async function htsSearch(){
+  var q=g('hts-q').value.trim();
+  if(!q){g('hts-status').textContent='Enter a keyword or HTS code.';return;}
+  var btn=g('hts-btn'),box=g('hts-results'),st=g('hts-status');
+  btn.disabled=true; st.className='ti-status'; st.textContent='Searching USITC…'; box.innerHTML='';
+  var isCode=looksLikeCode(q);
+  logSearch(isCode?{hts_code:q}:{keyword:q});
+  try{
+    var r=await fetch('/api/trade-lookup?source=hts&q='+encodeURIComponent(q));
+    var d=await r.json();
+    if(!r.ok)throw new Error(d&&d.error||('HTTP '+r.status));
+    var rows=(d.results||[]);
+    if(!rows.length){box.innerHTML='<div class="ti-empty">No HTS entries found.</div>';st.textContent='';return;}
+    st.textContent=rows.length+' result'+(rows.length===1?'':'s');
+    box.innerHTML=rows.map(function(x){
+      var duty=[];
+      if(x.general)duty.push('<span class="ti-duty"><b>General:</b> '+esc(x.general)+'</span>');
+      if(x.special)duty.push('<span class="ti-duty"><b>Special:</b> '+esc(x.special)+'</span>');
+      if(x.other)duty.push('<span class="ti-duty"><b>Col. 2:</b> '+esc(x.other)+'</span>');
+      var units=(x.units&&x.units.length)?'<span><b>Unit:</b> '+esc(x.units.join(' / '))+'</span>':'';
+      return '<div class="ti-res">'+
+        '<div class="ti-res-top"><span class="ti-hts">'+esc(x.htsno||'—')+'</span></div>'+
+        '<div class="ti-desc">'+esc(x.description||'')+'</div>'+
+        '<div class="ti-meta">'+duty.join('')+units+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){ st.className='ti-status err'; st.textContent='Lookup failed: '+esc(e.message); }
+  finally{ btn.disabled=false; }
+}
+
+// ── CBP CROSS Rulings Lookup ──
+async function crossSearch(){
+  var q=g('cross-q').value.trim();
+  if(!q){g('cross-status').textContent='Enter a keyword or HTS code.';return;}
+  var btn=g('cross-btn'),box=g('cross-results'),st=g('cross-status');
+  btn.disabled=true; st.className='ti-status'; st.textContent='Searching CROSS…'; box.innerHTML='';
+  logSearch(looksLikeCode(q)?{hts_code:q,keyword:q}:{keyword:q});
+  try{
+    var r=await fetch('/api/trade-lookup?source=cross&q='+encodeURIComponent(q));
+    var d=await r.json();
+    if(!r.ok)throw new Error(d&&d.error||('HTTP '+r.status));
+    var rows=(d.results||[]);
+    if(!rows.length){box.innerHTML='<div class="ti-empty">No rulings found.</div>';st.textContent='';return;}
+    st.textContent=rows.length+' of '+(d.totalHits||rows.length)+' ruling'+(d.totalHits===1?'':'s');
+    box.innerHTML=rows.map(function(x){
+      var tariffs=(x.tariffs&&x.tariffs.length)?'<div style="margin-top:8px;">'+x.tariffs.map(function(t){return '<span class="ti-chip">'+esc(t)+'</span>';}).join('')+'</div>':'';
+      var coll=x.collection?'<span class="ti-pill">'+esc(String(x.collection).toUpperCase())+'</span>':'';
+      var cat=x.categories?'<span><b>Category:</b> '+esc(x.categories)+'</span>':'';
+      var link=x.url?'<a class="ti-link" href="'+esc(x.url)+'" target="_blank" rel="noopener" onclick="logSearch({ruling_number:\''+esc(x.rulingNumber)+'\'})">View full ruling →</a>':'';
+      return '<div class="ti-res">'+
+        '<div class="ti-res-top"><span class="ti-rno">'+coll+' '+esc(x.rulingNumber||'—')+'</span><span class="ti-date">'+esc(x.rulingDate||'')+'</span></div>'+
+        '<div class="ti-desc">'+esc(x.subject||'')+'</div>'+
+        '<div class="ti-meta">'+cat+'</div>'+
+        tariffs+
+        '<div style="margin-top:8px;">'+link+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){ st.className='ti-status err'; st.textContent='Lookup failed: '+esc(e.message); }
+  finally{ btn.disabled=false; }
+}
+</script>
+</body>
+</html>
