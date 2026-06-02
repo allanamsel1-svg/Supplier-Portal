@@ -10,18 +10,7 @@
 // Note: Programmable Fax must be enabled on the Twilio account.
 export const config = { runtime: 'nodejs' };
 
-const SB_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
-
-async function logComm(row) {
-  try {
-    await fetch(SB_URL + '/rest/v1/twilio_communications', {
-      method: 'POST',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(row),
-    });
-  } catch (e) { /* best-effort */ }
-}
+import { logComm } from '../lib/twilio-log.mjs';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
