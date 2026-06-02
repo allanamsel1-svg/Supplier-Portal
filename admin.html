@@ -2065,6 +2065,44 @@
 </div>
 
 <!-- ── Supplier Detail Drawer ── -->
+<!-- Twilio SMS modal -->
+<div id="tw-sms-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#fff;border-radius:12px;width:460px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div style="padding:12px 16px;background:#1a1a2e;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#fff;font-size:14px;font-weight:600;">💬 Send SMS <span id="tw-sms-fac" style="font-weight:400;color:#bbb;font-size:12px;"></span></span>
+      <button onclick="g('tw-sms-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:1rem;">
+      <div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">To (phone)</label><input id="tw-sms-to" type="tel" placeholder="+8613800000000" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;" /></div>
+      <div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">Message</label><textarea id="tw-sms-body" rows="4" placeholder="Type your message…" style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;resize:vertical;"></textarea></div>
+      <div id="tw-sms-msg" style="font-size:12px;min-height:16px;margin-bottom:6px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button onclick="g('tw-sms-modal').style.display='none'" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="tw-sms-send" onclick="sendSms()" style="padding:8px 16px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Send SMS</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Twilio Fax modal -->
+<div id="tw-fax-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:1100;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#fff;border-radius:12px;width:460px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+    <div style="padding:12px 16px;background:#1a1a2e;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:#fff;font-size:14px;font-weight:600;">📠 Send Fax <span id="tw-fax-fac" style="font-weight:400;color:#bbb;font-size:12px;"></span></span>
+      <button onclick="g('tw-fax-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:1rem;">
+      <div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">To (fax number)</label><input id="tw-fax-to" type="tel" placeholder="+8620..." style="width:100%;padding:8px;border:1px solid #e0e0d8;border-radius:6px;font-size:13px;font-family:inherit;box-sizing:border-box;" /></div>
+      <div style="margin-bottom:8px;"><label style="font-size:11px;color:#888;display:block;margin-bottom:3px;">PDF document</label><input id="tw-fax-file" type="file" accept=".pdf,application/pdf" style="width:100%;font-size:12px;" /></div>
+      <div id="tw-fax-msg" style="font-size:12px;min-height:16px;margin-bottom:6px;"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button onclick="g('tw-fax-modal').style.display='none'" style="padding:8px 16px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="tw-fax-send" onclick="sendFax()" style="padding:8px 16px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">Send Fax</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="supplier-drawer">
   <div class="drawer-header">
@@ -2154,6 +2192,11 @@
         <div class="d-field"><div class="d-label">WeChat</div><div class="d-value" id="d-wechat">—</div><input class="d-input" id="de-wechat" type="text" placeholder="WeChat ID" style="display:none" /></div>
         <div class="d-field"><div class="d-label">WhatsApp</div><div class="d-value" id="d-whatsapp">—</div><input class="d-input" id="de-whatsapp" type="tel" placeholder="+86 138..." style="display:none" /></div>
       </div>
+    </div>
+
+    <div class="d-section">
+      <div class="d-section-title">Communications</div>
+      <div id="d-comms"><div style="font-size:12px;color:#aaa;">Open a factory to load communications.</div></div>
     </div>
 
     <div class="d-section">
@@ -2942,6 +2985,7 @@ async function openDrawer(id,e){
   dv('d-tel',f.telephone);
   dv('d-wechat',f.sales_wechat);
   dv('d-whatsapp',f.sales_whatsapp);
+  renderFactoryComms(f);
 
   // Address
   dv('d-address',f.address);
@@ -3054,6 +3098,104 @@ async function openDrawer(id,e){
   g('supplier-drawer').classList.add('open');
   g('supplier-drawer').scrollTop=0;
   }catch(ex){console.error('openDrawer error:',ex);}
+}
+
+// ── Twilio communications (factory drawer) ──
+var _twFactory=null;
+function renderFactoryComms(f){
+  _twFactory={id:f.id,name:f.factory_name_english||'',mobile:f.sales_mobile||'',tel:f.telephone||'',whatsapp:f.sales_whatsapp||''};
+  var el=g('d-comms'); if(!el)return;
+  var phone=_twFactory.mobile||_twFactory.tel||'';
+  el.innerHTML=
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">'+
+      '<button onclick="openSmsModal()" style="padding:7px 13px;background:#eef4ff;color:#2244cc;border:1px solid #c0d0f0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">💬 Send SMS</button>'+
+      '<button onclick="callFactory()" style="padding:7px 13px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📞 Call</button>'+
+      '<button onclick="openFaxModal()" style="padding:7px 13px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📠 Send Fax</button>'+
+      (phone?'<span style="font-size:11px;color:#aaa;">'+esc(phone)+'</span>':'<span style="font-size:11px;color:#c0392b;">No phone on file</span>')+
+    '</div>'+
+    '<div id="comm-thread" style="border:1px solid #e8e8e0;border-radius:8px;max-height:280px;overflow-y:auto;padding:8px;background:#fafaf8;font-size:12px;">Loading history…</div>';
+  loadCommHistory(f.id);
+}
+async function loadCommHistory(factoryId){
+  var box=g('comm-thread'); if(!box)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/twilio_communications?factory_id=eq.'+factoryId+'&order=created_at.desc&limit=100',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+    var rows=r.ok?await r.json():[];
+    if(!rows.length){box.innerHTML='<div style="color:#bbb;text-align:center;padding:1rem;">No communications yet.</div>';return;}
+    var icon={sms:'💬',voice:'📞',fax:'📠',whatsapp:'🟢'};
+    box.innerHTML=rows.map(function(c){
+      var out=c.direction==='outbound';
+      var when=c.created_at?new Date(c.created_at).toLocaleString():'';
+      return '<div style="display:flex;justify-content:'+(out?'flex-end':'flex-start')+';margin-bottom:6px;">'+
+        '<div style="max-width:82%;background:'+(out?'#e8f0ff':'#fff')+';border:1px solid '+(out?'#c0d0f0':'#e0e0d8')+';border-radius:8px;padding:7px 10px;">'+
+          '<div style="font-size:10px;color:#888;margin-bottom:2px;">'+(icon[c.channel]||'')+' '+esc((c.channel||'').toUpperCase())+' · '+(out?'OUT':'IN')+(c.status?' · '+esc(c.status):'')+'</div>'+
+          '<div style="color:#1a1a2e;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;">'+esc(c.body||'')+'</div>'+
+          '<div style="font-size:10px;color:#bbb;margin-top:3px;">'+esc(when)+'</div>'+
+        '</div></div>';
+    }).join('');
+  }catch(e){box.innerHTML='<div style="color:#b00;">Failed to load: '+esc(e.message)+'</div>';}
+}
+function openSmsModal(){
+  if(!_twFactory)return;
+  g('tw-sms-fac').textContent=_twFactory.name?('· '+_twFactory.name):'';
+  g('tw-sms-to').value=_twFactory.mobile||_twFactory.tel||'';
+  g('tw-sms-body').value='';
+  var m=g('tw-sms-msg');m.textContent='';m.style.color='';
+  g('tw-sms-modal').style.display='flex';
+}
+async function sendSms(){
+  var to=g('tw-sms-to').value.trim(),msg=g('tw-sms-body').value.trim(),el=g('tw-sms-msg'),btn=g('tw-sms-send');
+  if(!to||!msg){el.style.color='#b00';el.textContent='Enter a phone number and message.';return;}
+  btn.disabled=true;el.style.color='#888';el.textContent='Sending…';
+  try{
+    var r=await fetch('/api/twilio-sms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,message:msg,factory_id:_twFactory&&_twFactory.id})});
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    el.style.color='#1a7a1a';el.textContent='✓ Sent ('+(d.status||'queued')+')';
+    setTimeout(function(){g('tw-sms-modal').style.display='none';if(_twFactory)loadCommHistory(_twFactory.id);},900);
+  }catch(e){el.style.color='#b00';el.textContent='Failed: '+e.message;}
+  finally{btn.disabled=false;}
+}
+async function callFactory(){
+  if(!_twFactory)return;
+  var phone=_twFactory.mobile||_twFactory.tel||'';
+  if(!phone){alert('No phone number on file for this factory.');return;}
+  if(!confirm('Place an automated Twilio call to '+phone+'?'))return;
+  try{
+    var r=await fetch('/api/twilio-voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:phone,factory_id:_twFactory.id})});
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    alert('Call initiated ('+(d.status||'queued')+').');
+    loadCommHistory(_twFactory.id);
+  }catch(e){alert('Call failed: '+e.message);}
+}
+function openFaxModal(){
+  if(!_twFactory)return;
+  g('tw-fax-fac').textContent=_twFactory.name?('· '+_twFactory.name):'';
+  g('tw-fax-to').value=_twFactory.tel||_twFactory.mobile||'';
+  if(g('tw-fax-file'))g('tw-fax-file').value='';
+  var m=g('tw-fax-msg');m.textContent='';m.style.color='';
+  g('tw-fax-modal').style.display='flex';
+}
+async function sendFax(){
+  var to=g('tw-fax-to').value.trim(),fileEl=g('tw-fax-file'),el=g('tw-fax-msg'),btn=g('tw-fax-send');
+  var file=fileEl&&fileEl.files&&fileEl.files[0];
+  if(!to||!file){el.style.color='#b00';el.textContent='Enter a fax number and attach a PDF.';return;}
+  btn.disabled=true;el.style.color='#888';el.textContent='Uploading PDF…';
+  try{
+    var ts=Date.now();var safe=file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
+    var path=(_twFactory&&_twFactory.id?_twFactory.id:'misc')+'/'+ts+'_'+safe;
+    var up=await fetch(SB+'/storage/v1/object/twilio-fax/'+path,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/pdf','x-upsert':'true'},body:file});
+    if(!up.ok)throw new Error('Upload failed ('+up.status+')');
+    var mediaUrl=SB+'/storage/v1/object/public/twilio-fax/'+path;
+    el.textContent='Sending fax…';
+    var r=await fetch('/api/twilio-fax',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:to,mediaUrl:mediaUrl,factory_id:_twFactory&&_twFactory.id})});
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    el.style.color='#1a7a1a';el.textContent='✓ Fax queued ('+(d.status||'queued')+')';
+    setTimeout(function(){g('tw-fax-modal').style.display='none';if(_twFactory)loadCommHistory(_twFactory.id);},900);
+  }catch(e){el.style.color='#b00';el.textContent='Failed: '+e.message;}
+  finally{btn.disabled=false;}
 }
 
 function closeDrawer(){
