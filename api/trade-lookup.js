@@ -43,8 +43,14 @@ function looksLikeCode(q) {
   return /^[0-9][0-9.]{2,}$/.test(q.trim());
 }
 function normCode(q) {
-  // keep digits/dots, collapse stray separators
-  return q.trim().replace(/[^0-9.]/g, '');
+  // Normalize any HTS code to USITC dotted form XXXX.XX.XX.XX: strip to digits,
+  // then regroup as a 4-digit heading + 2-digit segments. This converts a
+  // 4-2-4 entry like "3304.10.0000" to "3304.10.00.00" (and is idempotent for
+  // already-correct codes / headings) so the USITC range lookup matches.
+  const d = q.trim().replace(/\D/g, '');
+  if (d.length <= 4) return d;
+  const rest = d.slice(4).match(/.{1,2}/g) || [];
+  return d.slice(0, 4) + '.' + rest.join('.');
 }
 
 async function htsByCode(code) {
@@ -62,11 +68,33 @@ async function htsByCode(code) {
   }));
 }
 
+// USITC keyword search is literal (substring of the description), so a specific
+// term like "lipstick" matches nothing while "lip" matches "Lip make-up
+// preparations". Build progressively broader candidates — full phrase → first
+// word → suffix-stripped stem → shrinking prefixes (down to 3 chars) — so the
+// search degrades to the closest matching stem instead of returning nothing.
+function keywordVariants(kw) {
+  const k = (kw || '').trim();
+  const first = k.split(/\s+/)[0] || k;
+  const variants = [];
+  const push = (v) => { v = (v || '').trim(); if (v.length >= 3 && variants.indexOf(v) === -1) variants.push(v); };
+  push(k);
+  push(first);
+  push(first.replace(/(ies|es|ing|ed|s)$/i, ''));
+  for (let len = Math.min(first.length - 1, 6); len >= 3; len--) push(first.slice(0, len));
+  return variants;
+}
+async function searchHits(keyword) {
+  const hits = await fetchJson(`${HTS_BASE}/search?keyword=${encodeURIComponent(keyword)}`);
+  return (Array.isArray(hits) ? hits : []).filter((h) => h && h.htsno);
+}
 async function htsByKeyword(keyword) {
-  const url = `${HTS_BASE}/search?keyword=${encodeURIComponent(keyword)}`;
-  const hits = await fetchJson(url);
-  const list = (Array.isArray(hits) ? hits : [])
-    .filter((h) => h && h.htsno)
+  let hits = [];
+  for (const v of keywordVariants(keyword)) {
+    try { hits = await searchHits(v); } catch { hits = []; }
+    if (hits.length) break;
+  }
+  const list = hits
     .slice(0, 25)
     .map((h) => ({
       htsno: h.htsno,
