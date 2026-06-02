@@ -3109,6 +3109,15 @@ function addVarRow(){
   el.appendChild(row);
 }
 
+// Valid HTS format: 4.2 (3304.10), 4.2.4 (3304.10.0000) or full 4.2.2.2.
+// Empty is allowed (the field is optional).
+function isValidHts(v){
+  if(v==null)return true;
+  var s=String(v).trim();
+  if(!s)return true;
+  return /^\d{4}\.\d{2}(\.\d{4}|\.\d{2}(\.\d{2})?)?$/.test(s);
+}
+
 // Cross-check an AI-estimated HTS code against real USITC data via the
 // server proxy (api/trade-lookup.js). Returns {ok,matched,row,msg}.
 async function usitcVerify(htsCode){
@@ -3263,6 +3272,13 @@ async function saveSku(){
   var model=g('sf-model')?g('sf-model').value.trim():'';
   var desc=g('sf-desc')?g('sf-desc').value.trim():'';
   if(!brand||!cat||!model||!desc){alert('Brand, Category, Model Number and Description are required.');return;}
+  var csHts=g('cs-hts')?g('cs-hts').value.trim():'';
+  if(csHts&&!isValidHts(csHts)){
+    if(g('cs-hts-usitc')){g('cs-hts-usitc').textContent='Invalid HTS format — expected e.g. 3304.10.0000 or 3304.10';g('cs-hts-usitc').style.color='#b00';}
+    alert('Invalid HTS code format: "'+csHts+'". Expected e.g. 3304.10.0000 or 3304.10.');
+    if(g('cs-hts'))g('cs-hts').focus();
+    return;
+  }
 
   var bOpt=g('sf-brand').options[g('sf-brand').selectedIndex];
   var cOpt=g('sf-category').options[g('sf-category').selectedIndex];

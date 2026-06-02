@@ -6697,6 +6697,15 @@ function rfqBrandChanged(){
   calcMargins();
 }
 
+// Valid HTS format: 4.2 (3304.10), 4.2.4 (3304.10.0000) or full 4.2.2.2
+// (3304.10.00.00). Empty is allowed (the field is optional at entry points).
+function isValidHts(v){
+  if(v==null)return true;
+  var s=String(v).trim();
+  if(!s)return true;
+  return /^\d{4}\.\d{2}(\.\d{4}|\.\d{2}(\.\d{2})?)?$/.test(s);
+}
+
 // Cross-check an AI-estimated HTS code against real USITC data via the
 // server proxy (api/trade-lookup.js). Returns {ok,matched,row,msg}.
 async function usitcVerify(htsCode){
@@ -6783,6 +6792,8 @@ function toggleFactorySelect(id){
 async function saveRFQ(action){
   var desc=g('rfq-description').value.trim();
   if(!desc){alert('Item description is required.');return;}
+  var rfqHts=(g('rfq-est-hts')&&g('rfq-est-hts').value.trim())||'';
+  if(rfqHts&&!isValidHts(rfqHts)){alert('The suggested HTS code "'+rfqHts+'" is not a valid format (expected e.g. 3304.10.0000 or 3304.10). Re-run the AI suggestion or clear it before saving.');return;}
 
   var catId=g('rfq-category-id').value;
   var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
@@ -11252,6 +11263,13 @@ function recalcPD(){
 async function savePDAll(silent){
   if(!pdCurrentDetail)return;
   if(pdSaving)return; // already saving
+  // HTS format validation (block save on malformed code) — before pdSaving lock.
+  var _csHts=(g('cs-hts')&&g('cs-hts').value.trim())||'';
+  if(_csHts&&!isValidHts(_csHts)){
+    if(g('cs-hts-usitc')){g('cs-hts-usitc').textContent='Invalid HTS format — expected e.g. 3304.10.0000 or 3304.10';g('cs-hts-usitc').style.color='#b00';}
+    if(!silent)alert('Invalid HTS code format: "'+_csHts+'". Expected e.g. 3304.10.0000 or 3304.10.');
+    return;
+  }
   pdSaving=true;
   if(!silent)updatePDSaveIndicator('saving');
   else updatePDSaveIndicator('saving');

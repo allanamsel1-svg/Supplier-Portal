@@ -3947,9 +3947,20 @@ function toggleRFQ(rfqId){
   if(body)body.classList.toggle('open');
 }
 
+// Valid HTS format: 4.2 (3304.10), 4.2.4 (3304.10.0000) or full 4.2.2.2.
+// Empty is allowed (HTS is "if known").
+function isValidHts(v){
+  if(v==null)return true;
+  var s=String(v).trim();
+  if(!s)return true;
+  return /^\d{4}\.\d{2}(\.\d{4}|\.\d{2}(\.\d{2})?)?$/.test(s);
+}
+
 async function saveQuoteDraft(rfqId){
   if(!FACTORY_ID){alert('Factory not loaded.');return;}
   var btn=g('qdraft-'+rfqId);btn.disabled=true;btn.textContent='Saving...';
+  var qHtsD=g('qhts-'+rfqId)?g('qhts-'+rfqId).value.trim():'';
+  if(qHtsD&&!isValidHts(qHtsD)){var ed=g('qerr-'+rfqId);if(ed){ed.textContent='HTS code format looks invalid — expected e.g. 8513.10.2000 or 3304.10. Please correct or clear it.';ed.style.display='block';}btn.disabled=false;btn.textContent='💾 Save Draft';return;}
   var existingId=g('qquoteid-'+rfqId).value;
   var assignId=g('qassignid-'+rfqId).value;
 
@@ -4054,6 +4065,8 @@ async function submitQuote(rfqId){
   var fobPortRaw=g('qfobport-'+rfqId)?g('qfobport-'+rfqId).value.trim():'';
   if(!fob||!moq){alert('Please enter at least Unit FOB price and MOQ.');return;}
   if(!fobPortRaw){alert('Please enter the FOB Port for this quote. If you can ship from multiple ports, submit a separate quote for each.');return;}
+  var qHtsS=g('qhts-'+rfqId)?g('qhts-'+rfqId).value.trim():'';
+  if(qHtsS&&!isValidHts(qHtsS)){showQuoteErr(rfqId,'HTS code format looks invalid — expected e.g. 8513.10.2000 or 3304.10. Please correct or clear it.');return;}
   var btn=g('qbtn-'+rfqId);
   btn.disabled=true;btn.textContent='Submitting...';
   var existingId=g('qquoteid-'+rfqId).value;
