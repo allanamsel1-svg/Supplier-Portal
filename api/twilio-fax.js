@@ -1,13 +1,15 @@
 // api/twilio-fax.js
 //
-// Send a fax via the Twilio Programmable Fax API. Credentials are server-side
-// only. Requires a publicly reachable PDF URL (mediaUrl) — the admin UI uploads
-// the PDF to the public `twilio-fax` Supabase bucket and passes its public URL.
-// Logs the fax to twilio_communications.
+// Send a fax via EMAIL-TO-FAX. Twilio Programmable Fax (/v1/Faxes) is
+// deprecated on this account ("resource /v1/Faxes was not found"), so instead
+// we email the PDF to the Fax.Plus gateway ({digits}@fax.plus) via SendGrid.
+// The admin UI uploads the PDF to the public `twilio-fax` Supabase bucket and
+// passes its public URL (mediaUrl); we fetch + attach it. Logs to
+// twilio_communications.
 //
-//   POST { to, mediaUrl, factory_id? } → { success, sid, status }
-//
-// Note: Programmable Fax must be enabled on the Twilio account.
+//   POST { to, mediaUrl, factory_id? }
+//     → { success:true, status:'sent', via:'email-to-fax', gateway }
+//     → on failure: { error, fallback:true, number }  (clear manual-send message)
 export const config = { runtime: 'nodejs' };
 
 async function logComm(row) {
@@ -45,9 +47,6 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const SID = process.env.TWILIO_ACCOUNT_SID, TOKEN = process.env.TWILIO_AUTH_TOKEN, FROM = process.env.TWILIO_PHONE_NUMBER;
-  if (!SID || !TOKEN || !FROM) return res.status(500).json({ error: 'Twilio environment variables are not configured' });
-
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
@@ -56,18 +55,44 @@ export default async function handler(req, res) {
   const factory_id = body.factory_id || null;
   if (!to || !mediaUrl) return res.status(400).json({ error: 'Missing "to" or "mediaUrl"' });
 
+  const SENDGRID_KEY = process.env.SENDGRID_API_KEY;
+  const FROM_EMAIL = 'sourcing@tbgsourcing.net';
+  const digits = to.replace(/\D/g, '');                 // Fax.Plus wants digits-only, no '+'
+  const faxAddr = digits + '@fax.plus';
+  const fallbackMsg = 'Fax not available — please use Dropbox Fax at fax.plus to send manually to ' + to;
+  const fail = async (detail) => {
+    try { await logComm({ factory_id, direction: 'outbound', channel: 'fax', to_number: to, from_number: FROM_EMAIL, body: 'Email-to-fax not sent (' + faxAddr + ') — ' + mediaUrl, status: 'failed', twilio_sid: null, has_attachment: true }); } catch {}
+    return res.status(502).json({ error: fallbackMsg, fallback: true, number: to, detail: detail || undefined });
+  };
+
+  if (!SENDGRID_KEY) return fail('SENDGRID_API_KEY not configured');
+  if (!digits) return fail('Invalid fax number');
+
   try {
-    const params = new URLSearchParams({ To: to, From: FROM, MediaUrl: mediaUrl });
-    const r = await fetch('https://fax.twilio.com/v1/Faxes', {
+    // Fetch the uploaded PDF and attach it to the gateway email.
+    const pdfResp = await fetch(mediaUrl);
+    if (!pdfResp.ok) return fail('Could not fetch the PDF (' + pdfResp.status + ')');
+    const b64 = Buffer.from(await pdfResp.arrayBuffer()).toString('base64');
+
+    const payload = {
+      personalizations: [{ to: [{ email: faxAddr }] }],
+      from: { email: FROM_EMAIL, name: 'TBG Sourcing' },
+      subject: 'Fax to ' + to,
+      content: [{ type: 'text/plain', value: 'Fax document attached (sent via the Fax.Plus email-to-fax gateway).' }],
+      attachments: [{ content: b64, filename: 'fax-' + digits + '.pdf', type: 'application/pdf', disposition: 'attachment' }],
+    };
+    const sg = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
-      headers: { Authorization: 'Basic ' + Buffer.from(SID + ':' + TOKEN).toString('base64'), 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString(),
+      headers: { Authorization: 'Bearer ' + SENDGRID_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) return res.status(r.status).json({ error: (d && d.message) || 'Twilio fax failed', code: d && d.code });
-    await logComm({ factory_id, direction: 'outbound', channel: 'fax', to_number: to, from_number: FROM, body: mediaUrl, status: d.status || 'queued', twilio_sid: d.sid || null });
-    return res.status(200).json({ success: true, sid: d.sid, status: d.status });
+    if (!sg.ok) {
+      const e = await sg.json().catch(() => ({}));
+      return fail((e.errors && e.errors[0] && e.errors[0].message) || ('SendGrid ' + sg.status));
+    }
+    await logComm({ factory_id, direction: 'outbound', channel: 'fax', to_number: to, from_number: FROM_EMAIL, body: 'Email-to-fax via ' + faxAddr + ' — ' + mediaUrl, status: 'sent', twilio_sid: null, has_attachment: true });
+    return res.status(200).json({ success: true, status: 'sent', via: 'email-to-fax', gateway: faxAddr });
   } catch (e) {
-    return res.status(502).json({ error: e.message });
+    return fail(e.message);
   }
 }
