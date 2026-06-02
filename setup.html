@@ -2649,7 +2649,7 @@ function renderSkuForm(sku,pkg,variations,sources,costing,certs){
   card('Costing & Freight',
     // Trade info
     grid('1fr 1fr 1fr','10px',
-      fld('HTS Code',txtIn('cs-hts',cv(costing,'hts_code'),'e.g. 3304.99.5000')+'<button onclick="aiSuggestHTS()" style="margin-top:4px;width:100%;font-size:11px;padding:3px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;">✦ AI Suggest Duty & Tariff</button>')+
+      fld('HTS Code',txtIn('cs-hts',cv(costing,'hts_code'),'e.g. 3304.99.5000')+'<button onclick="aiSuggestHTS()" style="margin-top:4px;width:100%;font-size:11px;padding:3px;background:#eef2ff;border:1px solid #c0d0f0;border-radius:5px;cursor:pointer;">✦ AI Suggest Duty & Tariff</button><span id="cs-hts-usitc" style="display:block;font-size:10px;margin-top:3px;line-height:1.4;"></span>')+
       fld('Country of Origin',txtIn('cs-origin',cv(costing,'country_of_origin','China')))+
       fld('FOB Port',txtIn('cs-port',cv(costing,'fob_port'),'e.g. Yantian, Shekou'))
     )+
@@ -3109,6 +3109,29 @@ function addVarRow(){
   el.appendChild(row);
 }
 
+// Cross-check an AI-estimated HTS code against real USITC data via the
+// server proxy (api/trade-lookup.js). Returns {ok,matched,row,msg}.
+async function usitcVerify(htsCode){
+  var out={ok:false,matched:false,row:null,msg:''};
+  if(!htsCode)return out;
+  try{
+    var r=await fetch('/api/trade-lookup?source=hts&q='+encodeURIComponent(htsCode));
+    var d=await r.json().catch(function(){return {};});
+    if(!r.ok){out.msg='USITC check unavailable';return out;}
+    out.ok=true;
+    var rows=d.results||[];
+    var norm=function(s){return String(s||'').replace(/[^0-9]/g,'');};
+    var nq=norm(htsCode);
+    var hit=rows.find(function(x){return norm(x.htsno)===nq;})
+      ||rows.find(function(x){var nx=norm(x.htsno);return nx&&(nx.indexOf(nq)===0||nq.indexOf(nx)===0);});
+    if(hit){out.matched=true;out.row=hit;
+      out.msg='✓ USITC verified — '+hit.htsno+': '+hit.description+' · Duty (General): '+(hit.general||'n/a')+((hit.units&&hit.units.length)?' · Unit: '+hit.units.join('/'):'');}
+    else{out.msg='⚠ HTS '+htsCode+' not found in USITC — unverified';}
+  }catch(e){out.msg='USITC check failed';}
+  return out;
+}
+function usitcColor(uv){return uv.matched?'#1a7a1a':(uv.ok?'#b00':'#886600');}
+
 // ── AI HTS suggest ──
 async function aiSuggestHTS(){
   var apiKey=localStorage.getItem('anthropic_key')||'';
@@ -3131,7 +3154,15 @@ async function aiSuggestHTS(){
       if(g('cs-tariff')&&res.tariff_pct!==undefined){g('cs-tariff').value=res.tariff_pct;if(g('cs-tariff-src'))g('cs-tariff-src').textContent='(AI)';}
       if(g('cs-hts')&&res.hts&&!hts)g('cs-hts').value=res.hts;
       recalcAll();
-      if(res.notes)alert('AI note: '+res.notes+'\n\nVerify with your customs broker.');
+      // USITC cross-check on the resulting HTS code
+      var uvMsg='';
+      var checkHts=g('cs-hts')?g('cs-hts').value.trim():(res.hts||'');
+      if(checkHts){
+        var uv=await usitcVerify(checkHts);
+        uvMsg=uv.msg?('\n\n'+uv.msg):'';
+        if(g('cs-hts-usitc')){g('cs-hts-usitc').textContent=uv.msg;g('cs-hts-usitc').style.color=usitcColor(uv);}
+      }
+      alert('AI note: '+(res.notes||'(none)')+'\n\nVerify with your customs broker.'+uvMsg);
     }
   }catch(e){alert('Error: '+e.message);}
   btn.textContent='✦ AI Suggest Duty & Tariff';btn.disabled=false;
