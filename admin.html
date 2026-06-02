@@ -2242,7 +2242,9 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var ADMIN_USER=localStorage.getItem('admin_user')||'admin';
 var BUILD_MARKER='KIT-BUILD-2026-05-27-A';  // bump to verify deploys reached the browser
 console.log('admin.html build:', BUILD_MARKER);
-var ADMIN_PASS=localStorage.getItem('admin_pass')||'supplier2024';
+// Admin password is verified SERVER-SIDE via /api/admin-auth (ADMIN_PASSWORD env
+// var on Vercel) — it is no longer a hardcoded client string. The session is an
+// HMAC-signed token issued by that endpoint.
 var allFactories=[];
 var allCategories=[];
 var allBrands=[];
@@ -2477,12 +2479,20 @@ async function createPackagingVariant(parentSkuId, np, mode){
   return (Array.isArray(irows)?irows[0]:irows).id;
 }
 
-function doLogin(){
+async function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value;
-  if(u===ADMIN_USER&&p===ADMIN_PASS){
-    localStorage.setItem('admin_session','1');
-    g('login').style.display='none';g('main').style.display='flex';loadData();
-  }else{g('l-err').style.display='block';}
+  var errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){
+      localStorage.setItem('admin_session',d.token);
+      if(errEl)errEl.style.display='none';
+      g('login').style.display='none';g('main').style.display='flex';loadData();
+      return;
+    }
+    if(errEl){ errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.'; errEl.style.display='block'; }
+  }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
 }
 function doLogout(){localStorage.removeItem('admin_session');g('main').style.display='none';g('login').style.display='flex';g('l-user').value='';g('l-pass').value='';}
 
@@ -12001,7 +12011,9 @@ async function sendRFQFollowup(assignmentId,factoryName,email,contactName,projec
   }catch(e){alert('Send failed: '+(e.text||e.message));}
 }
 
-function saveCreds(){var u=g('set-user').value.trim(),p=g('set-pass').value;if(u){localStorage.setItem('admin_user',u);ADMIN_USER=u;}if(p){localStorage.setItem('admin_pass',p);ADMIN_PASS=p;}flash('cred-saved');}
+// The admin password is managed server-side (ADMIN_PASSWORD env var on Vercel),
+// not in the browser. Only the display username is kept locally.
+function saveCreds(){var u=g('set-user').value.trim();if(u){localStorage.setItem('admin_user',u);ADMIN_USER=u;}if(g('set-pass'))g('set-pass').value='';flash('cred-saved');}
 function saveApiKey(){var k=g('set-apikey').value.trim();if(k)localStorage.setItem('anthropic_key',k);flash('api-saved');}
 function saveEmail(){var e=g('set-email').value.trim();if(e)localStorage.setItem('from_email',e);flash('email-saved');}
 function flash(id){var m=g(id);m.style.display='inline';setTimeout(function(){m.style.display='none';},2000);}
@@ -12135,12 +12147,20 @@ function renderFollowUps(){
   }).join('');
 }
 
-// ── Auto-login if session exists ──
-if(localStorage.getItem('admin_session')==='1'){
-  g('login').style.display='none';
-  g('main').style.display='flex';
-  loadData();
-}
+// ── Auto-login: validate the stored session token server-side ──
+(async function(){
+  var tok=localStorage.getItem('admin_session');
+  if(!tok)return;
+  function enter(){ g('login').style.display='none'; g('main').style.display='flex'; loadData(); }
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    // Valid token → enter. unconfigured (ADMIN_PASSWORD not set yet) → stay
+    // lenient so deploying this never locks out an existing session.
+    if(d&&(d.ok||d.unconfigured))enter();
+    else localStorage.removeItem('admin_session');   // invalid/expired token → require re-login
+  }catch(e){ enter(); }   // network error → don't lock out an existing session
+})();
 // ── SendGrid Email ──
 
 async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
