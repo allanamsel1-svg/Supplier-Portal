@@ -48,14 +48,32 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const PASS = process.env.ADMIN_PASSWORD;
-  const USER = process.env.ADMIN_USERNAME || 'admin';
-  const KEY = process.env.ADMIN_SESSION_SECRET || PASS || '';
+  // Trim env values — a stray trailing newline/space from a copy-paste in the
+  // Vercel dashboard is a common "looks right but won't match" cause.
+  const rawPass = process.env.ADMIN_PASSWORD;
+  const PASS = rawPass != null ? String(rawPass).trim() : rawPass;
+  const USER = String(process.env.ADMIN_USERNAME || 'admin').trim();
+  const KEY = String(process.env.ADMIN_SESSION_SECRET || PASS || '').trim();
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
   const action = (req.query && req.query.action) || body.action || 'login';
+
+  // Masked diagnostic — confirms the env var is read without leaking the value.
+  // The fingerprint = first 8 hex of HMAC-SHA256('fp', password); compute the
+  // same locally to confirm the live value matches what you intended.
+  if (action === 'debug') {
+    return res.status(200).json({
+      adminPasswordConfigured: !!PASS,
+      rawLength: rawPass != null ? String(rawPass).length : 0,
+      trimmedLength: PASS ? PASS.length : 0,
+      hadSurroundingWhitespace: rawPass != null ? (String(rawPass) !== String(rawPass).trim()) : false,
+      username: USER,
+      sessionSecretConfigured: !!process.env.ADMIN_SESSION_SECRET,
+      fingerprint: PASS ? createHmac('sha256', 'fp').update(PASS).digest('hex').slice(0, 8) : null
+    });
+  }
 
   // Not yet configured → tell the client to stay in lenient legacy mode.
   if (!PASS) return res.status(200).json({ ok: false, unconfigured: true });
