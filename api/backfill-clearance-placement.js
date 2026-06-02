@@ -46,9 +46,11 @@ export default async function handler(req, res) {
 // ─── backfill ────────────────────────────────────────────────────────
 async function runBackfill(opts) {
   const log = opts.log || (() => {});
-  let q = '/rest/v1/shop_out_observations?select=id,shop_out_id,front_photo_id&front_photo_id=not.is.null&order=created_at.asc';
+  // Un-detected rows carry a NULL clearance_confidence (the column defaults that
+  // backfilled the pre-feature rows set placement_type/is_clearance but not this).
+  // Filtering on it makes the backfill idempotent + paginatable via limit.
+  let q = '/rest/v1/shop_out_observations?select=id,shop_out_id,front_photo_id&front_photo_id=not.is.null&clearance_confidence=is.null&order=created_at.asc';
   if (opts.shopOutId) q += '&shop_out_id=eq.' + opts.shopOutId;
-  else q += '&placement_type=is.null';
   if (opts.limit) q += '&limit=' + opts.limit;
   const obs = await (await sb(q)).json();
   if (!Array.isArray(obs) || !obs.length) { log('Nothing to process.'); return { processed: 0, clearance: 0, placement: {}, errors: 0, remaining: 0 }; }
