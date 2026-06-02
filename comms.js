@@ -114,10 +114,12 @@ function twAddrSearch() {
   var box = g('tw-ab-results'); if (!box) return;
   var q = ((g('tw-ab-q') && g('tw-ab-q').value) || '').toLowerCase().trim();
   var cat = (g('tw-ab-cat') && g('tw-ab-cat').value) || '';
+  // Search-on-demand: don't dump the whole directory (it dominated every tab).
+  if (!q && !cat) { box.innerHTML = '<div style="color:#bbb;padding:4px;">Type a factory or customer name to look one up (optional — you can also just type a number above).</div>'; return; }
   var list = twContactList().filter(function (f) {
     if (cat && (f.categories || []).indexOf(cat) === -1) return false;
-    if (!q) return true;
-    return (f.name || '').toLowerCase().indexOf(q) > -1 || (f.contact || '').toLowerCase().indexOf(q) > -1;
+    if (q && !((f.name || '').toLowerCase().indexOf(q) > -1 || (f.contact || '').toLowerCase().indexOf(q) > -1)) return false;
+    return true;
   }).slice(0, 50);
   if (!list.length) { box.innerHTML = '<div style="color:#bbb;padding:4px;">No matches.</div>'; return; }
   box.innerHTML = list.map(function (f) {
@@ -160,12 +162,22 @@ function twPhoneTabHtml() {
 }
 function twFaxTabHtml() {
   return _twNumberBlock('fax') +
-    '<input id="tw-fax-file" type="file" accept=".pdf,application/pdf" style="width:100%;font-size:12px;margin-bottom:6px;" />' +
+    '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:4px;">PDF document</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+      '<label style="flex-shrink:0;padding:7px 14px;background:#fff;border:1px solid #c2780a;color:#c2780a;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📎 Attach PDF' +
+        '<input id="tw-fax-file" type="file" accept="application/pdf,.pdf" onchange="twFaxFileChosen()" style="display:none;" />' +
+      '</label>' +
+      '<span id="tw-fax-filename" style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">No PDF selected</span>' +
+    '</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">' +
       '<span id="tw-send-msg" style="font-size:11px;min-height:14px;"></span>' +
       '<button onclick="twSendFax()" style="padding:7px 16px;background:#c2780a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📠 Send Fax</button>' +
     '</div>' +
     twChanThreadHeader('Fax history') + '<div id="tw-chan-thread" style="border:1px solid #eee;border-radius:7px;max-height:340px;overflow-y:auto;padding:8px;background:#fafaf8;">…</div>';
+}
+function twFaxFileChosen() {
+  var f = g('tw-fax-file'), n = g('tw-fax-filename');
+  if (n) n.textContent = (f && f.files && f.files[0]) ? f.files[0].name : 'No PDF selected';
 }
 // ── Send actions (free-form: a contact selection is NOT required) ──
 function twMsg(text, color) { var el = g('tw-send-msg'); if (el) { el.textContent = text; el.style.color = color || '#888'; } }
@@ -216,6 +228,8 @@ async function twSendFax() {
     var d = await r.json().catch(function () { return {}; });
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
     twMsg('✓ Fax queued (' + (d.status || 'queued') + ')', '#1a7a1a');
+    if (g('tw-fax-file')) g('tw-fax-file').value = '';
+    if (g('tw-fax-filename')) g('tw-fax-filename').textContent = 'No PDF selected';
     twLoadThread();
   } catch (e) { twMsg('Failed: ' + e.message, '#b00'); }
 }
