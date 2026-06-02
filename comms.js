@@ -15,6 +15,8 @@
 
 var _twHome = null, _twTarget = null, _twTab = 'whatsapp', _twComms = [], _twStandalone = false;
 var __twContacts = [];
+var _twUnread = {};   // channel -> unread inbound count (standalone Messages page badges)
+function _twTabChannel(tab) { return tab === 'phone' ? 'voice' : tab; }   // Phone tab → 'voice' rows
 var TW_ADMIN_MOBILE = '+19177709904';
 var TW_CHAN = {
   whatsapp: { c: '#1a7a1a', bg: '#e8f8e8', i: '🟢', label: 'WhatsApp' },
@@ -66,15 +68,35 @@ function renderCommsStandalone() {
   twRenderTabs(); twRenderTab();
   twAiCardRender('Type a number, or pick a factory/customer from the address book, then send on any channel tab.', null, false);
   twEnsureContacts().then(function () { if (g('tw-ab-results')) twAddrSearch(); });
+  twLoadUnread();
 }
 function twRenderTabs() {
+  if (!g('tw-tabs')) return;
   var tabs = [['whatsapp', '🟢 WhatsApp'], ['sms', '💬 SMS'], ['phone', '📞 Phone'], ['fax', '📠 Fax']];
   g('tw-tabs').innerHTML = tabs.map(function (t) {
     var on = _twTab === t[0];
-    return '<button onclick="twSetTab(\'' + t[0] + '\')" style="padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:none;border-bottom:2px solid ' + (on ? '#1a1a2e' : 'transparent') + ';color:' + (on ? '#1a1a2e' : '#888') + ';">' + t[1] + '</button>';
+    var n = _twStandalone ? (_twUnread[_twTabChannel(t[0])] || 0) : 0;
+    var badge = n > 0 ? ' <span style="display:inline-block;min-width:15px;text-align:center;background:#e23b3b;color:#fff;font-size:9px;font-weight:700;line-height:1.4;border-radius:9px;padding:0 5px;margin-left:4px;vertical-align:middle;">' + (n > 99 ? '99+' : n) + '</span>' : '';
+    return '<button onclick="twSetTab(\'' + t[0] + '\')" style="padding:7px 11px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:none;border-bottom:2px solid ' + (on ? '#1a1a2e' : 'transparent') + ';color:' + (on ? '#1a1a2e' : '#888') + ';">' + t[1] + badge + '</button>';
   }).join('');
 }
-function twSetTab(tab) { _twTab = tab; twRenderTabs(); twRenderTab(); twLoadThread(); }
+function twSetTab(tab) { _twTab = tab; twRenderTabs(); twRenderTab(); twLoadThread(); twMarkChannelRead(_twTabChannel(tab)); }
+// ── Unread badges (standalone Messages page): count inbound, unread, per channel ──
+async function twLoadUnread() {
+  if (!_twStandalone) return;
+  try {
+    var r = await fetch(SB + '/rest/v1/twilio_communications?select=channel&direction=eq.inbound&read=eq.false&limit=2000', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+    var rows = r.ok ? await r.json() : [];
+    var m = {}; rows.forEach(function (x) { if (x.channel) m[x.channel] = (m[x.channel] || 0) + 1; });
+    _twUnread = m;
+  } catch (e) { _twUnread = {}; }
+  twRenderTabs();
+}
+function twMarkChannelRead(ch) {
+  if (!_twStandalone || !_twUnread[ch]) return;
+  _twUnread[ch] = 0; twRenderTabs();
+  fetch(SB + '/rest/v1/twilio_communications?channel=eq.' + ch + '&direction=eq.inbound&read=eq.false', { method: 'PATCH', headers: { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ read: true }) }).catch(function () { });
+}
 function twRenderTab() {
   var p = g('tw-tabpanel'); if (!p) return;
   if (_twTab === 'whatsapp' || _twTab === 'sms') p.innerHTML = twMsgTabHtml(_twTab);

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Zoom — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+  /* Admin login gate (matches admin.html / communications.html) */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .lb { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
+  .lb p { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .lb input { width: 100%; padding: 9px 11px; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; color: #1a1a2e; font-size: 14px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box; }
+  .lb input:focus { outline: none; border-color: #1a1a2e; }
+  .lb-btn { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .lb-btn:hover { opacity: 0.87; }
+  .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
+  #main { display: none; }
+  .zm-wrap { max-width: 860px; margin: 0 auto; padding: 1.5rem; }
+  .zm-note { font-size: 12.5px; color: #2a6da8; background: #eaf4fb; border: 1px solid #c4e0f2; border-radius: 9px; padding: 10px 13px; margin-bottom: 1.1rem; line-height: 1.5; }
+  .zm-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e0e0d8; margin-bottom: 1.1rem; }
+  .zm-tab { padding: 7px 13px; font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; background: none; border-bottom: 2px solid #1a1a2e; color: #1a1a2e; }
+  .zm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 640px) { .zm-grid { grid-template-columns: 1fr; } }
+  .zm-card { background: #fff; border: 1px solid #e6e6de; border-radius: 12px; padding: 1.1rem 1.2rem; position: relative; overflow: hidden; }
+  .zm-card h3 { font-size: 14px; font-weight: 600; color: #1a1a2e; margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
+  .zm-card .zm-sub { font-size: 12px; color: #999; margin-bottom: 12px; line-height: 1.45; }
+  .zm-cta { width: 100%; padding: 10px; background: #2d8cff; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: not-allowed; font-family: inherit; opacity: 0.92; }
+  .zm-input { width: 100%; padding: 8px 10px; border: 1px solid #d8d8d0; border-radius: 7px; font-size: 13px; box-sizing: border-box; font-family: inherit; margin-bottom: 8px; background: #f8f8f4; }
+  .zm-row { display: flex; gap: 8px; }
+  .zm-row .zm-input { flex: 1; min-width: 0; }
+  .zm-lbl { font-size: 10px; font-weight: 600; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+  /* "Coming Soon" overlay covering interactive placeholders */
+  .zm-soon-wrap { position: relative; }
+  .zm-soon-wrap .zm-soon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(252,252,250,0.74); border-radius: 8px; backdrop-filter: blur(1px); }
+  .zm-soon span { font-size: 11px; font-weight: 700; color: #2d8cff; background: #fff; border: 1px solid #c4e0f2; border-radius: 20px; padding: 5px 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .zm-empty { font-size: 12.5px; color: #aaa; text-align: center; padding: 22px 10px; line-height: 1.5; border: 1px dashed #e0e0d8; border-radius: 8px; background: #fafaf8; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="lb">
+    <h1>Zoom</h1>
+    <p>Admin access required</p>
+    <input type="text" id="l-user" placeholder="Username" />
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
+      <button type="button" id="l-pass-toggle" onclick="togglePw('l-pass','l-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+    </div>
+    <button class="lb-btn" onclick="doLogin()">Sign In</button>
+    <div class="lb-err" id="l-err">Incorrect username or password.</div>
+  </div>
+</div>
+
+<div id="main">
+  <div class="ri-top">
+    <div class="ri-top-title">🎥 Zoom</div>
+    <div class="ri-top-actions">
+      <a href="admin.html">← Admin</a>
+      <button onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <div class="zm-wrap">
+    <div class="zm-note">Zoom integration requires a Zoom Pro account. Contact management and transcripts will be available once connected.</div>
+
+    <div class="zm-tabs">
+      <button class="zm-tab" id="zm-tab-meetings">Meetings</button>
+    </div>
+
+    <div id="zm-panel-meetings">
+      <div class="zm-grid">
+
+        <!-- 1. Start Instant Meeting -->
+        <div class="zm-card">
+          <h3>⚡ Start Instant Meeting</h3>
+          <div class="zm-sub">Launch a Zoom meeting now and invite a contact.</div>
+          <button class="zm-cta" onclick="zmSoon()">Coming Soon — Zoom integration in development</button>
+        </div>
+
+        <!-- 2. Schedule Meeting (placeholder form + overlay) -->
+        <div class="zm-card">
+          <h3>📅 Schedule Meeting</h3>
+          <div class="zm-sub">Book a meeting with a contact for a future date and time.</div>
+          <div class="zm-soon-wrap">
+            <div class="zm-lbl">Contact</div>
+            <input class="zm-input" type="text" placeholder="Factory or customer contact" disabled />
+            <div class="zm-row">
+              <div style="flex:1;min-width:0;">
+                <div class="zm-lbl">Date</div>
+                <input class="zm-input" type="date" disabled />
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div class="zm-lbl">Time</div>
+                <input class="zm-input" type="time" disabled />
+              </div>
+            </div>
+            <button class="zm-cta" disabled>Schedule</button>
+            <div class="zm-soon"><span>Coming Soon</span></div>
+          </div>
+        </div>
+
+        <!-- 3. Join Meeting (placeholder input + overlay) -->
+        <div class="zm-card">
+          <h3>🔗 Join Meeting</h3>
+          <div class="zm-sub">Enter a meeting ID or paste a Zoom invite link to join.</div>
+          <div class="zm-soon-wrap">
+            <div class="zm-lbl">Meeting ID or link</div>
+            <input class="zm-input" type="text" placeholder="e.g. 123 4567 8901 or https://zoom.us/j/…" disabled />
+            <button class="zm-cta" disabled>Join</button>
+            <div class="zm-soon"><span>Coming Soon</span></div>
+          </div>
+        </div>
+
+        <!-- 4. Meeting History (empty state) -->
+        <div class="zm-card">
+          <h3>🕑 Meeting History</h3>
+          <div class="zm-sub">Past meetings, recordings and transcripts.</div>
+          <div class="zm-empty">No meetings logged yet — Zoom integration coming soon.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function g(id){return document.getElementById(id);}
+function zmSoon(){ alert('Coming Soon — Zoom integration is in development.'); }
+
+function enter(){ g('login').style.display='none'; g('main').style.display='block'; }
+async function doLogin(){
+  var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);localStorage.setItem('admin_user',u||'admin');if(errEl)errEl.style.display='none';enter();return;}
+    if(errEl){ errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.'; errEl.style.display='block'; }
+  }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
+}
+function doLogout(){ localStorage.removeItem('admin_session'); g('main').style.display='none'; g('login').style.display='flex'; g('l-user').value=''; g('l-pass').value=''; }
+function togglePw(inputId,btnId){
+  var inp=g(inputId),btn=g(btnId);if(!inp)return;
+  if(inp.type==='password'){inp.type='text';if(btn){btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}}
+  else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
+}
+(async function(){
+  var tok=localStorage.getItem('admin_session'); if(!tok)return;
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&(d.ok||d.unconfigured))enter(); else localStorage.removeItem('admin_session');
+  }catch(e){ enter(); }
+})();
+</script>
+</body>
+</html>
