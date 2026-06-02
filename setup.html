@@ -188,6 +188,7 @@
   <div class="tab" onclick="switchTab('freight');loadFreightTab();">🚢 Freight Rates</div>
   <div class="tab" onclick="switchTab('upc');loadUpcPool();">🏷 UPC Pool</div>
   <div class="tab" onclick="switchTab('packaging');loadPackagingTypes();">📦 Kit Packaging</div>
+  <div class="tab" onclick="switchTab('hts')">📊 HTS Lookup</div>
 </div>
 
 <!-- ══════════════════════════════════════ -->
@@ -727,7 +728,27 @@
 </div>
 
 
+<!-- ══════════════════════════════════════ -->
+<!-- HTS LOOKUP                             -->
+<!-- ══════════════════════════════════════ -->
+<div class="tab-panel" id="tab-hts">
+  <div class="wrap">
+    <div class="card">
+      <div class="card-title">📊 USITC HTS Lookup</div>
+      <div style="font-size:12px;color:#888;margin-bottom:12px;line-height:1.5;">Search the USITC Harmonized Tariff Schedule by keyword (e.g. <em>lipstick</em>) or HTS code (e.g. <em>3304.10.00.00</em>). Shows description, duty rate, and unit of quantity. This is the same USITC engine the AI duty/tariff cross-checks use.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input type="text" id="hts-tab-q" placeholder="Keyword or HTS code" onkeydown="if(event.key==='Enter')htsTabSearch()" style="flex:1;min-width:0;padding:9px 12px;font-size:13px;border:1px solid #d8d8d0;border-radius:8px;font-family:inherit;box-sizing:border-box;" />
+        <button id="hts-tab-btn" onclick="htsTabSearch()" style="flex-shrink:0;padding:9px 18px;background:#2244cc;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Search</button>
+      </div>
+      <div id="hts-tab-status" style="font-size:12px;color:#888;margin-bottom:10px;min-height:16px;"></div>
+      <div id="hts-tab-results" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+
 <script src="kit-builder.js"></script>
+<script src="hts-lookup.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var SETUP_BUILD='SETUP-2026-05-25-D'; try{console.log('setup.html build:',SETUP_BUILD);}catch(e){}
@@ -833,7 +854,7 @@ async function deletePackagingType(id){
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t,i){t.classList.remove('on');});
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('on');});
-  var tabs=['categories','brands','customers','skus','freight','upc','packaging'];
+  var tabs=['categories','brands','customers','skus','freight','upc','packaging','hts'];
   document.querySelectorAll('.tab')[tabs.indexOf(name)].classList.add('on');
   g('tab-'+name).classList.add('on');
   if(name==='categories')loadCats();
@@ -3109,37 +3130,35 @@ function addVarRow(){
   el.appendChild(row);
 }
 
-// Valid HTS format: 4.2 (3304.10), 4.2.4 (3304.10.0000) or full 4.2.2.2.
-// Empty is allowed (the field is optional).
-function isValidHts(v){
-  if(v==null)return true;
-  var s=String(v).trim();
-  if(!s)return true;
-  return /^\d{4}\.\d{2}(\.\d{4}|\.\d{2}(\.\d{2})?)?$/.test(s);
-}
+// isValidHts(), usitcVerify(), usitcColor() are provided by the shared
+// hts-lookup.js (loaded via <script src>) — the one USITC engine used by the
+// Setup HTS tab and all AI duty/tariff cross-checks.
 
-// Cross-check an AI-estimated HTS code against real USITC data via the
-// server proxy (api/trade-lookup.js). Returns {ok,matched,row,msg}.
-async function usitcVerify(htsCode){
-  var out={ok:false,matched:false,row:null,msg:''};
-  if(!htsCode)return out;
+// Setup → HTS Lookup tab: manual USITC search via the shared htsUsitcSearch().
+async function htsTabSearch(){
+  var q=((g('hts-tab-q')&&g('hts-tab-q').value)||'').trim();
+  var st=g('hts-tab-status'),box=g('hts-tab-results'),btn=g('hts-tab-btn');
+  if(!q){if(st)st.textContent='Enter a keyword or HTS code.';return;}
+  if(btn)btn.disabled=true; if(st){st.style.color='#888';st.textContent='Searching USITC…';} if(box)box.innerHTML='';
   try{
-    var r=await fetch('/api/trade-lookup?source=hts&q='+encodeURIComponent(htsCode));
-    var d=await r.json().catch(function(){return {};});
-    if(!r.ok){out.msg='USITC check unavailable';return out;}
-    out.ok=true;
-    var rows=d.results||[];
-    var norm=function(s){return String(s||'').replace(/[^0-9]/g,'');};
-    var nq=norm(htsCode);
-    var hit=rows.find(function(x){return norm(x.htsno)===nq;})
-      ||rows.find(function(x){var nx=norm(x.htsno);return nx&&(nx.indexOf(nq)===0||nq.indexOf(nx)===0);});
-    if(hit){out.matched=true;out.row=hit;
-      out.msg='✓ USITC verified — '+hit.htsno+': '+hit.description+' · Duty (General): '+(hit.general||'n/a')+((hit.units&&hit.units.length)?' · Unit: '+hit.units.join('/'):'');}
-    else{out.msg='⚠ HTS '+htsCode+' not found in USITC — unverified';}
-  }catch(e){out.msg='USITC check failed';}
-  return out;
+    var rows=await htsUsitcSearch(q);
+    if(!rows.length){box.innerHTML='<div style="color:#bbb;padding:1rem;text-align:center;">No HTS entries found.</div>';if(st)st.textContent='';return;}
+    if(st)st.textContent=rows.length+' result'+(rows.length===1?'':'s');
+    box.innerHTML=rows.map(function(x){
+      var segs=[];
+      if(x.general)segs.push('<span><b>General:</b> '+esc(x.general)+'</span>');
+      if(x.special)segs.push('<span><b>Special:</b> '+esc(x.special)+'</span>');
+      if(x.other)segs.push('<span><b>Col. 2:</b> '+esc(x.other)+'</span>');
+      if(x.units&&x.units.length)segs.push('<span><b>Unit:</b> '+esc(x.units.join(' / '))+'</span>');
+      return '<div style="border:1px solid #e8e8e0;border-radius:9px;padding:12px;background:#fcfcfa;">'+
+        '<div style="font-family:ui-monospace,Menlo,monospace;font-size:14px;font-weight:700;color:#1a1a2e;">'+esc(x.htsno||'—')+'</div>'+
+        '<div style="font-size:13px;color:#333;line-height:1.5;margin:6px 0 8px;">'+esc(x.description||'')+'</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:#555;">'+segs.join('')+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){if(st){st.style.color='#c0392b';st.textContent='Lookup failed: '+esc(e.message);}}
+  finally{if(btn)btn.disabled=false;}
 }
-function usitcColor(uv){return uv.matched?'#1a7a1a':(uv.ok?'#b00':'#886600');}
 
 // ── AI HTS suggest ──
 async function aiSuggestHTS(){

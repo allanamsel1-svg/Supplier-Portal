@@ -422,6 +422,7 @@
       <button class="sitem on" id="nav-dashboard" onclick="showPanel('dashboard')"><span class="sicon">▦</span> Dashboard</button>
       <button class="sitem" id="nav-intel" onclick="window.open('intelligence_hub.html','_blank')"><span class="sicon">🎯</span> Intel<span id="nav-intel-daily" onclick="event.stopPropagation();window.open('intel_daily.html','_blank')" title="Daily Intel Report" style="font-size:10px;color:#bbb;margin-left:8px;cursor:pointer;letter-spacing:0.02em;">+ Daily</span></button>
       <button class="sitem" id="nav-trade-intel" onclick="window.open('trade_intelligence.html','_blank')"><span class="sicon">🛃</span> Trade Intel <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
+      <button class="sitem" id="nav-comms" onclick="window.open('communications.html','_blank')"><span class="sicon">💬</span> Communications</button>
       <button class="sitem" id="nav-roadmap" onclick="window.open('roadmap.html','_blank')"><span class="sicon">🗺</span> System</button>
       <div class="slabel">Operations</div>
       <button class="sitem" id="nav-orders" onclick="showPanel('orders');loadOpenOrders();"><span class="sicon">📋</span> Open Orders <span class="scount" id="cnt-orders-urgent" style="background:#fff0f0;color:#b00;border:1px solid #fdd;font-weight:600;">3</span></button>
@@ -2247,6 +2248,7 @@
 </div>
 
 <script src="kit-builder.js"></script>
+<script src="hts-lookup.js"></script>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
@@ -5739,14 +5741,7 @@ function qHtsStatusBadge(s){
   return '<span style="display:inline-block;font-size:9px;padding:2px 7px;background:'+x.bg+';color:'+x.col+';border-radius:9px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;">'+x.lbl+'</span>';
 }
 // Parse a USITC "general" duty string into a numeric percent ("Free"→0, "3.4%"→3.4).
-function parseDutyPct(general){
-  if(general==null)return null;
-  var s=String(general).trim();
-  if(!s)return null;
-  if(/free/i.test(s))return 0;
-  var m=s.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
-  return m?parseFloat(m[1]):null;
-}
+// parseDutyPct() is provided by the shared hts-lookup.js
 // Run the AI HTS/duty estimate for a specific quote and persist to hts_ai_estimate etc.
 async function aiEstimateQuoteHTS(quoteId){
   var apiKey=localStorage.getItem('anthropic_key')||'';
@@ -6976,35 +6971,9 @@ function rfqBrandChanged(){
 
 // Valid HTS format: 4.2 (3304.10), 4.2.4 (3304.10.0000) or full 4.2.2.2
 // (3304.10.00.00). Empty is allowed (the field is optional at entry points).
-function isValidHts(v){
-  if(v==null)return true;
-  var s=String(v).trim();
-  if(!s)return true;
-  return /^\d{4}\.\d{2}(\.\d{4}|\.\d{2}(\.\d{2})?)?$/.test(s);
-}
-
-// Cross-check an AI-estimated HTS code against real USITC data via the
-// server proxy (api/trade-lookup.js). Returns {ok,matched,row,msg}.
-async function usitcVerify(htsCode){
-  var out={ok:false,matched:false,row:null,msg:''};
-  if(!htsCode)return out;
-  try{
-    var r=await fetch('/api/trade-lookup?source=hts&q='+encodeURIComponent(htsCode));
-    var d=await r.json().catch(function(){return {};});
-    if(!r.ok){out.msg='USITC check unavailable';return out;}
-    out.ok=true;
-    var rows=d.results||[];
-    var norm=function(s){return String(s||'').replace(/[^0-9]/g,'');};
-    var nq=norm(htsCode);
-    var hit=rows.filter(function(x){return norm(x.htsno);}).find(function(x){return norm(x.htsno)===nq;})
-      ||rows.find(function(x){var nx=norm(x.htsno);return nx&&(nx.indexOf(nq)===0||nq.indexOf(nx)===0);});
-    if(hit){out.matched=true;out.row=hit;
-      out.msg='✓ USITC verified — '+hit.htsno+': '+hit.description+' · Duty (General): '+(hit.general||'n/a')+((hit.units&&hit.units.length)?' · Unit: '+hit.units.join('/'):'');}
-    else{out.msg='⚠ HTS '+htsCode+' not found in USITC — unverified';}
-  }catch(e){out.msg='USITC check failed';}
-  return out;
-}
-function usitcColor(uv){return uv.matched?'#1a7a1a':(uv.ok?'#b00':'#886600');}
+// isValidHts(), usitcVerify(), usitcColor() are provided by the shared
+// hts-lookup.js (loaded via <script src>). All HTS cross-checks use that one
+// USITC engine (api/trade-lookup.js).
 
 async function suggestDutyTariff(){
   var apiKey=localStorage.getItem('anthropic_key')||'';

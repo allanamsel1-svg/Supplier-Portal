@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Communications — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+  /* Admin login gate (matches admin.html / trade_intelligence.html) */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .lb { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
+  .lb p { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .lb input { width: 100%; padding: 9px 11px; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; color: #1a1a2e; font-size: 14px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box; }
+  .lb input:focus { outline: none; border-color: #1a1a2e; }
+  .lb-btn { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .lb-btn:hover { opacity: 0.87; }
+  .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
+  #main { display: none; }
+  .cm-wrap { max-width: 760px; margin: 0 auto; padding: 1.5rem; }
+  .cm-intro { font-size: 13px; color: #777; margin-bottom: 1rem; line-height: 1.55; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="lb">
+    <h1>Communications</h1>
+    <p>Admin access required</p>
+    <input type="text" id="l-user" placeholder="Username" />
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
+      <button type="button" id="l-pass-toggle" onclick="togglePw('l-pass','l-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+    </div>
+    <button class="lb-btn" onclick="doLogin()">Sign In</button>
+    <div class="lb-err" id="l-err">Incorrect username or password.</div>
+  </div>
+</div>
+
+<div id="main">
+  <div class="ri-top">
+    <div class="ri-top-title">💬 Communications</div>
+    <div class="ri-top-actions">
+      <a href="admin.html">← Admin</a>
+      <button onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <div class="cm-wrap">
+    <div class="cm-intro">Send and review WhatsApp, SMS, calls and faxes for any factory. Search the address book to pick a factory, then use the channel tabs. All messages are logged and the AI summary updates per factory.</div>
+    <div id="d-comms"><div style="font-size:12px;color:#aaa;">Loading…</div></div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+function g(id){return document.getElementById(id);}
+
+function enter(){ g('login').style.display='none'; g('main').style.display='block'; if(typeof renderCommsStandalone==='function')renderCommsStandalone(); }
+async function doLogin(){
+  var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);localStorage.setItem('admin_user',u||'admin');if(errEl)errEl.style.display='none';enter();return;}
+    if(errEl){ errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.'; errEl.style.display='block'; }
+  }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
+}
+function doLogout(){ localStorage.removeItem('admin_session'); g('main').style.display='none'; g('login').style.display='flex'; g('l-user').value=''; g('l-pass').value=''; }
+function togglePw(inputId,btnId){
+  var inp=g(inputId),btn=g(btnId);if(!inp)return;
+  if(inp.type==='password'){inp.type='text';if(btn){btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}}
+  else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
+}
+(async function(){
+  var tok=localStorage.getItem('admin_session'); if(!tok)return;
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&(d.ok||d.unconfigured))enter(); else localStorage.removeItem('admin_session');
+  }catch(e){ enter(); }
+})();
+</script>
+<script src="comms.js"></script>
+</body>
+</html>

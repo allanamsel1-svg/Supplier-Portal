@@ -96,23 +96,11 @@
 
   <div class="ti-wrap">
     <div class="ti-intro">
-      Look up current U.S. import classification and precedent. <b>HTS Lookup</b> pulls live duty rates and units from the
-      USITC Harmonized Tariff Schedule; <b>CROSS Rulings</b> searches CBP classification rulings for precedent on a product or HTS code.
+      Search <b>CBP CROSS Rulings</b> for U.S. import classification precedent on a product or HTS code.
+      (USITC HTS duty-rate lookup has moved to <b>Setup → HTS Lookup</b>.)
     </div>
 
     <div class="ti-grid">
-      <!-- HTS Lookup -->
-      <div class="ti-card">
-        <div class="ti-card-head"><span style="font-size:18px;">📊</span><span class="ti-card-title">USITC HTS Lookup</span></div>
-        <div class="ti-card-src">Source: hts.usitc.gov — duty rate &amp; unit of quantity</div>
-        <div class="ti-search">
-          <input type="text" id="hts-q" placeholder="Keyword (e.g. lipstick) or HTS code (e.g. 3304.10.00.00)" onkeydown="if(event.key==='Enter')htsSearch()" />
-          <button id="hts-btn" onclick="htsSearch()">Search</button>
-        </div>
-        <div class="ti-status" id="hts-status"></div>
-        <div class="ti-results" id="hts-results"></div>
-      </div>
-
       <!-- CROSS Rulings -->
       <div class="ti-card">
         <div class="ti-card-head"><span style="font-size:18px;">⚖️</span><span class="ti-card-title">CBP CROSS Rulings</span></div>
@@ -182,36 +170,6 @@ function logSearch(fields){
 }
 
 // ── USITC HTS Lookup ──
-async function htsSearch(){
-  var q=g('hts-q').value.trim();
-  if(!q){g('hts-status').textContent='Enter a keyword or HTS code.';return;}
-  var btn=g('hts-btn'),box=g('hts-results'),st=g('hts-status');
-  btn.disabled=true; st.className='ti-status'; st.textContent='Searching USITC…'; box.innerHTML='';
-  var isCode=looksLikeCode(q);
-  logSearch(isCode?{hts_code:q}:{keyword:q});
-  try{
-    var r=await fetch('/api/trade-lookup?source=hts&q='+encodeURIComponent(q));
-    var d=await r.json();
-    if(!r.ok)throw new Error(d&&d.error||('HTTP '+r.status));
-    var rows=(d.results||[]);
-    if(!rows.length){box.innerHTML='<div class="ti-empty">No HTS entries found.</div>';st.textContent='';return;}
-    st.textContent=rows.length+' result'+(rows.length===1?'':'s');
-    box.innerHTML=rows.map(function(x){
-      var duty=[];
-      if(x.general)duty.push('<span class="ti-duty"><b>General:</b> '+esc(x.general)+'</span>');
-      if(x.special)duty.push('<span class="ti-duty"><b>Special:</b> '+esc(x.special)+'</span>');
-      if(x.other)duty.push('<span class="ti-duty"><b>Col. 2:</b> '+esc(x.other)+'</span>');
-      var units=(x.units&&x.units.length)?'<span><b>Unit:</b> '+esc(x.units.join(' / '))+'</span>':'';
-      return '<div class="ti-res">'+
-        '<div class="ti-res-top"><span class="ti-hts">'+esc(x.htsno||'—')+'</span></div>'+
-        '<div class="ti-desc">'+esc(x.description||'')+'</div>'+
-        '<div class="ti-meta">'+duty.join('')+units+'</div>'+
-      '</div>';
-    }).join('');
-  }catch(e){ st.className='ti-status err'; st.textContent='Lookup failed: '+esc(e.message); }
-  finally{ btn.disabled=false; }
-}
-
 // ── CBP CROSS Rulings Lookup ──
 async function crossSearch(){
   var q=g('cross-q').value.trim();
