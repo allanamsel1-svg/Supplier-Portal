@@ -163,21 +163,48 @@ function twPhoneTabHtml() {
 function twFaxTabHtml() {
   return _twNumberBlock('fax') +
     '<div style="font-size:10px;font-weight:600;color:#888;text-transform:uppercase;margin-bottom:4px;">PDF document</div>' +
-    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
       '<label style="flex-shrink:0;padding:7px 14px;background:#fff;border:1px solid #c2780a;color:#c2780a;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📎 Attach PDF' +
         '<input id="tw-fax-file" type="file" accept="application/pdf,.pdf" onchange="twFaxFileChosen()" style="display:none;" />' +
       '</label>' +
-      '<span id="tw-fax-filename" style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">No PDF selected</span>' +
+      '<span id="tw-fax-hint" style="font-size:12px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">No PDF selected — required to send</span>' +
+    '</div>' +
+    '<div id="tw-fax-preview" style="display:none;align-items:center;gap:10px;margin-bottom:10px;background:#fdf2e2;border:1px solid #e8cfa0;border-radius:8px;padding:8px 10px;">' +
+      '<span style="font-size:22px;flex-shrink:0;line-height:1;">📄</span>' +
+      '<div style="min-width:0;flex:1;">' +
+        '<div id="tw-fax-pname" style="font-size:12px;font-weight:600;color:#1a1a2e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>' +
+        '<div id="tw-fax-psize" style="font-size:11px;color:#999;"></div>' +
+      '</div>' +
+      '<button onclick="twFaxRemove()" title="Remove attachment" style="flex-shrink:0;padding:5px 10px;background:#fff;border:1px solid #d8b88a;color:#c2780a;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✕ Remove</button>' +
     '</div>' +
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;">' +
       '<span id="tw-send-msg" style="font-size:11px;min-height:14px;"></span>' +
-      '<button onclick="twSendFax()" style="padding:7px 16px;background:#c2780a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📠 Send Fax</button>' +
+      '<button id="tw-fax-send-btn" onclick="twSendFax()" disabled style="padding:7px 16px;background:#c2780a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:not-allowed;opacity:0.5;font-family:inherit;">📠 Send Fax</button>' +
     '</div>' +
     twChanThreadHeader('Fax history') + '<div id="tw-chan-thread" style="border:1px solid #eee;border-radius:7px;max-height:340px;overflow-y:auto;padding:8px;background:#fafaf8;">…</div>';
 }
+function twFmtBytes(n) { if (n == null) return ''; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(1) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
+function twFaxSetSendEnabled(on) {
+  var btn = g('tw-fax-send-btn'); if (!btn) return;
+  btn.disabled = !on;
+  btn.style.cursor = on ? 'pointer' : 'not-allowed';
+  btn.style.opacity = on ? '1' : '0.5';
+}
 function twFaxFileChosen() {
-  var f = g('tw-fax-file'), n = g('tw-fax-filename');
-  if (n) n.textContent = (f && f.files && f.files[0]) ? f.files[0].name : 'No PDF selected';
+  var f = g('tw-fax-file'), file = f && f.files && f.files[0];
+  if (!file) { twFaxRemove(); return; }
+  if (g('tw-fax-pname')) g('tw-fax-pname').textContent = file.name;
+  if (g('tw-fax-psize')) g('tw-fax-psize').textContent = twFmtBytes(file.size) + ' · PDF';
+  if (g('tw-fax-preview')) g('tw-fax-preview').style.display = 'flex';
+  if (g('tw-fax-hint')) g('tw-fax-hint').style.display = 'none';
+  twFaxSetSendEnabled(true);
+}
+function twFaxRemove() {
+  var f = g('tw-fax-file'); if (f) f.value = '';
+  if (g('tw-fax-preview')) g('tw-fax-preview').style.display = 'none';
+  if (g('tw-fax-hint')) g('tw-fax-hint').style.display = '';
+  twFaxSetSendEnabled(false);
+  twMsg('', '#888');
 }
 // ── Send actions (free-form: a contact selection is NOT required) ──
 function twMsg(text, color) { var el = g('tw-send-msg'); if (el) { el.textContent = text; el.style.color = color || '#888'; } }
@@ -229,16 +256,29 @@ async function twSendFax() {
     if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
     twMsg('✓ Fax queued (' + (d.status || 'queued') + ')', '#1a7a1a');
     if (g('tw-fax-file')) g('tw-fax-file').value = '';
-    if (g('tw-fax-filename')) g('tw-fax-filename').textContent = 'No PDF selected';
+    if (g('tw-fax-preview')) g('tw-fax-preview').style.display = 'none';
+    if (g('tw-fax-hint')) g('tw-fax-hint').style.display = '';
+    twFaxSetSendEnabled(false);
     twLoadThread();
   } catch (e) { twMsg('Failed: ' + e.message, '#b00'); }
 }
 // ── Per-channel thread (each tab shows only its own channel) ──
+function twEnsureSpinnerCss() {
+  if (g('tw-spin-css')) return;
+  var s = document.createElement('style'); s.id = 'tw-spin-css';
+  s.textContent = '@keyframes twspin{to{transform:rotate(360deg)}} .tw-spinner{display:inline-block;width:15px;height:15px;border:2px solid #e3e3da;border-top-color:#888;border-radius:50%;animation:twspin .7s linear infinite;vertical-align:middle;}';
+  document.head.appendChild(s);
+}
+function twThreadLoadingHtml(label) { twEnsureSpinnerCss(); return '<div style="color:#aaa;text-align:center;padding:16px;"><span class="tw-spinner"></span><span style="margin-left:8px;">Loading ' + escC(label) + '…</span></div>'; }
 async function twLoadThread() {
   var fid = twTargetId();
   if (!fid) { _twComms = []; twRenderChannelThread(); return; }
+  var box = g('tw-chan-thread');
+  var ch = _twTab === 'phone' ? 'voice' : _twTab;
+  var label = (TW_CHAN[ch] && TW_CHAN[ch].label) || ch;
+  if (box) box.innerHTML = twThreadLoadingHtml(label);
   try {
-    var r = await fetch(SB + '/rest/v1/twilio_communications?factory_id=eq.' + fid + '&order=created_at.desc&limit=300', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+    var r = await fetch(SB + '/rest/v1/twilio_communications?factory_id=eq.' + fid + '&order=created_at.desc&limit=50', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
     _twComms = r.ok ? await r.json() : [];
   } catch (e) { _twComms = []; }
   twRenderChannelThread();
