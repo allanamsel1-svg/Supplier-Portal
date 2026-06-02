@@ -65,7 +65,7 @@ function renderCommsStandalone() {
   _twTab = (function () { try { var t = new URLSearchParams(location.search).get('tab'); return ['whatsapp', 'sms', 'phone', 'fax'].indexOf(t) > -1 ? t : 'whatsapp'; } catch (e) { return 'whatsapp'; } })();
   var el = g('d-comms'); if (!el) return;
   el.innerHTML = _twShellHtml();
-  twRenderTabs(); twRenderTab();
+  twRenderTabs(); twRenderTab(); twLoadThread();
   twAiCardRender('Type a number, or pick a factory/customer from the address book, then send on any channel tab.', null, false);
   twEnsureContacts().then(function () { if (g('tw-ab-results')) twAddrSearch(); });
   twLoadUnread();
@@ -294,15 +294,25 @@ function twEnsureSpinnerCss() {
 function twThreadLoadingHtml(label) { twEnsureSpinnerCss(); return '<div style="color:#aaa;text-align:center;padding:16px;"><span class="tw-spinner"></span><span style="margin-left:8px;">Loading ' + escC(label) + '…</span></div>'; }
 async function twLoadThread() {
   var fid = twTargetId();
-  if (!fid) { _twComms = []; twRenderChannelThread(); return; }
   var box = g('tw-chan-thread');
+  var reqTab = _twTab;                                   // guard against a newer tab switch clobbering _twComms
   var ch = _twTab === 'phone' ? 'voice' : _twTab;
   var label = (TW_CHAN[ch] && TW_CHAN[ch].label) || ch;
+  // No contact selected: in the standalone Messages console show the whole
+  // channel INBOX (so inbound messages with no factory match are still visible);
+  // in the per-contact drawer just clear.
+  var url = (!fid)
+    ? (SB + '/rest/v1/twilio_communications?channel=eq.' + ch + '&order=created_at.desc&limit=50')
+    : (SB + '/rest/v1/twilio_communications?factory_id=eq.' + fid + '&order=created_at.desc&limit=50');
+  if (!fid && !_twStandalone) { _twComms = []; twRenderChannelThread(); return; }
   if (box) box.innerHTML = twThreadLoadingHtml(label);
+  var rows = [];
   try {
-    var r = await fetch(SB + '/rest/v1/twilio_communications?factory_id=eq.' + fid + '&order=created_at.desc&limit=50', { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
-    _twComms = r.ok ? await r.json() : [];
-  } catch (e) { _twComms = []; }
+    var r = await fetch(url, { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } });
+    rows = r.ok ? await r.json() : [];
+  } catch (e) { rows = []; }
+  if (_twTab !== reqTab) return;                         // a later switch superseded this load — drop stale result
+  _twComms = rows;
   twRenderChannelThread();
 }
 function twBubble(c) {
@@ -310,9 +320,11 @@ function twBubble(c) {
   var out = c.direction === 'outbound';
   var when = c.created_at ? new Date(c.created_at).toLocaleString() : '';
   var rt = c.response_time_hours != null ? (' · ⏱' + c.response_time_hours + 'h') : '';
+  var who = out ? (c.to_number || '') : (c.from_number || '');
+  var whoTxt = who ? (' · ' + escC(who)) : '';
   return '<div style="display:flex;justify-content:' + (out ? 'flex-end' : 'flex-start') + ';margin-bottom:6px;">' +
     '<div style="max-width:84%;background:' + (out ? col.bg : '#fff') + ';border:1px solid #e0e0d8;border-left:3px solid ' + col.c + ';border-radius:7px;padding:6px 9px;">' +
-      '<div style="font-size:10px;color:' + col.c + ';font-weight:600;margin-bottom:2px;">' + col.i + ' ' + (col.label || (c.channel || '')) + ' · ' + (out ? 'OUT' : 'IN') + (c.status ? ' · ' + escC(c.status) : '') + rt + '</div>' +
+      '<div style="font-size:10px;color:' + col.c + ';font-weight:600;margin-bottom:2px;">' + col.i + ' ' + (col.label || (c.channel || '')) + ' · ' + (out ? 'OUT' : 'IN') + whoTxt + (c.status ? ' · ' + escC(c.status) : '') + rt + '</div>' +
       '<div style="color:#1a1a2e;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere;">' + escC((c.body || '').slice(0, 400)) + '</div>' +
       '<div style="font-size:10px;color:#bbb;margin-top:3px;">' + escC(when) + '</div>' +
     '</div></div>';
@@ -322,8 +334,14 @@ function twRenderChannelThread() {
   var ch = _twTab === 'phone' ? 'voice' : _twTab;       // Phone tab → voice rows
   var rows = _twComms.filter(function (c) { return c.channel === ch; });
   var label = (TW_CHAN[ch] && TW_CHAN[ch].label) || ch;
-  if (!twTargetId()) { box.innerHTML = '<div style="color:#bbb;text-align:center;padding:10px;">Pick a factory/customer to see ' + escC(label) + ' history.</div>'; return; }
-  box.innerHTML = rows.length ? rows.map(twBubble).join('') : '<div style="color:#bbb;text-align:center;padding:10px;">No ' + escC(label) + ' history.</div>';
+  // Per-contact drawer with no contact picked → prompt. Standalone console shows
+  // the channel inbox (loaded by twLoadThread), even with nothing selected.
+  if (!twTargetId() && !_twStandalone) { box.innerHTML = '<div style="color:#bbb;text-align:center;padding:10px;">Pick a factory/customer to see ' + escC(label) + ' history.</div>'; return; }
+  if (!rows.length) {
+    var empty = twTargetId() ? ('No ' + escC(label) + ' history.') : ('No ' + escC(label) + ' messages yet.');
+    box.innerHTML = '<div style="color:#bbb;text-align:center;padding:10px;">' + empty + '</div>'; return;
+  }
+  box.innerHTML = rows.map(twBubble).join('');
 }
 // ── AI summary card (factory-scoped; deterministic fallback for customers/no key) ──
 function twFmtAgo(iso) { if (!iso) return ''; var d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : (d === 1 ? '1 day ago' : d + ' days ago'); }
