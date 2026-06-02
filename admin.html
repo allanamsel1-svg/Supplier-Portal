@@ -395,7 +395,10 @@
     <h1>Admin Portal</h1>
     <p>Supplier management dashboard</p>
     <input type="text" id="l-user" placeholder="Username" />
-    <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" />
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
+      <button type="button" id="l-pass-toggle" onclick="togglePw('l-pass','l-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+    </div>
     <button class="lb-btn" onclick="doLogin()">Sign In</button>
     <div class="lb-err" id="l-err">Incorrect username or password.</div>
   </div>
@@ -2495,6 +2498,12 @@ async function doLogin(){
   }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
 }
 function doLogout(){localStorage.removeItem('admin_session');g('main').style.display='none';g('login').style.display='flex';g('l-user').value='';g('l-pass').value='';}
+// Show/hide password toggle for the login field.
+function togglePw(inputId,btnId){
+  var inp=g(inputId),btn=g(btnId);if(!inp)return;
+  if(inp.type==='password'){inp.type='text';if(btn){btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}}
+  else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
+}
 
 function showPanel(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});

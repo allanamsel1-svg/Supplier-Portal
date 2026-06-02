@@ -60,21 +60,6 @@ export default async function handler(req, res) {
   body = body || {};
   const action = (req.query && req.query.action) || body.action || 'login';
 
-  // Masked diagnostic — confirms the env var is read without leaking the value.
-  // The fingerprint = first 8 hex of HMAC-SHA256('fp', password); compute the
-  // same locally to confirm the live value matches what you intended.
-  if (action === 'debug') {
-    return res.status(200).json({
-      adminPasswordConfigured: !!PASS,
-      rawLength: rawPass != null ? String(rawPass).length : 0,
-      trimmedLength: PASS ? PASS.length : 0,
-      hadSurroundingWhitespace: rawPass != null ? (String(rawPass) !== String(rawPass).trim()) : false,
-      username: USER,
-      sessionSecretConfigured: !!process.env.ADMIN_SESSION_SECRET,
-      fingerprint: PASS ? createHmac('sha256', 'fp').update(PASS).digest('hex').slice(0, 8) : null
-    });
-  }
-
   // Not yet configured → tell the client to stay in lenient legacy mode.
   if (!PASS) return res.status(200).json({ ok: false, unconfigured: true });
 
