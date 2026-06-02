@@ -37,14 +37,14 @@ body{background:#f5f5f0;}
 .btn-primary{background:#2244cc;color:#fff;}
 .btn-primary:hover{background:#3355dd;}
 .saved{display:none;font-size:12px;color:#1a7a1a;font-weight:600;}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;}
 .card{background:#fff;border:1px solid #e0e0d8;border-radius:10px;padding:1.25rem;}
 .card h3{font-size:15px;margin:0 0 12px;}
-.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:1rem;}
 .stat-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;}
 .stat-val{font-size:18px;font-weight:700;margin-top:3px;}
 .health-table{background:#fff;border:1px solid #e0e0d8;border-radius:10px;margin-top:1.5rem;overflow:hidden;}
-.health-row{display:grid;grid-template-columns:2.6fr 1.2fr 0.9fr 0.9fr 14px;gap:10px;align-items:center;padding:8px 14px;font-size:12px;border-bottom:0.5px solid #f0f0e8;}
+.health-row{display:grid;grid-template-columns:minmax(0,2.6fr) minmax(0,1.2fr) minmax(0,0.9fr) minmax(0,0.9fr) 14px;gap:10px;align-items:center;padding:8px 14px;font-size:12px;border-bottom:0.5px solid #f0f0e8;}
 .health-row.head{background:#fafaf8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;font-weight:600;}
 .dot{width:12px;height:12px;border-radius:50%;}
 .dot.green{background:#1a7a1a;}.dot.amber{background:#d89000;}.dot.red{background:#cc2222;}
@@ -73,7 +73,8 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .kpi .lab{font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;}
 .kpi .box.big .lab{color:#9aa;}
 .kpi .val{font-size:24px;font-weight:700;margin-top:4px;}
-.su-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;}
+.su-wrap{overflow-x:auto;border:1px solid #e0e0d8;border-radius:10px;background:#fff;}
+.su-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
 .su-table th,.su-table td{padding:8px 12px;border-bottom:0.5px solid #f0f0e8;text-align:right;}
 .su-table th{background:#fafaf8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;}
 .su-table th.lbl,.su-table td.lbl{text-align:left;}
@@ -150,7 +151,8 @@ td.fp-cat{font-weight:700;color:#1a1a2e;background:#f3f3ee;text-transform:upperc
 .cat-break b{color:#1a7a1a;}
 .summary-sub{font-size:13px;font-weight:700;color:#1a1a2e;margin:1.25rem 0 0.4rem;}
 /* Gap Analysis */
-.gap-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;overflow:hidden;}
+.gap-wrap{overflow-x:auto;border:1px solid #e0e0d8;border-radius:10px;background:#fff;}
+.gap-table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;}
 .gap-table th,.gap-table td{padding:9px 12px;border-bottom:0.5px solid #f0f0e8;text-align:right;vertical-align:top;}
 .gap-table th{background:#fafaf8;font-size:10px;text-transform:uppercase;letter-spacing:0.04em;color:#888;white-space:nowrap;}
 .gap-table th.lbl,.gap-table td.lbl{text-align:left;}
@@ -611,7 +613,7 @@ function renderGap(){
 
   // ── Section 1: Floor Coverage Table ──
   var html='<div style="font-size:12px;color:#888;margin-bottom:10px;">Floor categories detected across all shop-outs, cross-referenced against <strong>active</strong> Projections SKUs. Matching is heuristic (fuzzy category text).</div>';
-  html+='<table class="gap-table"><thead><tr>'+
+  html+='<div class="gap-wrap"><table class="gap-table"><thead><tr>'+
     '<th class="lbl">Category (detected on floor)</th>'+
     '<th>Total Lin. Ft</th><th>Sections</th><th>Shop-outs</th>'+
     '<th class="lbl">Coverage</th><th class="lbl">Matched TBG SKU groups</th></tr></thead><tbody>';
@@ -625,7 +627,7 @@ function renderGap(){
       '<td class="lbl">'+(r.paths.length?'<span style="color:#666;">'+r.paths.length+'</span> · ':'')+'<span class="gap-paths" style="display:inline;">'+gapPathsHtml(r.paths)+'</span></td>'+
     '</tr>';
   });
-  html+='</tbody></table>';
+  html+='</tbody></table></div>';
 
   // ── Section 2: Top Gaps by shelf space ──
   var totalLf=rows.reduce(function(s,r){return s+r.lf;},0);
@@ -643,7 +645,7 @@ function renderGap(){
   '</div>';
   html+='<div style="font-size:11px;color:#888;margin:-6px 0 10px;">Covered '+coveredLf.toFixed(0)+' ft · Partial '+partialLf.toFixed(0)+' ft · Gap '+(totalLf-coveredLf-partialLf).toFixed(0)+' ft of '+totalLf.toFixed(0)+' ft total.</div>';
   if(gapRows.length){
-    html+='<table class="gap-table"><thead><tr><th class="lbl">Gap Category — no active TBG SKU</th><th>Total Lin. Ft</th><th>Sections</th><th>Shop-outs</th><th></th></tr></thead><tbody>';
+    html+='<div class="gap-wrap"><table class="gap-table"><thead><tr><th class="lbl">Gap Category — no active TBG SKU</th><th>Total Lin. Ft</th><th>Sections</th><th>Shop-outs</th><th></th></tr></thead><tbody>';
     gapRows.forEach(function(r,i){
       html+='<tr>'+
         '<td class="lbl" style="font-weight:600;color:#1a1a2e;">'+esc(r.cat)+'</td>'+
@@ -653,7 +655,7 @@ function renderGap(){
         '<td style="text-align:right;"><button class="gap-addbtn" onclick="addGapToProjections('+i+')">+ Add to Projections</button></td>'+
       '</tr>';
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
   } else {
     html+='<div class="empty" style="padding:1.5rem;">No gaps — every detected floor category maps to an active Projections SKU.</div>';
   }
@@ -667,11 +669,11 @@ function renderGap(){
   html+='<div class="gap-section-h">SKU Whitespace</div>';
   html+='<div style="font-size:12px;color:#888;margin-bottom:10px;">Active Projections sub-categories with <strong>no</strong> floor sightings in any shop-out — what we are modeling that the market has not yet validated.</div>';
   if(whitespace.length){
-    html+='<table class="gap-table"><thead><tr><th class="lbl">TBG Sub-Category (no floor presence)</th><th>Active SKUs</th></tr></thead><tbody>';
+    html+='<div class="gap-wrap"><table class="gap-table"><thead><tr><th class="lbl">TBG Sub-Category (no floor presence)</th><th>Active SKUs</th></tr></thead><tbody>';
     whitespace.forEach(function(w){
       html+='<tr><td class="lbl" style="font-weight:600;color:#1a1a2e;">'+esc(w.sub)+'</td><td>'+w.count+'</td></tr>';
     });
-    html+='</tbody></table>';
+    html+='</tbody></table></div>';
   } else {
     html+='<div class="empty" style="padding:1.5rem;">Every active sub-category has been sighted on a floor.</div>';
   }
@@ -1223,13 +1225,13 @@ function renderStartup(){
     '</div>'+
     '<h3 style="font-size:15px;margin:0 0 6px;">One-Time Startup Costs</h3>'+
     '<div style="font-size:12px;color:#888;margin-bottom:8px;">Click a Projected or Actual amount to edit · ＋ detail/notes · × deletes a row</div>'+
-    '<table class="su-table"><thead><tr><th class="lbl">Item</th><th>Projected</th><th>Actual</th><th>Variance</th></tr></thead><tbody>'+
+    '<div class="su-wrap"><table class="su-table"><thead><tr><th class="lbl">Item</th><th>Projected</th><th>Actual</th><th>Variance</th></tr></thead><tbody>'+
       (rows||'<tr><td colspan="4" style="text-align:center;color:#bbb;padding:1.5rem;">No startup costs yet.</td></tr>')+
       '<tr class="su-row" style="font-weight:700;"><td class="lbl" style="border-top:2px solid #d8d8d0;">Total (active)</td>'+
         '<td style="border-top:2px solid #d8d8d0;">'+money0(totalProj)+'</td>'+
         '<td style="border-top:2px solid #d8d8d0;">'+money0(totalAct)+'</td>'+
         '<td class="'+(totalVar>0?'over':'')+'" style="border-top:2px solid #d8d8d0;">'+money0(totalVar)+'</td></tr>'+
-    '</tbody></table>'+
+    '</tbody></table></div>'+
     addForm+
     '<div style="font-size:11px;color:#888;margin-top:8px;">Remaining Working Capital = '+money0(OPENING_INVESTMENT)+' − total active startup costs (actual where entered, otherwise projected).</div>';
 }
