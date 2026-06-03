@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Banking — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<style>
+  /* Admin login gate (matches admin.html / communications.html / zoom.html) */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .lb { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
+  .lb p { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .lb input { width: 100%; padding: 9px 11px; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; color: #1a1a2e; font-size: 14px; margin-bottom: 10px; font-family: inherit; box-sizing: border-box; }
+  .lb input:focus { outline: none; border-color: #1a1a2e; }
+  .lb-btn { width: 100%; padding: 10px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .lb-btn:hover { opacity: 0.87; }
+  .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
+  #main { display: none; }
+  .mc-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+  .mc-banner { font-size: 12.5px; border-radius: 9px; padding: 10px 13px; margin-bottom: 1.1rem; line-height: 1.5; display: none; }
+  .mc-banner.err { background: #fdecec; border: 1px solid #f3c2c2; color: #b02525; display: block; }
+  .mc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 1.3rem; }
+  .mc-card { background: #fff; border: 1px solid #e6e6de; border-radius: 12px; padding: 1rem 1.1rem; }
+  .mc-card .mc-acct { font-size: 13px; font-weight: 600; color: #1a1a2e; display: flex; align-items: center; gap: 7px; }
+  .mc-card .mc-num { font-size: 11px; color: #aaa; margin-left: auto; font-weight: 400; }
+  .mc-card .mc-bal { font-size: 24px; font-weight: 700; color: #1a1a2e; margin: 8px 0 2px; letter-spacing: -0.01em; }
+  .mc-card .mc-avail { font-size: 11.5px; color: #888; }
+  .mc-card .mc-tag { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #2a8a4a; background: #e8f6ed; border-radius: 7px; padding: 1px 6px; }
+  .mc-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; background: #f7f7f4; border: 1px solid #e8e8e0; border-radius: 9px; padding: 9px 10px; }
+  .mc-bar label { font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; margin-right: 3px; }
+  .mc-bar input, .mc-bar select { padding: 6px 8px; border: 1px solid #d8d8d0; border-radius: 6px; font-size: 12px; font-family: inherit; background: #fff; box-sizing: border-box; }
+  .mc-bar .mc-search { flex: 1; min-width: 140px; }
+  .mc-refresh { margin-left: auto; padding: 7px 14px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .mc-refresh:hover { opacity: 0.88; }
+  table.mc-tx { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.mc-tx th { text-align: left; font-size: 10px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 10px; border-bottom: 1px solid #e8e8e0; }
+  table.mc-tx td { padding: 9px 10px; border-bottom: 1px solid #f0f0ea; vertical-align: top; }
+  table.mc-tx tr:hover td { background: #fafaf8; }
+  .mc-amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mc-amt.credit { color: #1a7a3a; }
+  .mc-amt.debit { color: #c0392b; }
+  .mc-date { color: #888; white-space: nowrap; }
+  .mc-cp { color: #555; }
+  .mc-empty { color: #aaa; text-align: center; padding: 26px; font-size: 13px; }
+  .mc-spin { display:inline-block;width:15px;height:15px;border:2px solid #e3e3da;border-top-color:#888;border-radius:50%;animation:mcspin .7s linear infinite;vertical-align:middle; }
+  @keyframes mcspin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="lb">
+    <h1>Banking</h1>
+    <p>Admin access required</p>
+    <input type="text" id="l-user" placeholder="Username" />
+    <div style="position:relative;margin-bottom:10px;">
+      <input type="password" id="l-pass" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
+      <button type="button" id="l-pass-toggle" onclick="togglePw('l-pass','l-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+    </div>
+    <button class="lb-btn" onclick="doLogin()">Sign In</button>
+    <div class="lb-err" id="l-err">Incorrect username or password.</div>
+  </div>
+</div>
+
+<div id="main">
+  <div class="ri-top">
+    <div class="ri-top-title">🏦 Banking</div>
+    <div class="ri-top-actions">
+      <a href="admin.html">← Admin</a>
+      <button onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <div class="mc-wrap">
+    <div class="mc-banner" id="mc-banner"></div>
+
+    <div class="mc-cards" id="mc-cards"><div class="mc-empty"><span class="mc-spin"></span> Loading accounts…</div></div>
+
+    <div class="mc-bar">
+      <span style="display:flex;align-items:center;gap:5px;">
+        <label>Account</label>
+        <select id="f-account" onchange="mercLoadTransactions()"></select>
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;">
+        <label>From</label><input type="date" id="f-from" onchange="mercRender()" />
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;">
+        <label>To</label><input type="date" id="f-to" onchange="mercRender()" />
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;">
+        <label>Type</label>
+        <select id="f-type" onchange="mercRender()">
+          <option value="all">All</option>
+          <option value="credit">Credits</option>
+          <option value="debit">Debits</option>
+        </select>
+      </span>
+      <input type="text" id="f-search" class="mc-search" placeholder="Search description or counterparty…" oninput="mercRender()" />
+      <button class="mc-refresh" onclick="mercRefresh()">↻ Refresh</button>
+    </div>
+
+    <div id="mc-tx-wrap">
+      <table class="mc-tx">
+        <thead><tr><th style="width:120px;">Date</th><th>Description</th><th>Counterparty</th><th style="text-align:right;width:130px;">Amount</th></tr></thead>
+        <tbody id="mc-tx-body"><tr><td colspan="4" class="mc-empty">Select an account to load transactions.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function g(id){return document.getElementById(id);}
+var _accounts = [], _txns = [];
+
+function escH(v){ return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtMoney(n, cur){
+  if (n == null || isNaN(n)) return '—';
+  var s = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  var sym = (cur === 'USD' || !cur) ? '$' : (cur + ' ');
+  return (n < 0 ? '-' : '') + sym + s;
+}
+function fmtDate(iso){ if(!iso) return '—'; var d=new Date(iso); return isNaN(d)?'—':d.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}); }
+function banner(msg){ var b=g('mc-banner'); if(!b) return; if(msg){ b.className='mc-banner err'; b.textContent=msg; } else { b.className='mc-banner'; b.textContent=''; } }
+
+async function mercLoadAccounts(){
+  banner('');
+  g('mc-cards').innerHTML = '<div class="mc-empty"><span class="mc-spin"></span> Loading accounts…</div>';
+  try {
+    var r = await fetch('/api/mercury?action=accounts');
+    var d = await r.json().catch(function(){return {};});
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    _accounts = d.accounts || [];
+  } catch (e) {
+    _accounts = [];
+    g('mc-cards').innerHTML = '<div class="mc-empty">No accounts loaded.</div>';
+    banner('Could not load Mercury accounts: ' + e.message);
+    return;
+  }
+  if (!_accounts.length) { g('mc-cards').innerHTML = '<div class="mc-empty">No accounts found.</div>'; return; }
+  g('mc-cards').innerHTML = _accounts.map(function(a){
+    return '<div class="mc-card">' +
+      '<div class="mc-acct">' + escH(a.name) + (a.status ? ' <span class="mc-tag">' + escH(a.status) + '</span>' : '') + (a.accountNumber ? '<span class="mc-num">' + escH(a.accountNumber) + '</span>' : '') + '</div>' +
+      '<div class="mc-bal">' + fmtMoney(a.currentBalance, a.currency) + '</div>' +
+      '<div class="mc-avail">Available: ' + fmtMoney(a.availableBalance, a.currency) + ' · ' + escH(a.currency || 'USD') + '</div>' +
+    '</div>';
+  }).join('');
+  var sel = g('f-account');
+  sel.innerHTML = _accounts.map(function(a){ return '<option value="' + escH(a.id) + '">' + escH(a.name) + '</option>'; }).join('');
+  await mercLoadTransactions();
+}
+
+async function mercLoadTransactions(){
+  var accountId = g('f-account').value;
+  if (!accountId) { _txns = []; mercRender(); return; }
+  g('mc-tx-body').innerHTML = '<tr><td colspan="4" class="mc-empty"><span class="mc-spin"></span> Loading transactions…</td></tr>';
+  try {
+    var r = await fetch('/api/mercury?action=transactions&accountId=' + encodeURIComponent(accountId) + '&limit=50');
+    var d = await r.json().catch(function(){return {};});
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    _txns = d.transactions || [];
+  } catch (e) {
+    _txns = [];
+    g('mc-tx-body').innerHTML = '<tr><td colspan="4" class="mc-empty">Could not load transactions.</td></tr>';
+    banner('Could not load transactions: ' + e.message);
+    return;
+  }
+  mercRender();
+}
+
+function mercRender(){
+  var cur = (_accounts.find(function(a){ return a.id === g('f-account').value; }) || {}).currency || 'USD';
+  var from = g('f-from').value ? new Date(g('f-from').value + 'T00:00:00') : null;
+  var to = g('f-to').value ? new Date(g('f-to').value + 'T23:59:59') : null;
+  var type = g('f-type').value;
+  var q = (g('f-search').value || '').toLowerCase().trim();
+  var rows = _txns.filter(function(t){
+    var when = t.posted_at || t.created_at;
+    var d = when ? new Date(when) : null;
+    if (from && d && d < from) return false;
+    if (to && d && d > to) return false;
+    if (type !== 'all' && t.direction !== type) return false;
+    if (q && !((t.description||'').toLowerCase().indexOf(q) > -1 || (t.counterparty_name||'').toLowerCase().indexOf(q) > -1)) return false;
+    return true;
+  });
+  if (!rows.length) { g('mc-tx-body').innerHTML = '<tr><td colspan="4" class="mc-empty">No transactions match the current filters.</td></tr>'; return; }
+  g('mc-tx-body').innerHTML = rows.map(function(t){
+    var cls = t.direction === 'credit' ? 'credit' : 'debit';
+    var sign = t.direction === 'credit' ? '+' : '';
+    return '<tr>' +
+      '<td class="mc-date">' + fmtDate(t.posted_at || t.created_at) + '</td>' +
+      '<td>' + escH(t.description) + (t.status ? ' <span style="font-size:10px;color:#bbb;">· ' + escH(t.status) + '</span>' : '') + '</td>' +
+      '<td class="mc-cp">' + escH(t.counterparty_name || '—') + '</td>' +
+      '<td style="text-align:right;"><span class="mc-amt ' + cls + '">' + sign + fmtMoney(t.amount, cur).replace('-','') + '</span></td>' +
+    '</tr>';
+  }).join('');
+}
+
+async function mercRefresh(){ await mercLoadAccounts(); }
+
+function enter(){ g('login').style.display='none'; g('main').style.display='block'; mercLoadAccounts(); }
+async function doLogin(){
+  var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);localStorage.setItem('admin_user',u||'admin');if(errEl)errEl.style.display='none';enter();return;}
+    if(errEl){ errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.'; errEl.style.display='block'; }
+  }catch(e){ if(errEl){ errEl.textContent='Login error — please try again.'; errEl.style.display='block'; } }
+}
+function doLogout(){ localStorage.removeItem('admin_session'); g('main').style.display='none'; g('login').style.display='flex'; g('l-user').value=''; g('l-pass').value=''; }
+function togglePw(inputId,btnId){
+  var inp=g(inputId),btn=g(btnId);if(!inp)return;
+  if(inp.type==='password'){inp.type='text';if(btn){btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}}
+  else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
+}
+(async function(){
+  var tok=localStorage.getItem('admin_session'); if(!tok)return;
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&(d.ok||d.unconfigured))enter(); else localStorage.removeItem('admin_session');
+  }catch(e){ enter(); }
+})();
+</script>
+</body>
+</html>
