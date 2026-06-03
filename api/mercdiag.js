@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
   if ((req.query && req.query.run) !== 'mercdiag') return res.status(400).json({ error: 'add ?run=mercdiag' });
   const KEY = process.env.MERCURY_API_KEY;
-  if (!KEY) return res.status(500).json({ error: 'MERCURY_API_KEY not set' });
+  if (!KEY) return res.status(500).json({ error: 'MERCURY_API_KEY not set', mercuryEnvKeys: Object.keys(process.env).filter((k) => /MERCUR/i.test(k)), allEnvSample: Object.keys(process.env).filter((k) => !/^(npm_|__|PATH$|PWD$|HOME$|NODE)/i.test(k)).sort() });
   const base = 'https://api.mercury.com/api/v1';
   const auth = { Authorization: 'Bearer ' + KEY, Accept: 'application/json' };
   const get = async (path) => {
