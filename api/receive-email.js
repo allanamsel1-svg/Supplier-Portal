@@ -1,11 +1,11 @@
 // api/receive-email.js
-import { IncomingForm } from 'formidable';
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// SendGrid Inbound Parse webhook. SendGrid POSTs the message as multipart/form-data.
+//
+// The repo has no package.json / installed deps (same constraint as the other
+// serverless functions), so we parse the multipart body with native Node built-ins
+// instead of `formidable`. Only text fields are needed (from, to, subject, text,
+// html, headers); file attachments are skipped.
+export const config = { runtime: 'nodejs' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -22,16 +22,10 @@ export default async function handler(req, res) {
   };
 
   try {
-    // Parse multipart form data using formidable
-    const fields = await new Promise((resolve, reject) => {
-      const form = new IncomingForm({ multiples: false });
-      form.parse(req, (err, fields) => {
-        if (err) reject(err);
-        else resolve(fields);
-      });
-    });
+    // Parse the request body using native Node built-ins (no formidable).
+    const fields = await parseBody(req);
 
-    // formidable v3 returns arrays for field values
+    // Field values are plain strings; keep array-tolerance for safety.
     const get = (key) => {
       const val = fields[key];
       if (Array.isArray(val)) return val[0] || '';
@@ -142,6 +136,83 @@ export default async function handler(req, res) {
     return res.status(200).json({ error: err.message });
   }
 }
+
+// ── Body parsing (native, no dependencies) ──
+
+async function readRawBody(req) {
+  // If a runtime already buffered the body, reuse it; otherwise drain the stream.
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return Buffer.from(req.body);
+  const chunks = [];
+  for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  return Buffer.concat(chunks);
+}
+
+async function parseBody(req) {
+  const contentType = (req.headers['content-type'] || req.headers['Content-Type'] || '').toString();
+
+  // If the runtime already parsed JSON/urlencoded into an object, just use it.
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) return req.body;
+
+  const raw = await readRawBody(req);
+
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+  if (/multipart\/form-data/i.test(contentType) && boundaryMatch) {
+    return parseMultipart(raw, (boundaryMatch[1] || boundaryMatch[2]).trim());
+  }
+
+  // Fallback: urlencoded body (covers x-www-form-urlencoded and lenient cases).
+  const fields = {};
+  try {
+    const params = new URLSearchParams(raw.toString('utf8'));
+    for (const [k, v] of params) fields[k] = v;
+  } catch { /* leave fields empty */ }
+  return fields;
+}
+
+// Buffer-based multipart/form-data parser. Returns { fieldName: value } for
+// non-file form fields. Attachments (parts with a filename) are skipped.
+function parseMultipart(buffer, boundary) {
+  const fields = {};
+  const delimiter = Buffer.from('--' + boundary);
+  const headerSep = Buffer.from('\r\n\r\n');
+
+  let pos = buffer.indexOf(delimiter);
+  if (pos === -1) return fields;
+  pos += delimiter.length;
+
+  while (pos < buffer.length) {
+    // Closing delimiter is "--boundary--".
+    if (buffer[pos] === 0x2d && buffer[pos + 1] === 0x2d) break;
+    // Skip the CRLF that follows the delimiter.
+    if (buffer[pos] === 0x0d && buffer[pos + 1] === 0x0a) pos += 2;
+
+    const next = buffer.indexOf(delimiter, pos);
+    if (next === -1) break;
+
+    let end = next;
+    // Strip the CRLF that precedes the next delimiter.
+    if (buffer[end - 2] === 0x0d && buffer[end - 1] === 0x0a) end -= 2;
+
+    const part = buffer.slice(pos, end);
+    const hEnd = part.indexOf(headerSep);
+    if (hEnd !== -1) {
+      const headerStr = part.slice(0, hEnd).toString('utf8');
+      const body = part.slice(hEnd + headerSep.length);
+      const nameMatch = headerStr.match(/name="([^"]*)"/i);
+      const isFile = /filename="/i.test(headerStr);
+      if (nameMatch && !isFile) {
+        fields[nameMatch[1]] = body.toString('utf8');
+      }
+    }
+
+    pos = next + delimiter.length;
+  }
+
+  return fields;
+}
+
+// ── Field helpers ──
 
 function extractEmail(str) {
   if (!str) return '';
