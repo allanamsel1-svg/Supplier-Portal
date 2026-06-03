@@ -15,7 +15,7 @@ async function supa(path) {
       console.warn('[supa] auth rejected (' + res.status + ') — clearing session', path);
       localStorage.removeItem('tenant_token');
       localStorage.removeItem('tenant_user');
-      window.location.href = '/tenant-login.html';
+      window.location.href = 'tenant-login.html';
       return [];
     }
     if (!res.ok) {
@@ -33,7 +33,7 @@ async function supa(path) {
 // ── Auth ── (validate token from localStorage; redirect to login if invalid)
 async function tenantAuth() {
   const token = localStorage.getItem('tenant_token');
-  if (!token) return window.location.href = '/tenant-login.html';
+  if (!token) return window.location.href = 'tenant-login.html';
   let res;
   try {
     res = await fetch('/api/tenant-auth?action=validate', { headers: { 'Authorization': 'Bearer ' + token } });
@@ -42,9 +42,9 @@ async function tenantAuth() {
     document.body.innerHTML = '<div style="color:#fca5a5;font-family:sans-serif;padding:40px;">Could not reach the server. Refresh to retry — you have not been signed out.</div>';
     return null;
   }
-  if (!res.ok) { localStorage.removeItem('tenant_token'); return window.location.href = '/tenant-login.html'; }
+  if (!res.ok) { localStorage.removeItem('tenant_token'); return window.location.href = 'tenant-login.html'; }
   const data = await res.json();
-  if (!data.valid) { localStorage.removeItem('tenant_token'); return window.location.href = '/tenant-login.html'; }
+  if (!data.valid) { localStorage.removeItem('tenant_token'); return window.location.href = 'tenant-login.html'; }
   return data.user;
 }
 
@@ -55,7 +55,7 @@ function doLogout() {
   }
   localStorage.removeItem('tenant_token');
   localStorage.removeItem('tenant_user');
-  window.location.href = '/tenant-login.html';
+  window.location.href = 'tenant-login.html';
 }
 
 // ── Theme (dark default; persisted to localStorage 'tenant_theme') ──
@@ -94,44 +94,45 @@ function renderHeader(user) {
 }
 
 // ── Sidebar definition ──
+// All hrefs are RELATIVE (no domain, no leading slash) — internal nav only.
 const TENANT_NAV = [
   { section: 'Overview', items: [
-    { icon: '⊞', label: 'Dashboard', href: '/tenant-dashboard.html' },
-    { icon: '💰', label: 'Financials', href: '/financials.html' },
-    { icon: '🧠', label: 'Intel', href: '/tenant-intel.html' },
+    { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html' },
+    { icon: '💰', label: 'Financials', href: 'financials.html' },
+    { icon: '🧠', label: 'Intel', href: 'tenant-intel.html' },
   ]},
   { section: 'Operations', items: [
-    { icon: '📦', label: 'Open Orders', href: '/tenant-operations.html#orders' },
-    { icon: '🏬', label: 'Warehouse', beta: true },
-    { icon: '📒', label: 'Accounting', beta: true },
-    { icon: '🔔', label: 'Credit Watch', href: '/tenant-operations.html#credit' },
-    { icon: '📈', label: 'Forecasting', beta: true },
+    { icon: '📦', label: 'Open Orders', href: 'tenant-operations.html#orders' },
+    { icon: '🏬', label: 'Warehouse', href: 'tenant-operations.html#warehouse', badge: 'BETA' },
+    { icon: '📒', label: 'Accounting', href: 'tenant-operations.html#accounting', badge: 'BETA' },
+    { icon: '🔔', label: 'Credit Watch', href: 'tenant-operations.html#credit' },
+    { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA' },
   ]},
   { section: 'Factories', items: [
-    { icon: '🏭', label: 'All Factories', href: '/tenant-factories.html' },
-    { icon: '⏳', label: 'Pending', href: '/tenant-factories.html#pending' },
-    { icon: '📇', label: 'Card Scanner', href: '/scanner.html' },
-    { icon: '🔍', label: 'Pending Reviews', href: '/tenant-factories.html#reviews' },
-    { icon: '✉️', label: 'Invitations', href: '/tenant-factories.html#invitations' },
-    { icon: '📌', label: 'RFQ Follow-ups', href: '/tenant-factories.html#followups' },
-    { icon: '⚠️', label: 'Compliance Alerts', href: '/tenant-factories.html#compliance' },
-    { icon: '📋', label: 'Compliance Rules', href: '/compliance-rules.html' },
+    { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html' },
+    { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending' },
+    { icon: '📇', label: 'Card Scanner', href: 'scanner.html' },
+    { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews' },
+    { icon: '✉️', label: 'Invitations', href: 'tenant-factories.html#invitations' },
+    { icon: '📌', label: 'RFQ Follow-ups', href: 'tenant-factories.html#followups' },
+    { icon: '⚠️', label: 'Compliance Alerts', href: 'tenant-factories.html#compliance' },
+    { icon: '📋', label: 'Compliance Rules', href: 'tenant-factories.html#compliance-rules' },
   ]},
   { section: 'Communications', items: [
-    { icon: '💬', label: 'Messages', href: '/tenant-communications.html' },
-    { icon: '🎥', label: 'Zoom', href: '/zoom.html' },
-    { icon: '👤', label: 'Allan', href: '/tenant-communications.html?tab=allan' },
-    { icon: '🔎', label: 'Sourcing', href: '/tenant-communications.html?tab=sourcing' },
-    { icon: '🛒', label: 'Sales', href: '/tenant-communications.html?tab=sales' },
-    { icon: '🎨', label: 'Graphics', href: '/tenant-communications.html?tab=graphics' },
-    { icon: '🧾', label: 'Accounting', href: '/tenant-communications.html?tab=accounting' },
-    { icon: '🚚', label: 'Logistics', href: '/tenant-communications.html?tab=logistics' },
-    { icon: '✅', label: 'Compliance', href: '/tenant-communications.html?tab=compliance' },
+    { icon: '💬', label: 'Messages', href: 'tenant-communications.html' },
+    { icon: '🎥', label: 'Zoom', href: 'zoom.html' },
+    { icon: '👤', label: 'Allan', href: 'tenant-communications.html?tab=allan' },
+    { icon: '🔎', label: 'Sourcing', href: 'tenant-communications.html?tab=sourcing' },
+    { icon: '🛒', label: 'Sales', href: 'tenant-communications.html?tab=sales' },
+    { icon: '🎨', label: 'Graphics', href: 'tenant-communications.html?tab=graphics' },
+    { icon: '🧾', label: 'Accounting', href: 'tenant-communications.html?tab=accounting' },
+    { icon: '🚚', label: 'Logistics', href: 'tenant-communications.html?tab=logistics' },
+    { icon: '✅', label: 'Compliance', href: 'tenant-communications.html?tab=compliance' },
   ]},
   { section: 'RFQ & Products', items: [
-    { icon: '📋', label: 'RFQs', href: '/tenant-rfq.html' },
-    { icon: '🧪', label: 'Product Development', href: '/tenant-rfq.html#pd' },
-    { icon: '📦', label: 'SKU Library', href: '/tenant-skus.html' },
+    { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html' },
+    { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd' },
+    { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus' },
   ]},
 ];
 
@@ -149,10 +150,9 @@ function renderSidebar(user) {
 
   const nav = TENANT_NAV.map(sec => {
     const items = sec.items.map(it => {
-      if (it.beta) {
-        return `<a class="nav-item beta" data-beta="1" href="#"><span class="icon">${it.icon}</span>${esc(it.label)}<span class="beta-tag">BETA</span></a>`;
-      }
-      return `<a class="nav-item" data-href="${esc(it.href)}" href="${esc(it.href)}"><span class="icon">${it.icon}</span>${esc(it.label)}</a>`;
+      // Every item is a real clickable link (beta items included — they just carry a BETA badge).
+      const badge = it.badge ? `<span class="beta-tag">${esc(it.badge)}</span>` : '';
+      return `<a class="nav-item" data-href="${esc(it.href)}" href="${esc(it.href)}"><span class="icon">${it.icon}</span>${esc(it.label)}${badge}</a>`;
     }).join('');
     return `<div class="nav-section">${esc(sec.section)}</div>${items}`;
   }).join('');
@@ -175,10 +175,6 @@ function renderSidebar(user) {
   else document.body.insertAdjacentHTML('afterbegin', html);
 
   document.getElementById('tenantLogoutBtn').addEventListener('click', doLogout);
-
-  document.querySelectorAll('.nav-item.beta').forEach(el => {
-    el.addEventListener('click', e => { e.preventDefault(); alert('Coming Soon — this module is in beta.'); });
-  });
 
   highlightNav();
   window.addEventListener('hashchange', highlightNav);

@@ -19,6 +19,7 @@
   <div class="tabs" id="tabs">
     <button class="tab" data-tab="rfq">RFQs <span class="tab-count" id="cnt-rfq"></span></button>
     <button class="tab" data-tab="pd">Product Development <span class="tab-count" id="cnt-pd"></span></button>
+    <button class="tab" data-tab="skus">SKU Library <span class="tab-count" id="cnt-skus"></span></button>
   </div>
 
   <div class="tab-pane" id="pane-rfq">
@@ -35,6 +36,21 @@
     </div>
     <div id="box-pd"><div class="loading">Loading product development…</div></div>
   </div>
+
+  <div class="tab-pane" id="pane-skus">
+    <div class="toolbar">
+      <input class="search-input" id="skuSearch" placeholder="Search by SKU code, name, description…">
+      <select class="filter-select" id="skuCategory"><option value="all">All categories</option></select>
+      <select class="filter-select" id="skuStatus">
+        <option value="all">All statuses</option>
+        <option value="draft">Draft</option>
+        <option value="live">Live</option>
+        <option value="active">Active</option>
+        <option value="archived">Archived</option>
+      </select>
+    </div>
+    <div class="cards-grid" id="grid-skus"><div class="loading">Loading SKUs…</div></div>
+  </div>
 </div>
 
 <div class="panel-overlay" id="panelOverlay"></div>
@@ -48,9 +64,9 @@
 
 <script src="/tenant-shared.js"></script>
 <script>
-const TABS = ['rfq', 'pd'];
+const TABS = ['rfq', 'pd', 'skus'];
 let TID = null;
-let rfqs = [], pds = [];
+let rfqs = [], pds = [], skus = [];
 const loaded = {};
 
 function showTab(tab) {
@@ -59,6 +75,7 @@ function showTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('pane-' + tab).classList.add('active');
   if (tab === 'pd' && !loaded.pd) { loaded.pd = true; loadPD(); }
+  if (tab === 'skus' && !loaded.skus) { loaded.skus = true; loadSKUs(); }
 }
 function goTab(tab) { location.hash = tab === 'rfq' ? '' : '#' + tab; }
 
@@ -210,6 +227,75 @@ async function openPD(id) {
   `;
 }
 
+// ── SKU Library (inline; same data as tenant-skus.html) ──
+function skuCode(s) { return s.model_number || [s.brand_prefix, s.category_prefix, s.sequence_number].filter(Boolean).join('-') || '—'; }
+function skuCat(s) { if (s.categories) return [s.categories.category, s.categories.sub_category].filter(Boolean).join(' › '); return s.category_prefix || ''; }
+function skuCosting(s) { const c = s.sku_costing; return (Array.isArray(c) && c.length) ? c[0] : null; }
+
+async function loadSKUs() {
+  skus = await supa(`skus?tenant_id=eq.${TID}&order=created_at.desc&select=*,categories(category,sub_category),sku_costing(fob_price,total_fob,landed_cost,wholesale_price,retail_price,gross_margin_pct,net_margin_pct,effective_date)`);
+  document.getElementById('cnt-skus').textContent = skus.length;
+  const cats = Array.from(new Set(skus.map(skuCat).filter(Boolean))).sort();
+  const sel = document.getElementById('skuCategory');
+  cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+  renderSKUs();
+}
+
+function renderSKUs() {
+  const q = (document.getElementById('skuSearch').value || '').toLowerCase().trim();
+  const cat = document.getElementById('skuCategory').value;
+  const st = document.getElementById('skuStatus').value;
+  let rows = skus.slice();
+  if (st !== 'all') rows = rows.filter(s => (s.status || '').toLowerCase() === st);
+  if (cat !== 'all') rows = rows.filter(s => skuCat(s) === cat);
+  if (q) rows = rows.filter(s => [skuCode(s), s.description, s.detailed_description].some(v => (v || '').toLowerCase().includes(q)));
+  const grid = document.getElementById('grid-skus');
+  if (!rows.length) { grid.innerHTML = '<div class="empty"><span class="empty-icon">📦</span>No SKUs found.</div>'; return; }
+  grid.innerHTML = rows.map(s => {
+    const c = skuCosting(s); const cat = skuCat(s);
+    return `<div class="card" data-id="${esc(s.id)}">
+      <div class="card-title">${esc(s.description || 'Unnamed SKU')}</div>
+      <div class="card-meta">${esc(skuCode(s))}</div>
+      <div>${statusBadge(s.status)}${cat ? ' <span class="chip">' + esc(cat) + '</span>' : ''}</div>
+      <div class="card-row" style="margin-top:10px;color:var(--sidebar-text);">
+        <span>FOB ${c ? money(c.total_fob || c.fob_price) : '—'}</span>
+        <span>· Retail ${c ? money(c.retail_price) : '—'}</span>
+        <span>· Margin ${c ? pct(c.gross_margin_pct) : '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.card').forEach(card => card.addEventListener('click', () => openSKU(card.dataset.id)));
+}
+
+async function openSKU(id) {
+  const s = skus.find(x => x.id === id);
+  if (!s) return;
+  openPanel(s.description || skuCode(s), skuCode(s), '<div class="loading">Loading details…</div>');
+  const [docs, sources] = await Promise.all([
+    supa(`sku_documents?sku_id=eq.${id}&order=uploaded_at.desc`),
+    supa(`sku_factory_sources?sku_id=eq.${id}&select=*,factories(factory_name_english)&order=effective_date.desc`),
+  ]);
+  const c = skuCosting(s);
+  const details = kv([
+    ['SKU code', skuCode(s)], ['Status', statusBadge(s.status), true], ['Category', skuCat(s)],
+    ['Customer-specific', s.is_customer_specific ? 'Yes' : null], ['Cosmetic', s.is_cosmetic ? 'Yes' : null],
+    ['Shelf life', s.shelf_life_days ? s.shelf_life_days + ' days' : null], ['Created', fmtDate(s.created_at)],
+  ]);
+  const cost = c ? kv([
+    ['FOB price', money(c.fob_price)], ['Total FOB', money(c.total_fob)], ['Landed cost', money(c.landed_cost)],
+    ['Wholesale', money(c.wholesale_price)], ['Retail', money(c.retail_price)],
+    ['Gross margin', pct(c.gross_margin_pct)], ['Net margin', pct(c.net_margin_pct)],
+  ]) : '<div class="empty" style="padding:12px;">No costing on record.</div>';
+  const docItems = docs.length ? docs.map(d => `<div class="sub-item"><div class="si-title">${esc(d.document_type || d.file_name || 'Document')}</div><div class="si-meta">${[d.file_name, d.is_current ? 'current' : null, fmtDate(d.uploaded_at)].filter(Boolean).map(esc).join(' · ')}</div></div>`).join('') : '<div class="empty" style="padding:12px;">No documents.</div>';
+  const srcItems = sources.length ? sources.map(fs => `<div class="sub-item"><div class="si-title">${esc(fs.factories && fs.factories.factory_name_english || 'Factory')}</div><div class="si-meta">${[fs.status && statusBadge(fs.status), fs.allocation_pct != null && 'alloc ' + fs.allocation_pct + '%', fs.fob_price != null && 'FOB ' + money(fs.fob_price)].filter(Boolean).join(' · ')}</div></div>`).join('') : '<div class="empty" style="padding:12px;">No factory sources.</div>';
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section"><h3>Details</h3>${details}</div>
+    <div class="panel-section"><h3>Costing</h3>${cost}</div>
+    <div class="panel-section"><h3>Documents (${docs.length})</h3><div class="sub-list">${docItems}</div></div>
+    <div class="panel-section"><h3>Factory Sources (${sources.length})</h3><div class="sub-list">${srcItems}</div></div>
+  `;
+}
+
 (async function init() {
   const user = await tenantAuth();
   if (!user || !user.tenant) return;
@@ -221,6 +307,9 @@ async function openPD(id) {
   document.getElementById('rfqSearch').addEventListener('input', renderRFQs);
   document.getElementById('rfqStatus').addEventListener('change', renderRFQs);
   document.getElementById('pdSearch').addEventListener('input', renderPD);
+  document.getElementById('skuSearch').addEventListener('input', renderSKUs);
+  document.getElementById('skuCategory').addEventListener('change', renderSKUs);
+  document.getElementById('skuStatus').addEventListener('change', renderSKUs);
   document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
   document.getElementById('panelOverlay').addEventListener('click', closePanel);
   window.addEventListener('hashchange', () => showTab((location.hash || '#rfq').slice(1)));

@@ -155,6 +155,8 @@ function togglePw(inputId,btnId){
   else{inp.type='password';if(btn){btn.textContent='👁';btn.setAttribute('aria-label','Show password');}}
 }
 (async function(){
+  // Tenant session → allow straight in (no admin login needed).
+  if(localStorage.getItem('tenant_token')){ enter(); return; }
   var tok=localStorage.getItem('admin_session'); if(!tok)return;
   try{
     var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});

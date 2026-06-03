@@ -23,6 +23,7 @@
     <button class="tab" data-tab="invitations">Invitations <span class="tab-count" id="cnt-invitations"></span></button>
     <button class="tab" data-tab="followups">RFQ Follow-ups <span class="tab-count" id="cnt-followups"></span></button>
     <button class="tab" data-tab="compliance">Compliance Alerts <span class="tab-count" id="cnt-compliance"></span></button>
+    <button class="tab" data-tab="compliance-rules">Compliance Rules</button>
   </div>
 
   <!-- ALL / PENDING share the toolbar + grid -->
@@ -46,6 +47,10 @@
   <div class="tab-pane" id="pane-invitations"><div id="box-invitations"><div class="loading">Loading invitations…</div></div></div>
   <div class="tab-pane" id="pane-followups"><div id="box-followups"><div class="loading">Loading follow-ups…</div></div></div>
   <div class="tab-pane" id="pane-compliance"><div id="box-compliance"><div class="loading">Loading alerts…</div></div></div>
+  <div class="tab-pane" id="pane-compliance-rules">
+    <iframe id="complianceRulesFrame" title="Compliance Rules" data-src="compliance-rules.html"
+      style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
+  </div>
 </div>
 
 <!-- Detail panel -->
@@ -60,7 +65,7 @@
 
 <script src="/tenant-shared.js"></script>
 <script>
-const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance'];
+const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance', 'compliance-rules'];
 let TID = null;
 let factories = [];
 const loaded = {};   // lazy-load guard per tab
@@ -83,6 +88,11 @@ async function loadTab(tab) {
   if (tab === 'invitations') return loadInvitations();
   if (tab === 'followups') return loadFollowups();
   if (tab === 'compliance') return loadCompliance();
+  if (tab === 'compliance-rules') {
+    const fr = document.getElementById('complianceRulesFrame');
+    if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load iframe once
+    return;
+  }
 }
 
 // ── Factories (All + Pending) ──
