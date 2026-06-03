@@ -33,8 +33,7 @@
     .slabel { font-size: 10px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.08em; padding: 0 1rem; margin-bottom: 4px; margin-top: 1rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
     .slabel:first-child { margin-top: 0; }
     .slabel:hover { color: #999; }
-    .slabel .chev { font-size: 8px; color: #ccc; transition: transform 0.22s ease; display: inline-block; }
-    .slabel.collapsed .chev { transform: rotate(-90deg); }
+    .slabel .chev { font-size: 8px; color: #ccc; display: inline-block; width: 9px; }
     /* Collapsible section body — smooth max-height transition */
     .ssec { overflow: hidden; transition: max-height 0.28s ease; max-height: 600px; }
     .ssec.collapsed { max-height: 0; }
@@ -481,17 +480,22 @@
     </div>
     <script>
     // Collapsible sidebar sections — persisted to localStorage (default: all expanded)
+    function setChevron(lbl, collapsed){ var c=lbl&&lbl.querySelector('.chev'); if(c) c.textContent = collapsed ? '▸' : '▾'; }
     function toggleSection(name){
       var sec=document.getElementById('ssec-'+name), lbl=document.getElementById('slbl-'+name);
       if(!sec||!lbl)return;
       var collapsed=sec.classList.toggle('collapsed');
       lbl.classList.toggle('collapsed',collapsed);
+      setChevron(lbl, collapsed);                 // ▾ expanded / ▸ collapsed
       try{ var st=JSON.parse(localStorage.getItem('admin_sidebar_sections')||'{}'); st[name]=collapsed; localStorage.setItem('admin_sidebar_sections',JSON.stringify(st)); }catch(e){}
     }
     (function initSidebarSections(){
       var st={}; try{ st=JSON.parse(localStorage.getItem('admin_sidebar_sections')||'{}'); }catch(e){}
       ['overview','operations','factories','communications','rfq','products','system'].forEach(function(name){
-        if(st[name]){ var sec=document.getElementById('ssec-'+name), lbl=document.getElementById('slbl-'+name); if(sec)sec.classList.add('collapsed'); if(lbl)lbl.classList.add('collapsed'); }
+        var sec=document.getElementById('ssec-'+name), lbl=document.getElementById('slbl-'+name);
+        var collapsed=!!st[name];
+        if(collapsed){ if(sec)sec.classList.add('collapsed'); if(lbl)lbl.classList.add('collapsed'); }
+        setChevron(lbl, collapsed);
       });
     })();
     </script>
