@@ -231,30 +231,77 @@ const MODULES = [
 
 let tenantUser = null;
 
+function showFatal(msg) {
+  const grid = document.getElementById('modulesGrid');
+  if (grid) grid.innerHTML = '<div class="loading" style="color:#fca5a5;">' + msg + '</div>';
+}
+
+function goLogin(reason) {
+  console.log('[dashboard] redirecting to login —', reason);
+  localStorage.removeItem('tenant_token');
+  localStorage.removeItem('tenant_user');
+  window.location.href = '/tenant-login.html';
+}
+
 async function init() {
   const token = localStorage.getItem('tenant_token');
-  if (!token) return window.location.href = '/tenant-login.html';
+  console.log('[dashboard] init — token present:', !!token);
+  if (!token) return goLogin('no token in localStorage');
 
-  const res = await fetch('/api/tenant-auth?action=validate', {
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
-  if (!res.ok) {
-    localStorage.removeItem('tenant_token');
-    localStorage.removeItem('tenant_user');
-    return window.location.href = '/tenant-login.html';
+  let res;
+  try {
+    res = await fetch('/api/tenant-auth?action=validate', {
+      method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+  } catch (e) {
+    // Network error — DO NOT sign the user out; let them retry.
+    console.error('[dashboard] validate network error:', e);
+    return showFatal('Could not reach the server. Check your connection and refresh — you have not been signed out.');
   }
 
-  const data = await res.json();
+  console.log('[dashboard] validate HTTP status:', res.status);
+
+  // Only an explicit auth rejection clears the session.
+  if (res.status === 401 || res.status === 403) {
+    return goLogin('validate returned ' + res.status);
+  }
+
+  // Any other non-OK (5xx, etc.) is a server problem, not an invalid session.
+  if (!res.ok) {
+    console.error('[dashboard] validate failed, status', res.status);
+    return showFatal('Sign-in check failed (server error ' + res.status + '). Please refresh.');
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (e) {
+    console.error('[dashboard] could not parse validate response:', e);
+    return showFatal('Unexpected server response. Please refresh.');
+  }
+  console.log('[dashboard] validate body:', data);
+
+  if (!data.valid || !data.user) {
+    return goLogin('response not valid');
+  }
+
   tenantUser = data.user;
 
   // UI
-  document.getElementById('tenantName').textContent = tenantUser.tenant.name;
-  document.getElementById('userName').textContent = tenantUser.full_name || tenantUser.email;
-  document.getElementById('welcomeMsg').textContent = `Welcome back, ${tenantUser.full_name || tenantUser.email.split('@')[0]}`;
-  document.title = `${tenantUser.tenant.name} — TBG Sourcing`;
+  try {
+    document.getElementById('tenantName').textContent = tenantUser.tenant.name;
+    document.getElementById('userName').textContent = tenantUser.full_name || tenantUser.email;
+    document.getElementById('welcomeMsg').textContent = `Welcome back, ${tenantUser.full_name || tenantUser.email.split('@')[0]}`;
+    document.title = `${tenantUser.tenant.name} — TBG Sourcing`;
 
-  renderModules(tenantUser.tenant.features);
-  loadStats(tenantUser.tenant.id, token);
+    renderModules(tenantUser.tenant.features);
+    loadStats(tenantUser.tenant.id, token);
+    console.log('[dashboard] rendered for', tenantUser.email);
+  } catch (e) {
+    console.error('[dashboard] render error:', e);
+    showFatal('Loaded your session but failed to render the dashboard: ' + e.message);
+  }
 }
 
 function renderModules(features) {

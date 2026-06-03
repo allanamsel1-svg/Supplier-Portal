@@ -82,6 +82,35 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   }
 
+  // ── VALIDATE SESSION ── works over GET or POST (only needs the Bearer token)
+  if (action === 'validate') {
+    try {
+      const token = bearer(req);
+      if (!token) return res.status(401).json({ error: 'No token' });
+
+      let session = null;
+      try {
+        const r = await fetch(SB_URL + '/rest/v1/tenant_sessions?select=id,tenant_id,expires_at,tenant_users(id,email,full_name,role,is_active,' + TENANT_EMBED + ')' +
+          '&token=eq.' + encodeURIComponent(token) + '&limit=1', { headers: H });
+        if (!r.ok) console.error('tenant-auth validate: session query failed', r.status, await r.text().catch(() => ''));
+        const arr = r.ok ? await r.json() : [];
+        session = Array.isArray(arr) ? arr[0] : null;
+      } catch (e) { console.error('tenant-auth validate: fetch threw', e); session = null; }
+
+      if (!session || !session.tenant_users) return res.status(401).json({ error: 'Invalid session' });
+      if (new Date(session.expires_at) < new Date()) {
+        fetch(SB_URL + '/rest/v1/tenant_sessions?token=eq.' + encodeURIComponent(token), { method: 'DELETE', headers: H }).catch(() => {});
+        return res.status(401).json({ error: 'Session expired' });
+      }
+      if (!session.tenant_users.is_active) return res.status(403).json({ error: 'Account inactive' });
+
+      return res.status(200).json({ valid: true, user: userPayload(session.tenant_users, session.tenant_id) });
+    } catch (e) {
+      console.error('tenant-auth validate: unhandled error', e);
+      return res.status(500).json({ error: 'Validation failed' });
+    }
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   // ── LOGIN ──
@@ -129,35 +158,6 @@ export default async function handler(req, res) {
     } catch (e) {
       console.error('tenant-auth login: unhandled error', e);
       return res.status(500).json({ error: 'Login failed' });
-    }
-  }
-
-  // ── VALIDATE SESSION ──
-  if (action === 'validate') {
-    try {
-      const token = bearer(req);
-      if (!token) return res.status(401).json({ error: 'No token' });
-
-      let session = null;
-      try {
-        const r = await fetch(SB_URL + '/rest/v1/tenant_sessions?select=id,tenant_id,expires_at,tenant_users(id,email,full_name,role,is_active,' + TENANT_EMBED + ')' +
-          '&token=eq.' + encodeURIComponent(token) + '&limit=1', { headers: H });
-        if (!r.ok) console.error('tenant-auth validate: session query failed', r.status, await r.text().catch(() => ''));
-        const arr = r.ok ? await r.json() : [];
-        session = Array.isArray(arr) ? arr[0] : null;
-      } catch (e) { console.error('tenant-auth validate: fetch threw', e); session = null; }
-
-      if (!session || !session.tenant_users) return res.status(401).json({ error: 'Invalid session' });
-      if (new Date(session.expires_at) < new Date()) {
-        fetch(SB_URL + '/rest/v1/tenant_sessions?token=eq.' + encodeURIComponent(token), { method: 'DELETE', headers: H }).catch(() => {});
-        return res.status(401).json({ error: 'Session expired' });
-      }
-      if (!session.tenant_users.is_active) return res.status(403).json({ error: 'Account inactive' });
-
-      return res.status(200).json({ valid: true, user: userPayload(session.tenant_users, session.tenant_id) });
-    } catch (e) {
-      console.error('tenant-auth validate: unhandled error', e);
-      return res.status(500).json({ error: 'Validation failed' });
     }
   }
 
