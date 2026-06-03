@@ -114,14 +114,14 @@
   <div class="card">
     <div class="card-title">Sign in to your account</div>
     <div class="field">
-      <label>Email</label>
+      <label for="email">Email</label>
       <input type="email" id="email" placeholder="you@company.com" autocomplete="email">
     </div>
     <div class="field">
-      <label>Password</label>
+      <label for="password">Password</label>
       <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
     </div>
-    <button class="btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+    <button class="btn" id="loginBtn" type="button">Sign In</button>
     <div class="error" id="errorMsg"></div>
   </div>
   <div class="footer">
@@ -129,63 +129,95 @@
   </div>
 </div>
 <script>
-  // Redirect if already logged in
-  const existing = localStorage.getItem('tenant_token');
-  if (existing) {
-    fetch('/api/tenant-auth?action=validate', {
-      headers: { 'Authorization': 'Bearer ' + existing }
-    }).then(r => r.json()).then(d => {
-      if (d.valid) window.location.href = '/tenant-dashboard.html';
-    }).catch(() => {});
+(function () {
+  'use strict';
+
+  var emailEl = document.getElementById('email');
+  var passwordEl = document.getElementById('password');
+  var btn = document.getElementById('loginBtn');
+  var err = document.getElementById('errorMsg');
+  var submitting = false;
+
+  function showError(msg) {
+    err.textContent = msg;
+    err.style.display = 'block';
   }
 
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Enter') doLogin();
-  });
+  function clearError() {
+    err.textContent = '';
+    err.style.display = 'none';
+  }
 
   async function doLogin() {
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const btn = document.getElementById('loginBtn');
-    const err = document.getElementById('errorMsg');
+    if (submitting) return;
+    clearError();
 
-    err.style.display = 'none';
+    var email = emailEl.value.trim();
+    var password = passwordEl.value;
+
     if (!email || !password) {
-      err.textContent = 'Please enter your email and password.';
-      err.style.display = 'block';
+      showError('Please enter your email and password.');
       return;
     }
 
+    submitting = true;
     btn.disabled = true;
     btn.textContent = 'Signing in…';
 
     try {
-      const res = await fetch('/api/tenant-auth?action=login', {
+      var res = await fetch('/api/tenant-auth?action=login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email: email, password: password })
       });
-      const data = await res.json();
 
-      if (!res.ok) {
-        err.textContent = data.error || 'Sign in failed.';
-        err.style.display = 'block';
+      var data = {};
+      try { data = await res.json(); } catch (e) { data = {}; }
+
+      if (!res.ok || !data.token) {
+        showError(data.error || 'Sign in failed.');
+        submitting = false;
         btn.disabled = false;
         btn.textContent = 'Sign In';
         return;
       }
 
       localStorage.setItem('tenant_token', data.token);
-      localStorage.setItem('tenant_user', JSON.stringify(data.user));
+      localStorage.setItem('tenant_user', JSON.stringify(data.user || {}));
       window.location.href = '/tenant-dashboard.html';
-
     } catch (e) {
-      err.textContent = 'Connection error. Please try again.';
-      err.style.display = 'block';
+      showError('Connection error. Please try again.');
+      submitting = false;
       btn.disabled = false;
       btn.textContent = 'Sign In';
     }
   }
+
+  // No inline onclick — wire events here.
+  btn.addEventListener('click', doLogin);
+
+  // Submit on Enter from either input field.
+  [emailEl, passwordEl].forEach(function (el) {
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doLogin();
+      }
+    });
+  });
+
+  // If already signed in with a valid token, skip straight to the dashboard.
+  var existing = localStorage.getItem('tenant_token');
+  if (existing) {
+    fetch('/api/tenant-auth?action=validate', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + existing }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.valid) window.location.href = '/tenant-dashboard.html'; })
+      .catch(function () {});
+  }
+})();
 </script>
 </body>
 </html>
