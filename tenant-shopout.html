@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop Out — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<style>
+  .obs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .obs-card { background: #131929; border: 1px solid #1e2d47; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color .15s; }
+  .obs-card:hover { border-color: #2563eb; }
+  .obs-thumb { width: 100%; height: 150px; object-fit: cover; background: #0d1424; display: block; }
+  .obs-thumb-ph { width: 100%; height: 150px; background: #0d1424; display: flex; align-items: center; justify-content: center; color: #334155; font-size: 30px; }
+  .obs-info { padding: 12px 14px; }
+  .obs-brand { font-size: 13px; font-weight: 600; color: #f1f5f9; }
+  .obs-prod { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+  .obs-meta { font-size: 12px; color: #6b7280; margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .obs-detail { grid-column: 1 / -1; background: #0d1424; border: 1px solid #1e3a6e; border-radius: 10px; padding: 18px; }
+  .obs-photos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .obs-photos img { width: 160px; height: 160px; object-fit: cover; border-radius: 8px; border: 1px solid #1e2d47; }
+  .back-link { color: #60a5fa; cursor: pointer; font-size: 13px; display: inline-block; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Shop Out</div>
+    <div class="page-sub" id="pageSub">Retail intelligence from store visits</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="runs">Runs <span class="tab-count" id="cnt-runs"></span></button>
+    <button class="tab" data-tab="observations">Observations <span class="tab-count" id="cnt-observations"></span></button>
+    <button class="tab" data-tab="pipeline">RFQ Pipeline <span class="tab-count" id="cnt-pipeline"></span></button>
+  </div>
+
+  <div class="tab-pane" id="pane-runs"><div id="box-runs"><div class="loading">Loading runs…</div></div></div>
+  <div class="tab-pane" id="pane-observations">
+    <div class="toolbar"><input class="search-input" id="obsSearch" placeholder="Search by brand or product…"></div>
+    <div id="box-observations"><div class="loading">Loading observations…</div></div>
+  </div>
+  <div class="tab-pane" id="pane-pipeline"><div id="box-pipeline"><div class="loading">Loading pipeline…</div></div></div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+let TID = null;
+let runs = [], observations = [], photoMap = {};
+const loaded = {};
+function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+
+function route() {
+  const h = location.hash || '#runs';
+  if (h.startsWith('#detail/')) { activateTab('runs'); return showRunDetail(h.slice('#detail/'.length)); }
+  const tab = h.slice(1) || 'runs';
+  activateTab(['runs', 'observations', 'pipeline'].includes(tab) ? tab : 'runs');
+}
+function activateTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (tab === 'runs') renderRuns();
+  if (tab === 'observations' && !loaded.observations) { loaded.observations = true; loadObservations(); }
+  if (tab === 'pipeline' && !loaded.pipeline) { loaded.pipeline = true; loadPipeline(); }
+}
+function goTab(tab) { location.hash = tab === 'runs' ? '' : '#' + tab; }
+
+const cnt = a => (Array.isArray(a) && a[0] && a[0].count) || 0;
+
+// TAB 1 — Runs
+async function loadRuns() {
+  runs = await supa(`shop_outs?tenant_id=eq.${TID}&order=shop_date.desc&select=*,shop_out_sections(count),shop_out_observations(count)`);
+  document.getElementById('cnt-runs').textContent = runs.length;
+  renderRuns();
+}
+function renderRuns() {
+  const box = document.getElementById('box-runs');
+  if (!runs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🛍️</span>No shop-out runs yet.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Location</th><th>Visit date</th><th>Sections</th><th>Observations</th><th>Status</th></tr></thead><tbody>${
+    runs.map(r => `<tr class="clickable" data-id="${esc(r.id)}">
+      <td>${esc(r.store_location_text || 'Unknown location')}</td><td>${fmtDate(r.shop_date)}</td>
+      <td>${cnt(r.shop_out_sections)}</td><td>${r.total_observations != null ? r.total_observations : cnt(r.shop_out_observations)}</td>
+      <td>${statusBadge(r.status || r.processing_status)}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => { location.hash = 'detail/' + tr.dataset.id; }));
+}
+
+async function showRunDetail(id) {
+  const box = document.getElementById('box-runs');
+  const r = runs.find(x => x.id === id);
+  box.innerHTML = '<div class="loading">Loading run…</div>';
+  const [sections, obs] = await Promise.all([
+    supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
+    supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
+  ]);
+  const head = r ? kv([
+    ['Location', r.store_location_text], ['Visit date', fmtDate(r.shop_date)],
+    ['Status', statusBadge(r.status || r.processing_status), true],
+    ['Photos', r.total_photos], ['Observations', r.total_observations], ['Description', r.description],
+  ]) : '';
+  const secList = sections.length ? sections.map(s => `<div class="sub-item">
+      <div class="si-title">${esc(s.department || s.category_detected || 'Section')}</div>
+      <div class="si-meta">${[s.brand_summary && preview(s.brand_summary, 120), s.estimated_linear_feet && s.estimated_linear_feet + ' ft'].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No sections.</div>';
+  const obsList = obs.length ? obs.map(o => `<div class="sub-item">
+      <div class="si-title">${esc(o.brand || '—')}${o.product_name ? ' — ' + esc(o.product_name) : ''}</div>
+      <div class="si-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No observations.</div>';
+  box.innerHTML = `<span class="back-link" id="backToRuns">← All runs</span>
+    <div class="panel-section"><h3>Run</h3>${head}</div>
+    <div class="panel-section"><h3>Sections (${sections.length})</h3><div class="sub-list">${secList}</div></div>
+    <div class="panel-section"><h3>Observations (${obs.length})</h3><div class="sub-list">${obsList}</div></div>`;
+  document.getElementById('backToRuns').addEventListener('click', () => { location.hash = ''; });
+}
+function preview(t, n) { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+
+// TAB 2 — Observations
+async function loadObservations() {
+  observations = await supa(`shop_out_observations?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_outs(store_location_text,shop_date)`);
+  document.getElementById('cnt-observations').textContent = observations.length;
+  // Batch-resolve front photo file paths.
+  const ids = observations.map(o => o.front_photo_id).filter(Boolean);
+  if (ids.length) {
+    const photos = await supa(`shop_out_photos?id=in.(${ids.join(',')})&select=id,file_path`);
+    photoMap = {};
+    photos.forEach(p => { photoMap[p.id] = p.file_path; });
+  }
+  renderObservations();
+}
+function renderObservations() {
+  const q = (document.getElementById('obsSearch').value || '').toLowerCase().trim();
+  let rows = observations.slice();
+  if (q) rows = rows.filter(o => [o.brand, o.product_name, o.sub_brand].some(v => (v || '').toLowerCase().includes(q)));
+  const box = document.getElementById('box-observations');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🔍</span>No observations found.</div>'; return; }
+  box.innerHTML = '<div class="obs-grid">' + rows.map(o => {
+    const fp = photoMap[o.front_photo_id];
+    const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+    const store = o.shop_outs && o.shop_outs.store_location_text;
+    return `<div class="obs-card" data-id="${esc(o.id)}">
+      ${thumb}
+      <div class="obs-info">
+        <div class="obs-brand">${esc(o.brand || '—')}</div>
+        <div class="obs-prod">${esc(o.product_name || '')}</div>
+        <div class="obs-meta">${[o.retail_price != null && money(o.retail_price), store].filter(v => v || v === 0).map(esc).join(' · ')}</div>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+  box.querySelectorAll('.obs-card').forEach(c => c.addEventListener('click', () => toggleObs(c.dataset.id)));
+}
+
+async function toggleObs(id) {
+  // Render an inline detail row right after the grid.
+  const o = observations.find(x => x.id === id);
+  if (!o) return;
+  let detail = document.getElementById('obs-detail');
+  if (detail && detail.dataset.id === id) { detail.remove(); return; }
+  if (detail) detail.remove();
+
+  const grid = document.querySelector('#box-observations .obs-grid');
+  detail = document.createElement('div');
+  detail.className = 'obs-detail'; detail.id = 'obs-detail'; detail.dataset.id = id;
+  detail.innerHTML = '<div class="loading">Loading observation…</div>';
+  grid.appendChild(detail);
+
+  const photoIds = [o.front_photo_id, o.back_photo_id].concat(Array.isArray(o.supplemental_photo_ids) ? o.supplemental_photo_ids : []).filter(Boolean);
+  let paths = [];
+  if (photoIds.length) {
+    const photos = await supa(`shop_out_photos?id=in.(${photoIds.join(',')})&select=id,file_path,photo_type`);
+    paths = photos.map(p => p.file_path).filter(Boolean);
+  }
+  const info = kv([
+    ['Brand', o.brand], ['Sub-brand', o.sub_brand], ['Product', o.product_name],
+    ['Retailer / store', o.shop_outs && o.shop_outs.store_location_text],
+    ['Retail price', o.retail_price != null ? money(o.retail_price) : null],
+    ['Compare-at', o.compare_at_price != null ? money(o.compare_at_price) : null],
+    ['Unit price', o.unit_price != null ? money(o.unit_price) : null],
+    ['Pack size', [o.pack_size, o.pack_size_unit].filter(Boolean).join(' ')],
+    ['UPC', o.upc], ['Country of origin', o.country_of_origin],
+    ['Department', o.department], ['Clearance', o.is_clearance ? 'Yes' : null],
+    ['Review status', o.review_status],
+    ['ML comment', o.ml_observation_comment || o.ml_observation],
+  ]);
+  const photoHtml = paths.length ? `<div class="obs-photos">${paths.map(p => `<img src="${esc(photoUrl(p))}" loading="lazy" onerror="this.style.display='none'">`).join('')}</div>` : '';
+  detail.innerHTML = `<span class="back-link" id="obsClose">✕ Close</span>${info}${photoHtml}`;
+  document.getElementById('obsClose').addEventListener('click', () => detail.remove());
+}
+
+// TAB 3 — RFQ Pipeline
+async function loadPipeline() {
+  const box = document.getElementById('box-pipeline');
+  const rows = await supa(`shop_out_rfq_pipeline?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_outs(store_location_text)`);
+  document.getElementById('cnt-pipeline').textContent = rows.length;
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📈</span>No items in the RFQ pipeline.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Stage</th><th>Brand</th><th>Product</th><th>Retailer</th><th>Retail</th><th>Target wholesale</th></tr></thead><tbody>${
+    rows.map(p => `<tr><td>${statusBadge(p.status)}</td><td>${esc(p.spotted_brand || '—')}</td>
+      <td>${esc(p.spotted_product || '—')}</td><td>${esc(p.shop_outs && p.shop_outs.store_location_text || '—')}</td>
+      <td>${money(p.spotted_retail_price)}</td><td>${money(p.target_wholesale)}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · shop-out intelligence';
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('obsSearch').addEventListener('input', renderObservations);
+  window.addEventListener('hashchange', route);
+  await loadRuns();
+  route();
+})();
+</script>
+</body>
+</html>

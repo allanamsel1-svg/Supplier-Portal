@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intelligence Hub — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<style>
+  .acc-list { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
+  .acc { background: #131929; border: 1px solid #1e2d47; border-radius: 10px; overflow: hidden; }
+  .acc-head { padding: 14px 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+  .acc-head:hover { background: #0f1e35; }
+  .acc-title { font-size: 14px; font-weight: 600; color: #f1f5f9; }
+  .acc-meta { font-size: 12px; color: #6b7280; margin-top: 3px; }
+  .acc-right { font-size: 12px; color: #6b7280; white-space: nowrap; flex-shrink: 0; text-align: right; }
+  .acc-body { padding: 0 16px 16px; font-size: 13px; color: #cbd5e1; line-height: 1.6; white-space: pre-wrap; border-top: 1px solid #131c30; display: none; }
+  .acc.open .acc-body { display: block; padding-top: 14px; }
+  .news-item { display: block; padding: 13px 16px; border: 1px solid #1e2d47; border-radius: 10px; background: #131929; text-decoration: none; }
+  .news-item:hover { border-color: #2563eb; background: #0f1e35; }
+  .news-head { font-size: 14px; color: #f1f5f9; font-weight: 600; }
+  .news-meta { font-size: 12px; color: #6b7280; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Intelligence Hub</div>
+    <div class="page-sub" id="pageSub">Retailer, brand, trade & news intelligence</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="retailer">Retailer Intel <span class="tab-count" id="cnt-retailer"></span></button>
+    <button class="tab" data-tab="brandwatch">Brand Watch <span class="tab-count" id="cnt-brandwatch"></span></button>
+    <button class="tab" data-tab="trade">Trade Intel <span class="tab-count" id="cnt-trade"></span></button>
+    <button class="tab" data-tab="crosssource">Cross Source <span class="tab-count" id="cnt-crosssource"></span></button>
+    <button class="tab" data-tab="news">News <span class="tab-count" id="cnt-news"></span></button>
+  </div>
+
+  <div class="tab-pane" id="pane-retailer"><div id="box-retailer"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-brandwatch"><div id="box-brandwatch"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-trade"><div id="box-trade"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-crosssource"><div id="box-crosssource"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-news"><div id="box-news"><div class="loading">Loading…</div></div></div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+const TABS = ['retailer', 'brandwatch', 'trade', 'crosssource', 'news'];
+let TID = null;
+const loaded = {};
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'retailer';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (!loaded[tab]) { loaded[tab] = true; LOADERS[tab](); }
+}
+function goTab(tab) { location.hash = tab === 'retailer' ? '' : '#' + tab; }
+
+function wireAccordion(box, onOpen) {
+  box.querySelectorAll('.acc').forEach(el => {
+    el.querySelector('.acc-head').addEventListener('click', () => {
+      const opening = !el.classList.contains('open');
+      el.classList.toggle('open');
+      if (opening && onOpen) onOpen(el);
+    });
+  });
+}
+function preview(text, n) { text = (text || '').replace(/\s+/g, ' ').trim(); return text.length > n ? text.slice(0, n) + '…' : text; }
+
+// TAB 1 — Retailer Intel
+async function loadRetailer() {
+  const box = document.getElementById('box-retailer');
+  const rows = await supa(`retailer_intel_summaries?tenant_id=eq.${TID}&order=summary_date.desc&select=*,retailers(name)`);
+  document.getElementById('cnt-retailer').textContent = rows.length;
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🏬</span>No retailer intel summaries yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rows.map(r => `<div class="acc">
+    <div class="acc-head"><div><div class="acc-title">${esc(r.retailers && r.retailers.name || 'Retailer')}</div>
+      <div class="acc-meta">${esc(preview(r.summary_text, 120) || 'No summary')}</div></div>
+      <div class="acc-right">${fmtDate(r.summary_date)}</div></div>
+    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`).join('') + '</div>';
+  wireAccordion(box);
+}
+
+// TAB 2 — Brand Watch
+async function loadBrandwatch() {
+  const box = document.getElementById('box-brandwatch');
+  const runs = await supa(`brand_watch_runs?tenant_id=eq.${TID}&order=started_at.desc&select=*,brand_watch_brands(name)`);
+  document.getElementById('cnt-brandwatch').textContent = runs.length;
+  if (!runs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">👁️</span>No brand watch runs yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + runs.map(r => `<div class="acc" data-run="${esc(r.id)}">
+    <div class="acc-head"><div><div class="acc-title">${esc(r.brand_watch_brands && r.brand_watch_brands.name || 'Brand')}</div>
+      <div class="acc-meta">${r.products_discovered != null ? r.products_discovered + ' products' : '—'} · ${statusBadge(r.status)}</div></div>
+      <div class="acc-right">${fmtDate(r.started_at)}</div></div>
+    <div class="acc-body"><div class="loading" style="padding:10px;">Loading products…</div></div></div>`).join('') + '</div>';
+  wireAccordion(box, async (el) => {
+    const body = el.querySelector('.acc-body');
+    if (body.dataset.done) return;
+    body.dataset.done = '1';
+    const prods = await supa(`brand_watch_products?run_id=eq.${el.dataset.run}&order=product_title.asc&select=product_title,vendor,product_type,price_current_cents,currency,in_stock,product_url`);
+    body.innerHTML = prods.length ? '<div class="sub-list">' + prods.map(p => `<div class="sub-item">
+      <div class="si-title">${esc(p.product_title || 'Product')}</div>
+      <div class="si-meta">${[p.vendor, p.product_type, p.price_current_cents != null && money(p.price_current_cents / 100), p.in_stock ? 'in stock' : 'out of stock'].filter(v => v || v === 0).map(esc).join(' · ')}${p.product_url ? ' · <a href="' + esc(p.product_url) + '" target="_blank" style="color:#60a5fa;">view</a>' : ''}</div>
+    </div>`).join('') + '</div>' : '<div class="empty" style="padding:10px;">No products captured in this run.</div>';
+  });
+}
+
+// TAB 3 — Trade Intel (search log; results are not persisted on this table)
+async function loadTrade() {
+  const box = document.getElementById('box-trade');
+  const rows = await supa(`trade_intelligence_searches?tenant_id=eq.${TID}&order=searched_at.desc`);
+  document.getElementById('cnt-trade').textContent = rows.length;
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🌐</span>No trade intelligence searches yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
+    const q = r.keyword || r.hts_code || r.ruling_number || 'Search';
+    return `<div class="acc"><div class="acc-head"><div>
+      <div class="acc-title">${esc(q)}</div>
+      <div class="acc-meta">${[r.hts_code && 'HTS ' + r.hts_code, r.ruling_number && 'Ruling ' + r.ruling_number].filter(Boolean).map(esc).join(' · ') || 'Keyword search'}</div></div>
+      <div class="acc-right">${fmtDate(r.searched_at)}</div></div>
+    <div class="acc-body">${kv([['Keyword', r.keyword], ['HTS code', r.hts_code], ['Ruling #', r.ruling_number], ['Searched', fmtDate(r.searched_at)]])}</div></div>`;
+  }).join('') + '</div>';
+  wireAccordion(box);
+}
+
+// TAB 4 — Cross Source
+async function loadCrosssource() {
+  const box = document.getElementById('box-crosssource');
+  const rows = await supa(`cross_source_summaries?tenant_id=eq.${TID}&order=summary_date.desc`);
+  document.getElementById('cnt-crosssource').textContent = rows.length;
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🔗</span>No cross-source summaries yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
+    let counts = '';
+    try { const mc = typeof r.module_counts === 'string' ? JSON.parse(r.module_counts) : r.module_counts; if (mc) counts = Object.entries(mc).map(([k, v]) => k + ': ' + v).join(' · '); } catch (e) {}
+    return `<div class="acc"><div class="acc-head"><div>
+      <div class="acc-title">Daily cross-source brief</div>
+      <div class="acc-meta">${esc(counts || preview(r.summary_text, 110))}</div></div>
+      <div class="acc-right">${fmtDate(r.summary_date)}</div></div>
+    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`;
+  }).join('') + '</div>';
+  wireAccordion(box);
+}
+
+// TAB 5 — News
+async function loadNews() {
+  const box = document.getElementById('box-news');
+  const rows = await supa(`retailer_news?tenant_id=eq.${TID}&order=ingested_at.desc&limit=100&select=id,ingested_at,news_articles(headline,source_name,external_url,published_at,snippet),retailers(name)`);
+  document.getElementById('cnt-news').textContent = rows.length;
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📰</span>No news yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
+    const a = r.news_articles || {};
+    const url = a.external_url || '#';
+    return `<a class="news-item" href="${esc(url)}" target="_blank" rel="noopener">
+      <div class="news-head">${esc(a.headline || '(Untitled)')}</div>
+      <div class="news-meta">${[a.source_name, r.retailers && r.retailers.name, fmtDate(a.published_at || r.ingested_at)].filter(Boolean).map(esc).join(' · ')} ↗</div>
+    </a>`;
+  }).join('') + '</div>';
+}
+
+const LOADERS = { retailer: loadRetailer, brandwatch: loadBrandwatch, trade: loadTrade, crosssource: loadCrosssource, news: loadNews };
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · intelligence';
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  window.addEventListener('hashchange', () => showTab((location.hash || '#retailer').slice(1)));
+  showTab((location.hash || '#retailer').slice(1));
+})();
+</script>
+</body>
+</html>

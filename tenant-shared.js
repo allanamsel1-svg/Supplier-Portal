@@ -55,8 +55,8 @@ const TENANT_NAV = [
   { section: 'Overview', items: [
     { icon: '⊞', label: 'Dashboard', href: '/tenant-dashboard.html' },
     { icon: '💰', label: 'Financials', href: '/financials.html' },
-    { icon: '🧠', label: 'Intel', href: '/intelligence_hub.html' },
-    { icon: '📰', label: 'Daily Intel', href: '/intel_daily.html' },
+    { icon: '🧠', label: 'Intel', href: '/tenant-intel.html' },
+    { icon: '📰', label: 'Daily Intel', href: '/tenant-intel-daily.html' },
   ]},
   { section: 'Operations', items: [
     { icon: '📦', label: 'Open Orders', href: '/tenant-operations.html#orders' },
