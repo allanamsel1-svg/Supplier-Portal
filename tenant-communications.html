@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Communications — TBG Sourcing</title>
 <link rel="stylesheet" href="tenant-portal.css">
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
 <style>
   .comms { display: flex; gap: 16px; height: calc(100vh - 190px); min-height: 420px; }
   .thread-list { width: 360px; flex-shrink: 0; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg2); }
@@ -131,8 +132,8 @@ async function openThread(id) {
   const msgs = await supa(`email_messages?thread_id=eq.${id}&tenant_id=eq.${TID}&select=id,from_name,from_email,to_email,subject,body_text,body_html,direction,sent_at,created_at&order=created_at.asc`);
 
   const header = `<div style="margin-bottom:18px;">
-    <div style="font-size:17px;font-weight:700;color:#f1f5f9;">${esc(t.subject || '(No subject)')}</div>
-    <div style="font-size:12px;color:#6b7280;margin-top:4px;">${esc(t.from_name || t.from_email || '')}${t.to_email ? ' → ' + esc(t.to_email) : ''}</div>
+    <div style="font-size:17px;font-weight:700;color:var(--text);">${esc(t.subject || '(No subject)')}</div>
+    <div style="font-size:12px;color:var(--text2);margin-top:4px;">${esc(t.from_name || t.from_email || '')}${t.to_email ? ' → ' + esc(t.to_email) : ''}</div>
   </div>`;
 
   const body = msgs.length ? msgs.map(m => {
