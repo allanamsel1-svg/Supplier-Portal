@@ -86,6 +86,10 @@ function renderHeader(user) {
         '<span class="th-tenant">' + esc(tenantName) + '</span>' +
         '<button class="th-signout" id="headerSignOut">Sign Out</button>' +
       '</div>' +
+    '</div>' +
+    '<div class="gauge-sticky" id="gaugeStickyBar">' +
+      '<div class="gauge-sticky-fill" id="gaugeStickyFill"></div>' +
+      '<span class="gauge-sticky-tooltip" id="gaugeStickyTip"></span>' +
     '</div>';
   document.body.insertAdjacentHTML('afterbegin', html);
   document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
