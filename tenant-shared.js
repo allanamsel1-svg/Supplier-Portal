@@ -58,13 +58,47 @@ function doLogout() {
   window.location.href = '/tenant-login.html';
 }
 
+// ── Theme (dark default; persisted to localStorage 'tenant_theme') ──
+function applySavedTheme() {
+  const theme = localStorage.getItem('tenant_theme') || 'dark';
+  document.body.classList.toggle('light-mode', theme === 'light');
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = theme === 'light' ? '🌙' : '☀️';
+}
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('tenant_theme', isLight ? 'light' : 'dark');
+  const btn = document.getElementById('themeToggleBtn');
+  if (btn) btn.textContent = isLight ? '🌙' : '☀️';
+}
+// Apply the saved theme as early as possible (script loads at end of <body>).
+try { if (document.body) applySavedTheme(); } catch (e) {}
+
+// ── Fixed top header ──
+function renderHeader(user) {
+  if (document.getElementById('tenantHeader')) return;
+  const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
+  const html =
+    '<div class="tenant-header" id="tenantHeader">' +
+      '<div class="th-logo">TBG Sourcing</div>' +
+      '<div class="th-right">' +
+        '<button class="th-btn" id="themeToggleBtn" title="Toggle light/dark">☀️</button>' +
+        '<span class="th-tenant">' + esc(tenantName) + '</span>' +
+        '<button class="th-signout" id="headerSignOut">Sign Out</button>' +
+      '</div>' +
+    '</div>';
+  document.body.insertAdjacentHTML('afterbegin', html);
+  document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
+  document.getElementById('headerSignOut').addEventListener('click', doLogout);
+  applySavedTheme();
+}
+
 // ── Sidebar definition ──
 const TENANT_NAV = [
   { section: 'Overview', items: [
     { icon: '⊞', label: 'Dashboard', href: '/tenant-dashboard.html' },
     { icon: '💰', label: 'Financials', href: '/financials.html' },
     { icon: '🧠', label: 'Intel', href: '/tenant-intel.html' },
-    { icon: '📰', label: 'Daily Intel', href: '/tenant-intel-daily.html' },
   ]},
   { section: 'Operations', items: [
     { icon: '📦', label: 'Open Orders', href: '/tenant-operations.html#orders' },
@@ -109,6 +143,7 @@ function esc(s) {
 
 // Build + mount the sidebar. `user` is the validated user object.
 function renderSidebar(user) {
+  renderHeader(user);
   const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
   const who = (user && (user.full_name || user.email)) || '—';
 
