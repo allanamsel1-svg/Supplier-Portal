@@ -25,7 +25,7 @@ function hashPassword(password) {
   return createHash('sha256').update(password + salt).digest('hex');
 }
 
-const TENANT_EMBED = 'tenants(name,slug,plan,billing_status,features)';
+const TENANT_EMBED = 'tenants(id,name,slug,plan,billing_status,features,api_cost_cap_usd,api_markup_rate)';
 
 function userPayload(u, tenantId) {
   return {
@@ -39,6 +39,8 @@ function userPayload(u, tenantId) {
       slug: u.tenants.slug,
       plan: u.tenants.plan,
       features: u.tenants.features,
+      api_cost_cap_usd: u.tenants.api_cost_cap_usd,
+      api_markup_rate: u.tenants.api_markup_rate,
     },
   };
 }

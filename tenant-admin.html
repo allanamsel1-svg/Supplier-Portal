@@ -75,8 +75,15 @@
   textarea { resize: vertical; min-height: 70px; }
 
   .features-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; align-items: start;
   }
+  .feat-group { border: 1px solid #1e2d47; border-radius: 8px; padding: 10px 12px; background: #0d1424; }
+  .feat-group-title { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+  .feat-group-items { display: flex; flex-direction: column; gap: 6px; }
+  .feat-group-warn { border-color: #92660a; background: rgba(251,191,36,0.06); grid-column: 1 / -1; }
+  .feat-group-warn .feat-group-title { color: #fbbf24; }
+  .feat-group-note { font-size: 11px; color: #fbbf24; margin-bottom: 8px; line-height: 1.4; }
+  .feat-group-warn .feat-group-items { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .feature-toggle {
     display: flex; align-items: center; gap: 8px;
     background: #0d1424; border: 1px solid #1e2d47; border-radius: 6px;
@@ -202,8 +209,29 @@
 const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 
-const FEATURES = ['rfq','shop_out','po_management','sku_library','brand_watch','retail_intel','trade_intel','compliance','factory_portal','financial'];
-const FEATURE_LABELS = {rfq:'RFQ',shop_out:'Shop Out',po_management:'Purchase Orders',sku_library:'SKU Library',brand_watch:'Brand Watch',retail_intel:'Retail Intel',trade_intel:'Trade Intel',compliance:'Compliance',factory_portal:'Factory Portal',financial:'Financials'};
+// Grouped feature keys (exact match to the features JSONB + tenant-shared.js nav keys).
+const FEATURE_GROUPS = [
+  { group: 'Overview & Finance', items: [['financials', 'Financials']] },
+  { group: 'Operations', items: [
+    ['po_management', 'Open Orders / POs'], ['warehouse', 'Warehouse'], ['accounting', 'Accounting'],
+    ['credit_watch', 'Credit Watch'], ['forecasting', 'Forecasting'],
+  ]},
+  { group: 'Factory Network', items: [
+    ['factory_portal', 'Factory Portal'], ['factory_pending', 'Pending Factories'], ['card_scanner', 'Card Scanner'],
+    ['factory_reviews', 'Pending Reviews'], ['factory_invitations', 'Invitations'], ['rfq_followups', 'RFQ Follow-ups'],
+    ['compliance', 'Compliance'],
+  ]},
+  { group: 'Communications', items: [['communications', 'Messages & Mailboxes'], ['zoom', 'Zoom']] },
+  { group: 'RFQ & Products', items: [
+    ['rfq', 'RFQs'], ['product_development', 'Product Development'], ['sku_library', 'SKU Library'],
+  ]},
+  { group: 'Intel (Advanced — enable with caution)', warn: true, items: [
+    ['intel_crosssource', 'Cross Source Intel'], ['intel_shopout', 'Shop Outs'], ['intel_brandwatch', 'Brand Watch'],
+    ['intel_retailer', 'Retailer Intel'], ['intel_trade', 'Trade Intel'], ['intel_news', 'News & Editorial'],
+    ['intel_fx', 'FX Watch'], ['intel_factory', 'Factory Intel'],
+  ]},
+];
+const FEATURES = FEATURE_GROUPS.reduce((a, g) => a.concat(g.items.map(i => i[0])), []);
 
 async function sbFetch(path, opts={}) {
   const res = await fetch(SUPABASE_URL + path, {
@@ -260,11 +288,18 @@ function copyLoginLink(btn) {
 }
 
 function buildFeaturesGrid(values={}) {
-  document.getElementById('featuresGrid').innerHTML = FEATURES.map(f => `
-    <label class="feature-toggle">
-      <input type="checkbox" id="feat-${f}" ${values[f] ? 'checked' : ''}>
-      <span>${FEATURE_LABELS[f]}</span>
-    </label>
+  document.getElementById('featuresGrid').innerHTML = FEATURE_GROUPS.map(g => `
+    <div class="feat-group${g.warn ? ' feat-group-warn' : ''}">
+      <div class="feat-group-title">${g.group}</div>
+      ${g.warn ? '<div class="feat-group-note">⚠ Intel features depend on external scrapers — enable only for trusted tenants.</div>' : ''}
+      <div class="feat-group-items">
+        ${g.items.map(([key, label]) => `
+          <label class="feature-toggle">
+            <input type="checkbox" id="feat-${key}" ${values[key] === true ? 'checked' : ''}>
+            <span>${label}</span>
+          </label>`).join('')}
+      </div>
+    </div>
   `).join('');
 }
 
@@ -285,7 +320,7 @@ function openNewTenant() {
   document.getElementById('f-cap').value = '500';
   document.getElementById('f-notes').value = '';
   document.getElementById('userSection').style.display = 'block';
-  buildFeaturesGrid({rfq:true,shop_out:true,po_management:true,sku_library:true,brand_watch:true,retail_intel:true,trade_intel:true,compliance:true,factory_portal:true,financial:false});
+  buildFeaturesGrid({});  // new tenant → zero access by default; admin enables per item
   document.getElementById('tenantModal').classList.add('open');
 
   // Auto-slug from name

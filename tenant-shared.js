@@ -95,46 +95,50 @@ function renderHeader(user) {
 
 // ── Sidebar definition ──
 // All hrefs are RELATIVE (no domain, no leading slash) — internal nav only.
+// Each item carries a `feature` key matched against the tenant's features JSONB.
+// feature:null = always shown (Dashboard). Intel is intentionally absent (admin-only for now).
 const TENANT_NAV = [
   { section: 'Overview', items: [
-    { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html' },
-    { icon: '💰', label: 'Financials', href: 'tenant-financials.html' },
-    { icon: '🧠', label: 'Intel', href: 'tenant-intel.html' },
+    { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html', feature: null },
+    { icon: '💰', label: 'Financials', href: 'tenant-financials.html', feature: 'financials' },
   ]},
   { section: 'Operations', items: [
-    { icon: '📦', label: 'Open Orders', href: 'tenant-operations.html#orders' },
-    { icon: '🏬', label: 'Warehouse', href: 'tenant-operations.html#warehouse', badge: 'BETA' },
-    { icon: '📒', label: 'Accounting', href: 'tenant-operations.html#accounting', badge: 'BETA' },
-    { icon: '🔔', label: 'Credit Watch', href: 'tenant-operations.html#credit' },
-    { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA' },
+    { icon: '📦', label: 'Open Orders', href: 'tenant-operations.html#orders', feature: 'po_management' },
+    { icon: '🏬', label: 'Warehouse', href: 'tenant-operations.html#warehouse', badge: 'BETA', feature: 'warehouse' },
+    { icon: '📒', label: 'Accounting', href: 'tenant-operations.html#accounting', badge: 'BETA', feature: 'accounting' },
+    { icon: '🔔', label: 'Credit Watch', href: 'tenant-operations.html#credit', feature: 'credit_watch' },
+    { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA', feature: 'forecasting' },
   ]},
   { section: 'Factories', items: [
-    { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html' },
-    { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending' },
-    { icon: '📇', label: 'Card Scanner', href: 'tenant-factories.html#scanner' },
-    { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews' },
-    { icon: '✉️', label: 'Invitations', href: 'tenant-factories.html#invitations' },
-    { icon: '📌', label: 'RFQ Follow-ups', href: 'tenant-factories.html#followups' },
-    { icon: '⚠️', label: 'Compliance Alerts', href: 'tenant-factories.html#compliance' },
-    { icon: '📋', label: 'Compliance Rules', href: 'tenant-factories.html#compliance-rules' },
+    { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html', feature: 'factory_portal' },
+    { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending', feature: 'factory_pending' },
+    { icon: '📇', label: 'Card Scanner', href: 'tenant-factories.html#scanner', feature: 'card_scanner' },
+    { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews', feature: 'factory_reviews' },
+    { icon: '✉️', label: 'Invitations', href: 'tenant-factories.html#invitations', feature: 'factory_invitations' },
+    { icon: '📌', label: 'RFQ Follow-ups', href: 'tenant-factories.html#followups', feature: 'rfq_followups' },
+    { icon: '⚠️', label: 'Compliance Alerts', href: 'tenant-factories.html#compliance', feature: 'compliance' },
+    { icon: '📋', label: 'Compliance Rules', href: 'tenant-factories.html#compliance-rules', feature: 'compliance' },
   ]},
   { section: 'Communications', items: [
-    { icon: '💬', label: 'Messages', href: 'tenant-communications.html' },
-    { icon: '🎥', label: 'Zoom', href: 'tenant-communications.html#zoom' },
-    { icon: '👤', label: 'Allan', href: 'tenant-communications.html?tab=allan' },
-    { icon: '🔎', label: 'Sourcing', href: 'tenant-communications.html?tab=sourcing' },
-    { icon: '🛒', label: 'Sales', href: 'tenant-communications.html?tab=sales' },
-    { icon: '🎨', label: 'Graphics', href: 'tenant-communications.html?tab=graphics' },
-    { icon: '🧾', label: 'Accounting', href: 'tenant-communications.html?tab=accounting' },
-    { icon: '🚚', label: 'Logistics', href: 'tenant-communications.html?tab=logistics' },
-    { icon: '✅', label: 'Compliance', href: 'tenant-communications.html?tab=compliance' },
+    { icon: '💬', label: 'Messages', href: 'tenant-communications.html', feature: 'communications' },
+    { icon: '🎥', label: 'Zoom', href: 'tenant-communications.html#zoom', feature: 'zoom' },
+    { icon: '👤', label: 'Allan', href: 'tenant-communications.html?tab=allan', feature: 'communications' },
+    { icon: '🔎', label: 'Sourcing', href: 'tenant-communications.html?tab=sourcing', feature: 'communications' },
+    { icon: '🛒', label: 'Sales', href: 'tenant-communications.html?tab=sales', feature: 'communications' },
+    { icon: '🎨', label: 'Graphics', href: 'tenant-communications.html?tab=graphics', feature: 'communications' },
+    { icon: '🧾', label: 'Accounting', href: 'tenant-communications.html?tab=accounting', feature: 'communications' },
+    { icon: '🚚', label: 'Logistics', href: 'tenant-communications.html?tab=logistics', feature: 'communications' },
+    { icon: '✅', label: 'Compliance', href: 'tenant-communications.html?tab=compliance', feature: 'communications' },
   ]},
   { section: 'RFQ & Products', items: [
-    { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html' },
-    { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd' },
-    { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus' },
+    { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html', feature: 'rfq' },
+    { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd', feature: 'product_development' },
+    { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus', feature: 'sku_library' },
   ]},
 ];
+
+// Tenant feature flags (set in renderSidebar from the validated user).
+let TENANT_FEATURES = {};
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => (
@@ -147,13 +151,18 @@ function renderSidebar(user) {
   renderHeader(user);
   const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
   const who = (user && (user.full_name || user.email)) || '—';
+  TENANT_FEATURES = (user && user.tenant && user.tenant.features) || {};
+
+  // An item shows only if its feature is null (always-on) or enabled (=== true).
+  const allowed = it => it.feature == null || TENANT_FEATURES[it.feature] === true;
 
   const nav = TENANT_NAV.map(sec => {
-    const items = sec.items.map(it => {
-      // Every item is a real clickable link (beta items included — they just carry a BETA badge).
+    const items = sec.items.filter(allowed).map(it => {
       const badge = it.badge ? `<span class="beta-tag">${esc(it.badge)}</span>` : '';
       return `<a class="nav-item" data-href="${esc(it.href)}" href="${esc(it.href)}"><span class="icon">${it.icon}</span>${esc(it.label)}${badge}</a>`;
     }).join('');
+    // Hide the whole section if no items survived the feature filter.
+    if (!items) return '';
     return `<div class="nav-section">${esc(sec.section)}</div>${items}`;
   }).join('');
 
