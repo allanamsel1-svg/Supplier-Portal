@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin — Supplier Portal</title>
+  <script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+  <script src="admin-theme.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     /* Overflow safety net: clamp media/form controls so nothing bleeds past its container; wrap long unbroken strings. */
@@ -375,6 +377,81 @@
     .mc-est { font-size:11px;color:#888; }
     .mc-act { font-size:14px;font-weight:700; }
 
+    /* ── Admin dark mode (scoped to admin.html's own elements) ── */
+    body.admin-dark { background: #0a0e1a !important; color: #e2e8f0 !important; }
+    body.admin-dark .topbar,
+    body.admin-dark .sidebar,
+    body.admin-dark .ph,
+    body.admin-dark .stat,
+    body.admin-dark .fc,
+    body.admin-dark .sbar,
+    body.admin-dark .set-section,
+    body.admin-dark .mgr-card,
+    body.admin-dark .sq-row,
+    body.admin-dark .chat-bar,
+    body.admin-dark .lb,
+    body.admin-dark .modal,
+    body.admin-dark .mb.ai { background: #0d1424 !important; border-color: #1e2d47 !important; color: #e2e8f0 !important; }
+    body.admin-dark .panel,
+    body.admin-dark .chat-msgs { background: #0a0e1a !important; }
+    body.admin-dark .topbar-title,
+    body.admin-dark .ph-title,
+    body.admin-dark .stat-val,
+    body.admin-dark .fc-name,
+    body.admin-dark .mgr-card-title,
+    body.admin-dark .mgr-item-name,
+    body.admin-dark .d-value,
+    body.admin-dark .qdet-val,
+    body.admin-dark .sc-section-title,
+    body.admin-dark .cat-tree-name-top,
+    body.admin-dark .cat-tree-name-sub { color: #e2e8f0 !important; }
+    body.admin-dark .ph-sub,
+    body.admin-dark .stat-label,
+    body.admin-dark .fc-meta span,
+    body.admin-dark .slabel,
+    body.admin-dark .sitem,
+    body.admin-dark .logout,
+    body.admin-dark .badge,
+    body.admin-dark .d-label,
+    body.admin-dark .qdet-label,
+    body.admin-dark .mgr-item-meta,
+    body.admin-dark .mf label,
+    body.admin-dark .empty,
+    body.admin-dark .set-section h3,
+    body.admin-dark .set-section p { color: #94a3b8 !important; }
+    body.admin-dark .sitem:hover,
+    body.admin-dark .sitem.on,
+    body.admin-dark .cat-tree-node:hover { background: #0f1e35 !important; color: #e2e8f0 !important; }
+    body.admin-dark .badge,
+    body.admin-dark .scount,
+    body.admin-dark .ctag,
+    body.admin-dark .sq,
+    body.admin-dark .av.ai,
+    body.admin-dark .cmp-chip,
+    body.admin-dark .mgr-item,
+    body.admin-dark .sc-section,
+    body.admin-dark .qdet-item { background: #0f1e35 !important; border-color: #1e2d47 !important; }
+    body.admin-dark input,
+    body.admin-dark select,
+    body.admin-dark textarea,
+    body.admin-dark .lb input,
+    body.admin-dark .sbar input,
+    body.admin-dark .sbar select,
+    body.admin-dark .chat-bar textarea,
+    body.admin-dark .set-section input,
+    body.admin-dark .modal textarea,
+    body.admin-dark .mf input,
+    body.admin-dark .mf select,
+    body.admin-dark .mf textarea,
+    body.admin-dark .d-input,
+    body.admin-dark .sc-input { background: #0a0e1a !important; border-color: #1e2d47 !important; color: #e2e8f0 !important; }
+    body.admin-dark table { color: #e2e8f0 !important; }
+    body.admin-dark tr:hover td { background: #0f1e35 !important; }
+    body.admin-dark .rfq-tab.on,
+    body.admin-dark .rfq-tab:hover { color: #e2e8f0 !important; border-bottom-color: #3b82f6 !important; }
+    body.admin-dark .cat-tree-children { border-left-color: #1e2d47 !important; }
+    body.admin-dark .cat-tree-name-leaf { color: #94a3b8 !important; }
+
 </style>
   
   <!-- Google Analytics -->
@@ -417,6 +494,7 @@
       <div class="topbar-title">Supplier Portal Admin</div>
     </div>
     <div class="topbar-r">
+      <button id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle dark/light mode" style="background:none;border:1px solid #e0e0d8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;margin-right:8px;">🌙</button>
       <span class="badge" id="total-badge">0 factories</span>
       <button class="logout" onclick="doLogout()">Sign out</button>
     </div>
