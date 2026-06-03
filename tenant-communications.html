@@ -91,12 +91,10 @@ function goTab(tab) {
   showTab(tab);
 }
 
-async function loadThreads(user) {
-  // email_threads has no tenant_id — scope to this tenant's factories (null factory = general mail).
-  const facs = await supa(`factories?tenant_id=eq.${TID}&select=id`);
-  const facIds = new Set(facs.map(f => f.id));
-  const threads = await supa(`email_threads?select=id,subject,from_email,from_name,to_email,direction,status,department,factory_id,last_message_at,created_at&order=last_message_at.desc.nullslast`);
-  allThreads = threads.filter(t => !t.factory_id || facIds.has(t.factory_id));
+async function loadThreads() {
+  // Direct tenant_id filtering (email_threads now carries tenant_id).
+  // Note: ordered by last_message_at — email_threads has no updated_at column.
+  allThreads = await supa(`email_threads?tenant_id=eq.${TID}&order=last_message_at.desc.nullslast&select=*,email_messages(*)`);
   renderThreads();
 }
 
@@ -130,7 +128,7 @@ async function openThread(id) {
   const panel = document.getElementById('msgPanel');
   panel.innerHTML = '<div class="loading">Loading messages…</div>';
   const t = allThreads.find(x => x.id === id) || {};
-  const msgs = await supa(`email_messages?thread_id=eq.${id}&select=id,from_name,from_email,to_email,subject,body_text,body_html,direction,sent_at&order=sent_at.asc`);
+  const msgs = await supa(`email_messages?thread_id=eq.${id}&tenant_id=eq.${TID}&select=id,from_name,from_email,to_email,subject,body_text,body_html,direction,sent_at,created_at&order=created_at.asc`);
 
   const header = `<div style="margin-bottom:18px;">
     <div style="font-size:17px;font-weight:700;color:#f1f5f9;">${esc(t.subject || '(No subject)')}</div>
@@ -142,7 +140,7 @@ async function openThread(id) {
     if (!text && m.body_html) text = m.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const dir = (m.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
     return `<div class="msg ${dir}">
-      <div class="msg-head"><span class="msg-from">${esc(m.from_name || m.from_email || 'Unknown')}</span><span class="msg-date">${fmtDate(m.sent_at)}</span></div>
+      <div class="msg-head"><span class="msg-from">${esc(m.from_name || m.from_email || 'Unknown')}</span><span class="msg-date">${fmtDate(m.sent_at || m.created_at)}</span></div>
       <div class="msg-body">${esc(text || '(No content)')}</div>
     </div>`;
   }).join('') : '<div class="empty">No messages in this thread.</div>';
@@ -159,7 +157,7 @@ async function openThread(id) {
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
 
-  await loadThreads(user);
+  await loadThreads();
   showTab(tabFromUrl());
 })();
 </script>

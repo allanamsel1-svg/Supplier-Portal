@@ -154,17 +154,14 @@ async function openPO(id) {
   `;
 }
 
-// ── Credit Watch ── (credit_checks has no tenant_id; scope to this tenant's factories via entity_id)
+// ── Credit Watch ── (credit_checks now has tenant_id — direct filter)
 async function loadCredit() {
   const box = document.getElementById('box-credit');
+  // Factory-name map for nicer company labels when entity_id is a factory.
   const facs = await supa(`factories?tenant_id=eq.${TID}&select=id,factory_name_english`);
   factoryMap = {};
   facs.forEach(f => { factoryMap[f.id] = f.factory_name_english; });
-  const ids = facs.map(f => f.id);
-  let checks = [];
-  if (ids.length) {
-    checks = await supa(`credit_checks?entity_id=in.(${ids.join(',')})&order=created_at.desc`);
-  }
+  const checks = await supa(`credit_checks?tenant_id=eq.${TID}&order=created_at.desc`);
   document.getElementById('cnt-credit').textContent = checks.length;
   box.innerHTML = checks.length
     ? `<table class="data-table"><thead><tr><th>Company</th><th>Score</th><th>Severity</th><th>Source</th><th>Checked</th></tr></thead><tbody>${
