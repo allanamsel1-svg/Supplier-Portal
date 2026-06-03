@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="tenant-portal.css">
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
 <style>
-  .acc-list { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
+  .acc-list { display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
   .acc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .acc-head { padding: 14px 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
   .acc-head:hover { background: var(--card-hover); }
@@ -20,6 +20,40 @@
   .news-item:hover { border-color: #2563eb; background: var(--card-hover); }
   .news-head { font-size: 14px; color: var(--text); font-weight: 600; }
   .news-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .briefing { background: var(--card-bg); border: 1px solid var(--border); border-left: 3px solid #3b82f6; border-radius: 10px; padding: 18px; max-width: 980px; margin-bottom: 18px; }
+  .briefing h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #3b82f6; margin-bottom: 8px; }
+  .briefing .b-text { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
+  .ai-search { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 18px; max-width: 980px; }
+  .ai-row { display: flex; gap: 10px; }
+  .ai-input { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 14px; color: var(--text); outline: none; }
+  .ai-input:focus { border-color: #3b82f6; }
+  .ai-send { background: #2563eb; color: rgb(255,255,255); border: none; border-radius: 8px; padding: 0 18px; font-size: 16px; cursor: pointer; }
+  .ai-send:disabled { background: #1e3a6e; cursor: not-allowed; }
+  .ai-result { margin-top: 12px; font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; display: none; }
+  .ai-result.open { display: block; }
+  .mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; max-width: 980px; }
+  .mod { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: border-color .12s; }
+  .mod:hover { border-color: #2563eb; }
+  .mod .m-ico { font-size: 18px; } .mod .m-name { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 6px; } .mod .m-cnt { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  /* shop out */
+  .so-toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .obs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .obs-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; }
+  .obs-card:hover { border-color: #2563eb; }
+  .obs-thumb { width: 100%; height: 150px; object-fit: cover; background: var(--bg2); display: block; }
+  .obs-thumb-ph { width: 100%; height: 150px; background: var(--bg2); display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 30px; }
+  .obs-info { padding: 12px 14px; }
+  .obs-brand { font-size: 13px; font-weight: 600; color: var(--text); }
+  .obs-prod { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .obs-meta { font-size: 12px; color: var(--text2); margin-top: 6px; }
+  .obs-photos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .obs-photos img { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+  .back-link { color: #3b82f6; cursor: pointer; font-size: 13px; display: inline-block; margin-bottom: 14px; }
+  .act-btn { background: #2563eb; color: rgb(255,255,255); border: none; border-radius: 7px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; margin-right: 8px; }
+  .act-btn.ghost { background: none; border: 1px solid var(--border); color: var(--text2); }
+  .act-btn:hover { opacity: 0.9; }
+  .so-status { font-size: 12px; color: var(--text2); margin-top: 8px; }
+  .match-badge { font-size: 10px; padding: 2px 7px; border-radius: 5px; background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #166534; margin-left: 6px; }
 </style>
 </head>
 <body>
@@ -28,227 +62,385 @@
 <div class="main">
   <div class="page-header">
     <div class="page-title">Intelligence Hub</div>
-    <div class="page-sub" id="pageSub">Retailer, brand, trade & news intelligence</div>
+    <div class="page-sub" id="pageSub">Cross-source sourcing &amp; retail intelligence</div>
   </div>
 
   <div class="tabs" id="tabs">
-    <button class="tab" data-tab="retailer">Retailer Intel <span class="tab-count" id="cnt-retailer"></span></button>
-    <button class="tab" data-tab="brandwatch">Brand Watch <span class="tab-count" id="cnt-brandwatch"></span></button>
-    <button class="tab" data-tab="trade">Trade Intel <span class="tab-count" id="cnt-trade"></span></button>
-    <button class="tab" data-tab="crosssource">Cross Source <span class="tab-count" id="cnt-crosssource"></span></button>
-    <button class="tab" data-tab="news">News <span class="tab-count" id="cnt-news"></span></button>
-    <button class="tab" data-tab="shopout">Shop Out Obs. <span class="tab-count" id="cnt-shopout"></span></button>
-    <button class="tab" data-tab="pricetrends">Price Trends <span class="tab-count" id="cnt-pricetrends"></span></button>
-    <button class="tab" data-tab="daily">Daily Intel <span class="tab-count" id="cnt-daily"></span></button>
-    <button class="tab" data-tab="importgenius">Import Genius</button>
+    <button class="tab" data-tab="crosssource">Cross Source Intel</button>
+    <button class="tab" data-tab="shopout">Shop Outs <span class="tab-count" id="cnt-shopout"></span></button>
+    <button class="tab" data-tab="factory">Factory Intel <span class="beta-tag">BETA</span></button>
+    <button class="tab" data-tab="brandwatch">Brand Watch <span class="beta-tag">BETA</span></button>
+    <button class="tab" data-tab="catalog">Online Catalog <span class="beta-tag">SOON</span></button>
+    <button class="tab" data-tab="retailer">Retailer Intel <span class="beta-tag">BETA</span></button>
+    <button class="tab" data-tab="social">Social Trends <span class="beta-tag">SOON</span></button>
+    <button class="tab" data-tab="news">News &amp; Editorial</button>
+    <button class="tab" data-tab="trade">Trade Intel <span class="beta-tag">BETA</span></button>
+    <button class="tab" data-tab="fx">FX Watch</button>
   </div>
 
-  <div class="tab-pane" id="pane-retailer"><div id="box-retailer"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-brandwatch"><div id="box-brandwatch"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-trade"><div id="box-trade"><div class="loading">Loading…</div></div></div>
   <div class="tab-pane" id="pane-crosssource"><div id="box-crosssource"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-shopout"><div id="box-shopout"><div class="loading">Loading shop-outs…</div></div></div>
+  <div class="tab-pane" id="pane-factory"><div id="box-factory"></div></div>
+  <div class="tab-pane" id="pane-brandwatch"><div id="box-brandwatch"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-catalog"><div id="box-catalog"></div></div>
+  <div class="tab-pane" id="pane-retailer"><div id="box-retailer"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-social"><div id="box-social"></div></div>
   <div class="tab-pane" id="pane-news"><div id="box-news"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-shopout"><div id="box-shopout"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-pricetrends"><div id="box-pricetrends"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-daily">
-    <div id="box-daily"><div class="loading">Loading…</div></div>
-    <div class="section-h" style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:#3b82f6;font-weight:700;margin:28px 0 12px;max-width:900px;">Recent News — last 7 days</div>
-    <div id="box-daily-news"><div class="loading">Loading…</div></div>
-  </div>
-  <div class="tab-pane" id="pane-importgenius"></div>
+  <div class="tab-pane" id="pane-trade"><div id="box-trade"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-fx"><div id="box-fx"><div class="loading">Loading…</div></div></div>
 </div>
 
 <script src="tenant-shared.js"></script>
 <script>
-const TABS = ['retailer', 'brandwatch', 'trade', 'crosssource', 'news', 'shopout', 'pricetrends', 'daily', 'importgenius'];
-let TID = null;
+const TABS = ['crosssource', 'shopout', 'factory', 'brandwatch', 'catalog', 'retailer', 'social', 'news', 'trade', 'fx'];
+let TID = null, TOKEN = null;
+let runs = [], observations = [], photoMap = {};
 const loaded = {};
+function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+function preview(t, n) { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
 
 function showTab(tab) {
-  if (!TABS.includes(tab)) tab = 'retailer';
+  if (!TABS.includes(tab)) tab = 'crosssource';
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.getElementById('pane-' + tab).classList.add('active');
-  if (!loaded[tab]) { loaded[tab] = true; LOADERS[tab](); }
+  if (!loaded[tab]) { loaded[tab] = true; (LOADERS[tab] || function(){})(); }
 }
-function goTab(tab) { location.hash = tab === 'retailer' ? '' : '#' + tab; }
+function goTab(tab) { location.hash = tab === 'crosssource' ? '' : '#' + tab; }
+function wireAccordion(box) { box.querySelectorAll('.acc').forEach(el => el.querySelector('.acc-head').addEventListener('click', () => el.classList.toggle('open'))); }
+function comingSoon(box, label, icon) { document.getElementById(box).innerHTML = `<div class="empty"><span class="empty-icon">${icon}</span><div style="font-size:16px;color:var(--text);margin-bottom:6px;">${esc(label)}</div>Coming Soon</div>`; }
 
-function wireAccordion(box, onOpen) {
-  box.querySelectorAll('.acc').forEach(el => {
-    el.querySelector('.acc-head').addEventListener('click', () => {
-      const opening = !el.classList.contains('open');
-      el.classList.toggle('open');
-      if (opening && onOpen) onOpen(el);
-    });
+// ── TAB 1: Cross Source Intel ──
+async function loadCrosssource() {
+  const box = document.getElementById('box-crosssource');
+  const rows = await supa(`cross_source_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=1`);
+  const brief = rows[0];
+  const counts = await Promise.all([
+    countRows('shop_outs'), countRows('brand_watch_runs'), countRows('retailer_intel_summaries'),
+    countRows('news_daily_summaries'), countRows('trade_intelligence_searches'),
+  ]);
+  const mods = [
+    { t: 'shopout', i: '🛍️', n: 'Shop Outs', c: counts[0] },
+    { t: 'brandwatch', i: '👁️', n: 'Brand Watch', c: counts[1] },
+    { t: 'retailer', i: '🏬', n: 'Retailer Intel', c: counts[2] },
+    { t: 'news', i: '📰', n: 'News & Editorial', c: counts[3] },
+    { t: 'trade', i: '🌐', n: 'Trade Intel', c: counts[4] },
+    { t: 'fx', i: '💱', n: 'FX Watch', c: null },
+  ];
+  box.innerHTML =
+    `<div class="briefing"><h3>Daily Briefing${brief ? ' · ' + fmtDate(brief.summary_date) : ''}</h3>
+       <div class="b-text">${esc(brief ? (brief.summary_text || 'No summary text.') : 'No cross-source briefing yet.')}</div></div>
+     <div class="ai-search">
+       <div class="ai-row"><input class="ai-input" id="aiInput" placeholder="Ask anything about your sourcing, factories, products, intel..."><button class="ai-send" id="aiSend">➤</button></div>
+       <div class="ai-result" id="aiResult"></div>
+     </div>
+     <div class="mods">${mods.map(m => `<div class="mod" data-go="${m.t}"><div class="m-ico">${m.i}</div><div class="m-name">${esc(m.n)}</div><div class="m-cnt">${m.c == null ? 'View' : m.c + ' record' + (m.c === 1 ? '' : 's')}</div></div>`).join('')}</div>`;
+  box.querySelectorAll('.mod').forEach(el => el.addEventListener('click', () => goTab(el.dataset.go)));
+  document.getElementById('aiSend').addEventListener('click', runSearch);
+  document.getElementById('aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+}
+async function countRows(table) {
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/' + table + '?tenant_id=eq.' + TID + '&select=id', { method: 'HEAD', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, Prefer: 'count=exact', Range: '0-0' } });
+    const cr = r.headers.get('content-range') || ''; const tot = cr.split('/')[1];
+    return tot && tot !== '*' ? parseInt(tot, 10) : 0;
+  } catch (e) { return 0; }
+}
+async function runSearch() {
+  const q = document.getElementById('aiInput').value.trim(); if (!q) return;
+  const btn = document.getElementById('aiSend'), res = document.getElementById('aiResult');
+  btn.disabled = true; res.classList.add('open'); res.textContent = 'Thinking…';
+  try {
+    const r = await fetch('/api/tenant-search', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ query: q, tenant_id: TID }) });
+    const d = await r.json().catch(() => ({}));
+    res.textContent = r.ok ? (d.answer || 'No answer.') + (d.sources && d.sources.length ? '\n\nSources: ' + d.sources.join(', ') : '') : (d.error || 'Search failed.');
+  } catch (e) { res.textContent = 'Connection error.'; }
+  btn.disabled = false;
+}
+
+// ── TAB 2: Shop Outs (full) ──
+const cnt = a => (Array.isArray(a) && a[0] && a[0].count) || 0;
+async function loadShopout() {
+  runs = await supa(`shop_outs?tenant_id=eq.${TID}&order=shop_date.desc&select=*,shop_out_sections(count),shop_out_observations(count)`);
+  document.getElementById('cnt-shopout').textContent = runs.length;
+  renderShopHome();
+}
+function renderShopHome() {
+  const box = document.getElementById('box-shopout');
+  box.innerHTML = `<div class="so-toolbar">
+      <input class="search-input" id="soSearch" placeholder="Search location / status…">
+      <select class="filter-select" id="soStatus"><option value="all">All statuses</option></select>
+      <label style="font-size:12px;color:var(--text2);"><input type="checkbox" id="soArchived"> Show archived</label>
+      <button class="act-btn ghost" id="soObsBtn">All Observations</button>
+    </div>
+    <div id="so-list"></div>`;
+  const statuses = Array.from(new Set(runs.map(r => r.status || r.processing_status).filter(Boolean))).sort();
+  const sel = document.getElementById('soStatus');
+  statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+  document.getElementById('soSearch').addEventListener('input', renderRunList);
+  document.getElementById('soStatus').addEventListener('change', renderRunList);
+  document.getElementById('soArchived').addEventListener('change', renderRunList);
+  document.getElementById('soObsBtn').addEventListener('click', loadAllObservations);
+  renderRunList();
+}
+function renderRunList() {
+  const q = (document.getElementById('soSearch').value || '').toLowerCase().trim();
+  const st = document.getElementById('soStatus').value;
+  const showArch = document.getElementById('soArchived').checked;
+  let rows = runs.slice();
+  if (!showArch) rows = rows.filter(r => !r.archived_at && !r.deleted_at);
+  if (st !== 'all') rows = rows.filter(r => (r.status || r.processing_status) === st);
+  if (q) rows = rows.filter(r => (r.store_location_text || '').toLowerCase().includes(q) || (r.status || '').toLowerCase().includes(q));
+  const box = document.getElementById('so-list');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🛍️</span>No shop-out runs.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Location</th><th>Visit date</th><th>Sections</th><th>Observations</th><th>Status</th></tr></thead><tbody>${
+    rows.map(r => `<tr class="clickable" data-id="${esc(r.id)}"><td>${esc(r.store_location_text || 'Unknown location')}</td>
+      <td>${fmtDate(r.shop_date)}</td><td>${cnt(r.shop_out_sections)}</td>
+      <td>${r.total_observations != null ? r.total_observations : cnt(r.shop_out_observations)}</td>
+      <td>${statusBadge(r.status || r.processing_status)}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => showRunDetail(tr.dataset.id)));
+}
+async function showRunDetail(id) {
+  const box = document.getElementById('box-shopout');
+  const r = runs.find(x => x.id === id);
+  box.innerHTML = '<div class="loading">Loading run…</div>';
+  const [sections, obs] = await Promise.all([
+    supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
+    supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
+  ]);
+  const pmap = {};
+  const fpIds = obs.map(o => o.front_photo_id).filter(Boolean);
+  if (fpIds.length) { (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => pmap[p.id] = p.file_path); }
+  const prices = await supa(`shop_out_price_history?shop_out_id=eq.${id}&order=created_at.desc&limit=50&select=brand,product_name,previous_price,retail_price,price_change_pct,price_change_direction`);
+
+  const head = r ? kv([
+    ['Location', r.store_location_text], ['Visit date', fmtDate(r.shop_date)],
+    ['Status', statusBadge(r.status || r.processing_status), true],
+    ['Photos', r.total_photos], ['Observations', r.total_observations],
+  ]) : '';
+  const actions = `<div style="margin:12px 0;">
+      <input type="file" id="soFile" accept="image/*" multiple style="display:none;">
+      <button class="act-btn" id="soUpload">📤 Upload Photos</button>
+      <button class="act-btn ghost" id="soProcess">⚙ Run AI Processing</button>
+      <div class="so-status" id="soActStatus"></div>
+    </div>`;
+  const secList = sections.length ? sections.map(s => `<div class="sub-item">
+      <div class="si-title">${esc(s.department || s.category_detected || 'Section')}</div>
+      <div class="si-meta">${[s.brand_summary && preview(s.brand_summary, 140), s.estimated_linear_feet && s.estimated_linear_feet + ' ft'].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
+  const obsCards = obs.length ? '<div class="obs-grid">' + obs.map(o => {
+    const fp = pmap[o.front_photo_id];
+    const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+    const match = o.factory_match_id ? '<span class="match-badge">Factory match</span>' : '';
+    return `<div class="obs-card" data-id="${esc(o.id)}">${thumb}<div class="obs-info">
+        <div class="obs-brand">${esc(o.brand || '—')}${match}</div>
+        <div class="obs-prod">${esc(o.product_name || '')}</div>
+        <div class="obs-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
+        ${o.ml_observation_comment ? '<div class="obs-meta" style="margin-top:4px;">🤖 ' + esc(preview(o.ml_observation_comment, 80)) + '</div>' : ''}
+      </div></div>`;
+  }).join('') + '</div>' : '<div class="empty" style="padding:12px;">No observations.</div>';
+  const priceTable = prices.length ? `<table class="data-table"><thead><tr><th>Product</th><th>Was</th><th>Now</th><th>Change</th></tr></thead><tbody>${
+    prices.map(p => { const col = (p.price_change_direction || '').toLowerCase() === 'up' ? '#f87171' : '#4ade80'; const v = p.price_change_pct != null ? (p.price_change_pct > 0 ? '+' : '') + Number(p.price_change_pct).toFixed(0) + '%' : '—';
+      return `<tr><td>${esc(p.product_name || p.brand || '—')}</td><td>${money(p.previous_price)}</td><td>${money(p.retail_price)}</td><td style="color:${col};font-weight:600;">${esc(v)}</td></tr>`; }).join('')
+  }</tbody></table>` : '<div class="empty" style="padding:12px;">No price changes recorded.</div>';
+
+  box.innerHTML = `<span class="back-link" id="soBack">← All shop-outs</span>
+    <div class="panel-section"><h3>Run</h3>${head}${actions}</div>
+    <div class="panel-section"><h3>Section Intelligence (${sections.length})</h3><div class="sub-list">${secList}</div></div>
+    <div class="panel-section"><h3>Observations (${obs.length})</h3>${obsCards}</div>
+    <div class="panel-section"><h3>Competitor Price Intel (${prices.length})</h3>${priceTable}</div>`;
+  document.getElementById('soBack').addEventListener('click', renderShopHome);
+  document.getElementById('soUpload').addEventListener('click', () => document.getElementById('soFile').click());
+  document.getElementById('soFile').addEventListener('change', e => uploadPhotos(id, e.target.files));
+  document.getElementById('soProcess').addEventListener('click', () => processRun(id));
+  box.querySelectorAll('.obs-card').forEach(c => c.addEventListener('click', () => openObs(obs.find(x => x.id === c.dataset.id))));
+}
+async function uploadPhotos(shopOutId, files) {
+  const status = document.getElementById('soActStatus');
+  if (!files || !files.length) return;
+  status.textContent = 'Uploading ' + files.length + ' photo(s)…';
+  let ok = 0, fail = 0;
+  for (const f of files) {
+    const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = shopOutId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + safe;
+    try {
+      const r = await fetch(SUPA_URL + '/storage/v1/object/shop-out-photos/' + path, {
+        method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f,
+      });
+      if (r.ok) ok++; else fail++;
+    } catch (e) { fail++; }
+  }
+  status.textContent = `Uploaded ${ok}, failed ${fail}. ${fail ? 'Photo storage may require admin permission; run AI processing to ingest.' : 'Now run AI processing to extract observations.'}`;
+}
+async function processRun(shopOutId) {
+  const status = document.getElementById('soActStatus');
+  status.textContent = 'Triggering AI processing…';
+  try {
+    const r = await fetch('/api/process-shop-out-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_out_id: shopOutId, tenant_id: TID }) });
+    const d = await r.json().catch(() => ({}));
+    status.textContent = r.ok ? 'AI processing started. Refresh shortly to see new observations.' : ('Processing error: ' + (d.error || ('HTTP ' + r.status)));
+  } catch (e) { status.textContent = 'Could not reach the processing service.'; }
+}
+function openObs(o) {
+  if (!o) return;
+  let detail = document.getElementById('obs-detail');
+  if (detail) detail.remove();
+  detail = document.createElement('div');
+  detail.id = 'obs-detail'; detail.className = 'panel-section';
+  const photoIds = [o.front_photo_id, o.back_photo_id].concat(Array.isArray(o.supplemental_photo_ids) ? o.supplemental_photo_ids : []).filter(Boolean);
+  const info = kv([
+    ['Brand', o.brand], ['Sub-brand', o.sub_brand], ['Product', o.product_name],
+    ['Retail price', o.retail_price != null ? money(o.retail_price) : null], ['Compare-at', o.compare_at_price != null ? money(o.compare_at_price) : null],
+    ['Unit price', o.unit_price != null ? money(o.unit_price) : null], ['Pack', [o.pack_size, o.pack_size_unit].filter(Boolean).join(' ')],
+    ['UPC', o.upc], ['Country', o.country_of_origin], ['Clearance', o.is_clearance ? 'Yes' : null],
+    ['Factory match', o.factory_match_id ? 'Yes' : null], ['ML comment', o.ml_observation_comment || o.ml_observation],
+  ]);
+  detail.innerHTML = `<h3>Observation: ${esc(o.brand || '—')} ${esc(o.product_name || '')}</h3>${info}
+    <div class="obs-photos" id="obsPhotos"></div>
+    <div style="margin-top:10px;"><button class="act-btn" id="obsRfq">➕ Add to RFQ Pipeline</button></div>
+    <div class="so-status" id="obsRfqStatus"></div>`;
+  document.getElementById('box-shopout').appendChild(detail);
+  if (photoIds.length) supa(`shop_out_photos?id=in.(${photoIds.join(',')})&select=file_path`).then(ph => {
+    document.getElementById('obsPhotos').innerHTML = ph.map(p => p.file_path ? `<img src="${esc(photoUrl(p.file_path))}" loading="lazy" onerror="this.style.display='none'">` : '').join('');
   });
+  document.getElementById('obsRfq').addEventListener('click', () => addToPipeline(o));
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-function preview(text, n) { text = (text || '').replace(/\s+/g, ' ').trim(); return text.length > n ? text.slice(0, n) + '…' : text; }
-
-// TAB 1 — Retailer Intel
-async function loadRetailer() {
-  const box = document.getElementById('box-retailer');
-  const rows = await supa(`retailer_intel_summaries?tenant_id=eq.${TID}&order=summary_date.desc&select=*,retailers(name)`);
-  document.getElementById('cnt-retailer').textContent = rows.length;
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🏬</span>No retailer intel summaries yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rows.map(r => `<div class="acc">
-    <div class="acc-head"><div><div class="acc-title">${esc(r.retailers && r.retailers.name || 'Retailer')}</div>
-      <div class="acc-meta">${esc(preview(r.summary_text, 120) || 'No summary')}</div></div>
-      <div class="acc-right">${fmtDate(r.summary_date)}</div></div>
-    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`).join('') + '</div>';
-  wireAccordion(box);
+async function addToPipeline(o) {
+  const status = document.getElementById('obsRfqStatus');
+  status.textContent = 'Adding to RFQ pipeline…';
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/shop_out_rfq_pipeline', {
+      method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ tenant_id: TID, observation_id: o.id, shop_out_id: o.shop_out_id, status: 'new', spotted_brand: o.brand, spotted_product: o.product_name, spotted_retail_price: o.retail_price }),
+    });
+    status.textContent = r.ok ? 'Added to RFQ pipeline ✓' : 'Could not add (may require write permission).';
+  } catch (e) { status.textContent = 'Could not add to pipeline.'; }
+}
+async function loadAllObservations() {
+  const box = document.getElementById('box-shopout');
+  box.innerHTML = '<span class="back-link" id="aoBack">← Shop-out runs</span><div class="toolbar"><input class="search-input" id="aoSearch" placeholder="Search by brand or product…"></div><div id="ao-grid"><div class="loading">Loading observations…</div></div>';
+  document.getElementById('aoBack').addEventListener('click', renderShopHome);
+  observations = await supa(`shop_out_observations?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_outs(store_location_text)`);
+  const fpIds = observations.map(o => o.front_photo_id).filter(Boolean);
+  photoMap = {};
+  if (fpIds.length) (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => photoMap[p.id] = p.file_path);
+  const render = () => {
+    const q = (document.getElementById('aoSearch').value || '').toLowerCase().trim();
+    let rows = observations.filter(o => !q || [o.brand, o.product_name, o.sub_brand].some(v => (v || '').toLowerCase().includes(q)));
+    const g = document.getElementById('ao-grid');
+    if (!rows.length) { g.innerHTML = '<div class="empty">No observations.</div>'; return; }
+    g.innerHTML = '<div class="obs-grid">' + rows.map(o => { const fp = photoMap[o.front_photo_id];
+      const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+      return `<div class="obs-card" data-id="${esc(o.id)}">${thumb}<div class="obs-info"><div class="obs-brand">${esc(o.brand || '—')}</div><div class="obs-prod">${esc(o.product_name || '')}</div><div class="obs-meta">${[o.retail_price != null && money(o.retail_price), o.shop_outs && o.shop_outs.store_location_text].filter(v => v || v === 0).map(esc).join(' · ')}</div></div></div>`;
+    }).join('') + '</div>';
+    g.querySelectorAll('.obs-card').forEach(c => c.addEventListener('click', () => openObs(observations.find(x => x.id === c.dataset.id))));
+  };
+  document.getElementById('aoSearch').addEventListener('input', render);
+  render();
 }
 
-// TAB 2 — Brand Watch
+// ── TAB 3: Factory Intel (BETA — no factory_prospects table) ──
+function loadFactory() { comingSoon('box-factory', 'Factory Intel', '🏭'); }
+
+// ── TAB 4: Brand Watch ──
 async function loadBrandwatch() {
   const box = document.getElementById('box-brandwatch');
-  const runs = await supa(`brand_watch_runs?tenant_id=eq.${TID}&order=started_at.desc&select=*,brand_watch_brands(name)`);
-  document.getElementById('cnt-brandwatch').textContent = runs.length;
-  if (!runs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">👁️</span>No brand watch runs yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + runs.map(r => `<div class="acc" data-run="${esc(r.id)}">
+  const rs = await supa(`brand_watch_runs?tenant_id=eq.${TID}&order=started_at.desc&select=*,brand_watch_brands(name)`);
+  if (!rs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">👁️</span>No brand watch runs yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rs.map(r => `<div class="acc" data-run="${esc(r.id)}">
     <div class="acc-head"><div><div class="acc-title">${esc(r.brand_watch_brands && r.brand_watch_brands.name || 'Brand')}</div>
       <div class="acc-meta">${r.products_discovered != null ? r.products_discovered + ' products' : '—'} · ${statusBadge(r.status)}</div></div>
       <div class="acc-right">${fmtDate(r.started_at)}</div></div>
     <div class="acc-body"><div class="loading" style="padding:10px;">Loading products…</div></div></div>`).join('') + '</div>';
-  wireAccordion(box, async (el) => {
-    const body = el.querySelector('.acc-body');
-    if (body.dataset.done) return;
-    body.dataset.done = '1';
-    const prods = await supa(`brand_watch_products?run_id=eq.${el.dataset.run}&order=product_title.asc&select=product_title,vendor,product_type,price_current_cents,currency,in_stock,product_url`);
-    body.innerHTML = prods.length ? '<div class="sub-list">' + prods.map(p => `<div class="sub-item">
-      <div class="si-title">${esc(p.product_title || 'Product')}</div>
-      <div class="si-meta">${[p.vendor, p.product_type, p.price_current_cents != null && money(p.price_current_cents / 100), p.in_stock ? 'in stock' : 'out of stock'].filter(v => v || v === 0).map(esc).join(' · ')}${p.product_url ? ' · <a href="' + esc(p.product_url) + '" target="_blank" style="color:#60a5fa;">view</a>' : ''}</div>
-    </div>`).join('') + '</div>' : '<div class="empty" style="padding:10px;">No products captured in this run.</div>';
-  });
+  box.querySelectorAll('.acc').forEach(el => el.querySelector('.acc-head').addEventListener('click', async () => {
+    el.classList.toggle('open'); const body = el.querySelector('.acc-body'); if (body.dataset.done) return; body.dataset.done = '1';
+    const ps = await supa(`brand_watch_products?run_id=eq.${el.dataset.run}&order=product_title.asc&select=product_title,vendor,price_current_cents,in_stock,product_url`);
+    body.innerHTML = ps.length ? '<div class="sub-list">' + ps.map(p => `<div class="sub-item"><div class="si-title">${esc(p.product_title || 'Product')}</div><div class="si-meta">${[p.vendor, p.price_current_cents != null && money(p.price_current_cents / 100), p.in_stock ? 'in stock' : 'out of stock'].filter(v => v || v === 0).map(esc).join(' · ')}${p.product_url ? ' · <a href="' + esc(p.product_url) + '" target="_blank" style="color:#60a5fa;">view</a>' : ''}</div></div>`).join('') + '</div>' : '<div class="empty" style="padding:10px;">No products captured.</div>';
+  }));
 }
 
-// TAB 3 — Trade Intel (search log; results are not persisted on this table)
+// ── TAB 5: Online Catalog (SOON) ──
+function loadCatalog() { comingSoon('box-catalog', 'Online Catalog', '🗂️'); }
+
+// ── TAB 6: Retailer Intel ──
+async function loadRetailer() {
+  const box = document.getElementById('box-retailer');
+  const rows = await supa(`retailer_intel_summaries?tenant_id=eq.${TID}&order=summary_date.desc&select=*,retailers(name)`);
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🏬</span>No retailer intel summaries yet.</div>'; return; }
+  box.innerHTML = '<div class="acc-list">' + rows.map(r => `<div class="acc">
+    <div class="acc-head"><div><div class="acc-title">${esc(r.retailers && r.retailers.name || 'Retailer')}</div>
+      <div class="acc-meta">${esc(preview(r.summary_text, 120) || 'No summary')}</div></div><div class="acc-right">${fmtDate(r.summary_date)}</div></div>
+    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`).join('') + '</div>';
+  wireAccordion(box);
+}
+
+// ── TAB 7: Social Trends (SOON) ──
+function loadSocial() { comingSoon('box-social', 'Social Trends', '📱'); }
+
+// ── TAB 8: News & Editorial ──
+async function loadNews() {
+  const box = document.getElementById('box-news');
+  const since = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [summaries, recent] = await Promise.all([
+    supa(`news_daily_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=10`),
+    supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles!inner(headline,source_name,external_url,published_at,ai_highlight),retailers(name)&news_articles.published_at=gte.${since}&order=ingested_at.desc&limit=60`),
+  ]);
+  let html = '';
+  if (summaries.length) {
+    html += '<div class="acc-list" style="margin-bottom:18px;">' + summaries.map(s => `<div class="acc"><div class="acc-head"><div>
+      <div class="acc-title">Daily summary · ${fmtDate(s.summary_date)}</div><div class="acc-meta">${s.article_count != null ? s.article_count + ' headlines' : preview(s.summary_text, 100)}</div></div>
+      <div class="acc-right">${s.article_count != null ? s.article_count + ' 📰' : ''}</div></div><div class="acc-body">${esc(s.summary_text || '')}</div></div>`).join('') + '</div>';
+  }
+  let news = recent;
+  if (!news.length) news = await supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles(headline,source_name,external_url,published_at),retailers(name)&order=ingested_at.desc&limit=60`);
+  html += '<div class="acc-list">' + (news.length ? news.map(r => { const a = r.news_articles || {};
+    return `<a class="news-item" href="${esc(a.external_url || '#')}" target="_blank" rel="noopener"><div class="news-head">${esc(a.headline || '(Untitled)')}</div>
+      <div class="news-meta">${[a.source_name, r.retailers && r.retailers.name, fmtDate(a.published_at || r.ingested_at)].filter(Boolean).map(esc).join(' · ')} ↗</div></a>`; }).join('') : '<div class="empty">No news yet.</div>') + '</div>';
+  box.innerHTML = html;
+  wireAccordion(box);
+}
+
+// ── TAB 9: Trade Intel ──
 async function loadTrade() {
   const box = document.getElementById('box-trade');
   const rows = await supa(`trade_intelligence_searches?tenant_id=eq.${TID}&order=searched_at.desc`);
-  document.getElementById('cnt-trade').textContent = rows.length;
   if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🌐</span>No trade intelligence searches yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
-    const q = r.keyword || r.hts_code || r.ruling_number || 'Search';
-    return `<div class="acc"><div class="acc-head"><div>
-      <div class="acc-title">${esc(q)}</div>
-      <div class="acc-meta">${[r.hts_code && 'HTS ' + r.hts_code, r.ruling_number && 'Ruling ' + r.ruling_number].filter(Boolean).map(esc).join(' · ') || 'Keyword search'}</div></div>
-      <div class="acc-right">${fmtDate(r.searched_at)}</div></div>
-    <div class="acc-body">${kv([['Keyword', r.keyword], ['HTS code', r.hts_code], ['Ruling #', r.ruling_number], ['Searched', fmtDate(r.searched_at)]])}</div></div>`;
-  }).join('') + '</div>';
-  wireAccordion(box);
-}
-
-// TAB 4 — Cross Source
-async function loadCrosssource() {
-  const box = document.getElementById('box-crosssource');
-  const rows = await supa(`cross_source_summaries?tenant_id=eq.${TID}&order=summary_date.desc`);
-  document.getElementById('cnt-crosssource').textContent = rows.length;
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🔗</span>No cross-source summaries yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
-    let counts = '';
-    try { const mc = typeof r.module_counts === 'string' ? JSON.parse(r.module_counts) : r.module_counts; if (mc) counts = Object.entries(mc).map(([k, v]) => k + ': ' + v).join(' · '); } catch (e) {}
-    return `<div class="acc"><div class="acc-head"><div>
-      <div class="acc-title">Daily cross-source brief</div>
-      <div class="acc-meta">${esc(counts || preview(r.summary_text, 110))}</div></div>
-      <div class="acc-right">${fmtDate(r.summary_date)}</div></div>
-    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`;
-  }).join('') + '</div>';
-  wireAccordion(box);
-}
-
-// TAB 5 — News
-async function loadNews() {
-  const box = document.getElementById('box-news');
-  const rows = await supa(`retailer_news?tenant_id=eq.${TID}&order=ingested_at.desc&limit=100&select=id,ingested_at,news_articles(headline,source_name,external_url,published_at,snippet),retailers(name)`);
-  document.getElementById('cnt-news').textContent = rows.length;
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📰</span>No news yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rows.map(r => {
-    const a = r.news_articles || {};
-    const url = a.external_url || '#';
-    return `<a class="news-item" href="${esc(url)}" target="_blank" rel="noopener">
-      <div class="news-head">${esc(a.headline || '(Untitled)')}</div>
-      <div class="news-meta">${[a.source_name, r.retailers && r.retailers.name, fmtDate(a.published_at || r.ingested_at)].filter(Boolean).map(esc).join(' · ')} ↗</div>
-    </a>`;
-  }).join('') + '</div>';
-}
-
-// TAB 6 — Shop Out Observations (summary; full detail on tenant-shopout.html)
-async function loadShopout() {
-  const box = document.getElementById('box-shopout');
-  const obs = await supa(`shop_out_observations?tenant_id=eq.${TID}&order=created_at.desc&limit=25&select=brand,product_name,retail_price,created_at,shop_outs(store_location_text)`);
-  document.getElementById('cnt-shopout').textContent = obs.length;
-  const head = '<div style="margin-bottom:14px;"><a href="tenant-shopout.html" style="color:#3b82f6;font-size:13px;">Open full Shop Out workspace →</a></div>';
-  if (!obs.length) { box.innerHTML = head + '<div class="empty"><span class="empty-icon">🛍️</span>No shop-out observations yet.</div>'; return; }
-  box.innerHTML = head + '<div class="acc-list">' + obs.map(o => `<div class="acc"><div class="acc-head"><div>
-      <div class="acc-title">${esc(o.brand || '—')}${o.product_name ? ' — ' + esc(o.product_name) : ''}</div>
-      <div class="acc-meta">${[o.retail_price != null && money(o.retail_price), o.shop_outs && o.shop_outs.store_location_text].filter(v => v || v === 0).map(esc).join(' · ')}</div></div>
-      <div class="acc-right">${fmtDate(o.created_at)}</div></div></div>`).join('') + '</div>';
-}
-
-// TAB 7 — Price Trends (shop_out_price_history; no tenant_id → scope via shop_outs)
-async function loadPricetrends() {
-  const box = document.getElementById('box-pricetrends');
-  const rows = await supa(`shop_out_price_history?select=brand,product_name,retailer,previous_price,retail_price,unit_price,price_change_pct,price_change_direction,shop_date,created_at,shop_outs!inner(tenant_id)&shop_outs.tenant_id=eq.${TID}&order=created_at.desc&limit=100`);
-  document.getElementById('cnt-pricetrends').textContent = rows.length;
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📉</span>No price changes recorded.</div>'; return; }
-  box.innerHTML = `<table class="data-table"><thead><tr><th>Product</th><th>Retailer</th><th>Was</th><th>Now</th><th>Change</th><th>Date</th></tr></thead><tbody>${
-    rows.map(r => {
-      const pctv = r.price_change_pct != null ? (r.price_change_pct > 0 ? '+' : '') + Number(r.price_change_pct).toFixed(0) + '%' : '—';
-      const color = (r.price_change_direction || '').toLowerCase() === 'up' ? '#f87171' : '#4ade80';
-      return `<tr><td>${esc(r.product_name || r.brand || '—')}</td><td>${esc(r.retailer || '—')}</td>
-        <td>${money(r.previous_price)}</td><td>${money(r.retail_price != null ? r.retail_price : r.unit_price)}</td>
-        <td style="color:${color};font-weight:600;">${esc(pctv)}</td><td>${fmtDate(r.shop_date || r.created_at)}</td></tr>`;
-    }).join('')
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Query</th><th>HTS code</th><th>Ruling #</th><th>Searched</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${esc(r.keyword || '—')}</td><td>${esc(r.hts_code || '—')}</td><td>${esc(r.ruling_number || '—')}</td><td>${fmtDate(r.searched_at)}</td></tr>`).join('')
   }</tbody></table>`;
 }
 
-// TAB 8 — Daily Intel (news_daily_summaries + recent news)
-async function loadDaily() {
-  const box = document.getElementById('box-daily');
-  const rows = await supa(`news_daily_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=30`);
-  document.getElementById('cnt-daily').textContent = rows.length;
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🗞️</span>No daily summaries yet.</div>'; }
-  else {
-    box.innerHTML = '<div class="acc-list">' + rows.map(r => `<div class="acc"><div class="acc-head"><div>
-      <div class="acc-title">${fmtDate(r.summary_date)}</div>
-      <div class="acc-meta">${[r.article_count != null && r.article_count + ' headlines', r.signal_article_count != null && r.signal_article_count + ' signal'].filter(Boolean).map(esc).join(' · ') || preview(r.summary_text, 110)}</div></div>
-      <div class="acc-right">${r.article_count != null ? r.article_count + ' 📰' : ''}</div></div>
-      <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`).join('') + '</div>';
-    wireAccordion(box);
-  }
-  // recent news (7 days)
-  const nbox = document.getElementById('box-daily-news');
-  const since = new Date(Date.now() - 7 * 864e5).toISOString();
-  let news = await supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles!inner(headline,source_name,external_url,published_at),retailers(name)&news_articles.published_at=gte.${since}&order=ingested_at.desc&limit=50`);
-  if (!news.length) news = await supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles(headline,source_name,external_url,published_at),retailers(name)&order=ingested_at.desc&limit=50`);
-  nbox.innerHTML = news.length ? '<div class="acc-list">' + news.map(r => {
-    const a = r.news_articles || {};
-    return `<a class="news-item" href="${esc(a.external_url || '#')}" target="_blank" rel="noopener">
-      <div class="news-head">${esc(a.headline || '(Untitled)')}</div>
-      <div class="news-meta">${[a.source_name, r.retailers && r.retailers.name, fmtDate(a.published_at || r.ingested_at)].filter(Boolean).map(esc).join(' · ')} ↗</div></a>`;
-  }).join('') + '</div>' : '<div class="empty">No recent news.</div>';
+// ── TAB 10: FX Watch ──
+async function loadFx() {
+  const box = document.getElementById('box-fx');
+  const rows = await supa(`fx_rates?order=rate_date.desc&limit=60&select=pair,rate,rate_date,source`);
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">💱</span>No FX rates available.</div>'; return; }
+  const pairs = {};
+  rows.forEach(r => { (pairs[r.pair] = pairs[r.pair] || []).push(r); });
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:18px;max-width:980px;">';
+  Object.keys(pairs).forEach(p => { const latest = pairs[p][0];
+    html += `<div class="briefing" style="margin:0;"><h3>${esc(p)}</h3><div style="font-size:26px;font-weight:700;color:var(--text);">${Number(latest.rate).toFixed(4)}</div><div class="acc-meta">as of ${fmtDate(latest.rate_date)} · ${esc(latest.source || '')}</div></div>`; });
+  html += '</div>';
+  html += `<table class="data-table"><thead><tr><th>Pair</th><th>Rate</th><th>Date</th><th>Source</th></tr></thead><tbody>${
+    rows.map(r => `<tr><td>${esc(r.pair)}</td><td>${Number(r.rate).toFixed(4)}</td><td>${fmtDate(r.rate_date)}</td><td>${esc(r.source || '—')}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.innerHTML = html;
 }
 
-// TAB 9 — Import Genius (placeholder)
-function loadImportgenius() {
-  document.getElementById('pane-importgenius').innerHTML =
-    '<div style="max-width:680px;opacity:0.55;">' +
-    '<div class="toolbar"><input class="search-input" placeholder="Search import/export shipment records…" disabled>' +
-    '<button class="tab" disabled style="border:1px solid var(--border);border-radius:8px;">Search</button></div>' +
-    '<div class="empty"><span class="empty-icon">🚢</span>Import Genius Integration — Coming Soon</div></div>';
-}
-
-const LOADERS = { retailer: loadRetailer, brandwatch: loadBrandwatch, trade: loadTrade, crosssource: loadCrosssource, news: loadNews, shopout: loadShopout, pricetrends: loadPricetrends, daily: loadDaily, importgenius: loadImportgenius };
+const LOADERS = { crosssource: loadCrosssource, shopout: loadShopout, factory: loadFactory, brandwatch: loadBrandwatch, catalog: loadCatalog, retailer: loadRetailer, social: loadSocial, news: loadNews, trade: loadTrade, fx: loadFx };
 
 (async function init() {
   const user = await tenantAuth();
   if (!user || !user.tenant) return;
   TID = user.tenant.id;
+  TOKEN = localStorage.getItem('tenant_token');
   renderSidebar(user);
   document.getElementById('pageSub').textContent = user.tenant.name + ' · intelligence';
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
-  window.addEventListener('hashchange', () => showTab((location.hash || '#retailer').slice(1)));
-  showTab((location.hash || '#retailer').slice(1));
+  window.addEventListener('hashchange', () => showTab((location.hash || '#crosssource').slice(1)));
+  showTab((location.hash || '#crosssource').slice(1));
 })();
 </script>
 </body>
