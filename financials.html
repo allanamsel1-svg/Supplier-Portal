@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Banking — Supplier Portal</title>
+<title>Financials — Supplier Portal</title>
 <link rel="stylesheet" href="ri_shared.css">
 <style>
-  /* Admin login gate (matches admin.html / communications.html / zoom.html) */
+  /* Admin login gate (matches admin.html / communications.html / zoom.html / mercury.html) */
   #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
   .lb { background: #fff; border: 1px solid #e0e0d8; border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
   .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1a1a2e; }
@@ -18,6 +18,16 @@
   .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
   #main { display: none; }
   .mc-wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+  /* Tab strip */
+  .fin-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e0e0d8; margin-bottom: 1.25rem; }
+  .fin-tab { padding: 9px 16px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; color: #888; }
+  .fin-tab:hover { color: #555; }
+  .fin-tab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; }
+  .fin-panel { display: none; }
+  .fin-panel.active { display: block; }
+  .fin-soon { color: #aaa; text-align: center; padding: 60px 20px; }
+  .fin-soon h2 { font-size: 17px; font-weight: 600; color: #555; margin-bottom: 6px; }
+  .fin-soon p { font-size: 13px; color: #aaa; }
   .mc-banner { font-size: 12.5px; border-radius: 9px; padding: 10px 13px; margin-bottom: 1.1rem; line-height: 1.5; display: none; }
   .mc-banner.err { background: #fdecec; border: 1px solid #f3c2c2; color: #b02525; display: block; }
   .mc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 1.3rem; }
@@ -51,7 +61,7 @@
 
 <div id="login">
   <div class="lb">
-    <h1>Banking</h1>
+    <h1>Financials</h1>
     <p>Admin access required</p>
     <input type="text" id="l-user" placeholder="Username" />
     <div style="position:relative;margin-bottom:10px;">
@@ -65,53 +75,80 @@
 
 <div id="main">
   <div class="ri-top">
-    <div class="ri-top-title">🏦 Banking</div>
+    <div class="ri-top-title">💰 Financials</div>
     <div class="ri-top-actions">
       <a href="admin.html">← Admin</a>
       <button onclick="doLogout()">Log out</button>
     </div>
   </div>
   <div class="mc-wrap">
-    <div class="mc-banner" id="mc-banner"></div>
 
-    <div class="mc-cards" id="mc-cards"><div class="mc-empty"><span class="mc-spin"></span> Loading accounts…</div></div>
-
-    <div class="mc-bar">
-      <span style="display:flex;align-items:center;gap:5px;">
-        <label>Account</label>
-        <select id="f-account" onchange="mercLoadTransactions()"></select>
-      </span>
-      <span style="display:flex;align-items:center;gap:5px;">
-        <label>From</label><input type="date" id="f-from" onchange="mercRender()" />
-      </span>
-      <span style="display:flex;align-items:center;gap:5px;">
-        <label>To</label><input type="date" id="f-to" onchange="mercRender()" />
-      </span>
-      <span style="display:flex;align-items:center;gap:5px;">
-        <label>Type</label>
-        <select id="f-type" onchange="mercRender()">
-          <option value="all">All</option>
-          <option value="credit">Credits</option>
-          <option value="debit">Debits</option>
-        </select>
-      </span>
-      <input type="text" id="f-search" class="mc-search" placeholder="Search description or counterparty…" oninput="mercRender()" />
-      <button class="mc-refresh" onclick="mercRefresh()">↻ Refresh</button>
+    <div class="fin-tabs">
+      <button class="fin-tab active" id="fin-tab-banking" onclick="switchFinTab('banking')">Banking</button>
+      <button class="fin-tab" id="fin-tab-api" onclick="switchFinTab('api')">API Costs</button>
     </div>
 
-    <div id="mc-tx-wrap">
-      <table class="mc-tx">
-        <thead><tr><th style="width:120px;">Date</th><th>Description</th><th>Counterparty</th><th style="text-align:right;width:130px;">Amount</th></tr></thead>
-        <tbody id="mc-tx-body"><tr><td colspan="4" class="mc-empty">Select an account to load transactions.</td></tr></tbody>
-      </table>
+    <!-- Tab 1: Banking (Mercury) — default active -->
+    <div class="fin-panel active" id="fin-panel-banking">
+      <div class="mc-banner" id="mc-banner"></div>
+
+      <div class="mc-cards" id="mc-cards"><div class="mc-empty"><span class="mc-spin"></span> Loading accounts…</div></div>
+
+      <div class="mc-bar">
+        <span style="display:flex;align-items:center;gap:5px;">
+          <label>Account</label>
+          <select id="f-account" onchange="mercLoadTransactions()"></select>
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+          <label>From</label><input type="date" id="f-from" onchange="mercRender()" />
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+          <label>To</label><input type="date" id="f-to" onchange="mercRender()" />
+        </span>
+        <span style="display:flex;align-items:center;gap:5px;">
+          <label>Type</label>
+          <select id="f-type" onchange="mercRender()">
+            <option value="all">All</option>
+            <option value="credit">Credits</option>
+            <option value="debit">Debits</option>
+          </select>
+        </span>
+        <input type="text" id="f-search" class="mc-search" placeholder="Search description or counterparty…" oninput="mercRender()" />
+        <button class="mc-refresh" onclick="mercRefresh()">↻ Refresh</button>
+      </div>
+
+      <div id="mc-tx-wrap">
+        <table class="mc-tx">
+          <thead><tr><th style="width:120px;">Date</th><th>Description</th><th>Counterparty</th><th style="text-align:right;width:130px;">Amount</th></tr></thead>
+          <tbody id="mc-tx-body"><tr><td colspan="4" class="mc-empty">Select an account to load transactions.</td></tr></tbody>
+        </table>
+      </div>
     </div>
+
+    <!-- Tab 2: API Costs — placeholder -->
+    <div class="fin-panel" id="fin-panel-api">
+      <div class="fin-soon">
+        <h2>API Cost Tracking</h2>
+        <p>Coming soon</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-window.location.href = 'financials.html';   // Banking moved into Financials → API Costs tabbed page
 function g(id){return document.getElementById(id);}
 var _accounts = [], _txns = [];
+
+// Tab switching — show/hide panels, no page reload
+function switchFinTab(tab){
+  var tabs = ['banking','api'];
+  tabs.forEach(function(t){
+    var btn = g('fin-tab-' + t), panel = g('fin-panel-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (panel) panel.classList.toggle('active', t === tab);
+  });
+}
 
 function escH(v){ return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtMoney(n, cur){
