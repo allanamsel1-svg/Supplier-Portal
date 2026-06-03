@@ -126,12 +126,30 @@
       </div>
     </div>
 
-    <!-- Tab 2: API Costs — placeholder -->
+    <!-- Tab 2: API Costs — Buyline Brands usage (marked up 1.5x) -->
     <div class="fin-panel" id="fin-panel-api">
-      <div class="fin-soon">
-        <h2>API Cost Tracking</h2>
-        <p>Coming soon</p>
+      <div class="mc-cards" id="api-month-cards" style="margin-bottom:1.3rem;"></div>
+
+      <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin:0 0 8px;">Monthly Summary</div>
+      <div id="api-summary-wrap" style="margin-bottom:1.6rem;">
+        <table class="mc-tx" id="api-summary-table">
+          <thead><tr>
+            <th>Month</th><th>Service</th><th>Feature</th>
+            <th style="text-align:right;">Calls</th><th style="text-align:right;">Tokens In</th><th style="text-align:right;">Tokens Out</th>
+            <th style="text-align:right;">Actual Cost</th><th style="text-align:right;">Your Cost</th>
+          </tr></thead>
+          <tbody id="api-summary-body"><tr><td colspan="8" class="mc-empty"><span class="mc-spin"></span> Loading…</td></tr></tbody>
+        </table>
       </div>
+
+      <div style="font-size:13px;font-weight:600;color:#1a1a2e;margin:0 0 8px;">Recent Calls (last 50)</div>
+      <table class="mc-tx" id="api-calls-table">
+        <thead><tr>
+          <th style="width:150px;">Date / Time</th><th>Service</th><th>Feature</th>
+          <th style="text-align:right;">Tokens In</th><th style="text-align:right;">Tokens Out</th><th style="text-align:right;">Cost</th>
+        </tr></thead>
+        <tbody id="api-calls-body"><tr><td colspan="6" class="mc-empty">Loading…</td></tr></tbody>
+      </table>
     </div>
 
     <!-- Tab 3: Projections — embedded projections.html -->
@@ -160,6 +178,96 @@ function switchFinTab(tab){
     var fr = g('fin-projections-frame');
     if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;
   }
+  // Lazy-load API cost data the first time the API Costs tab is opened.
+  if (tab === 'api' && !_apiCostsLoaded) { _apiCostsLoaded = true; loadApiCosts(); }
+}
+
+// ── API Costs (Buyline Brands; "Your Cost" = actual × markup) ──
+var TCOST_TID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+var TCOST_MARKUP = 1.50;
+var TCOST_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var _apiCostsLoaded = false;
+
+async function apiCostFetch(qs) {
+  try {
+    var r = await fetch('https://mjkjubctswjwjihxjpnd.supabase.co/rest/v1/api_cost_log?' + qs, {
+      headers: { 'apikey': TCOST_KEY, 'Authorization': 'Bearer ' + TCOST_KEY }
+    });
+    if (!r.ok) return [];
+    var d = await r.json();
+    return Array.isArray(d) ? d : [];
+  } catch (e) { return []; }
+}
+
+function monthLabel(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso); if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}
+
+async function loadApiCosts() {
+  var all = await apiCostFetch('tenant_id=eq.' + TCOST_TID + '&select=service,feature,cost_usd,tokens_in,tokens_out,created_at');
+  var recent = await apiCostFetch('tenant_id=eq.' + TCOST_TID + '&order=created_at.desc&limit=50&select=created_at,service,feature,tokens_in,tokens_out,cost_usd');
+
+  // ── This Month card ──
+  var now = new Date(); var ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  var mCalls = 0, mTokens = 0, mYourCost = 0;
+  all.forEach(function (r) {
+    if ((r.created_at || '').slice(0, 7) === ym) {
+      mCalls++; mTokens += (Number(r.tokens_in) || 0) + (Number(r.tokens_out) || 0);
+      mYourCost += (Number(r.cost_usd) || 0) * TCOST_MARKUP;
+    }
+  });
+  g('api-month-cards').innerHTML =
+    '<div class="mc-card"><div class="mc-acct">This Month — Calls</div><div class="mc-bal">' + mCalls.toLocaleString() + '</div><div class="mc-avail">API calls this month</div></div>' +
+    '<div class="mc-card"><div class="mc-acct">This Month — Tokens</div><div class="mc-bal">' + mTokens.toLocaleString() + '</div><div class="mc-avail">in + out</div></div>' +
+    '<div class="mc-card"><div class="mc-acct">This Month — Your Cost</div><div class="mc-bal">' + fmtMoney(mYourCost, 'USD') + '</div><div class="mc-avail">billed at ' + TCOST_MARKUP + '×</div></div>';
+
+  // ── Monthly summary grouped by month + service + feature ──
+  var groups = {};
+  all.forEach(function (r) {
+    var key = (r.created_at || '').slice(0, 7) + '|' + (r.service || '—') + '|' + (r.feature || '—');
+    var grp = groups[key] || (groups[key] = { month: (r.created_at || '').slice(0, 7), service: r.service || '—', feature: r.feature || '—', calls: 0, ti: 0, to: 0, cost: 0 });
+    grp.calls++; grp.ti += Number(r.tokens_in) || 0; grp.to += Number(r.tokens_out) || 0; grp.cost += Number(r.cost_usd) || 0;
+  });
+  var rows = Object.values(groups).sort(function (a, b) { return a.month < b.month ? 1 : a.month > b.month ? -1 : (a.service + a.feature < b.service + b.feature ? -1 : 1); });
+  var sBody = g('api-summary-body');
+  if (!rows.length) {
+    sBody.innerHTML = '<tr><td colspan="8" class="mc-empty">No API usage recorded yet.</td></tr>';
+  } else {
+    var tot = { calls: 0, ti: 0, to: 0, cost: 0 };
+    var html = rows.map(function (r) {
+      tot.calls += r.calls; tot.ti += r.ti; tot.to += r.to; tot.cost += r.cost;
+      return '<tr><td>' + escH(monthLabel(r.month + '-01')) + '</td><td>' + escH(r.service) + '</td><td>' + escH(r.feature) + '</td>' +
+        '<td style="text-align:right;">' + r.calls.toLocaleString() + '</td>' +
+        '<td style="text-align:right;">' + r.ti.toLocaleString() + '</td>' +
+        '<td style="text-align:right;">' + r.to.toLocaleString() + '</td>' +
+        '<td style="text-align:right;">' + fmtMoney(r.cost, 'USD') + '</td>' +
+        '<td style="text-align:right;font-weight:600;">' + fmtMoney(r.cost * TCOST_MARKUP, 'USD') + '</td></tr>';
+    }).join('');
+    html += '<tr style="border-top:2px solid #e0e0d8;font-weight:700;"><td colspan="3">Grand Total</td>' +
+      '<td style="text-align:right;">' + tot.calls.toLocaleString() + '</td>' +
+      '<td style="text-align:right;">' + tot.ti.toLocaleString() + '</td>' +
+      '<td style="text-align:right;">' + tot.to.toLocaleString() + '</td>' +
+      '<td style="text-align:right;">' + fmtMoney(tot.cost, 'USD') + '</td>' +
+      '<td style="text-align:right;">' + fmtMoney(tot.cost * TCOST_MARKUP, 'USD') + '</td></tr>';
+    sBody.innerHTML = html;
+  }
+
+  // ── Recent calls drilldown ──
+  var cBody = g('api-calls-body');
+  cBody.innerHTML = recent.length ? recent.map(function (r) {
+    return '<tr><td class="mc-date">' + escH(fmtDateTime(r.created_at)) + '</td><td>' + escH(r.service || '—') + '</td><td>' + escH(r.feature || '—') + '</td>' +
+      '<td style="text-align:right;">' + (Number(r.tokens_in) || 0).toLocaleString() + '</td>' +
+      '<td style="text-align:right;">' + (Number(r.tokens_out) || 0).toLocaleString() + '</td>' +
+      '<td style="text-align:right;">' + fmtMoney(Number(r.cost_usd) || 0, 'USD') + '</td></tr>';
+  }).join('') : '<tr><td colspan="6" class="mc-empty">No calls recorded yet.</td></tr>';
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso); if (isNaN(d)) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
 function escH(v){ return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

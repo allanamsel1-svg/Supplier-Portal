@@ -39,11 +39,13 @@ export default async function handler(req, res) {
 
   const tid = encodeURIComponent(session.tenant_id);
 
+  // Status values in this DB: rfqs → sent/draft/approved; skus → draft/active.
+  // "Active RFQs" = anything not draft/terminal. "Live SKUs" = active/live.
   const [rfqs, factories, skus, pos] = await Promise.all([
-    count('rfqs?tenant_id=eq.' + tid + '&status=in.(active,open,pending)'),
+    count('rfqs?tenant_id=eq.' + tid + '&status=not.in.(draft,cancelled,closed,archived,complete,completed)'),
     count('factories?tenant_id=eq.' + tid),
-    count('skus?tenant_id=eq.' + tid),
-    count('purchase_orders?tenant_id=eq.' + tid + '&status=not.in.(cancelled,closed,complete)'),
+    count('skus?tenant_id=eq.' + tid + '&status=in.(active,live)'),
+    count('purchase_orders?tenant_id=eq.' + tid + '&status=not.in.(cancelled,closed,complete,completed)'),
   ]);
 
   return res.status(200).json({ rfqs, factories, skus, pos });

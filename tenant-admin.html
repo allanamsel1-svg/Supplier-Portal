@@ -217,10 +217,21 @@ async function sbFetch(path, opts={}) {
 async function loadTenants() {
   const res = await sbFetch('/rest/v1/tenants?order=created_at.asc&select=*');
   const tenants = await res.json();
+
+  // Map each tenant to its admin user's email (first admin) for the login link.
+  const emailByTenant = {};
+  try {
+    const ures = await sbFetch('/rest/v1/tenant_users?role=eq.admin&select=tenant_id,email&order=created_at.asc');
+    const users = await ures.json();
+    (Array.isArray(users) ? users : []).forEach(u => { if (!emailByTenant[u.tenant_id]) emailByTenant[u.tenant_id] = u.email; });
+  } catch (e) {}
+
   document.getElementById('tenantCount').textContent = `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('tenantTable');
   if (!tenants.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No tenants yet</td></tr>'; return; }
-  tbody.innerHTML = tenants.map(t => `
+  tbody.innerHTML = tenants.map(t => {
+    const email = emailByTenant[t.id] || '';
+    return `
     <tr>
       <td><strong style="color:#f1f5f9">${t.name}</strong><br><span style="font-size:11px;color:#374151">${t.slug}</span></td>
       <td>${t.plan}</td>
@@ -231,9 +242,22 @@ async function loadTenants() {
       <td class="actions">
         <button class="btn-sm" onclick='editTenant(${JSON.stringify(t)})'>Edit</button>
         <button class="btn-sm" onclick="managUsers('${t.id}','${t.name}')">Users</button>
+        <button class="btn-sm" data-email="${email}" onclick="copyLoginLink(this)">Copy Login Link</button>
       </td>
     </tr>
-  `).join('');
+  `; }).join('');
+}
+
+function copyLoginLink(btn) {
+  const email = btn.getAttribute('data-email') || '';
+  let url = 'https://portal.tbgsourcing.net/tenant-login.html';
+  if (email) url += '?email=' + encodeURIComponent(email);
+  const done = () => { const o = btn.textContent; btn.textContent = email ? 'Copied!' : 'Copied (no admin email)'; setTimeout(() => { btn.textContent = o; }, 1600); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => { window.prompt('Copy login link:', url); });
+  } else {
+    window.prompt('Copy login link:', url);
+  }
 }
 
 function buildFeaturesGrid(values={}) {

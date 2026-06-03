@@ -193,6 +193,16 @@
     }
   }
 
+  // Pre-fill email from ?email= (used by the admin "Copy Login Link" button).
+  try {
+    var preEmail = new URLSearchParams(window.location.search).get('email');
+    if (preEmail) {
+      emailEl.value = preEmail.trim();
+      // Move focus to password since email is already filled.
+      setTimeout(function () { passwordEl.focus(); }, 0);
+    }
+  } catch (e) {}
+
   // No inline onclick — wire events here.
   btn.addEventListener('click', doLogin);
 

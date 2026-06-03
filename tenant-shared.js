@@ -10,6 +10,14 @@ async function supa(path) {
     const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
       headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
     });
+    // Global auth guard: any 401/403 clears the session and bounces to login.
+    if (res.status === 401 || res.status === 403) {
+      console.warn('[supa] auth rejected (' + res.status + ') — clearing session', path);
+      localStorage.removeItem('tenant_token');
+      localStorage.removeItem('tenant_user');
+      window.location.href = '/tenant-login.html';
+      return [];
+    }
     if (!res.ok) {
       console.error('[supa] query failed', res.status, path, await res.text().catch(() => ''));
       return [];
