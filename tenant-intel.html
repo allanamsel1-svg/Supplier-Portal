@@ -285,23 +285,8 @@ async function renderDetail(id) {
   ]);
   const pmap = {}; const fpIds = obs.map(o => o.front_photo_id).filter(Boolean);
   if (fpIds.length) (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => pmap[p.id] = p.file_path);
-  const sm = await signPhotos(Object.values(pmap));  // signed thumbnail URLs (private bucket)
-  const prices = await loadPriceChanges(id);
+  await signPhotos(Object.values(pmap));  // signed thumbnail URLs (private bucket)
   const clearance = obs.filter(o => o.is_clearance).length;
-  const secCards = sections.length ? sections.map(sec => {
-    let bs = sec.brand_summary;
-    if (typeof bs === 'string' && bs.trim().charAt(0) === '[') { try { bs = JSON.parse(bs); } catch (e) {} }
-    let body;
-    if (Array.isArray(bs) && bs.length) {
-      body = `<table class="data-table"><thead><tr><th>Brand</th><th>Product Type</th><th>Facings</th><th>SKUs</th><th>Notes</th></tr></thead><tbody>${bs.map(b => `<tr><td>${esc(b.brand || b.name || '—')}</td><td>${esc(b.product_type || b.type || '')}</td><td>${esc(b.facings != null ? b.facings : '')}</td><td>${esc(b.skus != null ? b.skus : (b.sku_count != null ? b.sku_count : ''))}</td><td>${esc(b.notes || '')}</td></tr>`).join('')}</tbody></table>`;
-    } else {
-      body = `<div style="white-space:pre-wrap;">${esc((typeof bs === 'string' ? bs : '') || 'No brand summary.')}</div>`;
-    }
-    if (sec.section_comment) body += `<div class="acc-meta" style="margin-top:8px;">💬 ${esc(sec.section_comment)}</div>`;
-    const cat = sec.category_override || sec.category_detected || sec.department || 'Section';
-    const meta = [sec.estimated_linear_feet && sec.estimated_linear_feet + ' ft', sec.ai_confidence != null && 'AI conf ' + sec.ai_confidence].filter(Boolean).map(esc).join(' · ');
-    return `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(cat)}</div><div class="acc-meta">${meta}</div></div><div class="acc-right">${sec.category_override ? 'override' : ''}</div></div><div class="acc-body">${body}</div></div>`;
-  }).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
   const obsCards = obs.length ? '<div class="obs-grid">' + obs.map(o => {
     const fp = pmap[o.front_photo_id]; const src = fp ? photoSrc(fp) : ''; const thumb = src ? `<img class="obs-thumb" src="${esc(src)}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
     const cross = crossSearch(o); const crossBadge = cross ? `<span class="chip">seen at ${cross.length} retailers</span>` : '';
@@ -314,13 +299,15 @@ async function renderDetail(id) {
         <button class="btn btn-sec" data-save="${esc(o.id)}">Save</button><button class="btn btn-sec" data-rfq="${esc(o.id)}">RFQ</button></div>
       </div></div>`;
   }).join('') + '</div>' : '<div class="empty" style="padding:12px;">No observations.</div>';
-  const priceCards = prices.length ? `<table class="data-table"><thead><tr><th>Product</th><th>Was</th><th>Now</th><th>Δ</th><th>Validation</th></tr></thead><tbody>${prices.map(p => { const col = (p.price_change_direction || '').toLowerCase() === 'up' ? '#f87171' : '#4ade80'; const v = p.price_change_pct != null ? (p.price_change_pct > 0 ? '+' : '') + Number(p.price_change_pct).toFixed(0) + '%' : '—'; return `<tr><td>${esc(p.product_name || p.brand || '—')}</td><td>${money(p.previous_price)}</td><td>${money(p.retail_price)}</td><td style="color:${col};font-weight:600;">${esc(v)}</td><td>${esc(p.ml_validation_status || '—')}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty" style="padding:12px;">No price changes.</div>';
   det.innerHTML = `<span class="back-link" id="soBackTop">▾ Detail</span>${head}
     <div style="margin:12px 0;display:flex;gap:14px;flex-wrap:wrap;"><div class="dstat"><div class="dstat-l">Photos</div><div class="dstat-v">${s.total_photos || 0}</div></div><div class="dstat"><div class="dstat-l">Observations</div><div class="dstat-v">${obs.length}</div></div><div class="dstat"><div class="dstat-l">Clearance signals</div><div class="dstat-v">${clearance}</div></div><div class="dstat"><div class="dstat-l">Sections</div><div class="dstat-v">${sections.length}</div></div></div>
     <div class="d-actions" style="padding:0 0 12px;"><button class="btn btn-sec" id="soArchBtn">${s.archived_at ? 'Restore' : 'Archive'}</button><button class="btn btn-sec" id="soDelBtn">Delete</button><button class="btn btn-sec" id="soLocBtn">Edit location</button></div>
-    <div class="panel-section"><h3>Section Intelligence (${sections.length})</h3><div class="acc-list">${secCards}</div></div>
+    <div id="clearance-card"></div>
+    <div id="register-card"></div>
+    <div class="panel-section"><h3>Section Intelligence (${sections.length})</h3><div id="sections-container"><div class="loading">Loading sections…</div></div></div>
     <div class="panel-section"><h3>Observations (${obs.length})</h3>${obsCards}</div>
-    <div class="panel-section"><h3>Cross-Retailer Price Intelligence (${prices.length})</h3>${priceCards}</div>`;
+    <div id="pricechange-card"></div>`;
+  obsShopOutId = id;
   // wire
   det.querySelectorAll('.obs-thumb-wrap[data-fp]').forEach(el => { const fp = el.dataset.fp; if (fp && photoSrc(fp)) el.style.cursor = 'zoom-in', el.addEventListener('click', () => openLightbox([photoSrc(fp)], 0)); });
   det.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', () => saveMlComment(b.dataset.save)));
@@ -328,8 +315,10 @@ async function renderDetail(id) {
   document.getElementById('soArchBtn').addEventListener('click', () => toggleArchive(s));
   document.getElementById('soDelBtn').addEventListener('click', () => deleteShopOut(s));
   document.getElementById('soLocBtn').addEventListener('click', () => editLocationFor(s));
+  renderSignalCards(obs);
+  loadPriceChanges(id);
+  loadSections(id);
 }
-async function loadPriceChanges(id) { return await supa(`shop_out_price_history?shop_out_id=eq.${id}&order=created_at.desc&limit=50&select=brand,product_name,previous_price,retail_price,price_change_pct,price_change_direction,ml_validation_status,shop_outs!inner(tenant_id)&shop_outs.tenant_id=eq.${TID}`); }
 function setupDropzone(id) {
   const dz = document.getElementById('dz'), file = document.getElementById('dzFile');
   dz.addEventListener('click', () => file.click());
@@ -683,6 +672,291 @@ function openLightbox(imgs, idx) { lbImgs = imgs; lbIdx = idx || 0; document.get
 function lbStep(n) { if (!lbImgs.length) return; lbIdx = (lbIdx + n + lbImgs.length) % lbImgs.length; document.getElementById('lbImg').src = lbImgs[lbIdx]; }
 function openModal(html) { document.getElementById('modalBox').innerHTML = html; document.getElementById('modalOv').classList.add('open'); }
 function closeModal() { document.getElementById('modalOv').classList.remove('open'); }
+
+// ════ Transplanted shop-out detail features (from shop_outs.html, dark-adapted) ════
+var obsShopOutId = null;
+var pcData = {}, pcSel = {};
+var secFlagState = {};
+function g(id) { return document.getElementById(id); }
+function shopById(id) { return shops.find(x => x.id === id); }
+function chainName(s) { return retailerName(s); }
+function priceCell(v) { return money(v); }
+function unitPriceTxt(price, unit) { if (price == null || isNaN(Number(price))) return '—'; return '$' + Number(price).toFixed(2) + (unit ? '/' + String(unit).replace(/_/g, ' ') : ''); }
+function tbgUnitPrice(sku) { if (!sku || sku.proposed_sell_price == null) return null; var u = (sku.size_unit || '').toString().toLowerCase().replace(/[^a-z]/g, '') || null; return { price: Number(sku.proposed_sell_price), unit: u }; }
+function soToast(m) { try { var e = document.createElement('div'); e.textContent = m; e.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e3a6e;color:rgb(255,255,255);padding:10px 16px;border-radius:8px;z-index:90;font-size:13px;'; document.body.appendChild(e); setTimeout(function () { e.remove(); }, 1800); } catch (e) {} }
+
+// ── CHANGE 1: clearance + checkout signal cards ──
+function renderSignalCards(obs) {
+  var clear = obs.filter(function (o) { return o.is_clearance === true; });
+  var reg = obs.filter(function (o) { return o.placement_type === 'checkout_register'; });
+  var s = shopById(obsShopOutId), chain = esc(chainName(s)), sdate = esc((s && s.shop_date) || '—');
+  var cc = g('clearance-card');
+  if (cc) {
+    if (clear.length) {
+      var rows = clear.map(function (o) {
+        return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">' + esc(o.brand || '—') + '</div>' +
+          '<div style="font-size:12px;color:var(--text2);">' + esc(o.product_name || '') + '</div></div>' +
+          '<div style="font-weight:700;font-size:13px;white-space:nowrap;color:var(--text);">' + priceCell(o.retail_price) + '</div>' +
+          '<input id="clr-note-' + o.id + '" value="' + esc(o.reviewer_notes || '') + '" placeholder="note…" onblur="saveClearanceNote(\'' + o.id + '\')" style="width:150px;font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:var(--input-bg);color:var(--text);" /></div>';
+      }).join('');
+      cc.innerHTML = '<div style="border:1.5px solid #991b1b;background:var(--card-bg);border-radius:10px;padding:16px;margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:13px;color:#f87171;margin-bottom:4px;">🚩 CLEARANCE ITEMS — ' + chain + ' · ' + sdate + ' (' + clear.length + ')</div>' +
+        '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Products on clearance = potential brand exit or category wind-down signal. Review before sourcing.</div>' + rows + '</div>';
+    } else cc.innerHTML = '';
+  }
+  var rc = g('register-card');
+  if (rc) {
+    if (reg.length) {
+      var rrows = reg.map(function (o) {
+        return '<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="flex:1;min-width:0;"><div style="font-weight:700;font-size:13px;color:var(--text);">' + esc(o.brand || '—') + '</div>' +
+          '<div style="font-size:12px;color:var(--text2);">' + esc(o.product_name || '') + '</div></div>' +
+          '<div style="font-weight:700;font-size:13px;white-space:nowrap;color:var(--text);">' + priceCell(o.retail_price) + '</div></div>';
+      }).join('');
+      rc.innerHTML = '<div style="border:1.5px solid #92660a;background:var(--card-bg);border-radius:10px;padding:16px;margin-bottom:14px;">' +
+        '<div style="font-weight:700;font-size:13px;color:#fbbf24;margin-bottom:4px;">🛒 CHECKOUT &amp; IMPULSE PLACEMENT — ' + chain + ' · ' + sdate + ' (' + reg.length + ')</div>' +
+        '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Products at register = impulse/high-velocity category signal. Consider small-format SKUs.</div>' + rrows + '</div>';
+    } else rc.innerHTML = '';
+  }
+}
+async function saveClearanceNote(obsId) {
+  var inp = g('clr-note-' + obsId); if (!inp) return;
+  try { await sbPatch('shop_out_observations?id=eq.' + obsId, { reviewer_notes: inp.value.trim() || null }); } catch (e) {}
+}
+
+// ── CHANGE 2: full price-change validation card ──
+function pcValBadge(st) {
+  if (st === 'confirmed') return '<span style="font-size:10px;font-weight:700;background:rgba(74,222,128,0.14);color:#4ade80;border-radius:8px;padding:2px 7px;">✓ Confirmed</span>';
+  if (st === 'rejected') return '<span style="font-size:10px;font-weight:700;background:rgba(248,113,113,0.14);color:#f87171;border-radius:8px;padding:2px 7px;">✗ Rejected</span>';
+  if (st === 'adjusted') return '<span style="font-size:10px;font-weight:700;background:rgba(251,191,36,0.14);color:#fbbf24;border-radius:8px;padding:2px 7px;">~ Adjusted</span>';
+  return '<span style="font-size:10px;color:var(--text2);">Unreviewed</span>';
+}
+async function togglePcExpand(rowId) {
+  var box = g('pc-panel-' + rowId); if (!box) return;
+  if (box.style.display !== 'none') { box.style.display = 'none'; box.innerHTML = ''; return; }
+  var d = pcData[rowId]; if (!d) return;
+  var p = d.p, sku = d.sku, tbg = d.tbg, imgId = 'pc-img-' + rowId;
+  var mpct = function (v) { return v != null ? (Number(v) * 100).toFixed(1) + '%' : '—'; };
+  var unitNew = (d.newU != null && d.nu) ? unitPriceTxt(d.newU, d.nu) : '—';
+  var left = '<div style="flex:1;min-width:200px;">' +
+    '<div style="width:100%;max-width:300px;border-radius:8px;overflow:hidden;background:var(--bg2);"><img id="' + imgId + '" style="width:100%;display:block;" /></div>' +
+    '<div style="font-size:12px;margin-top:8px;line-height:1.7;">' +
+      '<div style="font-weight:700;font-size:13px;color:var(--text);">' + esc(p.brand || '—') + '</div>' +
+      '<div style="color:var(--text2);">' + esc(p.product_name || '') + '</div>' +
+      '<div style="color:var(--text2);">Pack ' + esc(d.packCurr || '—') + ' · Retail ' + priceCell(p.retail_price) + ' · Unit ' + esc(unitNew) + '</div>' +
+      '<div style="color:var(--text2);">' + esc(p.shop_date || '—') + ' · ' + d.chain + (d.storeLoc ? ' · ' + esc(d.storeLoc) : '') + '</div>' +
+    '</div></div>';
+  var right;
+  if (sku) {
+    var tbgU = tbg ? unitPriceTxt(tbg.price, tbg.unit) : '—';
+    right = '<div style="flex:1;min-width:200px;font-size:12px;line-height:1.8;color:var(--text);">' +
+      '<div style="font-size:10px;text-transform:uppercase;color:var(--text2);font-weight:600;letter-spacing:0.04em;margin-bottom:4px;">Matched TBG SKU</div>' +
+      '<div style="font-weight:700;font-size:13px;">' + esc(sku.item_description || '—') + '</div>' +
+      '<div style="color:var(--text2);">Size ' + esc(sku.size_unit || '—') + '</div>' +
+      '<div>Proposed sell ' + priceCell(sku.proposed_sell_price) + ' · Comp retail ' + priceCell(sku.comp_retail_price) + '</div>' +
+      '<div>TBG margin ' + mpct(sku.tbg_margin) + ' · Customer margin ' + mpct(sku.customer_margin) + '</div>' +
+      '<div style="margin-top:4px;font-weight:700;color:#60a5fa;">TBG unit price: ' + esc(tbgU) + '</div>' +
+    '</div>';
+  } else {
+    right = '<div style="flex:1;min-width:200px;font-size:12px;color:var(--text2);display:flex;align-items:center;">No valid same-category TBG match — nothing to compare.</div>';
+  }
+  var st = p.ml_validation_status || ''; pcSel[rowId] = st || null;
+  function vbtn(val, label, bg, fg) {
+    return '<button id="pc-btn-' + rowId + '-' + val + '" onclick="pcSelect(\'' + rowId + '\',\'' + val + '\')" style="cursor:pointer;border:none;background:' + bg + ';color:' + fg + ';font-weight:700;border-radius:7px;padding:6px 12px;font-size:12px;font-family:inherit;outline:' + (st === val ? '2px solid #93c5fd' : 'none') + ';outline-offset:1px;">' + label + '</button>';
+  }
+  var bottom = '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px;">' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">' +
+      vbtn('confirmed', '✓ Confirmed', 'rgba(74,222,128,0.14)', '#4ade80') +
+      vbtn('rejected', '✗ Rejected — bad data', 'rgba(248,113,113,0.14)', '#f87171') +
+      vbtn('adjusted', '~ Adjusted', 'rgba(251,191,36,0.14)', '#fbbf24') +
+    '</div>' +
+    '<textarea id="pc-note-' + rowId + '" placeholder="Validation note — explain why this was rejected or adjusted" style="width:100%;box-sizing:border-box;min-height:48px;padding:8px 10px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;resize:vertical;background:var(--input-bg);color:var(--text);">' + esc(p.ml_validation_note || '') + '</textarea>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;">' +
+      '<button onclick="savePcValidation(\'' + rowId + '\')" style="font-size:12px;padding:6px 16px;background:#2563eb;color:rgb(255,255,255);border:none;border-radius:7px;font-weight:600;cursor:pointer;font-family:inherit;">Save validation</button>' +
+      (p.ml_validated_at ? '<span style="font-size:11px;color:var(--text2);">last: ' + esc(p.ml_validation_status || '') + ' · ' + esc(String(p.ml_validated_at).slice(0, 10)) + ' · ' + esc(p.ml_validated_by || '') + '</span>' : '') +
+    '</div></div>';
+  box.innerHTML = '<div style="margin-top:10px;padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;">' +
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;">' + left + right + '</div>' + bottom + '</div>';
+  box.style.display = 'block';
+  if (d.photoPath) { await signPhotos([d.photoPath]); var img = g(imgId); if (img && photoSrc(d.photoPath)) img.src = photoSrc(d.photoPath); }
+}
+function pcSelect(rowId, st) {
+  pcSel[rowId] = st;
+  ['confirmed', 'rejected', 'adjusted'].forEach(function (x) { var b = g('pc-btn-' + rowId + '-' + x); if (b) b.style.outline = (x === st ? '2px solid #93c5fd' : 'none'); });
+}
+async function savePcValidation(rowId) {
+  var st = pcSel[rowId];
+  if (!st) { alert('Choose ✓ Confirmed, ✗ Rejected, or ~ Adjusted first.'); return; }
+  var noteEl = g('pc-note-' + rowId), note = noteEl ? noteEl.value.trim() : '';
+  try {
+    var r = await sbPatch('shop_out_price_history?id=eq.' + rowId, { ml_validation_status: st, ml_validation_note: note || null, ml_validated_at: new Date().toISOString(), ml_validated_by: 'tenant' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    soToast('Validation saved');
+    if (obsShopOutId) loadPriceChanges(obsShopOutId);
+  } catch (e) { alert('Save failed: ' + e.message); }
+}
+async function loadPriceChanges(id) {
+  var pc = g('pricechange-card'); if (!pc) return;
+  var rows = await supa('shop_out_price_history?shop_out_id=eq.' + id + '&is_flagged=eq.true&order=price_change_pct.desc&select=*');
+  if (!rows || !rows.length) { pc.innerHTML = ''; return; }
+  var rejectedN = rows.filter(function (p) { return p.ml_validation_status === 'rejected'; }).length;
+  var nonRej = rows.filter(function (p) { return p.ml_validation_status !== 'rejected'; });
+  var reviewN = nonRej.filter(function (p) { return p.needs_review; }).length;
+  var obsMap = {}, skuMap = {}, photoPathById = {};
+  var oids = [];
+  rows.forEach(function (p) { if (p.observation_id) oids.push(p.observation_id); if (p.previous_observation_id) oids.push(p.previous_observation_id); });
+  oids = oids.filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+  if (oids.length) { (await supa('shop_out_observations?id=in.(' + oids.join(',') + ')&select=id,pack_size,pack_size_unit,unit_price,normalized_unit,projection_sku_id,sku_match_method,is_category_gap,front_photo_id')).forEach(function (o) { obsMap[o.id] = o; }); }
+  var fpids = rows.map(function (p) { var c = obsMap[p.observation_id]; return c && c.front_photo_id; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+  if (fpids.length) { (await supa('shop_out_photos?id=in.(' + fpids.join(',') + ')&select=id,file_path')).forEach(function (ph) { photoPathById[ph.id] = ph.file_path; }); }
+  var skuIds = rows.map(function (p) { var c = obsMap[p.observation_id]; return c && c.projection_sku_id; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+  if (skuIds.length) { (await supa('projection_skus?id=in.(' + skuIds.join(',') + ')&select=id,item_description,size_unit,proposed_sell_price,comp_retail_price,customer_margin,tbg_margin')).forEach(function (sk) { skuMap[sk.id] = sk; }); }
+  function packStr(o) { if (!o || o.pack_size == null) return '—'; return o.pack_size + (o.pack_size_unit ? (' ' + String(o.pack_size_unit).replace(/_/g, ' ')) : ''); }
+  var sObj = shopById(id), chain = esc(chainName(sObj)), storeLoc = (sObj && sObj.store_location_text) || '';
+  pcData = {};
+  var body = rows.map(function (p) {
+    var pct = Number(p.price_change_pct);
+    var changeCell;
+    if (p.needs_review) {
+      changeCell = '<div style="white-space:nowrap;min-width:74px;text-align:right;"><span style="font-size:10px;font-weight:700;background:rgba(251,191,36,0.14);color:#fbbf24;border-radius:8px;padding:2px 7px;">⚠ Needs Review</span><div style="font-size:10px;color:#fbbf24;margin-top:2px;">' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%</div></div>';
+    } else {
+      var up = pct >= 0, col = up ? '#4ade80' : '#f87171', arrow = up ? '▲' : '▼';
+      changeCell = '<div style="font-weight:700;font-size:13px;color:' + col + ';white-space:nowrap;min-width:74px;text-align:right;">' + arrow + ' ' + (up ? '+' : '') + pct.toFixed(1) + '%</div>';
+    }
+    var curr = obsMap[p.observation_id] || {}, prev = obsMap[p.previous_observation_id] || {};
+    var nu = curr.normalized_unit || p.pack_size_unit || null;
+    var newU = curr.unit_price != null ? Number(curr.unit_price) : (p.unit_price != null ? Number(p.unit_price) : null);
+    var oldU = prev.unit_price != null ? Number(prev.unit_price) : null;
+    var packLine = '<span style="color:var(--text2);">Pack:</span> ' + esc(packStr(prev)) + ' → ' + esc(packStr(Object.keys(curr).length ? curr : { pack_size: p.pack_size, pack_size_unit: p.pack_size_unit }));
+    var unitLine = (oldU != null || newU != null) ? '<span style="color:var(--text2);">Unit:</span> ' + (oldU != null ? esc(unitPriceTxt(oldU, prev.normalized_unit || nu)) : '—') + ' → <strong>' + (newU != null ? esc(unitPriceTxt(newU, nu)) : '—') + '</strong>' : '';
+    var tbgLine = '', ctxLine = '';
+    var validMatch = !!(curr.projection_sku_id && curr.sku_match_method && !curr.is_category_gap);
+    var sku = validMatch ? skuMap[curr.projection_sku_id] : null;
+    var tbg = sku ? tbgUnitPrice(sku) : null;
+    if (validMatch && tbg && newU != null && tbg.unit === nu) {
+      var better = newU > tbg.price; var tcol = better ? '#4ade80' : '#f87171';
+      tbgLine = '<span style="color:var(--text2);">vs TBG ' + esc(sku.item_description || '') + ':</span> <strong style="color:' + tcol + ';">' + esc(unitPriceTxt(tbg.price, tbg.unit)) + '</strong>';
+      var verdict = better ? 'TBG is better value' : 'Competitor is better value';
+      ctxLine = '<div style="font-size:11px;color:' + tcol + ';margin-top:2px;font-weight:600;">' + esc((p.brand || '') + ' ' + (p.product_name || '')) + ' at ' + esc(unitPriceTxt(newU, nu)) + ' vs TBG ' + esc(sku.item_description || '') + ' at ' + esc(unitPriceTxt(tbg.price, tbg.unit)) + ' — ' + verdict + '</div>';
+    }
+    var packCurr = packStr(Object.keys(curr).length ? curr : { pack_size: p.pack_size, pack_size_unit: p.pack_size_unit });
+    var rejected = p.ml_validation_status === 'rejected';
+    var strike = rejected ? 'text-decoration:line-through;opacity:0.55;' : '';
+    var detailLine = '<div style="font-size:11px;color:var(--text2);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;' + strike + '"><span>' + packLine + '</span>' + (unitLine ? '<span>' + unitLine + '</span>' : '') + (tbgLine ? '<span>' + tbgLine + '</span>' : '') + '</div>';
+    pcData[p.id] = { p: p, newU: newU, nu: nu, packCurr: packCurr, photoPath: curr.front_photo_id ? photoPathById[curr.front_photo_id] : null, sku: sku, tbg: tbg, chain: chain, storeLoc: storeLoc };
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border);">' +
+      '<div onclick="togglePcExpand(\'' + p.id + '\')" style="display:flex;gap:10px;align-items:center;cursor:pointer;">' +
+        '<div style="flex:1;min-width:0;' + strike + '"><div style="font-weight:700;font-size:13px;color:var(--text);">' + esc(p.brand || '—') + '</div><div style="font-size:12px;color:var(--text2);">' + esc(p.product_name || '') + '</div></div>' +
+        '<div style="font-size:13px;white-space:nowrap;color:var(--text2);' + strike + '">' + priceCell(p.previous_price) + ' → <strong style="color:var(--text);">' + priceCell(p.retail_price) + '</strong></div>' +
+        '<div style="' + strike + '">' + changeCell + '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px;white-space:nowrap;">' + pcValBadge(p.ml_validation_status) + '<span style="font-size:11px;color:var(--text2);">prev ' + esc(p.previous_shop_date || '—') + ' ▾</span></div>' +
+      '</div>' + detailLine + (rejected ? '' : ctxLine) + '<div id="pc-panel-' + p.id + '" style="display:none;"></div></div>';
+  }).join('');
+  var dates = []; rows.forEach(function (p) { if (p.shop_date) dates.push(p.shop_date); if (p.previous_shop_date) dates.push(p.previous_shop_date); }); dates.sort();
+  var earliest = dates.length ? dates[0] : '—', latest = dates.length ? dates[dates.length - 1] : '—';
+  var nVisits = new Set(dates).size;
+  var nProducts = new Set(rows.map(function (p) { return (p.brand || '').toLowerCase() + '|' + (p.product_name || '').toLowerCase(); })).size;
+  var confirmed = nonRej.length - reviewN;
+  pc.innerHTML = '<div style="border:1.5px solid #1d4ed8;background:var(--card-bg);border-radius:10px;padding:16px;margin-top:14px;">' +
+    '<div style="font-weight:700;font-size:13px;color:#60a5fa;margin-bottom:4px;">📈 COMPETITOR PRICE CHANGES — ' + chain + ' (' + esc(earliest) + ' → ' + esc(latest) + ')</div>' +
+    '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;">Comparing ' + nProducts + ' products across ' + nVisits + ' visits · ' + confirmed + ' confirmed · ' + reviewN + ' needs review' + (rejectedN ? ' · <span style="color:#f87171;font-weight:600;">' + rejectedN + ' rejected</span>' : '') + ' · <span style="color:#4ade80;font-weight:600;">▲ competitor up = good for TBG</span> · <span style="color:#f87171;font-weight:600;">▼ down = margin pressure</span> · <span style="color:var(--text2);">click a row to validate</span></div>' + body + '</div>';
+}
+
+// ── CHANGE 3: section intelligence with photos ──
+function secFlagBadge(flag) {
+  if (flag === 'correct') return '<span style="font-size:10px;font-weight:700;background:rgba(74,222,128,0.14);color:#4ade80;border-radius:8px;padding:2px 7px;">✓ AI correct</span>';
+  if (flag === 'close') return '<span style="font-size:10px;font-weight:700;background:rgba(251,191,36,0.14);color:#fbbf24;border-radius:8px;padding:2px 7px;">~ AI close</span>';
+  if (flag === 'missed') return '<span style="font-size:10px;font-weight:700;background:rgba(248,113,113,0.14);color:#f87171;border-radius:8px;padding:2px 7px;">✗ AI missed</span>';
+  return '';
+}
+function secFlagGroup(id, flag) {
+  function btn(val, label) {
+    var active = flag === val;
+    var bg = active ? (val === 'correct' ? '#166534' : (val === 'close' ? '#92660a' : '#991b1b')) : 'var(--card-bg)';
+    var col = active ? 'rgb(255,255,255)' : 'var(--text2)';
+    return '<button onclick="setSectionFlag(\'' + id + '\',\'' + val + '\')" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-family:inherit;font-weight:600;background:' + bg + ';color:' + col + ';">' + label + '</button>';
+  }
+  return btn('correct', '✓ AI correct') + btn('close', '~ AI close') + btn('missed', '✗ AI missed');
+}
+async function patchSection(id, patch) {
+  patch.updated_at = new Date().toISOString();
+  try {
+    var r = await fetch(SUPA_URL + '/rest/v1/shop_out_sections?id=eq.' + id, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JS(patch) });
+    if (!r.ok) return false;
+    var rows = await r.json();
+    return Array.isArray(rows) && rows.length > 0;
+  } catch (e) { return false; }
+}
+function flashSecSaved(elId) { var el = g(elId); if (!el) return; el.style.display = 'inline'; setTimeout(function () { el.style.display = 'none'; }, 1500); }
+async function saveSectionComment(id) { var ta = g('sec-com-' + id); if (!ta) return; if (await patchSection(id, { section_comment: ta.value.trim() || null })) flashSecSaved('sec-com-ok-' + id); else alert('Could not save comment.'); }
+async function saveSectionCategory(id) {
+  var inp = g('sec-catin-' + id); if (!inp) return; var val = inp.value.trim();
+  if (!(await patchSection(id, { category_override: val || null }))) { alert('Could not save category.'); return; }
+  var disp = g('sec-catd-' + id), ai = g('sec-catai-' + id); var aiCat = disp ? (disp.getAttribute('data-ai') || '') : '';
+  if (disp) disp.textContent = val || aiCat || 'Uncategorized';
+  if (ai) { if (val) { ai.textContent = 'AI: ' + aiCat; ai.style.display = 'block'; } else { ai.style.display = 'none'; } }
+  flashSecSaved('sec-catok-' + id);
+}
+async function setSectionFlag(id, val) {
+  var cur = secFlagState[id] || ''; var next = (cur === val) ? null : val;
+  if (!(await patchSection(id, { ai_accuracy_flag: next }))) { alert('Could not save flag.'); return; }
+  secFlagState[id] = next || '';
+  var grp = g('sec-flag-' + id); if (grp) grp.innerHTML = secFlagGroup(id, next || '');
+  var bdg = g('sec-flagb-' + id); if (bdg) bdg.innerHTML = secFlagBadge(next || '');
+}
+async function loadSections(id) {
+  var c = g('sections-container'); if (!c) return;
+  var secs = await supa('shop_out_sections?shop_out_id=eq.' + id + '&order=sequence_number.asc&select=*');
+  if (!secs.length) { c.innerHTML = '<div style="color:var(--text2);font-size:12px;">No section (wide-angle shelf) photos detected.</div>'; return; }
+  var pathById = {};
+  var photoIds = secs.map(function (s) { return s.section_photo_id; }).filter(Boolean);
+  if (photoIds.length) { var uniq = photoIds.filter(function (v, i, a) { return a.indexOf(v) === i; }); (await supa('shop_out_photos?id=in.(' + uniq.join(',') + ')&select=id,file_path')).forEach(function (p) { pathById[p.id] = p.file_path; }); }
+  await signPhotos(Object.values(pathById));
+  var html = secs.map(function (s, i) {
+    var conf = s.ai_confidence != null ? Number(s.ai_confidence) : null;
+    var confBadge = conf != null ? '<span style="font-size:10px;font-weight:700;border-radius:8px;padding:2px 7px;' + (conf >= 0.75 ? 'background:rgba(74,222,128,0.14);color:#4ade80;' : (conf >= 0.5 ? 'background:rgba(251,191,36,0.14);color:#fbbf24;' : 'background:rgba(248,113,113,0.14);color:#f87171;')) + '">' + (conf * 100).toFixed(0) + '% conf</span>' : '';
+    var lf = s.estimated_linear_feet != null ? Number(s.estimated_linear_feet) : null;
+    var thumbId = 'sec-thumb-' + s.id; var path = pathById[s.section_photo_id]; var src = path ? photoSrc(path) : '';
+    var brands = Array.isArray(s.brand_summary) ? s.brand_summary : [];
+    var brandTable;
+    if (brands.length > 0) {
+      brandTable = '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px;color:var(--text);"><thead><tr style="text-align:left;color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:0.04em;"><th style="padding:4px 6px;">Brand</th><th style="padding:4px 6px;">Product Type</th><th style="padding:4px 6px;text-align:right;">Facings</th><th style="padding:4px 6px;text-align:right;">SKUs</th><th style="padding:4px 6px;">Notes</th></tr></thead><tbody>' +
+        brands.map(function (b) { return '<tr style="border-top:1px solid var(--border);"><td style="padding:4px 6px;font-weight:600;">' + esc(b.brand_name || b.brand || '—') + '</td><td style="padding:4px 6px;color:var(--text2);">' + esc(b.product_type || '—') + '</td><td style="padding:4px 6px;text-align:right;">' + (b.facing_count != null ? esc(String(b.facing_count)) : '—') + '</td><td style="padding:4px 6px;text-align:right;">' + (b.distinct_skus_visible != null ? esc(String(b.distinct_skus_visible)) : '—') + '</td><td style="padding:4px 6px;color:var(--text2);">' + esc(b.notes || '—') + '</td></tr>'; }).join('') + '</tbody></table>';
+    } else { brandTable = '<div style="font-size:12px;color:var(--text2);margin-top:8px;">No brands captured.</div>'; }
+    var cat = s.category_detected || 'Uncategorized'; var override = s.category_override || ''; var displayCat = override || cat;
+    var flag = s.ai_accuracy_flag || ''; var comment = s.section_comment || '';
+    return '<div style="display:flex;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="flex-shrink:0;width:120px;height:120px;border-radius:8px;overflow:hidden;background:var(--bg2);">' +
+        '<img id="' + thumbId + '"' + (src ? ' src="' + esc(src) + '" onclick="openLightbox([\'' + esc(src) + '\'],0)" style="cursor:zoom-in;' : ' style="') + 'width:120px;height:120px;object-fit:cover;display:block;" /></div>' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">' +
+          '<div style="min-width:0;">' +
+            '<div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.04em;">Section #' + (i + 1) + (s.department ? ' · ' + esc(s.department) : '') + '</div>' +
+            '<div id="sec-catd-' + s.id + '" data-ai="' + esc(cat) + '" style="font-weight:700;font-size:15px;margin-top:2px;color:var(--text);">' + esc(displayCat) + '</div>' +
+            '<div id="sec-catai-' + s.id + '" style="font-size:11px;color:var(--text2);' + (override ? '' : 'display:none;') + '">AI: ' + esc(cat) + '</div>' +
+            '<div style="margin-top:4px;"><input id="sec-catin-' + s.id + '" value="' + esc(override) + '" placeholder="Override category…" onblur="saveSectionCategory(\'' + s.id + '\')" style="font-size:12px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;width:170px;max-width:100%;background:var(--input-bg);color:var(--text);" /> <span id="sec-catok-' + s.id + '" style="display:none;font-size:11px;color:#4ade80;font-weight:600;">✓ saved</span></div>' +
+            '<div style="font-size:12px;color:var(--text2);margin-top:4px;">' + (lf != null ? '≈ ' + lf + ' linear ft' : 'linear ft unknown') + '</div>' +
+            '<div id="sec-flag-' + s.id + '" style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">' + secFlagGroup(s.id, flag) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">' + confBadge + '<span id="sec-flagb-' + s.id + '">' + secFlagBadge(flag) + '</span></div>' +
+        '</div>' + brandTable +
+        '<div style="margin-top:10px;"><textarea id="sec-com-' + s.id + '" onblur="saveSectionComment(\'' + s.id + '\')" placeholder="Add notes (e.g. shelf header says K Beauty, clearance end cap, bottom shelf obscured)" style="width:100%;box-sizing:border-box;min-height:46px;padding:7px 9px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;resize:vertical;background:var(--input-bg);color:var(--text);">' + esc(comment) + '</textarea> <span id="sec-com-ok-' + s.id + '" style="display:none;font-size:11px;color:#4ade80;font-weight:600;">✓ saved</span></div>' +
+      '</div></div>';
+  }).join('');
+  var totalLF = 0, capturedBrands = {}, uncapturedSkus = 0; var UNCAP = /unidentified|generic|unknown/i;
+  secs.forEach(function (s) {
+    if (s.estimated_linear_feet != null && !isNaN(Number(s.estimated_linear_feet))) totalLF += Number(s.estimated_linear_feet);
+    (Array.isArray(s.brand_summary) ? s.brand_summary : []).forEach(function (b) { var name = (b.brand_name || b.brand || '').trim(); if (!name) return; if (UNCAP.test(name)) { uncapturedSkus += (b.distinct_skus_visible != null && !isNaN(Number(b.distinct_skus_visible))) ? Number(b.distinct_skus_visible) : 0; } else { capturedBrands[name.toLowerCase()] = true; } });
+  });
+  html += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:18px;flex-wrap:wrap;">' +
+    '<div><div class="dstat-l">Est. Linear Feet</div><div class="dstat-v">≈ ' + (Math.round(totalLF * 10) / 10) + ' ft</div></div>' +
+    '<div><div class="dstat-l">Sections</div><div class="dstat-v">' + secs.length + '</div></div>' +
+    '<div><div class="dstat-l">Brands Captured</div><div class="dstat-v">' + Object.keys(capturedBrands).length + '</div></div>' +
+    '<div><div class="dstat-l">Est. Uncaptured SKUs</div><div class="dstat-v">' + uncapturedSkus + '</div></div></div>';
+  c.innerHTML = html;
+  secs.forEach(function (s) { secFlagState[s.id] = s.ai_accuracy_flag || ''; });
+}
 
 const LOADERS = { crosssource: loadCrosssource, shopout: loadShops, factory: loadFactory, brandwatch: loadBrandwatch, catalog: loadCatalog, retailer: loadRetailer, social: loadSocial, news: loadNews, trade: loadTrade, fx: loadFx };
 
