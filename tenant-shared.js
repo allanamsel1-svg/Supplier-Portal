@@ -98,7 +98,7 @@ function renderHeader(user) {
 const TENANT_NAV = [
   { section: 'Overview', items: [
     { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html' },
-    { icon: '💰', label: 'Financials', href: 'financials.html' },
+    { icon: '💰', label: 'Financials', href: 'tenant-financials.html' },
     { icon: '🧠', label: 'Intel', href: 'tenant-intel.html' },
   ]},
   { section: 'Operations', items: [
@@ -111,7 +111,7 @@ const TENANT_NAV = [
   { section: 'Factories', items: [
     { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html' },
     { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending' },
-    { icon: '📇', label: 'Card Scanner', href: 'scanner.html' },
+    { icon: '📇', label: 'Card Scanner', href: 'tenant-factories.html#scanner' },
     { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews' },
     { icon: '✉️', label: 'Invitations', href: 'tenant-factories.html#invitations' },
     { icon: '📌', label: 'RFQ Follow-ups', href: 'tenant-factories.html#followups' },
@@ -120,7 +120,7 @@ const TENANT_NAV = [
   ]},
   { section: 'Communications', items: [
     { icon: '💬', label: 'Messages', href: 'tenant-communications.html' },
-    { icon: '🎥', label: 'Zoom', href: 'zoom.html' },
+    { icon: '🎥', label: 'Zoom', href: 'tenant-communications.html#zoom' },
     { icon: '👤', label: 'Allan', href: 'tenant-communications.html?tab=allan' },
     { icon: '🔎', label: 'Sourcing', href: 'tenant-communications.html?tab=sourcing' },
     { icon: '🛒', label: 'Sales', href: 'tenant-communications.html?tab=sales' },

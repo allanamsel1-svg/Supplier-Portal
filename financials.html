@@ -4,15 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Financials — Supplier Portal</title>
-<link rel="stylesheet" href="tenant-portal.css">
-<script>
-  (function(){
-    var theme = localStorage.getItem('tenant_theme') || 'dark';
-    if(theme === 'light') document.documentElement.classList.add('light-mode');
-    else document.documentElement.classList.remove('light-mode');
-  })();
-</script>
-<script src="tenant-theme-sync.js"></script>
 <link rel="stylesheet" href="ri_shared.css">
 <style>
   /* Admin login gate (matches admin.html / communications.html / zoom.html / mercury.html) */
@@ -382,7 +373,6 @@ function togglePw(inputId,btnId){
 }
 (async function(){
   // Tenant session → allow straight in (no admin login needed).
-  if(localStorage.getItem('tenant_token')){ enter(); return; }
   var tok=localStorage.getItem('admin_session'); if(!tok)return;
   try{
     var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});

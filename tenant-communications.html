@@ -77,6 +77,9 @@ let current = 'all';
 let activeThread = null;
 
 function tabFromUrl() {
+  // Support both #hash (e.g. sidebar Zoom → #zoom) and ?tab= (dept mailboxes).
+  const h = (location.hash || '').replace('#', '');
+  if (TABS.includes(h)) return h;
   const t = new URLSearchParams(location.search).get('tab');
   return TABS.includes(t) ? t : 'all';
 }
@@ -172,6 +175,7 @@ async function openThread(id) {
   document.getElementById('pageSub').textContent = user.tenant.name + ' · email inbox';
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  window.addEventListener('hashchange', () => showTab(tabFromUrl()));  // sidebar #zoom etc.
 
   await loadThreads();
   showTab(tabFromUrl());

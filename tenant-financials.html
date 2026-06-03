@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financials — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .mc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .mc-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .mc-acct { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; }
+  .mc-num { font-size: 11px; color: var(--text2); margin-left: auto; font-weight: 400; }
+  .mc-bal { font-size: 24px; font-weight: 700; color: var(--text); margin: 8px 0 2px; }
+  .mc-avail { font-size: 11.5px; color: var(--text2); }
+  .mc-tag { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #4ade80; border: 1px solid #166534; background: rgba(74,222,128,0.12); border-radius: 7px; padding: 1px 6px; }
+  .amt { font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .amt.credit { color: #4ade80; } .amt.debit { color: #f87171; }
+  .summary-card { display: inline-flex; flex-direction: column; gap: 2px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin-right: 14px; margin-bottom: 14px; }
+  .summary-card .sc-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+  .summary-card .sc-val { font-size: 22px; font-weight: 700; color: var(--text); }
+  .sec-h { font-size: 13px; font-weight: 600; color: var(--text); margin: 6px 0 10px; }
+  iframe.fin-frame { width: 100%; height: calc(100vh - 200px); min-height: 520px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg2); }
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Financials</div>
+    <div class="page-sub" id="pageSub">Banking, API costs &amp; projections</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="banking">Banking</button>
+    <button class="tab" data-tab="api">API Costs</button>
+    <button class="tab" data-tab="projections">Projections</button>
+  </div>
+
+  <!-- Banking -->
+  <div class="tab-pane" id="pane-banking">
+    <div class="mc-cards" id="mcCards"><div class="loading">Loading accounts…</div></div>
+    <div class="toolbar">
+      <select class="filter-select" id="mcAccount"></select>
+      <select class="filter-select" id="mcType">
+        <option value="all">All</option><option value="credit">Credits</option><option value="debit">Debits</option>
+      </select>
+      <input class="search-input" id="mcSearch" placeholder="Search description or counterparty…">
+    </div>
+    <div id="mcTxWrap">
+      <table class="data-table"><thead><tr><th>Date</th><th>Description</th><th>Counterparty</th><th style="text-align:right;">Amount</th></tr></thead>
+      <tbody id="mcTxBody"><tr><td colspan="4" class="empty" style="padding:20px;">Select an account.</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <!-- API Costs -->
+  <div class="tab-pane" id="pane-api">
+    <div id="apiMonthCards"></div>
+    <div class="sec-h">Monthly Summary</div>
+    <table class="data-table" style="margin-bottom:24px;"><thead><tr>
+      <th>Month</th><th>Service</th><th>Feature</th><th style="text-align:right;">Calls</th>
+      <th style="text-align:right;">Tokens In</th><th style="text-align:right;">Tokens Out</th>
+      <th style="text-align:right;">Actual</th><th style="text-align:right;">Your Cost</th>
+    </tr></thead><tbody id="apiSummaryBody"><tr><td colspan="8" class="empty" style="padding:20px;">Loading…</td></tr></tbody></table>
+    <div class="sec-h">Recent Calls (last 50)</div>
+    <table class="data-table"><thead><tr>
+      <th>Date / Time</th><th>Service</th><th>Feature</th><th style="text-align:right;">Tokens In</th><th style="text-align:right;">Tokens Out</th><th style="text-align:right;">Cost</th>
+    </tr></thead><tbody id="apiCallsBody"><tr><td colspan="6" class="empty" style="padding:20px;">Loading…</td></tr></tbody></table>
+  </div>
+
+  <!-- Projections -->
+  <div class="tab-pane" id="pane-projections">
+    <iframe class="fin-frame" id="projFrame" title="Projections" data-src="projections.html"></iframe>
+  </div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+const TABS = ['banking', 'api', 'projections'];
+const MARKUP = 1.50;
+let TID = null;
+let accounts = [], txns = [];
+const loaded = {};
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'banking';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (tab === 'banking' && !loaded.banking) { loaded.banking = true; loadBanking(); }
+  if (tab === 'api' && !loaded.api) { loaded.api = true; loadApiCosts(); }
+  if (tab === 'projections') { const fr = document.getElementById('projFrame'); if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src; }
+}
+function goTab(tab) { location.hash = tab === 'banking' ? '' : '#' + tab; }
+
+// ── Banking (Mercury) ──
+async function loadBanking() {
+  const cards = document.getElementById('mcCards');
+  try {
+    const r = await fetch('/api/mercury?action=accounts');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    accounts = d.accounts || [];
+  } catch (e) { cards.innerHTML = '<div class="empty">Could not load Mercury accounts: ' + esc(e.message) + '</div>'; return; }
+  if (!accounts.length) { cards.innerHTML = '<div class="empty">No accounts found.</div>'; return; }
+  cards.innerHTML = accounts.map(a => `<div class="mc-card">
+    <div class="mc-acct">${esc(a.name)}${a.status ? ' <span class="mc-tag">' + esc(a.status) + '</span>' : ''}${a.accountNumber ? '<span class="mc-num">' + esc(a.accountNumber) + '</span>' : ''}</div>
+    <div class="mc-bal">${money(a.currentBalance)}</div>
+    <div class="mc-avail">Available: ${money(a.availableBalance)} · ${esc(a.currency || 'USD')}</div>
+  </div>`).join('');
+  document.getElementById('mcAccount').innerHTML = accounts.map(a => `<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');
+  await loadTx();
+}
+async function loadTx() {
+  const accountId = document.getElementById('mcAccount').value;
+  const body = document.getElementById('mcTxBody');
+  if (!accountId) { txns = []; renderTx(); return; }
+  body.innerHTML = '<tr><td colspan="4" class="empty" style="padding:20px;">Loading transactions…</td></tr>';
+  try {
+    const r = await fetch('/api/mercury?action=transactions&accountId=' + encodeURIComponent(accountId) + '&limit=50');
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    txns = d.transactions || [];
+  } catch (e) { body.innerHTML = '<tr><td colspan="4" class="empty" style="padding:20px;">Could not load transactions.</td></tr>'; return; }
+  renderTx();
+}
+function renderTx() {
+  const type = document.getElementById('mcType').value;
+  const q = (document.getElementById('mcSearch').value || '').toLowerCase().trim();
+  let rows = txns.filter(t => {
+    if (type !== 'all' && t.direction !== type) return false;
+    if (q && !((t.description || '').toLowerCase().includes(q) || (t.counterparty_name || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  const body = document.getElementById('mcTxBody');
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="4" class="empty" style="padding:20px;">No transactions match.</td></tr>'; return; }
+  body.innerHTML = rows.map(t => {
+    const cls = t.direction === 'credit' ? 'credit' : 'debit';
+    const sign = t.direction === 'credit' ? '+' : '';
+    return `<tr><td>${fmtDate(t.posted_at || t.created_at)}</td><td>${esc(t.description || '')}</td>
+      <td>${esc(t.counterparty_name || '—')}</td><td style="text-align:right;"><span class="amt ${cls}">${sign}${money(Math.abs(Number(t.amount) || 0))}</span></td></tr>`;
+  }).join('');
+}
+
+// ── API Costs (api_cost_log, tenant-scoped, ×1.5 markup) ──
+function monthLabel(ym) { const d = new Date(ym + '-01T00:00:00'); return isNaN(d) ? ym : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }); }
+async function loadApiCosts() {
+  const all = await supa(`api_cost_log?tenant_id=eq.${TID}&select=service,feature,cost_usd,tokens_in,tokens_out,created_at`);
+  const recent = await supa(`api_cost_log?tenant_id=eq.${TID}&order=created_at.desc&limit=50&select=created_at,service,feature,tokens_in,tokens_out,cost_usd`);
+  const now = new Date(), ym = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  let mCalls = 0, mTokens = 0, mCost = 0;
+  all.forEach(r => { if ((r.created_at || '').slice(0, 7) === ym) { mCalls++; mTokens += (Number(r.tokens_in) || 0) + (Number(r.tokens_out) || 0); mCost += (Number(r.cost_usd) || 0) * MARKUP; } });
+  document.getElementById('apiMonthCards').innerHTML =
+    `<div class="summary-card"><span class="sc-label">This Month — Calls</span><span class="sc-val">${mCalls.toLocaleString()}</span></div>` +
+    `<div class="summary-card"><span class="sc-label">This Month — Tokens</span><span class="sc-val">${mTokens.toLocaleString()}</span></div>` +
+    `<div class="summary-card"><span class="sc-label">This Month — Your Cost</span><span class="sc-val">${money(mCost)}</span></div>`;
+  // monthly summary grouped
+  const groups = {};
+  all.forEach(r => {
+    const k = (r.created_at || '').slice(0, 7) + '|' + (r.service || '—') + '|' + (r.feature || '—');
+    const g = groups[k] || (groups[k] = { month: (r.created_at || '').slice(0, 7), service: r.service || '—', feature: r.feature || '—', calls: 0, ti: 0, to: 0, cost: 0 });
+    g.calls++; g.ti += Number(r.tokens_in) || 0; g.to += Number(r.tokens_out) || 0; g.cost += Number(r.cost_usd) || 0;
+  });
+  const list = Object.values(groups).sort((a, b) => a.month < b.month ? 1 : -1);
+  const sBody = document.getElementById('apiSummaryBody');
+  if (!list.length) { sBody.innerHTML = '<tr><td colspan="8" class="empty" style="padding:20px;">No API usage recorded yet.</td></tr>'; }
+  else {
+    const tot = { calls: 0, ti: 0, to: 0, cost: 0 };
+    let h = list.map(r => { tot.calls += r.calls; tot.ti += r.ti; tot.to += r.to; tot.cost += r.cost;
+      return `<tr><td>${esc(monthLabel(r.month))}</td><td>${esc(r.service)}</td><td>${esc(r.feature)}</td>
+        <td style="text-align:right;">${r.calls.toLocaleString()}</td><td style="text-align:right;">${r.ti.toLocaleString()}</td>
+        <td style="text-align:right;">${r.to.toLocaleString()}</td><td style="text-align:right;">${money(r.cost)}</td>
+        <td style="text-align:right;font-weight:600;">${money(r.cost * MARKUP)}</td></tr>`; }).join('');
+    h += `<tr style="font-weight:700;border-top:2px solid var(--border);"><td colspan="3">Grand Total</td>
+      <td style="text-align:right;">${tot.calls.toLocaleString()}</td><td style="text-align:right;">${tot.ti.toLocaleString()}</td>
+      <td style="text-align:right;">${tot.to.toLocaleString()}</td><td style="text-align:right;">${money(tot.cost)}</td>
+      <td style="text-align:right;">${money(tot.cost * MARKUP)}</td></tr>`;
+    sBody.innerHTML = h;
+  }
+  const cBody = document.getElementById('apiCallsBody');
+  cBody.innerHTML = recent.length ? recent.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(r.service || '—')}</td><td>${esc(r.feature || '—')}</td>
+    <td style="text-align:right;">${(Number(r.tokens_in) || 0).toLocaleString()}</td><td style="text-align:right;">${(Number(r.tokens_out) || 0).toLocaleString()}</td>
+    <td style="text-align:right;">${money(Number(r.cost_usd) || 0)}</td></tr>`).join('') : '<tr><td colspan="6" class="empty" style="padding:20px;">No calls recorded yet.</td></tr>';
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · financials';
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('mcAccount').addEventListener('change', loadTx);
+  document.getElementById('mcType').addEventListener('change', renderTx);
+  document.getElementById('mcSearch').addEventListener('input', renderTx);
+  window.addEventListener('hashchange', () => showTab((location.hash || '#banking').slice(1)));
+  showTab((location.hash || '#banking').slice(1));
+})();
+</script>
+</body>
+</html>
