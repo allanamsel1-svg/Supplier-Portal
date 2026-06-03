@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RFQs — TBG Sourcing</title>
+<link rel="stylesheet" href="/tenant-portal.css">
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">RFQ &amp; Product Development</div>
+    <div class="page-sub" id="pageSub">Requests for quote and product development</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="rfq">RFQs <span class="tab-count" id="cnt-rfq"></span></button>
+    <button class="tab" data-tab="pd">Product Development <span class="tab-count" id="cnt-pd"></span></button>
+  </div>
+
+  <div class="tab-pane" id="pane-rfq">
+    <div class="toolbar">
+      <input class="search-input" id="rfqSearch" placeholder="Search RFQs by project #, description, category…">
+      <select class="filter-select" id="rfqStatus"><option value="all">All statuses</option></select>
+    </div>
+    <div id="box-rfq"><div class="loading">Loading RFQs…</div></div>
+  </div>
+
+  <div class="tab-pane" id="pane-pd">
+    <div class="toolbar">
+      <input class="search-input" id="pdSearch" placeholder="Search product development…">
+    </div>
+    <div id="box-pd"><div class="loading">Loading product development…</div></div>
+  </div>
+</div>
+
+<div class="panel-overlay" id="panelOverlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-head">
+    <div><h2 id="panelTitle"></h2><div class="sub" id="panelSub"></div></div>
+    <button class="panel-close" id="panelCloseBtn">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script src="/tenant-shared.js"></script>
+<script>
+const TABS = ['rfq', 'pd'];
+let TID = null;
+let rfqs = [], pds = [];
+const loaded = {};
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'rfq';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (tab === 'pd' && !loaded.pd) { loaded.pd = true; loadPD(); }
+}
+function goTab(tab) { location.hash = tab === 'rfq' ? '' : '#' + tab; }
+
+// ── RFQs ──
+async function loadRFQs() {
+  rfqs = await supa(`rfqs?tenant_id=eq.${TID}&order=created_at.desc&select=*,rfq_factory_assignments(count)`);
+  document.getElementById('cnt-rfq').textContent = rfqs.length;
+  const statuses = Array.from(new Set(rfqs.map(r => r.status).filter(Boolean))).sort();
+  const sel = document.getElementById('rfqStatus');
+  statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
+  renderRFQs();
+}
+
+function rfqTitle(r) { return [r.project_number, r.item_description].filter(Boolean).join(' — ') || 'Untitled RFQ'; }
+function asgCount(r) { const a = r.rfq_factory_assignments; return (Array.isArray(a) && a[0] && a[0].count) || 0; }
+
+function renderRFQs() {
+  const q = (document.getElementById('rfqSearch').value || '').toLowerCase().trim();
+  const st = document.getElementById('rfqStatus').value;
+  let rows = rfqs.slice();
+  if (st !== 'all') rows = rows.filter(r => r.status === st);
+  if (q) rows = rows.filter(r => [r.project_number, r.item_description, r.category, r.sub_category]
+    .some(v => (v || '').toLowerCase().includes(q)));
+  const box = document.getElementById('box-rfq');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📋</span>No RFQs found.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Project</th><th>Description</th><th>Category</th><th>Status</th><th>Factories</th><th>Created</th></tr></thead><tbody>${
+    rows.map(r => `<tr class="clickable" data-id="${esc(r.id)}">
+      <td>${esc(r.project_number || '—')}</td><td>${esc(r.item_description || '—')}</td>
+      <td>${esc([r.category, r.sub_category].filter(Boolean).join(' › ') || '—')}</td>
+      <td>${statusBadge(r.status)}</td><td>${asgCount(r)}</td><td>${fmtDate(r.created_at)}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openRFQ(tr.dataset.id)));
+}
+
+async function openRFQ(id) {
+  const r = rfqs.find(x => x.id === id);
+  if (!r) return;
+  openPanel(rfqTitle(r), [r.category, r.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
+
+  const [assignments, quotes] = await Promise.all([
+    supa(`rfq_factory_assignments?rfq_id=eq.${id}&select=*,factories(factory_name_english)&order=sent_at.desc`),
+    supa(`rfq_quotes?rfq_id=eq.${id}&select=id,quote_option,status,total_fob_price,unit_fob_price,score_overall_v2,score_tier,compliance_status,factory_model_number&order=score_overall_v2.desc.nullslast`),
+  ]);
+
+  const details = kv([
+    ['Project #', r.project_number],
+    ['Status', statusBadge(r.status), true],
+    ['Category', [r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' › ')],
+    ['Quantity', r.quote_quantity != null ? Number(r.quote_quantity).toLocaleString() : null],
+    ['Target retail', r.target_retail_price ? money(r.target_retail_price) : null],
+    ['Target wholesale', r.target_wholesale_price ? money(r.target_wholesale_price) : null],
+    ['Max FOB', r.max_fob_price ? money(r.max_fob_price) : null],
+    ['Target gross margin', r.target_gross_margin_pct != null ? pct(r.target_gross_margin_pct) : null],
+    ['Est. landed cost', r.est_landed_cost ? money(r.est_landed_cost) : null],
+    ['FOB port', r.fob_port],
+    ['Prop 65 strategy', r.prop65_strategy],
+    ['Created', fmtDate(r.created_at)],
+  ]);
+
+  const spec = (r.detailed_specifications || r.item_description)
+    ? `<div class="sub-item"><div class="si-meta" style="white-space:pre-wrap;color:#cbd5e1;">${esc(r.detailed_specifications || r.item_description)}</div></div>`
+    : '<div class="empty" style="padding:12px;">No specification text.</div>';
+
+  const asgItems = assignments.length ? assignments.map(a => `<div class="sub-item">
+      <div class="si-title">${esc(a.factories && a.factories.factory_name_english || 'Factory')}</div>
+      <div class="si-meta">${statusBadge(a.status)} · sent ${fmtDate(a.sent_at)}${a.quoted_at ? ' · quoted ' + fmtDate(a.quoted_at) : ''}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No factory assignments.</div>';
+
+  const quoteItems = quotes.length ? quotes.map(qt => `<div class="sub-item">
+      <div class="si-title">${esc(qt.factory_model_number || ('Option ' + (qt.quote_option || '')))} ${qt.score_tier ? '· ' + esc(qt.score_tier) : ''}</div>
+      <div class="si-meta">${[
+        qt.status && 'status: ' + qt.status,
+        qt.total_fob_price != null && 'FOB ' + money(qt.total_fob_price),
+        qt.score_overall_v2 != null && 'score ' + qt.score_overall_v2,
+        qt.compliance_status && 'compliance: ' + qt.compliance_status,
+      ].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No quotes received.</div>';
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section"><h3>RFQ Details</h3>${details}</div>
+    <div class="panel-section"><h3>Specifications</h3><div class="sub-list">${spec}</div></div>
+    <div class="panel-section"><h3>Factory Assignments (${assignments.length})</h3><div class="sub-list">${asgItems}</div></div>
+    <div class="panel-section"><h3>Quotes Received (${quotes.length})</h3><div class="sub-list">${quoteItems}</div></div>
+  `;
+}
+
+// ── Product Development ──
+async function loadPD() {
+  pds = await supa(`product_development?tenant_id=eq.${TID}&order=created_at.desc&select=*,skus!product_development_sku_id_fkey(model_number,description)`);
+  document.getElementById('cnt-pd').textContent = pds.length;
+  renderPD();
+}
+function pdTitle(p) { return [p.pd_number, p.item_description || p.item_number].filter(Boolean).join(' — ') || 'PD item'; }
+function renderPD() {
+  const q = (document.getElementById('pdSearch').value || '').toLowerCase().trim();
+  let rows = pds.slice();
+  if (q) rows = rows.filter(p => [p.pd_number, p.item_description, p.item_number, p.category]
+    .some(v => (v || '').toLowerCase().includes(q)));
+  const box = document.getElementById('box-pd');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🧪</span>No product development records.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>PD #</th><th>Item</th><th>Category</th><th>SKU</th><th>Status</th><th>Created</th></tr></thead><tbody>${
+    rows.map(p => `<tr class="clickable" data-id="${esc(p.id)}">
+      <td>${esc(p.pd_number || '—')}</td><td>${esc(p.item_description || p.item_number || '—')}</td>
+      <td>${esc(p.category || '—')}</td><td>${esc(p.skus ? (p.skus.model_number || '') : '—')}</td>
+      <td>${statusBadge(p.status || p.sku_lifecycle_status)}</td><td>${fmtDate(p.created_at)}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openPD(tr.dataset.id)));
+}
+
+async function openPD(id) {
+  const p = pds.find(x => x.id === id);
+  if (!p) return;
+  openPanel(pdTitle(p), [p.category, p.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
+  const items = await supa(`product_development_items?product_development_id=eq.${id}&order=created_at.desc`);
+
+  const details = kv([
+    ['PD #', p.pd_number],
+    ['Item #', p.item_number],
+    ['Status', statusBadge(p.status || p.sku_lifecycle_status), true],
+    ['Lifecycle', p.sku_lifecycle_status],
+    ['Gates', p.gates_status],
+    ['Category', p.category],
+    ['Color', p.color_name],
+    ['Linked SKU', p.skus ? esc(p.skus.model_number || '') + (p.skus.description ? ' — ' + esc(p.skus.description) : '') : null, true],
+    ['FOB price', p.fob_price ? money(p.fob_price) : null],
+    ['Target retail', p.target_retail_price ? money(p.target_retail_price) : null],
+    ['Wholesale', p.wholesale_price ? money(p.wholesale_price) : null],
+    ['Created', fmtDate(p.created_at)],
+  ]);
+
+  const desc = (p.detailed_description || p.item_description)
+    ? `<div class="sub-item"><div class="si-meta" style="white-space:pre-wrap;color:#cbd5e1;">${esc(p.detailed_description || p.item_description)}</div></div>`
+    : '<div class="empty" style="padding:12px;">No description.</div>';
+
+  const itemRows = items.length ? items.map(it => `<div class="sub-item">
+      <div class="si-title">Version ${esc(it.current_version || '—')} · ${statusBadge(it.status)}</div>
+      <div class="si-meta">${[
+        it.accepted_at && 'accepted ' + fmtDate(it.accepted_at),
+        it.approved_at && 'approved ' + fmtDate(it.approved_at),
+        it.master_case_pack_units && 'master pack ' + it.master_case_pack_units,
+        it.cartons_confirmed_at && 'cartons confirmed',
+      ].filter(Boolean).map(esc).join(' · ') || 'In progress'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No development items / samples.</div>';
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section"><h3>Details</h3>${details}</div>
+    <div class="panel-section"><h3>Description</h3><div class="sub-list">${desc}</div></div>
+    <div class="panel-section"><h3>Items &amp; Sample Status (${items.length})</h3><div class="sub-list">${itemRows}</div></div>
+  `;
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · RFQs and product development';
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('rfqSearch').addEventListener('input', renderRFQs);
+  document.getElementById('rfqStatus').addEventListener('change', renderRFQs);
+  document.getElementById('pdSearch').addEventListener('input', renderPD);
+  document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
+  document.getElementById('panelOverlay').addEventListener('click', closePanel);
+  window.addEventListener('hashchange', () => showTab((location.hash || '#rfq').slice(1)));
+
+  await loadRFQs();
+  showTab((location.hash || '#rfq').slice(1));
+})();
+</script>
+</body>
+</html>

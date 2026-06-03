@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factories — TBG Sourcing</title>
+<link rel="stylesheet" href="/tenant-portal.css">
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Factories</div>
+    <div class="page-sub" id="pageSub">Manage your factory network</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="all">All Factories <span class="tab-count" id="cnt-all"></span></button>
+    <button class="tab" data-tab="pending">Pending <span class="tab-count" id="cnt-pending"></span></button>
+    <button class="tab" data-tab="reviews">Pending Reviews <span class="tab-count" id="cnt-reviews"></span></button>
+    <button class="tab" data-tab="invitations">Invitations <span class="tab-count" id="cnt-invitations"></span></button>
+    <button class="tab" data-tab="followups">RFQ Follow-ups <span class="tab-count" id="cnt-followups"></span></button>
+    <button class="tab" data-tab="compliance">Compliance Alerts <span class="tab-count" id="cnt-compliance"></span></button>
+  </div>
+
+  <!-- ALL / PENDING share the toolbar + grid -->
+  <div class="tab-pane" id="pane-all">
+    <div class="toolbar">
+      <input class="search-input" id="facSearch" placeholder="Search factories by name, city, country…">
+      <select class="filter-select" id="facStatus">
+        <option value="all">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+      </select>
+    </div>
+    <div class="cards-grid" id="grid-all"><div class="loading">Loading factories…</div></div>
+  </div>
+
+  <div class="tab-pane" id="pane-pending">
+    <div class="cards-grid" id="grid-pending"><div class="loading">Loading…</div></div>
+  </div>
+
+  <div class="tab-pane" id="pane-reviews"><div id="box-reviews"><div class="loading">Loading reviews…</div></div></div>
+  <div class="tab-pane" id="pane-invitations"><div id="box-invitations"><div class="loading">Loading invitations…</div></div></div>
+  <div class="tab-pane" id="pane-followups"><div id="box-followups"><div class="loading">Loading follow-ups…</div></div></div>
+  <div class="tab-pane" id="pane-compliance"><div id="box-compliance"><div class="loading">Loading alerts…</div></div></div>
+</div>
+
+<!-- Detail panel -->
+<div class="panel-overlay" id="panelOverlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-head">
+    <div><h2 id="panelTitle"></h2><div class="sub" id="panelSub"></div></div>
+    <button class="panel-close" id="panelCloseBtn">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script src="/tenant-shared.js"></script>
+<script>
+const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance'];
+let TID = null;
+let factories = [];
+const loaded = {};   // lazy-load guard per tab
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'all';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  loadTab(tab);
+}
+
+function goTab(tab) { location.hash = tab === 'all' ? '' : '#' + tab; }
+
+async function loadTab(tab) {
+  if (tab === 'all' || tab === 'pending') { renderFactoryGrid(tab); return; }
+  if (loaded[tab]) return;
+  loaded[tab] = true;
+  if (tab === 'reviews') return loadReviews();
+  if (tab === 'invitations') return loadInvitations();
+  if (tab === 'followups') return loadFollowups();
+  if (tab === 'compliance') return loadCompliance();
+}
+
+// ── Factories (All + Pending) ──
+async function loadFactories() {
+  factories = await supa(`factories?tenant_id=eq.${TID}&order=factory_name_english.asc&select=*,factory_categories(category,sub_category,sub_sub_category,is_primary),factory_certifications(certification_name,expiry_date,issued_by,certificate_number,issue_date)`);
+  document.getElementById('cnt-all').textContent = factories.length;
+  document.getElementById('cnt-pending').textContent = factories.filter(f => (f.status || '').toLowerCase() === 'pending').length;
+  renderFactoryGrid('all');
+  renderFactoryGrid('pending');
+}
+
+function factoryCats(f) {
+  const fromJoin = (f.factory_categories || []).map(c => c.sub_category || c.category).filter(Boolean);
+  const fromCol = Array.isArray(f.product_categories) ? f.product_categories : [];
+  return Array.from(new Set([...fromJoin, ...fromCol]));
+}
+
+function renderFactoryGrid(tab) {
+  const grid = document.getElementById('grid-' + tab);
+  let rows = factories.slice();
+  if (tab === 'pending') rows = rows.filter(f => (f.status || '').toLowerCase() === 'pending');
+
+  if (tab === 'all') {
+    const q = (document.getElementById('facSearch').value || '').toLowerCase().trim();
+    const st = document.getElementById('facStatus').value;
+    if (st !== 'all') rows = rows.filter(f => (f.status || '').toLowerCase() === st);
+    if (q) rows = rows.filter(f => [f.factory_name_english, f.city, f.country, f.state_province]
+      .some(v => (v || '').toLowerCase().includes(q)));
+  }
+
+  if (!rows.length) {
+    grid.innerHTML = '<div class="empty"><span class="empty-icon">🏭</span>No factories found.</div>';
+    return;
+  }
+  grid.innerHTML = rows.map(f => {
+    const cats = factoryCats(f);
+    const certs = (f.factory_certifications || []).length || (Array.isArray(f.certifications) ? f.certifications.length : 0);
+    const loc = [f.city, f.country].filter(Boolean).join(', ') || '—';
+    return `<div class="card" data-id="${esc(f.id)}">
+      <div class="card-title">${esc(f.factory_name_english || 'Unnamed factory')}</div>
+      <div class="card-meta">📍 ${esc(loc)}</div>
+      <div>${statusBadge(f.status)}</div>
+      <div class="card-row">${cats.slice(0, 4).map(c => `<span class="chip">${esc(c)}</span>`).join('') || '<span class="card-meta">No categories</span>'}</div>
+      <div class="card-row" style="color:#6b7280;">${certs} cert${certs === 1 ? '' : 's'} · added ${fmtDate(f.created_at)}</div>
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('.card').forEach(c => c.addEventListener('click', () => openFactory(c.dataset.id)));
+}
+
+async function openFactory(id) {
+  const f = factories.find(x => x.id === id);
+  if (!f) return;
+  openPanel(f.factory_name_english || 'Factory', [f.city, f.country].filter(Boolean).join(', '),
+    '<div class="loading">Loading details…</div>');
+
+  const [contacts, documents] = await Promise.all([
+    supa(`factory_contacts?factory_id=eq.${id}&order=is_primary.desc`),
+    supa(`factory_documents?factory_id=eq.${id}&order=uploaded_at.desc`),
+  ]);
+  const certs = f.factory_certifications || [];
+  const cats = f.factory_categories || [];
+
+  const overview = kv([
+    ['Local name', f.factory_name_local],
+    ['Status', statusBadge(f.status), true],
+    ['Address', [f.address, f.city, f.state_province, f.postal_code, f.country].filter(Boolean).join(', ')],
+    ['Telephone', f.telephone],
+    ['Years in business', f.years_in_business],
+    ['Export %', f.export_percentage != null ? f.export_percentage + '%' : null],
+    ['Annual revenue', f.annual_revenue_usd ? money(f.annual_revenue_usd) : null],
+    ['Catalog', f.catalog_url ? `<a href="${esc(f.catalog_url)}" target="_blank" style="color:#60a5fa;">View catalog</a>` : null, true],
+  ]);
+
+  const perf = kv([
+    ['Reliability', f.reliability_score != null ? f.reliability_score : null],
+    ['Quote completion', f.quote_completion_rate != null ? pct(f.quote_completion_rate) : null],
+    ['Response time', f.response_time_hours != null ? f.response_time_hours + ' hrs' : null],
+    ['Credit score', f.credit_score],
+    ['Payment terms', f.payment_terms],
+    ['Credit watch', f.credit_watch ? 'Yes' : null],
+  ]);
+
+  const sales = [f.sales_contact_name && `${f.sales_contact_name}${f.sales_email ? ' · ' + f.sales_email : ''}${f.sales_mobile ? ' · ' + f.sales_mobile : ''}`]
+    .filter(Boolean);
+  const contactItems = contacts.map(c => `<div class="sub-item">
+      <div class="si-title">${esc(c.contact_name || 'Contact')}${c.title ? ' — ' + esc(c.title) : ''}</div>
+      <div class="si-meta">${[c.email, c.mobile, c.whatsapp && 'WA: ' + c.whatsapp, c.wechat && 'WeChat: ' + c.wechat].filter(Boolean).map(esc).join(' · ') || 'No contact info'}</div>
+    </div>`).join('');
+
+  const certItems = certs.length ? certs.map(c => `<div class="sub-item">
+      <div class="si-title">${esc(c.certification_name || 'Certification')}</div>
+      <div class="si-meta">${[c.issued_by && 'by ' + c.issued_by, c.certificate_number && '#' + c.certificate_number, c.expiry_date && 'expires ' + fmtDate(c.expiry_date)].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No certifications.</div>';
+
+  const docItems = documents.length ? documents.map(d => `<div class="sub-item">
+      <div class="si-title">${esc(d.document_type || d.file_name || 'Document')}</div>
+      <div class="si-meta">${[d.file_name, d.expiry_date && 'expires ' + fmtDate(d.expiry_date), d.is_current ? 'current' : null].filter(Boolean).map(esc).join(' · ')}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No documents.</div>';
+
+  const catItems = cats.length ? `<div class="card-row">${cats.map(c =>
+    `<span class="chip">${esc([c.category, c.sub_category, c.sub_sub_category].filter(Boolean).join(' › '))}${c.is_primary ? ' ★' : ''}</span>`).join('')}</div>`
+    : '<div class="empty" style="padding:12px;">No categories.</div>';
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section"><h3>Overview</h3>${overview}</div>
+    <div class="panel-section"><h3>Categories</h3>${catItems}</div>
+    <div class="panel-section"><h3>Performance</h3>${perf}</div>
+    <div class="panel-section"><h3>Contacts</h3><div class="sub-list">${sales.map(s => `<div class="sub-item"><div class="si-title">Sales</div><div class="si-meta">${esc(s)}</div></div>`).join('')}${contactItems}</div>${(!sales.length && !contacts.length) ? '<div class="empty" style="padding:12px;">No contacts.</div>' : ''}</div>
+    <div class="panel-section"><h3>Certifications (${certs.length})</h3><div class="sub-list">${certItems}</div></div>
+    <div class="panel-section"><h3>Documents (${documents.length})</h3><div class="sub-list">${docItems}</div></div>
+  `;
+}
+
+// ── Pending Reviews ──
+async function loadReviews() {
+  const box = document.getElementById('box-reviews');
+  const [subs, certs] = await Promise.all([
+    supa(`pending_subcategories?select=*,factories!inner(factory_name_english,tenant_id)&factories.tenant_id=eq.${TID}&order=created_at.desc`),
+    supa(`pending_certifications?select=*,factories!inner(factory_name_english,tenant_id)&factories.tenant_id=eq.${TID}&order=created_at.desc`),
+  ]);
+  document.getElementById('cnt-reviews').textContent = subs.length + certs.length;
+  const subRows = subs.map(s => `<tr><td>${esc(s.factories && s.factories.factory_name_english)}</td>
+    <td>${esc(s.proposed_name)}</td><td>${esc([s.parent_category, s.parent_sub_category].filter(Boolean).join(' › ') || '—')}</td>
+    <td>${statusBadge(s.status)}</td><td>${fmtDate(s.created_at)}</td></tr>`).join('');
+  const certRows = certs.map(c => `<tr><td>${esc(c.factories && c.factories.factory_name_english)}</td>
+    <td>${esc(c.proposed_name)}</td><td>Certification</td><td>${statusBadge(c.status)}</td><td>${fmtDate(c.created_at)}</td></tr>`).join('');
+  const rows = subRows + certRows;
+  box.innerHTML = rows
+    ? `<table class="data-table"><thead><tr><th>Factory</th><th>Proposed</th><th>Type / Parent</th><th>Status</th><th>Submitted</th></tr></thead><tbody>${rows}</tbody></table>`
+    : '<div class="empty"><span class="empty-icon">🔍</span>No pending reviews.</div>';
+}
+
+// ── Invitations ──
+async function loadInvitations() {
+  const box = document.getElementById('box-invitations');
+  const ev = await supa(`invitation_events?select=*,factories!inner(factory_name_english,tenant_id)&factories.tenant_id=eq.${TID}&order=created_at.desc`);
+  document.getElementById('cnt-invitations').textContent = ev.length;
+  box.innerHTML = ev.length
+    ? `<table class="data-table"><thead><tr><th>Factory</th><th>Event</th><th>By</th><th>Notes</th><th>When</th></tr></thead><tbody>${
+        ev.map(e => `<tr><td>${esc(e.factories && e.factories.factory_name_english)}</td><td>${statusBadge(e.event_type)}</td>
+          <td>${esc(e.triggered_by || '—')}</td><td>${esc(e.event_notes || '—')}</td><td>${fmtDate(e.created_at)}</td></tr>`).join('')
+      }</tbody></table>`
+    : '<div class="empty"><span class="empty-icon">✉️</span>No invitation activity.</div>';
+}
+
+// ── RFQ Follow-ups ──
+async function loadFollowups() {
+  const box = document.getElementById('box-followups');
+  // Follow-up needed = assignment sent but not yet quoted.
+  const a = await supa(`rfq_factory_assignments?tenant_id=eq.${TID}&quoted_at=is.null&select=*,rfqs(project_number,item_description,status),factories(factory_name_english)&order=sent_at.desc`);
+  document.getElementById('cnt-followups').textContent = a.length;
+  box.innerHTML = a.length
+    ? `<table class="data-table"><thead><tr><th>Factory</th><th>RFQ</th><th>Status</th><th>Sent</th><th>Viewed</th></tr></thead><tbody>${
+        a.map(x => `<tr><td>${esc(x.factories && x.factories.factory_name_english)}</td>
+          <td>${esc(x.rfqs ? (x.rfqs.project_number || '') + ' ' + (x.rfqs.item_description || '') : '—')}</td>
+          <td>${statusBadge(x.status)}</td><td>${fmtDate(x.sent_at)}</td><td>${x.viewed_at ? fmtDate(x.viewed_at) : 'Not viewed'}</td></tr>`).join('')
+      }</tbody></table>`
+    : '<div class="empty"><span class="empty-icon">📌</span>No outstanding follow-ups — all assignments quoted.</div>';
+}
+
+// ── Compliance Alerts ──
+async function loadCompliance() {
+  const box = document.getElementById('box-compliance');
+  const al = await supa(`compliance_alerts?select=*,factories!inner(factory_name_english,tenant_id)&factories.tenant_id=eq.${TID}&order=created_at.desc`);
+  document.getElementById('cnt-compliance').textContent = al.length;
+  box.innerHTML = al.length
+    ? `<table class="data-table"><thead><tr><th>Factory</th><th>Type</th><th>Severity</th><th>Message</th><th>Status</th><th>Created</th></tr></thead><tbody>${
+        al.map(a => `<tr><td>${esc(a.factories && a.factories.factory_name_english)}</td><td>${esc(a.alert_type || '—')}</td>
+          <td>${statusBadge(a.severity)}</td><td>${esc(a.message || '—')}</td>
+          <td>${a.resolved ? statusBadge('resolved') : (a.acknowledged ? statusBadge('acknowledged') : statusBadge('open'))}</td>
+          <td>${fmtDate(a.created_at)}</td></tr>`).join('')
+      }</tbody></table>`
+    : '<div class="empty"><span class="empty-icon">⚠️</span>No compliance alerts.</div>';
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · factory network';
+
+  // Wire tabs, search, panel close
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('facSearch').addEventListener('input', () => renderFactoryGrid('all'));
+  document.getElementById('facStatus').addEventListener('change', () => renderFactoryGrid('all'));
+  document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
+  document.getElementById('panelOverlay').addEventListener('click', closePanel);
+  window.addEventListener('hashchange', () => showTab((location.hash || '#all').slice(1)));
+
+  await loadFactories();
+  showTab((location.hash || '#all').slice(1));
+})();
+</script>
+</body>
+</html>
