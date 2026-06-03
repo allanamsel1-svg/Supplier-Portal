@@ -86,6 +86,7 @@
     <div class="fin-tabs">
       <button class="fin-tab active" id="fin-tab-banking" onclick="switchFinTab('banking')">Banking</button>
       <button class="fin-tab" id="fin-tab-api" onclick="switchFinTab('api')">API Costs</button>
+      <button class="fin-tab" id="fin-tab-projections" onclick="switchFinTab('projections')">Projections</button>
     </div>
 
     <!-- Tab 1: Banking (Mercury) — default active -->
@@ -133,6 +134,12 @@
       </div>
     </div>
 
+    <!-- Tab 3: Projections — embedded projections.html -->
+    <div class="fin-panel" id="fin-panel-projections">
+      <iframe id="fin-projections-frame" title="Projections" data-src="projections.html"
+        style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid #e0e0d8;border-radius:10px;background:#fff;"></iframe>
+    </div>
+
   </div>
 </div>
 
@@ -142,12 +149,17 @@ var _accounts = [], _txns = [];
 
 // Tab switching — show/hide panels, no page reload
 function switchFinTab(tab){
-  var tabs = ['banking','api'];
+  var tabs = ['banking','api','projections'];
   tabs.forEach(function(t){
     var btn = g('fin-tab-' + t), panel = g('fin-panel-' + t);
     if (btn) btn.classList.toggle('active', t === tab);
     if (panel) panel.classList.toggle('active', t === tab);
   });
+  // Lazy-load the Projections iframe the first time the tab is opened.
+  if (tab === 'projections') {
+    var fr = g('fin-projections-frame');
+    if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;
+  }
 }
 
 function escH(v){ return (v==null?'':String(v)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

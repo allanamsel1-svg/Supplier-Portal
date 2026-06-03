@@ -76,15 +76,15 @@ const TENANT_NAV = [
     { icon: '📋', label: 'Compliance Rules', href: '/compliance-rules.html' },
   ]},
   { section: 'Communications', items: [
-    { icon: '💬', label: 'Messages', href: '/communications.html' },
+    { icon: '💬', label: 'Messages', href: '/tenant-communications.html' },
     { icon: '🎥', label: 'Zoom', href: '/zoom.html' },
-    { icon: '👤', label: 'Allan', href: '/communications.html?tab=allan' },
-    { icon: '🔎', label: 'Sourcing', href: '/communications.html?tab=sourcing' },
-    { icon: '🛒', label: 'Sales', href: '/communications.html?tab=sales' },
-    { icon: '🎨', label: 'Graphics', href: '/communications.html?tab=graphics' },
-    { icon: '🧾', label: 'Accounting', href: '/communications.html?tab=accounting' },
-    { icon: '🚚', label: 'Logistics', href: '/communications.html?tab=logistics' },
-    { icon: '✅', label: 'Compliance', href: '/communications.html?tab=compliance' },
+    { icon: '👤', label: 'Allan', href: '/tenant-communications.html?tab=allan' },
+    { icon: '🔎', label: 'Sourcing', href: '/tenant-communications.html?tab=sourcing' },
+    { icon: '🛒', label: 'Sales', href: '/tenant-communications.html?tab=sales' },
+    { icon: '🎨', label: 'Graphics', href: '/tenant-communications.html?tab=graphics' },
+    { icon: '🧾', label: 'Accounting', href: '/tenant-communications.html?tab=accounting' },
+    { icon: '🚚', label: 'Logistics', href: '/tenant-communications.html?tab=logistics' },
+    { icon: '✅', label: 'Compliance', href: '/tenant-communications.html?tab=compliance' },
   ]},
   { section: 'RFQ & Products', items: [
     { icon: '📋', label: 'RFQs', href: '/tenant-rfq.html' },
@@ -141,29 +141,26 @@ function renderSidebar(user) {
   window.addEventListener('hashchange', highlightNav);
 }
 
-// Highlight the nav item matching the current path + hash.
+// Highlight the nav item matching the current page (pathname) AND its hash/query.
+// Suffix = the page's #hash if present, else its ?query (e.g. ?tab=sales), else ''.
 function highlightNav() {
   const path = location.pathname.split('/').pop() || 'tenant-dashboard.html';
-  const hash = location.hash || '';
+  const suffix = location.hash || location.search || '';
   const items = Array.from(document.querySelectorAll('.nav-item[data-href]'));
-  let best = null;
   items.forEach(el => el.classList.remove('active'));
+
+  let exact = null, pageDefault = null;
   items.forEach(el => {
     const href = el.getAttribute('data-href');
-    const [p, rest] = href.split(/(?=[#?])/); // split before # or ?
-    const itemPath = p.split('/').pop();
+    const parts = href.split(/(?=[#?])/);      // split before the first # or ?
+    const itemPath = parts[0].split('/').pop();
+    const itemSuffix = parts[1] || '';
     if (itemPath !== path) return;
-    const itemHash = (rest && rest.startsWith('#')) ? rest : '';
-    if (itemHash === hash) best = el;                 // exact hash match
-    else if (!itemHash && !best) best = best || el;   // page default fallback
+    if (itemSuffix === suffix) exact = el;      // same page + same hash/query
+    if (!itemSuffix) pageDefault = pageDefault || el; // hash/query-less item for this page
   });
-  // If nothing matched the hash exactly, fall back to the page's hash-less item.
-  if (!best) {
-    best = items.find(el => {
-      const href = el.getAttribute('data-href');
-      return href.split(/(?=[#?])/)[0].split('/').pop() === path && !/[#?]/.test(href);
-    });
-  }
+
+  const best = exact || pageDefault;
   if (best) best.classList.add('active');
 }
 

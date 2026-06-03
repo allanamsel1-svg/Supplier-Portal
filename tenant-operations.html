@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operations — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Operations</div>
+    <div class="page-sub" id="pageSub">Orders, credit, and operational workflows</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="orders">Open Orders <span class="tab-count" id="cnt-orders"></span></button>
+    <button class="tab" data-tab="warehouse">Warehouse</button>
+    <button class="tab" data-tab="accounting">Accounting</button>
+    <button class="tab" data-tab="credit">Credit Watch <span class="tab-count" id="cnt-credit"></span></button>
+    <button class="tab" data-tab="forecasting">Forecasting</button>
+  </div>
+
+  <div class="tab-pane" id="pane-orders"><div id="box-orders"><div class="loading">Loading open orders…</div></div></div>
+  <div class="tab-pane" id="pane-warehouse"></div>
+  <div class="tab-pane" id="pane-accounting"></div>
+  <div class="tab-pane" id="pane-credit"><div id="box-credit"><div class="loading">Loading credit checks…</div></div></div>
+  <div class="tab-pane" id="pane-forecasting"></div>
+</div>
+
+<div class="panel-overlay" id="panelOverlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-head">
+    <div><h2 id="panelTitle"></h2><div class="sub" id="panelSub"></div></div>
+    <button class="panel-close" id="panelCloseBtn">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+const TABS = ['orders', 'warehouse', 'accounting', 'credit', 'forecasting'];
+const BETA = { warehouse: 'Warehouse', accounting: 'Accounting', forecasting: 'Forecasting' };
+let TID = null;
+let orders = [], milestonesByPo = {}, factoryMap = {};
+const loaded = {};
+
+function comingSoon(title) {
+  return `<div class="empty"><span class="empty-icon">🚧</span><div style="font-size:16px;color:#cbd5e1;margin-bottom:6px;">${esc(title)}</div>Coming Soon — this module is in beta.</div>`;
+}
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'orders';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (BETA[tab]) { document.getElementById('pane-' + tab).innerHTML = comingSoon(BETA[tab] + ' — Coming Soon'); return; }
+  if (tab === 'credit' && !loaded.credit) { loaded.credit = true; loadCredit(); }
+}
+function goTab(tab) { location.hash = tab === 'orders' ? '' : '#' + tab; }
+
+const OPEN_EXCLUDE = ['cancelled', 'canceled', 'closed', 'complete', 'completed'];
+
+async function loadOrders() {
+  orders = await supa(`purchase_orders?tenant_id=eq.${TID}&select=*,factories(factory_name_english)&order=created_at.desc`);
+  orders = orders.filter(o => !OPEN_EXCLUDE.includes((o.status || '').toLowerCase()));
+  document.getElementById('cnt-orders').textContent = orders.length;
+
+  // Fetch milestones for these POs in one shot (no FK embed available).
+  const ids = orders.map(o => o.id);
+  if (ids.length) {
+    const ms = await supa(`po_milestones?purchase_order_id=in.(${ids.join(',')})&select=purchase_order_id,milestone_type,status,agreed_date,revised_date,completed_at&order=display_order.asc`);
+    milestonesByPo = {};
+    ms.forEach(m => { (milestonesByPo[m.purchase_order_id] = milestonesByPo[m.purchase_order_id] || []).push(m); });
+  }
+  renderOrders();
+}
+
+function poFactory(o) { return (o.factories && o.factories.factory_name_english) || o.factory_name_snapshot || '—'; }
+function poValue(o) {
+  if (o.subtotal_fob != null) return Number(o.subtotal_fob);
+  if (o.quantity != null && o.unit_fob_price != null) return Number(o.quantity) * Number(o.unit_fob_price);
+  return null;
+}
+function msProgress(id) {
+  const ms = milestonesByPo[id] || [];
+  if (!ms.length) return '—';
+  const done = ms.filter(m => m.completed_at || /complete|done/i.test(m.status || '')).length;
+  return `${done}/${ms.length}`;
+}
+
+function renderOrders() {
+  const box = document.getElementById('box-orders');
+  if (!orders.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📦</span>No open orders.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>PO #</th><th>Factory</th><th>Status</th><th>Value</th><th>Expected ship</th><th>Milestones</th></tr></thead><tbody>${
+    orders.map(o => `<tr class="clickable" data-id="${esc(o.id)}">
+      <td>${esc(o.po_number || '—')}</td><td>${esc(poFactory(o))}</td><td>${statusBadge(o.status)}</td>
+      <td>${money(poValue(o))}</td><td>${fmtDate(o.expected_ship_date)}</td><td>${msProgress(o.id)}</td></tr>`).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openPO(tr.dataset.id)));
+}
+
+async function openPO(id) {
+  const o = orders.find(x => x.id === id);
+  if (!o) return;
+  openPanel('PO ' + (o.po_number || ''), poFactory(o), '<div class="loading">Loading details…</div>');
+  const lines = await supa(`purchase_order_lines?po_id=eq.${id}&select=*,skus(model_number,description)&order=created_at.asc`);
+  const ms = milestonesByPo[id] || await supa(`po_milestones?purchase_order_id=eq.${id}&select=*&order=display_order.asc`);
+
+  const details = kv([
+    ['PO #', o.po_number],
+    ['Status', statusBadge(o.status), true],
+    ['Factory', poFactory(o)],
+    ['Quantity', o.quantity != null ? Number(o.quantity).toLocaleString() : null],
+    ['Unit FOB', o.unit_fob_price ? money(o.unit_fob_price) : null],
+    ['Subtotal FOB', poValue(o) != null ? money(poValue(o)) : null],
+    ['Currency', o.currency],
+    ['Payment terms', o.payment_terms],
+    ['Incoterm', o.factory_incoterm],
+    ['FOB port', o.fob_port],
+    ['Expected ship', fmtDate(o.expected_ship_date)],
+    ['Expected arrival', fmtDate(o.expected_arrival_date)],
+    ['Destination', [o.destination_port, o.destination_country].filter(Boolean).join(', ')],
+    ['Customer PO ref', o.customer_po_reference],
+    ['Created', fmtDate(o.created_at)],
+  ]);
+
+  const lineItems = lines.length ? `<table class="data-table"><thead><tr><th>SKU</th><th>Qty</th><th>Recv</th><th>Unit FOB</th><th>Total</th></tr></thead><tbody>${
+    lines.map(l => `<tr><td>${esc(l.skus ? (l.skus.model_number || l.skus.description || '') : (l.sku_id || '—'))}</td>
+      <td>${l.qty_ordered != null ? Number(l.qty_ordered).toLocaleString() : '—'}</td>
+      <td>${l.qty_received != null ? Number(l.qty_received).toLocaleString() : '—'}</td>
+      <td>${money(l.unit_fob_price)}</td><td>${money(l.total_fob_value)}</td></tr>`).join('')
+  }</tbody></table>` : '<div class="empty" style="padding:12px;">No line items.</div>';
+
+  const msItems = ms.length ? ms.map(m => `<div class="sub-item">
+      <div class="si-title">${esc(m.milestone_type || 'Milestone')} ${statusBadge(m.status)}</div>
+      <div class="si-meta">${[m.agreed_date && 'agreed ' + fmtDate(m.agreed_date), m.revised_date && 'revised ' + fmtDate(m.revised_date), m.completed_at && 'completed ' + fmtDate(m.completed_at)].filter(Boolean).map(esc).join(' · ') || 'Pending'}</div>
+    </div>`).join('') : '<div class="empty" style="padding:12px;">No milestones.</div>';
+
+  const docs = [
+    ['Purchase order PDF', o.pdf_path], ['Signed PDF', o.signed_pdf_path],
+    ['CMF document', o.cmf_doc_path], ['Artwork', o.artwork_doc_path],
+  ].filter(d => d[1]);
+  const docItems = docs.length ? docs.map(d => `<div class="sub-item"><div class="si-title">${esc(d[0])}</div><div class="si-meta">${esc(d[1])}</div></div>`).join('')
+    : '<div class="empty" style="padding:12px;">No documents.</div>';
+
+  document.getElementById('panelBody').innerHTML = `
+    <div class="panel-section"><h3>Order Details</h3>${details}</div>
+    <div class="panel-section"><h3>Line Items (${lines.length})</h3>${lineItems}</div>
+    <div class="panel-section"><h3>Milestones (${ms.length})</h3><div class="sub-list">${msItems}</div></div>
+    <div class="panel-section"><h3>Documents</h3><div class="sub-list">${docItems}</div></div>
+  `;
+}
+
+// ── Credit Watch ── (credit_checks has no tenant_id; scope to this tenant's factories via entity_id)
+async function loadCredit() {
+  const box = document.getElementById('box-credit');
+  const facs = await supa(`factories?tenant_id=eq.${TID}&select=id,factory_name_english`);
+  factoryMap = {};
+  facs.forEach(f => { factoryMap[f.id] = f.factory_name_english; });
+  const ids = facs.map(f => f.id);
+  let checks = [];
+  if (ids.length) {
+    checks = await supa(`credit_checks?entity_id=in.(${ids.join(',')})&order=created_at.desc`);
+  }
+  document.getElementById('cnt-credit').textContent = checks.length;
+  box.innerHTML = checks.length
+    ? `<table class="data-table"><thead><tr><th>Company</th><th>Score</th><th>Severity</th><th>Source</th><th>Checked</th></tr></thead><tbody>${
+        checks.map(c => `<tr><td>${esc(factoryMap[c.entity_id] || c.entity_type || c.entity_id || '—')}</td>
+          <td>${esc(c.score_value != null ? c.score_value : '—')}</td><td>${statusBadge(c.alert_severity)}</td>
+          <td>${esc(c.source || '—')}</td><td>${fmtDate(c.check_date || c.created_at)}</td></tr>`).join('')
+      }</tbody></table>`
+    : '<div class="empty"><span class="empty-icon">🔔</span>No credit checks on record.</div>';
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · operations';
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
+  document.getElementById('panelOverlay').addEventListener('click', closePanel);
+  window.addEventListener('hashchange', () => showTab((location.hash || '#orders').slice(1)));
+
+  await loadOrders();
+  showTab((location.hash || '#orders').slice(1));
+})();
+</script>
+</body>
+</html>

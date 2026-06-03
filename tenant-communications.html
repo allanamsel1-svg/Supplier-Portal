@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Communications — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<style>
+  .comms { display: flex; gap: 16px; height: calc(100vh - 190px); min-height: 420px; }
+  .thread-list { width: 360px; flex-shrink: 0; overflow-y: auto; border: 1px solid #1e2d47; border-radius: 10px; background: #0d1424; }
+  .thread {
+    padding: 14px 16px; border-bottom: 1px solid #131c30; cursor: pointer; transition: background 0.12s;
+  }
+  .thread:hover { background: #131929; }
+  .thread.active { background: #1e3a6e; }
+  .thread-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .thread-from { font-size: 13px; font-weight: 600; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-date { font-size: 11px; color: #6b7280; flex-shrink: 0; }
+  .thread-subj { font-size: 13px; color: #cbd5e1; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thread-prev { font-size: 12px; color: #6b7280; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .unread-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; margin-right: 6px; }
+  .msg-panel { flex: 1; overflow-y: auto; border: 1px solid #1e2d47; border-radius: 10px; background: #0d1424; padding: 24px; }
+  .msg {
+    border: 1px solid #1e2d47; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; background: #131929;
+  }
+  .msg.inbound { border-left: 3px solid #3b82f6; }
+  .msg.outbound { border-left: 3px solid #22c55e; }
+  .msg-head { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; margin-bottom: 8px; }
+  .msg-from { color: #f1f5f9; font-weight: 600; }
+  .msg-date { color: #6b7280; }
+  .msg-body { font-size: 13px; color: #cbd5e1; white-space: pre-wrap; line-height: 1.55; word-break: break-word; }
+  .zoom-link {
+    margin-left: auto; font-size: 12px; color: #93c5fd; text-decoration: none; border: 1px solid #1e3a6e;
+    padding: 8px 14px; border-radius: 8px;
+  }
+  .zoom-link:hover { background: #131929; }
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Communications</div>
+    <div class="page-sub" id="pageSub">Email inbox by mailbox</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="all">All</button>
+    <button class="tab" data-tab="allan">Allan</button>
+    <button class="tab" data-tab="sourcing">Sourcing</button>
+    <button class="tab" data-tab="sales">Sales</button>
+    <button class="tab" data-tab="graphics">Graphics</button>
+    <button class="tab" data-tab="accounting">Accounting</button>
+    <button class="tab" data-tab="logistics">Logistics</button>
+    <button class="tab" data-tab="compliance">Compliance</button>
+    <a class="zoom-link" href="zoom.html">🎥 Zoom</a>
+  </div>
+
+  <div class="comms">
+    <div class="thread-list" id="threadList"><div class="loading">Loading…</div></div>
+    <div class="msg-panel" id="msgPanel"><div class="empty"><span class="empty-icon">💬</span>Select a conversation to read it.</div></div>
+  </div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance'];
+let TID = null;
+let allThreads = [];     // tenant-visible threads
+let current = 'all';
+let activeThread = null;
+
+function tabFromUrl() {
+  const t = new URLSearchParams(location.search).get('tab');
+  return TABS.includes(t) ? t : 'all';
+}
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'all';
+  current = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  renderThreads();
+}
+
+function goTab(tab) {
+  const u = new URL(location.href);
+  if (tab === 'all') u.searchParams.delete('tab'); else u.searchParams.set('tab', tab);
+  history.replaceState(null, '', u);
+  highlightNav();          // keep sidebar in sync with ?tab=
+  showTab(tab);
+}
+
+async function loadThreads(user) {
+  // email_threads has no tenant_id — scope to this tenant's factories (null factory = general mail).
+  const facs = await supa(`factories?tenant_id=eq.${TID}&select=id`);
+  const facIds = new Set(facs.map(f => f.id));
+  const threads = await supa(`email_threads?select=id,subject,from_email,from_name,to_email,direction,status,department,factory_id,last_message_at,created_at&order=last_message_at.desc.nullslast`);
+  allThreads = threads.filter(t => !t.factory_id || facIds.has(t.factory_id));
+  renderThreads();
+}
+
+function threadsForTab() {
+  if (current === 'all') return allThreads;
+  return allThreads.filter(t => (t.department || '').toLowerCase() === current);
+}
+
+function renderThreads() {
+  const list = document.getElementById('threadList');
+  const rows = threadsForTab();
+  if (!rows.length) { list.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>No messages in this mailbox.</div>'; return; }
+  list.innerHTML = rows.map(t => {
+    const unread = (t.status || '').toLowerCase() === 'unread';
+    return `<div class="thread" data-id="${esc(t.id)}">
+      <div class="thread-top">
+        <span class="thread-from">${unread ? '<span class="unread-dot"></span>' : ''}${esc(t.from_name || t.from_email || 'Unknown')}</span>
+        <span class="thread-date">${fmtDate(t.last_message_at || t.created_at)}</span>
+      </div>
+      <div class="thread-subj">${esc(t.subject || '(No subject)')}</div>
+      <div class="thread-prev">${esc(t.from_email || '')}${t.department ? ' · ' + esc(t.department) : ''}</div>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.thread').forEach(el => el.addEventListener('click', () => openThread(el.dataset.id)));
+  if (activeThread) { const a = list.querySelector(`.thread[data-id="${activeThread}"]`); if (a) a.classList.add('active'); }
+}
+
+async function openThread(id) {
+  activeThread = id;
+  document.querySelectorAll('.thread').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  const panel = document.getElementById('msgPanel');
+  panel.innerHTML = '<div class="loading">Loading messages…</div>';
+  const t = allThreads.find(x => x.id === id) || {};
+  const msgs = await supa(`email_messages?thread_id=eq.${id}&select=id,from_name,from_email,to_email,subject,body_text,body_html,direction,sent_at&order=sent_at.asc`);
+
+  const header = `<div style="margin-bottom:18px;">
+    <div style="font-size:17px;font-weight:700;color:#f1f5f9;">${esc(t.subject || '(No subject)')}</div>
+    <div style="font-size:12px;color:#6b7280;margin-top:4px;">${esc(t.from_name || t.from_email || '')}${t.to_email ? ' → ' + esc(t.to_email) : ''}</div>
+  </div>`;
+
+  const body = msgs.length ? msgs.map(m => {
+    let text = m.body_text;
+    if (!text && m.body_html) text = m.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const dir = (m.direction || '').toLowerCase() === 'outbound' ? 'outbound' : 'inbound';
+    return `<div class="msg ${dir}">
+      <div class="msg-head"><span class="msg-from">${esc(m.from_name || m.from_email || 'Unknown')}</span><span class="msg-date">${fmtDate(m.sent_at)}</span></div>
+      <div class="msg-body">${esc(text || '(No content)')}</div>
+    </div>`;
+  }).join('') : '<div class="empty">No messages in this thread.</div>';
+
+  panel.innerHTML = header + body;
+}
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · email inbox';
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+
+  await loadThreads(user);
+  showTab(tabFromUrl());
+})();
+</script>
+</body>
+</html>
