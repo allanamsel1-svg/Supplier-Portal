@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TBG Sourcing — Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0a0e1a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 240px;
+    min-height: 100vh;
+    background: #0d1424;
+    border-right: 1px solid #1e2d47;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+  }
+  .sidebar-logo {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid #1e2d47;
+  }
+  .sidebar-logo .wordmark { font-size: 15px; font-weight: 700; color: #fff; }
+  .sidebar-logo .tenant-name {
+    font-size: 11px;
+    color: #3b82f6;
+    margin-top: 3px;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .nav-section {
+    padding: 8px 16px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 16px;
+    font-size: 13px;
+    color: #9ca3af;
+    cursor: pointer;
+    border-radius: 0;
+    transition: all 0.12s;
+    text-decoration: none;
+  }
+  .nav-item:hover { background: #131929; color: #e2e8f0; }
+  .nav-item.active { background: #1e3a6e; color: #93c5fd; }
+  .nav-item .icon { width: 16px; text-align: center; font-size: 14px; }
+  .nav-item.disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+  .sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid #1e2d47;
+  }
+  .user-info { font-size: 12px; color: #6b7280; margin-bottom: 10px; }
+  .user-name { color: #9ca3af; font-weight: 500; }
+  .btn-logout {
+    width: 100%;
+    background: none;
+    border: 1px solid #1e2d47;
+    border-radius: 6px;
+    padding: 7px;
+    font-size: 12px;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .btn-logout:hover { border-color: #374151; color: #9ca3af; }
+
+  /* MAIN */
+  .main {
+    margin-left: 240px;
+    flex: 1;
+    padding: 32px;
+    min-height: 100vh;
+  }
+  .page-header {
+    margin-bottom: 28px;
+  }
+  .page-title { font-size: 22px; font-weight: 700; color: #f1f5f9; }
+  .page-sub { font-size: 13px; color: #6b7280; margin-top: 4px; }
+
+  /* STAT CARDS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-card {
+    background: #131929;
+    border: 1px solid #1e2d47;
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-value { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-top: 6px; }
+  .stat-sub { font-size: 12px; color: #374151; margin-top: 4px; }
+
+  /* MODULE CARDS */
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .module-card {
+    background: #131929;
+    border: 1px solid #1e2d47;
+    border-radius: 10px;
+    padding: 22px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .module-card:hover { border-color: #2563eb; background: #0f1e35; }
+  .module-card.locked { opacity: 0.4; cursor: not-allowed; }
+  .module-icon { font-size: 24px; margin-bottom: 12px; }
+  .module-name { font-size: 14px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
+  .module-desc { font-size: 12px; color: #6b7280; line-height: 1.5; }
+  .module-badge {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-weight: 500;
+  }
+  .badge-active { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .badge-locked { background: #1c1917; color: #78716c; border: 1px solid #292524; }
+
+  .loading { color: #6b7280; font-size: 14px; padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="wordmark">TBG Sourcing</div>
+    <div class="tenant-name" id="tenantName">Loading…</div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Overview</div>
+    <a class="nav-item active" href="/tenant-dashboard.html">
+      <span class="icon">⊞</span> Dashboard
+    </a>
+
+    <div class="nav-section">Sourcing</div>
+    <a class="nav-item" href="#" id="nav-rfq">
+      <span class="icon">📋</span> RFQ Management
+    </a>
+    <a class="nav-item" href="#" id="nav-factories">
+      <span class="icon">🏭</span> Factories
+    </a>
+    <a class="nav-item" href="#" id="nav-sku">
+      <span class="icon">📦</span> SKU Library
+    </a>
+    <a class="nav-item" href="#" id="nav-po">
+      <span class="icon">🧾</span> Purchase Orders
+    </a>
+
+    <div class="nav-section">Intelligence</div>
+    <a class="nav-item" href="#" id="nav-shopout">
+      <span class="icon">🛍️</span> Shop Out
+    </a>
+    <a class="nav-item" href="#" id="nav-brand">
+      <span class="icon">👁️</span> Brand Watch
+    </a>
+    <a class="nav-item" href="#" id="nav-trade">
+      <span class="icon">🌐</span> Trade Intel
+    </a>
+
+    <div class="nav-section">Compliance</div>
+    <a class="nav-item" href="#" id="nav-compliance">
+      <span class="icon">✅</span> Compliance
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-info">
+      Signed in as<br>
+      <span class="user-name" id="userName">—</span>
+    </div>
+    <button class="btn-logout" onclick="doLogout()">Sign Out</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub" id="welcomeMsg">Welcome back</div>
+  </div>
+
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-card"><div class="stat-label">Active RFQs</div><div class="stat-value" id="stat-rfqs">—</div></div>
+    <div class="stat-card"><div class="stat-label">Factories</div><div class="stat-value" id="stat-factories">—</div></div>
+    <div class="stat-card"><div class="stat-label">Live SKUs</div><div class="stat-value" id="stat-skus">—</div></div>
+    <div class="stat-card"><div class="stat-label">Open POs</div><div class="stat-value" id="stat-pos">—</div></div>
+  </div>
+
+  <div class="modules-grid" id="modulesGrid">
+    <div class="loading">Loading your workspace…</div>
+  </div>
+</div>
+
+<script>
+const MODULES = [
+  { key: 'rfq', icon: '📋', name: 'RFQ Management', desc: 'Create and manage requests for quote across your factory network.' },
+  { key: 'sku_library', icon: '📦', name: 'SKU Library', desc: 'Manage your product catalog, costing, and compliance status.' },
+  { key: 'po_management', icon: '🧾', name: 'Purchase Orders', desc: 'Track purchase orders, milestones, and shipment progress.' },
+  { key: 'shop_out', icon: '🛍️', name: 'Shop Out', desc: 'AI-powered retail intelligence from store visits.' },
+  { key: 'brand_watch', icon: '👁️', name: 'Brand Watch', desc: 'Monitor competitor brands and pricing across channels.' },
+  { key: 'trade_intel', icon: '🌐', name: 'Trade Intelligence', desc: 'Tariff rulings, HTS codes, and trade news.' },
+  { key: 'compliance', icon: '✅', name: 'Compliance', desc: 'Regulatory screening, certifications, and document management.' },
+  { key: 'retail_intel', icon: '📊', name: 'Retail Intel', desc: 'Retailer summaries, buyer news, and account intelligence.' },
+];
+
+let tenantUser = null;
+
+async function init() {
+  const token = localStorage.getItem('tenant_token');
+  if (!token) return window.location.href = '/tenant-login.html';
+
+  const res = await fetch('/api/tenant-auth?action=validate', {
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (!res.ok) {
+    localStorage.removeItem('tenant_token');
+    localStorage.removeItem('tenant_user');
+    return window.location.href = '/tenant-login.html';
+  }
+
+  const data = await res.json();
+  tenantUser = data.user;
+
+  // UI
+  document.getElementById('tenantName').textContent = tenantUser.tenant.name;
+  document.getElementById('userName').textContent = tenantUser.full_name || tenantUser.email;
+  document.getElementById('welcomeMsg').textContent = `Welcome back, ${tenantUser.full_name || tenantUser.email.split('@')[0]}`;
+  document.title = `${tenantUser.tenant.name} — TBG Sourcing`;
+
+  renderModules(tenantUser.tenant.features);
+  loadStats(tenantUser.tenant.id, token);
+}
+
+function renderModules(features) {
+  const grid = document.getElementById('modulesGrid');
+  grid.innerHTML = MODULES.map(m => {
+    const on = features[m.key];
+    return `<div class="module-card ${on ? '' : 'locked'}" onclick="${on ? `goModule('${m.key}')` : ''}">
+      <div class="module-icon">${m.icon}</div>
+      <div class="module-name">${m.name}</div>
+      <div class="module-desc">${m.desc}</div>
+      <span class="module-badge ${on ? 'badge-active' : 'badge-locked'}">${on ? 'Active' : 'Not included'}</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadStats(tenantId, token) {
+  try {
+    const res = await fetch(`/api/tenant-stats?tenant_id=${tenantId}`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const d = await res.json();
+    document.getElementById('stat-rfqs').textContent = d.rfqs ?? '—';
+    document.getElementById('stat-factories').textContent = d.factories ?? '—';
+    document.getElementById('stat-skus').textContent = d.skus ?? '—';
+    document.getElementById('stat-pos').textContent = d.pos ?? '—';
+  } catch(e) {}
+}
+
+function goModule(key) {
+  const map = {
+    rfq: '/admin.html#rfq',
+    sku_library: '/admin.html#skus',
+    po_management: '/admin.html#po',
+    shop_out: '/admin.html#shopout',
+    brand_watch: '/admin.html#brandwatch',
+    trade_intel: '/trade_intelligence.html',
+    compliance: '/admin.html#compliance',
+    retail_intel: '/admin.html#intel',
+  };
+  if (map[key]) window.location.href = map[key];
+}
+
+async function doLogout() {
+  const token = localStorage.getItem('tenant_token');
+  if (token) {
+    await fetch('/api/tenant-auth?action=logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }).catch(() => {});
+  }
+  localStorage.removeItem('tenant_token');
+  localStorage.removeItem('tenant_user');
+  window.location.href = '/tenant-login.html';
+}
+
+init();
+</script>
+</body>
+</html>

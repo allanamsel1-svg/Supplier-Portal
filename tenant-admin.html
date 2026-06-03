@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tenant Management — TBG Sourcing Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+  .topbar {
+    background: #0d1424; border-bottom: 1px solid #1e2d47;
+    padding: 14px 24px; display: flex; align-items: center; gap: 16px;
+  }
+  .back-btn {
+    color: #3b82f6; text-decoration: none; font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .page-title { font-size: 16px; font-weight: 600; color: #f1f5f9; }
+  .main { padding: 28px; max-width: 1100px; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .btn-primary {
+    background: #2563eb; color: #fff; border: none; border-radius: 7px;
+    padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  .btn-primary:hover { background: #1d4ed8; }
+
+  .table-wrap {
+    background: #131929; border: 1px solid #1e2d47; border-radius: 10px; overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 600;
+    color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid #1e2d47; background: #0d1424;
+  }
+  td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid #111827; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #0f1e35; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 11px; font-weight: 500;
+  }
+  .badge-active { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+  .badge-trial { background: #1c1400; color: #fbbf24; border: 1px solid #78350f; }
+  .badge-suspended { background: #1f0a0a; color: #f87171; border: 1px solid #7f1d1d; }
+
+  .actions { display: flex; gap: 8px; }
+  .btn-sm {
+    padding: 5px 12px; font-size: 12px; border-radius: 5px;
+    border: 1px solid #1e2d47; background: none; color: #9ca3af; cursor: pointer;
+  }
+  .btn-sm:hover { border-color: #3b82f6; color: #3b82f6; }
+  .btn-sm.danger:hover { border-color: #ef4444; color: #ef4444; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #131929; border: 1px solid #1e2d47; border-radius: 12px;
+    padding: 28px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; color: #f1f5f9; margin-bottom: 20px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 11px; font-weight: 500; color: #9ca3af; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; }
+  input, select, textarea {
+    width: 100%; background: #0d1424; border: 1px solid #1e2d47; border-radius: 7px;
+    padding: 10px 12px; font-size: 13px; color: #f1f5f9; outline: none;
+  }
+  input:focus, select:focus { border-color: #3b82f6; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  .features-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;
+  }
+  .feature-toggle {
+    display: flex; align-items: center; gap: 8px;
+    background: #0d1424; border: 1px solid #1e2d47; border-radius: 6px;
+    padding: 8px 10px; cursor: pointer;
+  }
+  .feature-toggle input[type=checkbox] { width: auto; }
+  .feature-toggle label { margin: 0; font-size: 12px; color: #9ca3af; cursor: pointer; text-transform: none; letter-spacing: 0; }
+
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn-cancel { background: none; border: 1px solid #1e2d47; border-radius: 7px; padding: 9px 18px; font-size: 13px; color: #6b7280; cursor: pointer; }
+  .btn-cancel:hover { border-color: #374151; }
+
+  .empty { padding: 48px; text-align: center; color: #374151; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="admin.html" class="back-btn">← Admin</a>
+  <div class="page-title">Tenant Management</div>
+</div>
+
+<div class="main">
+  <div class="toolbar">
+    <div style="font-size:13px;color:#6b7280;" id="tenantCount">Loading…</div>
+    <button class="btn-primary" onclick="openNewTenant()">+ New Tenant</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Company</th>
+          <th>Plan</th>
+          <th>Status</th>
+          <th>Monthly Fee</th>
+          <th>API Cap</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tenantTable">
+        <tr><td colspan="7" class="empty">Loading tenants…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- New/Edit Tenant Modal -->
+<div class="modal-overlay" id="tenantModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">New Tenant</div>
+    <input type="hidden" id="editId">
+
+    <div class="field">
+      <label>Company Name</label>
+      <input type="text" id="f-name" placeholder="Byline Brands">
+    </div>
+    <div class="field">
+      <label>Slug (URL identifier)</label>
+      <input type="text" id="f-slug" placeholder="byline-brands">
+    </div>
+    <div class="field">
+      <label>Plan</label>
+      <select id="f-plan">
+        <option value="full">Full</option>
+        <option value="sourcing">Sourcing Only</option>
+        <option value="intel">Intel Only</option>
+        <option value="starter">Starter</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Billing Status</label>
+      <select id="f-billing">
+        <option value="active">Active</option>
+        <option value="trial">Trial</option>
+        <option value="suspended">Suspended</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Monthly Fee (USD)</label>
+      <input type="number" id="f-fee" value="100" step="50">
+    </div>
+    <div class="field">
+      <label>API Cost Cap (USD/month)</label>
+      <input type="number" id="f-cap" value="500" step="100">
+    </div>
+    <div class="field">
+      <label>Feature Access</label>
+      <div class="features-grid" id="featuresGrid"></div>
+    </div>
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="f-notes" placeholder="Internal notes…"></textarea>
+    </div>
+
+    <div id="userSection" style="display:none;">
+      <hr style="border-color:#1e2d47;margin:20px 0;">
+      <div style="font-size:13px;font-weight:600;color:#f1f5f9;margin-bottom:14px;">Admin User</div>
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="f-uname" placeholder="Jane Smith">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="f-uemail" placeholder="jane@company.com">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="f-upass" placeholder="Temporary password">
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="saveTenant()">Save Tenant</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+const SUPABASE_KEY = document.cookie.match(/admin_key=([^;]+)/)?.[1] || localStorage.getItem('admin_supabase_key') || prompt('Admin API key:');
+if (SUPABASE_KEY) localStorage.setItem('admin_supabase_key', SUPABASE_KEY);
+
+const FEATURES = ['rfq','shop_out','po_management','sku_library','brand_watch','retail_intel','trade_intel','compliance','factory_portal','financial'];
+const FEATURE_LABELS = {rfq:'RFQ',shop_out:'Shop Out',po_management:'Purchase Orders',sku_library:'SKU Library',brand_watch:'Brand Watch',retail_intel:'Retail Intel',trade_intel:'Trade Intel',compliance:'Compliance',factory_portal:'Factory Portal',financial:'Financials'};
+
+async function sbFetch(path, opts={}) {
+  const res = await fetch(SUPABASE_URL + path, {
+    ...opts,
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation', ...(opts.headers||{}) }
+  });
+  return res;
+}
+
+async function loadTenants() {
+  const res = await sbFetch('/rest/v1/tenants?order=created_at.asc&select=*');
+  const tenants = await res.json();
+  document.getElementById('tenantCount').textContent = `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''}`;
+  const tbody = document.getElementById('tenantTable');
+  if (!tenants.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No tenants yet</td></tr>'; return; }
+  tbody.innerHTML = tenants.map(t => `
+    <tr>
+      <td><strong style="color:#f1f5f9">${t.name}</strong><br><span style="font-size:11px;color:#374151">${t.slug}</span></td>
+      <td>${t.plan}</td>
+      <td><span class="badge badge-${t.billing_status}">${t.billing_status}</span></td>
+      <td>$${Number(t.monthly_fee_usd).toFixed(0)}/mo</td>
+      <td>$${Number(t.api_cost_cap_usd).toFixed(0)}/mo</td>
+      <td style="color:#6b7280">${new Date(t.created_at).toLocaleDateString()}</td>
+      <td class="actions">
+        <button class="btn-sm" onclick='editTenant(${JSON.stringify(t)})'>Edit</button>
+        <button class="btn-sm" onclick="managUsers('${t.id}','${t.name}')">Users</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function buildFeaturesGrid(values={}) {
+  document.getElementById('featuresGrid').innerHTML = FEATURES.map(f => `
+    <label class="feature-toggle">
+      <input type="checkbox" id="feat-${f}" ${values[f] ? 'checked' : ''}>
+      <span>${FEATURE_LABELS[f]}</span>
+    </label>
+  `).join('');
+}
+
+function getFeatures() {
+  const obj = {};
+  FEATURES.forEach(f => obj[f] = document.getElementById('feat-'+f).checked);
+  return obj;
+}
+
+function openNewTenant() {
+  document.getElementById('modalTitle').textContent = 'New Tenant';
+  document.getElementById('editId').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-slug').value = '';
+  document.getElementById('f-plan').value = 'full';
+  document.getElementById('f-billing').value = 'active';
+  document.getElementById('f-fee').value = '100';
+  document.getElementById('f-cap').value = '500';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('userSection').style.display = 'block';
+  buildFeaturesGrid({rfq:true,shop_out:true,po_management:true,sku_library:true,brand_watch:true,retail_intel:true,trade_intel:true,compliance:true,factory_portal:true,financial:false});
+  document.getElementById('tenantModal').classList.add('open');
+
+  // Auto-slug from name
+  document.getElementById('f-name').oninput = function() {
+    if (!document.getElementById('editId').value) {
+      document.getElementById('f-slug').value = this.value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    }
+  };
+}
+
+function editTenant(t) {
+  document.getElementById('modalTitle').textContent = 'Edit Tenant';
+  document.getElementById('editId').value = t.id;
+  document.getElementById('f-name').value = t.name;
+  document.getElementById('f-slug').value = t.slug;
+  document.getElementById('f-plan').value = t.plan;
+  document.getElementById('f-billing').value = t.billing_status;
+  document.getElementById('f-fee').value = t.monthly_fee_usd;
+  document.getElementById('f-cap').value = t.api_cost_cap_usd;
+  document.getElementById('f-notes').value = t.notes || '';
+  document.getElementById('userSection').style.display = 'none';
+  buildFeaturesGrid(t.features || {});
+  document.getElementById('tenantModal').classList.add('open');
+}
+
+async function saveTenant() {
+  const id = document.getElementById('editId').value;
+  const payload = {
+    name: document.getElementById('f-name').value.trim(),
+    slug: document.getElementById('f-slug').value.trim(),
+    plan: document.getElementById('f-plan').value,
+    billing_status: document.getElementById('f-billing').value,
+    monthly_fee_usd: parseFloat(document.getElementById('f-fee').value),
+    api_cost_cap_usd: parseFloat(document.getElementById('f-cap').value),
+    features: getFeatures(),
+    notes: document.getElementById('f-notes').value.trim(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!payload.name || !payload.slug) return alert('Name and slug required');
+
+  let tenantId = id;
+  if (id) {
+    await sbFetch(`/rest/v1/tenants?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+  } else {
+    const res = await sbFetch('/rest/v1/tenants', { method: 'POST', body: JSON.stringify(payload) });
+    const data = await res.json();
+    tenantId = data[0]?.id;
+
+    // Create admin user if provided
+    const uname = document.getElementById('f-uname').value.trim();
+    const uemail = document.getElementById('f-uemail').value.trim();
+    const upass = document.getElementById('f-upass').value;
+    if (uemail && upass && tenantId) {
+      const hash = await sha256(upass + 'tbg-salt-2026');
+      await sbFetch('/rest/v1/tenant_users', {
+        method: 'POST',
+        body: JSON.stringify({ tenant_id: tenantId, email: uemail, password_hash: hash, full_name: uname, role: 'admin' })
+      });
+    }
+  }
+
+  closeModal();
+  loadTenants();
+}
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function managUsers(tenantId, tenantName) {
+  alert(`User management for ${tenantName} — coming next build.`);
+}
+
+function closeModal() {
+  document.getElementById('tenantModal').classList.remove('open');
+}
+
+document.getElementById('tenantModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('tenantModal')) closeModal();
+});
+
+loadTenants();
+</script>
+</body>
+</html>
