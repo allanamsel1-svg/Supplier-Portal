@@ -7,53 +7,81 @@
 <link rel="stylesheet" href="tenant-portal.css">
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
 <style>
-  .acc-list { display: flex; flex-direction: column; gap: 10px; max-width: 980px; }
-  .acc { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  .acc-head { padding: 14px 16px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-  .acc-head:hover { background: var(--card-hover); }
-  .acc-title { font-size: 14px; font-weight: 600; color: var(--text); }
-  .acc-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
-  .acc-right { font-size: 12px; color: var(--text2); white-space: nowrap; flex-shrink: 0; text-align: right; }
-  .acc-body { padding: 0 16px 16px; font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; border-top: 1px solid var(--border); display: none; }
-  .acc.open .acc-body { display: block; padding-top: 14px; }
-  .news-item { display: block; padding: 13px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); text-decoration: none; }
-  .news-item:hover { border-color: #2563eb; background: var(--card-hover); }
-  .news-head { font-size: 14px; color: var(--text); font-weight: 600; }
-  .news-meta { font-size: 12px; color: var(--text2); margin-top: 4px; }
-  .briefing { background: var(--card-bg); border: 1px solid var(--border); border-left: 3px solid #3b82f6; border-radius: 10px; padding: 18px; max-width: 980px; margin-bottom: 18px; }
-  .briefing h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #3b82f6; margin-bottom: 8px; }
-  .briefing .b-text { font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; }
-  .ai-search { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 18px; max-width: 980px; }
-  .ai-row { display: flex; gap: 10px; }
-  .ai-input { flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 14px; color: var(--text); outline: none; }
-  .ai-input:focus { border-color: #3b82f6; }
-  .ai-send { background: #2563eb; color: rgb(255,255,255); border: none; border-radius: 8px; padding: 0 18px; font-size: 16px; cursor: pointer; }
-  .ai-send:disabled { background: #1e3a6e; cursor: not-allowed; }
-  .ai-result { margin-top: 12px; font-size: 13px; color: var(--text); line-height: 1.6; white-space: pre-wrap; display: none; }
-  .ai-result.open { display: block; }
-  .mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; max-width: 980px; }
-  .mod { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: border-color .12s; }
-  .mod:hover { border-color: #2563eb; }
-  .mod .m-ico { font-size: 18px; } .mod .m-name { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 6px; } .mod .m-cnt { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  /* shared intel bits (dark, variable-driven) */
+  .grad { background: linear-gradient(135deg,#131929 0%,#1e3a8a 100%); color:rgb(255,255,255); border-radius:14px; padding:20px 22px; margin-bottom:18px; max-width:1000px; }
+  .grad.warn { background: linear-gradient(135deg,#3a2e00 0%,#92660a 100%); }
+  .grad.alert { background: linear-gradient(135deg,#3a0a0a 0%,#991b1b 100%); }
+  .grad .g-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; opacity:.75; margin-bottom:6px; }
+  .grad .g-date { font-size:11px; opacity:.65; margin-bottom:12px; }
+  .grad .g-text { font-size:13px; line-height:1.6; opacity:.95; white-space:pre-wrap; }
+  .ai-search { background: var(--card-bg); border:1px solid var(--border); border-radius:12px; padding:14px; margin-bottom:18px; max-width:1000px; }
+  .ai-row { display:flex; gap:10px; } .ai-input { flex:1; background:var(--input-bg); border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-size:14px; color:var(--text); outline:none; }
+  .ai-input:focus { border-color:#3b82f6; } .ai-send { background:#2563eb; color:rgb(255,255,255); border:none; border-radius:8px; padding:0 18px; font-size:16px; cursor:pointer; }
+  .ai-result { margin-top:12px; font-size:13px; color:var(--text); line-height:1.6; white-space:pre-wrap; display:none; } .ai-result.open { display:block; }
+  .mods { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; max-width:1000px; }
+  .mod { background:var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:16px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; }
+  .mod:hover { border-color:#2563eb; } .mod .m-name { font-size:14px; font-weight:600; color:var(--text); } .mod .m-sub { font-size:12px; color:var(--text2); margin-top:3px; } .mod .m-val { font-size:22px; font-weight:700; color:#3b82f6; }
+  .acc-list { display:flex; flex-direction:column; gap:10px; max-width:1000px; }
+  .acc { background:var(--card-bg); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .acc-head { padding:14px 16px; cursor:pointer; display:flex; justify-content:space-between; gap:12px; align-items:flex-start; } .acc-head:hover { background:var(--card-hover); }
+  .acc-title { font-size:14px; font-weight:600; color:var(--text); } .acc-meta { font-size:12px; color:var(--text2); margin-top:3px; } .acc-right { font-size:12px; color:var(--text2); white-space:nowrap; }
+  .acc-body { padding:0 16px 16px; font-size:13px; color:var(--text); line-height:1.6; white-space:pre-wrap; border-top:1px solid var(--border); display:none; } .acc.open .acc-body { display:block; padding-top:14px; }
+  .tier-sec { margin-bottom:24px; max-width:1100px; } .tier-head { display:flex; align-items:baseline; gap:10px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .tier-name { font-size:13px; font-weight:700; color:var(--text); } .tier-count { font-size:11px; color:var(--text2); } .tier-desc { font-size:11px; color:var(--text2); font-style:italic; margin-left:auto; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
+  .dcard { background:var(--card-bg); border:1px solid var(--border); border-radius:9px; padding:14px; cursor:pointer; transition:border-color .15s; }
+  .dcard:hover { border-color:#2563eb; } .dcard.sel { border-color:#3b82f6; background:var(--card-hover); }
+  .dcard-name { font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; word-break:break-word; } .dcard-sub { font-size:10px; color:var(--text2); margin-bottom:8px; word-break:break-all; }
+  .dcard-foot { display:flex; justify-content:space-between; align-items:center; } .dcard-meta { font-size:10px; color:var(--text2); }
+  .pill { font-size:9px; font-weight:700; padding:2px 7px; border-radius:7px; letter-spacing:.04em; white-space:nowrap; }
+  .pill.live { background:rgba(74,222,128,0.14); color:#4ade80; } .pill.awaiting { background:rgba(148,163,184,0.14); color:var(--text2); } .pill.failed { background:rgba(248,113,113,0.14); color:#f87171; }
+  .tier-badge { display:inline-block; font-size:9px; padding:2px 8px; border-radius:7px; font-weight:700; }
+  .tb1 { background:rgba(236,72,153,0.16); color:#f472b6; } .tb2 { background:rgba(96,165,250,0.16); color:#60a5fa; } .tb3 { background:rgba(74,222,128,0.16); color:#4ade80; } .tb4 { background:rgba(251,191,36,0.16); color:#fbbf24; }
+  .split { display:flex; gap:16px; align-items:flex-start; }
+  .split-left { flex:1; min-width:0; } .split-right { width:560px; max-width:48%; flex-shrink:0; background:var(--bg2); border:1px solid var(--border); border-radius:10px; min-height:200px; }
+  .dstat-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-top:12px; }
+  .dstat { background:var(--card-bg); border:1px solid var(--border); border-radius:7px; padding:10px 12px; } .dstat-l { font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--text2); } .dstat-v { font-size:15px; font-weight:700; color:var(--text); margin-top:3px; word-break:break-word; }
+  .d-head { padding:18px; border-bottom:1px solid var(--border); } .d-name { font-size:20px; font-weight:700; color:var(--text); margin-bottom:6px; } .d-sub { font-size:12px; color:var(--text2); } .d-sub a { color:#60a5fa; text-decoration:none; }
+  .d-actions { padding:14px 18px; border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; }
+  .btn { padding:8px 14px; font-size:12px; font-weight:600; border:none; border-radius:7px; cursor:pointer; }
+  .btn-pri { background:#2563eb; color:rgb(255,255,255); } .btn-pri:disabled { background:#1e3a6e; cursor:not-allowed; } .btn-sec { background:var(--card-bg); border:1px solid var(--border); color:var(--text); }
+  .prod { background:var(--card-bg); border:1px solid var(--border); border-radius:8px; margin-bottom:8px; overflow:hidden; }
+  .prod-head { display:flex; gap:10px; padding:10px 12px; cursor:pointer; align-items:center; } .prod-head:hover { background:var(--card-hover); }
+  .prod-img { width:42px; height:42px; background:var(--bg2); border-radius:5px; flex-shrink:0; overflow:hidden; } .prod-img img { width:100%; height:100%; object-fit:cover; }
+  .prod-title { font-size:12px; font-weight:600; color:var(--text); } .prod-meta { font-size:10px; color:var(--text2); } .prod-price { font-size:12px; font-weight:700; color:#60a5fa; white-space:nowrap; }
+  .variants { padding:8px 12px; border-top:1px solid var(--border); display:none; } .prod.open .variants { display:block; }
+  .vrow { display:grid; grid-template-columns:1fr auto auto; gap:8px; padding:6px 0; border-bottom:.5px solid var(--border); font-size:11px; align-items:center; color:var(--text); }
+  .vstock { font-size:9px; padding:1px 5px; border-radius:5px; font-weight:700; } .vstock.in { background:rgba(74,222,128,0.14); color:#4ade80; } .vstock.out { background:rgba(248,113,113,0.14); color:#f87171; }
+  .subtabs { display:flex; gap:4px; border-bottom:1px solid var(--border); padding:0 18px; } .subtab { padding:10px 14px; font-size:12px; font-weight:600; color:var(--text2); cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; } .subtab.active { color:#3b82f6; border-bottom-color:#3b82f6; }
+  .rtag { display:inline-block; font-size:10px; padding:2px 8px; border-radius:6px; background:rgba(148,163,184,0.14); color:var(--text2); border:1px solid var(--border); margin:2px 4px 2px 0; }
+  .rtag.inv-rising { color:#f87171; } .rtag.inv-falling { color:#4ade80; } .rtag.margin-high { color:#fbbf24; } .rtag.private-label { color:#60a5fa; }
+  .ne-streams { display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; } .ne-stream { padding:7px 16px; font-size:13px; font-weight:600; background:var(--card-bg); color:var(--text2); border:1px solid var(--border); border-radius:20px; cursor:pointer; } .ne-stream.active { background:#1e3a6e; color:#93c5fd; border-color:#3b82f6; }
+  .ne-art { border:1px solid var(--border); border-radius:10px; background:var(--card-bg); padding:14px 16px; margin-bottom:8px; } .ne-art.fluff { opacity:.55; }
+  .ne-src { font-size:11px; color:var(--text2); } .ne-head { font-size:14px; font-weight:600; color:var(--text); margin:4px 0; } .ne-head a { color:var(--text); text-decoration:none; } .ne-head a:hover { color:#60a5fa; } .ne-hl { font-size:12px; color:var(--text2); line-height:1.5; }
+  .netag { display:inline-block; font-size:10px; padding:2px 7px; border-radius:6px; margin:3px 4px 0 0; background:rgba(96,165,250,0.12); color:#93c5fd; border:1px solid var(--border); }
   /* shop out */
-  .so-toolbar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-  .obs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
-  .obs-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; }
-  .obs-card:hover { border-color: #2563eb; }
-  .obs-thumb { width: 100%; height: 150px; object-fit: cover; background: var(--bg2); display: block; }
-  .obs-thumb-ph { width: 100%; height: 150px; background: var(--bg2); display: flex; align-items: center; justify-content: center; color: var(--text2); font-size: 30px; }
-  .obs-info { padding: 12px 14px; }
-  .obs-brand { font-size: 13px; font-weight: 600; color: var(--text); }
-  .obs-prod { font-size: 12px; color: var(--text2); margin-top: 2px; }
-  .obs-meta { font-size: 12px; color: var(--text2); margin-top: 6px; }
-  .obs-photos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-  .obs-photos img { width: 150px; height: 150px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
-  .back-link { color: #3b82f6; cursor: pointer; font-size: 13px; display: inline-block; margin-bottom: 14px; }
-  .act-btn { background: #2563eb; color: rgb(255,255,255); border: none; border-radius: 7px; padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; margin-right: 8px; }
-  .act-btn.ghost { background: none; border: 1px solid var(--border); color: var(--text2); }
-  .act-btn:hover { opacity: 0.9; }
-  .so-status { font-size: 12px; color: var(--text2); margin-top: 8px; }
-  .match-badge { font-size: 10px; padding: 2px 7px; border-radius: 5px; background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #166534; margin-left: 6px; }
+  .so-wrap { display:flex; gap:16px; align-items:flex-start; }
+  .so-left { width:340px; flex-shrink:0; }
+  .so-right { flex:1; min-width:0; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px; min-height:300px; }
+  .so-item { background:var(--card-bg); border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin-bottom:8px; cursor:pointer; } .so-item:hover { border-color:#2563eb; } .so-item.sel { border-color:#3b82f6; background:var(--card-hover); }
+  .so-item-name { font-size:13px; font-weight:600; color:var(--text); } .so-item-meta { font-size:11px; color:var(--text2); margin-top:3px; }
+  .dropzone { border:2px dashed var(--border); border-radius:12px; padding:40px 20px; text-align:center; color:var(--text2); cursor:pointer; background:var(--card-bg); }
+  .dropzone.over { border-color:#3b82f6; color:#93c5fd; }
+  .obs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+  .obs-card { background:var(--card-bg); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .obs-thumb { width:100%; height:140px; object-fit:cover; background:var(--bg2); display:block; } .obs-thumb-ph { width:100%; height:140px; background:var(--bg2); display:flex; align-items:center; justify-content:center; color:var(--text2); font-size:28px; }
+  .obs-info { padding:12px 14px; } .obs-brand { font-size:13px; font-weight:600; color:var(--text); } .obs-prod { font-size:12px; color:var(--text2); margin-top:2px; } .obs-meta { font-size:12px; color:var(--text2); margin-top:6px; }
+  .ml-box { width:100%; background:var(--input-bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px; padding:6px 8px; margin-top:6px; font-family:inherit; }
+  .match-badge { font-size:10px; padding:2px 7px; border-radius:5px; background:rgba(74,222,128,0.12); color:#4ade80; border:1px solid #166534; margin-left:6px; }
+  .so-status { font-size:12px; color:var(--text2); margin-top:8px; }
+  .back-link { color:#3b82f6; cursor:pointer; font-size:13px; display:inline-block; margin-bottom:12px; }
+  .lightbox { position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:80; display:none; align-items:center; justify-content:center; } .lightbox.open { display:flex; }
+  .lightbox img { max-width:90vw; max-height:88vh; border-radius:8px; } .lb-nav { position:absolute; top:50%; transform:translateY(-50%); background:rgba(255,255,255,0.12); color:rgb(255,255,255); border:none; width:44px; height:44px; border-radius:50%; font-size:22px; cursor:pointer; } .lb-prev { left:20px; } .lb-next { right:20px; } .lb-close { position:absolute; top:18px; right:20px; background:rgba(255,255,255,0.12); color:rgb(255,255,255); border:none; width:40px; height:40px; border-radius:50%; font-size:20px; cursor:pointer; }
+  .modal-ov { position:fixed; inset:0; background:rgba(2,6,16,0.6); z-index:75; display:none; align-items:center; justify-content:center; } .modal-ov.open { display:flex; }
+  .modal { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:24px; width:420px; max-width:92vw; } .modal h3 { color:var(--text); font-size:16px; margin-bottom:16px; }
+  .modal input, .modal select { width:100%; background:var(--input-bg); border:1px solid var(--border); border-radius:7px; padding:9px 11px; color:var(--text); font-size:13px; margin-bottom:12px; }
+  .cbp-card { background:var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:16px; max-width:1000px; }
+  .chip { display:inline-block; font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(148,163,184,0.12); color:var(--text2); border:1px solid var(--border); margin:2px 4px 2px 0; }
 </style>
 </head>
 <body>
@@ -80,24 +108,30 @@
 
   <div class="tab-pane" id="pane-crosssource"><div id="box-crosssource"><div class="loading">Loading…</div></div></div>
   <div class="tab-pane" id="pane-shopout"><div id="box-shopout"><div class="loading">Loading shop-outs…</div></div></div>
-  <div class="tab-pane" id="pane-factory"><div id="box-factory"></div></div>
+  <div class="tab-pane" id="pane-factory"><div id="box-factory"><div class="loading">Loading…</div></div></div>
   <div class="tab-pane" id="pane-brandwatch"><div id="box-brandwatch"><div class="loading">Loading…</div></div></div>
   <div class="tab-pane" id="pane-catalog"><div id="box-catalog"></div></div>
   <div class="tab-pane" id="pane-retailer"><div id="box-retailer"><div class="loading">Loading…</div></div></div>
   <div class="tab-pane" id="pane-social"><div id="box-social"></div></div>
   <div class="tab-pane" id="pane-news"><div id="box-news"><div class="loading">Loading…</div></div></div>
-  <div class="tab-pane" id="pane-trade"><div id="box-trade"><div class="loading">Loading…</div></div></div>
+  <div class="tab-pane" id="pane-trade"><div id="box-trade"></div></div>
   <div class="tab-pane" id="pane-fx"><div id="box-fx"><div class="loading">Loading…</div></div></div>
 </div>
+
+<div class="lightbox" id="lightbox"><button class="lb-close" id="lbClose">×</button><button class="lb-nav lb-prev" id="lbPrev">‹</button><img id="lbImg" src=""><button class="lb-nav lb-next" id="lbNext">›</button></div>
+<div class="modal-ov" id="modalOv"><div class="modal" id="modalBox"></div></div>
 
 <script src="tenant-shared.js"></script>
 <script>
 const TABS = ['crosssource', 'shopout', 'factory', 'brandwatch', 'catalog', 'retailer', 'social', 'news', 'trade', 'fx'];
+const UPLOAD_CONCURRENCY = 8, MAX_UPLOAD_ATTEMPTS = 4, CLASSIFY_CONCURRENCY = 4, PAIR_CONCURRENCY = 5;
 let TID = null, TOKEN = null;
-let runs = [], observations = [], photoMap = {};
 const loaded = {};
 function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
 function preview(t, n) { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+function timeAgo(s) { if (!s) return ''; const d = (Date.now() - new Date(s).getTime()) / 1000; if (d < 3600) return Math.floor(d / 60) + 'm ago'; if (d < 86400) return Math.floor(d / 3600) + 'h ago'; return Math.floor(d / 86400) + 'd ago'; }
+function sbPost(path, body, prefer) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: prefer || 'return=minimal' }, body: JSON.stringify(body) }); }
+function sbPatch(path, body) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }); }
 
 function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'crosssource';
@@ -109,42 +143,39 @@ function showTab(tab) {
 function goTab(tab) { location.hash = tab === 'crosssource' ? '' : '#' + tab; }
 function wireAccordion(box) { box.querySelectorAll('.acc').forEach(el => el.querySelector('.acc-head').addEventListener('click', () => el.classList.toggle('open'))); }
 function comingSoon(box, label, icon) { document.getElementById(box).innerHTML = `<div class="empty"><span class="empty-icon">${icon}</span><div style="font-size:16px;color:var(--text);margin-bottom:6px;">${esc(label)}</div>Coming Soon</div>`; }
+async function countRows(path) { try { const r = await fetch(SUPA_URL + '/rest/v1/' + path, { method: 'HEAD', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, Prefer: 'count=exact', Range: '0-0' } }); const cr = r.headers.get('content-range') || ''; const t = cr.split('/')[1]; return t && t !== '*' ? parseInt(t, 10) : 0; } catch (e) { return 0; } }
 
 // ── TAB 1: Cross Source Intel ──
 async function loadCrosssource() {
   const box = document.getElementById('box-crosssource');
-  const rows = await supa(`cross_source_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=1`);
-  const brief = rows[0];
-  const counts = await Promise.all([
-    countRows('shop_outs'), countRows('brand_watch_runs'), countRows('retailer_intel_summaries'),
-    countRows('news_daily_summaries'), countRows('trade_intelligence_searches'),
+  const brief = (await supa(`cross_source_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=1`))[0];
+  const today = new Date().toISOString().slice(0, 10);
+  const [obs, fac, brands, news, retl, fx] = await Promise.all([
+    countRows('shop_out_observations?select=id'),
+    countRows('factories?tenant_id=eq.' + TID + '&select=id'),
+    countRows('brand_watch_brands?status=eq.active&select=id'),
+    countRows('news_articles?is_fluff=eq.false&ingested_at=gte.' + today + '&select=id'),
+    countRows('retailers?status=eq.active&select=id'),
+    supa('fx_rates?pair=eq.USD%2FCNY&order=rate_date.desc&limit=1'),
   ]);
+  const fxRate = fx[0] ? Number(fx[0].rate).toFixed(4) : '—';
   const mods = [
-    { t: 'shopout', i: '🛍️', n: 'Shop Outs', c: counts[0] },
-    { t: 'brandwatch', i: '👁️', n: 'Brand Watch', c: counts[1] },
-    { t: 'retailer', i: '🏬', n: 'Retailer Intel', c: counts[2] },
-    { t: 'news', i: '📰', n: 'News & Editorial', c: counts[3] },
-    { t: 'trade', i: '🌐', n: 'Trade Intel', c: counts[4] },
-    { t: 'fx', i: '💱', n: 'FX Watch', c: null },
+    { t: 'shopout', n: 'Shop Outs', s: 'observations captured', v: obs },
+    { t: 'factory', n: 'Factory Intel', s: 'factories', v: fac },
+    { t: 'brandwatch', n: 'Brand Watch', s: 'active brands', v: brands },
+    { t: 'news', n: 'News & Editorial', s: 'signal articles today', v: news },
+    { t: 'catalog', n: 'Online Catalog', s: 'coming soon', v: '—' },
+    { t: 'retailer', n: 'Retailer Intel', s: 'active retailers', v: retl },
+    { t: 'social', n: 'Social Trends', s: 'coming soon', v: '—' },
+    { t: 'fx', n: 'FX Watch', s: 'USD/CNY', v: fxRate },
   ];
   box.innerHTML =
-    `<div class="briefing"><h3>Daily Briefing${brief ? ' · ' + fmtDate(brief.summary_date) : ''}</h3>
-       <div class="b-text">${esc(brief ? (brief.summary_text || 'No summary text.') : 'No cross-source briefing yet.')}</div></div>
-     <div class="ai-search">
-       <div class="ai-row"><input class="ai-input" id="aiInput" placeholder="Ask anything about your sourcing, factories, products, intel..."><button class="ai-send" id="aiSend">➤</button></div>
-       <div class="ai-result" id="aiResult"></div>
-     </div>
-     <div class="mods">${mods.map(m => `<div class="mod" data-go="${m.t}"><div class="m-ico">${m.i}</div><div class="m-name">${esc(m.n)}</div><div class="m-cnt">${m.c == null ? 'View' : m.c + ' record' + (m.c === 1 ? '' : 's')}</div></div>`).join('')}</div>`;
+    `<div class="grad"><div class="g-label">Daily Briefing</div><div class="g-date">${brief ? fmtDate(brief.summary_date) : ''}</div><div class="g-text">${esc(brief ? (brief.summary_text || 'No summary text.') : 'No cross-source briefing yet.')}</div></div>
+     <div class="ai-search"><div class="ai-row"><input class="ai-input" id="aiInput" placeholder="Ask anything about your sourcing, factories, products, intel..."><button class="ai-send" id="aiSend">➤</button></div><div class="ai-result" id="aiResult"></div></div>
+     <div class="mods">${mods.map(m => `<div class="mod" data-go="${m.t}"><div><div class="m-name">${esc(m.n)}</div><div class="m-sub">${esc(m.s)}</div></div><div class="m-val">${esc(String(m.v))}</div></div>`).join('')}</div>`;
   box.querySelectorAll('.mod').forEach(el => el.addEventListener('click', () => goTab(el.dataset.go)));
   document.getElementById('aiSend').addEventListener('click', runSearch);
   document.getElementById('aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
-}
-async function countRows(table) {
-  try {
-    const r = await fetch(SUPA_URL + '/rest/v1/' + table + '?tenant_id=eq.' + TID + '&select=id', { method: 'HEAD', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, Prefer: 'count=exact', Range: '0-0' } });
-    const cr = r.headers.get('content-range') || ''; const tot = cr.split('/')[1];
-    return tot && tot !== '*' ? parseInt(tot, 10) : 0;
-  } catch (e) { return 0; }
 }
 async function runSearch() {
   const q = document.getElementById('aiInput').value.trim(); if (!q) return;
@@ -158,278 +189,458 @@ async function runSearch() {
   btn.disabled = false;
 }
 
-// ── TAB 2: Shop Outs (full) ──
+// ── TAB 2: Shop Outs (full left/right) ──
+let shops = [], custMap = {}, selectedShop = null, crossIndex = {};
 const cnt = a => (Array.isArray(a) && a[0] && a[0].count) || 0;
-async function loadShopout() {
-  runs = await supa(`shop_outs?tenant_id=eq.${TID}&order=shop_date.desc&select=*,shop_out_sections(count),shop_out_observations(count)`);
-  document.getElementById('cnt-shopout').textContent = runs.length;
-  renderShopHome();
+async function loadShops() {
+  const [list, custs] = await Promise.all([
+    supa(`shop_outs?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_out_sections(count),shop_out_observations(count)`),
+    supa(`customers?tenant_id=eq.${TID}&select=id,customer_name`),
+  ]);
+  shops = list; custMap = {}; custs.forEach(c => custMap[c.id] = c.customer_name);
+  document.getElementById('cnt-shopout').textContent = shops.length;
+  buildCrossIndex();
+  renderShopUI();
 }
-function renderShopHome() {
-  const box = document.getElementById('box-shopout');
-  box.innerHTML = `<div class="so-toolbar">
-      <input class="search-input" id="soSearch" placeholder="Search location / status…">
-      <select class="filter-select" id="soStatus"><option value="all">All statuses</option></select>
-      <label style="font-size:12px;color:var(--text2);"><input type="checkbox" id="soArchived"> Show archived</label>
-      <button class="act-btn ghost" id="soObsBtn">All Observations</button>
-    </div>
-    <div id="so-list"></div>`;
-  const statuses = Array.from(new Set(runs.map(r => r.status || r.processing_status).filter(Boolean))).sort();
-  const sel = document.getElementById('soStatus');
-  statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
-  document.getElementById('soSearch').addEventListener('input', renderRunList);
-  document.getElementById('soStatus').addEventListener('change', renderRunList);
-  document.getElementById('soArchived').addEventListener('change', renderRunList);
-  document.getElementById('soObsBtn').addEventListener('click', loadAllObservations);
-  renderRunList();
+function retailerName(s) { return (s.customer_id && custMap[s.customer_id]) || s.store_location_text || 'Unknown retailer'; }
+async function buildCrossIndex() {
+  // cross-retailer price index across this tenant's observations
+  const all = await supa(`shop_out_observations?tenant_id=eq.${TID}&select=brand,product_name,retail_price,shop_out_id&limit=2000`);
+  crossIndex = {};
+  all.forEach(o => { const k = ((o.brand || '') + '|' + (o.product_name || '')).toLowerCase().trim(); if (!k || k === '|') return; (crossIndex[k] = crossIndex[k] || []).push(o); });
 }
-function renderRunList() {
+function crossSearch(o) { const k = ((o.brand || '') + '|' + (o.product_name || '')).toLowerCase().trim(); const hits = (crossIndex[k] || []).filter(x => x.retail_price != null); return hits.length > 1 ? hits : null; }
+function factoryBadge(o) { return o.factory_match_id ? '<span class="match-badge">Factory match</span>' : ''; }
+function renderShopUI() {
+  document.getElementById('box-shopout').innerHTML = `<div class="so-wrap">
+      <div class="so-left">
+        <div style="display:flex;gap:8px;margin-bottom:10px;"><input class="search-input" id="soSearch" placeholder="Search retailer…" style="flex:1;min-width:0;"><button class="btn btn-pri" id="soNew">+ New</button></div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;"><select class="filter-select" id="soStatus" style="flex:1;"><option value="all">All statuses</option><option value="pending">pending</option><option value="processing">processing</option><option value="complete">complete</option><option value="failed">failed</option></select><label style="font-size:11px;color:var(--text2);"><input type="checkbox" id="soArch"> Archived</label></div>
+        <div id="soList"></div>
+      </div>
+      <div class="so-right" id="soDetail"><div class="empty">Select a shop-out to view detail.</div></div>
+    </div>`;
+  document.getElementById('soSearch').addEventListener('input', renderList);
+  document.getElementById('soStatus').addEventListener('change', renderList);
+  document.getElementById('soArch').addEventListener('change', renderList);
+  document.getElementById('soNew').addEventListener('click', newShopOut);
+  renderList();
+}
+function renderList() {
   const q = (document.getElementById('soSearch').value || '').toLowerCase().trim();
   const st = document.getElementById('soStatus').value;
-  const showArch = document.getElementById('soArchived').checked;
-  let rows = runs.slice();
-  if (!showArch) rows = rows.filter(r => !r.archived_at && !r.deleted_at);
-  if (st !== 'all') rows = rows.filter(r => (r.status || r.processing_status) === st);
-  if (q) rows = rows.filter(r => (r.store_location_text || '').toLowerCase().includes(q) || (r.status || '').toLowerCase().includes(q));
-  const box = document.getElementById('so-list');
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🛍️</span>No shop-out runs.</div>'; return; }
-  box.innerHTML = `<table class="data-table"><thead><tr><th>Location</th><th>Visit date</th><th>Sections</th><th>Observations</th><th>Status</th></tr></thead><tbody>${
-    rows.map(r => `<tr class="clickable" data-id="${esc(r.id)}"><td>${esc(r.store_location_text || 'Unknown location')}</td>
-      <td>${fmtDate(r.shop_date)}</td><td>${cnt(r.shop_out_sections)}</td>
-      <td>${r.total_observations != null ? r.total_observations : cnt(r.shop_out_observations)}</td>
-      <td>${statusBadge(r.status || r.processing_status)}</td></tr>`).join('')
-  }</tbody></table>`;
-  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => showRunDetail(tr.dataset.id)));
+  const arch = document.getElementById('soArch').checked;
+  let rows = shops.slice();
+  if (!arch) rows = rows.filter(s => !s.archived_at && !s.deleted_at);
+  if (st !== 'all') rows = rows.filter(s => (s.processing_status || s.status) === st);
+  if (q) rows = rows.filter(s => retailerName(s).toLowerCase().includes(q));
+  const box = document.getElementById('soList');
+  if (!rows.length) { box.innerHTML = '<div class="empty" style="padding:24px;">No shop-outs.</div>'; return; }
+  box.innerHTML = rows.map(s => `<div class="so-item${selectedShop === s.id ? ' sel' : ''}" data-id="${esc(s.id)}">
+      <div class="so-item-name">${esc(retailerName(s))}</div>
+      <div class="so-item-meta">${fmtDate(s.shop_date)} · ${esc(s.store_location_text || '')}</div>
+      <div class="so-item-meta">${statusBadge(s.processing_status || s.status)} · ${s.total_photos || 0} 📷 · ${s.total_observations != null ? s.total_observations : cnt(s.shop_out_observations)} obs</div>
+    </div>`).join('');
+  box.querySelectorAll('.so-item').forEach(el => el.addEventListener('click', () => selectShop(el.dataset.id)));
 }
-async function showRunDetail(id) {
-  const box = document.getElementById('box-shopout');
-  const r = runs.find(x => x.id === id);
-  box.innerHTML = '<div class="loading">Loading run…</div>';
+function selectShop(id) { selectedShop = id; renderList(); renderDetail(id); }
+async function renderDetail(id) {
+  const s = shops.find(x => x.id === id); const det = document.getElementById('soDetail');
+  if (!s) return; det.innerHTML = '<div class="loading">Loading…</div>';
+  const status = (s.processing_status || s.status || 'pending').toLowerCase();
+  const head = `<div class="d-name">${esc(retailerName(s))}</div><div class="d-sub">${fmtDate(s.shop_date)} · ${esc(s.store_location_text || '')} · ${statusBadge(status)}</div>`;
+  if (status === 'pending' && (!s.total_photos || s.total_photos === 0)) {
+    det.innerHTML = head + `<div class="dropzone" id="dz" style="margin-top:16px;">📤 Drag &amp; drop photos here, or click to upload<input type="file" id="dzFile" accept="image/*" multiple style="display:none;"></div><div class="so-status" id="soActStatus"></div>`;
+    setupDropzone(id); return;
+  }
+  if (status === 'pending') {
+    det.innerHTML = head + `<div style="margin-top:16px;">${s.total_photos} photo(s) uploaded · ~${Math.ceil(s.total_photos / 2)} pair(s) · est. AI cost ~$${(s.total_photos * 0.01).toFixed(2)}</div>
+      <div style="margin-top:12px;"><button class="btn btn-pri" id="soProc">⚙ Process with AI</button> <button class="btn btn-sec" id="soMore">Add more photos</button><input type="file" id="dzFile" accept="image/*" multiple style="display:none;"></div><div class="so-status" id="soActStatus"></div>`;
+    document.getElementById('soProc').addEventListener('click', () => triggerProcessing(id));
+    document.getElementById('soMore').addEventListener('click', () => document.getElementById('dzFile').click());
+    document.getElementById('dzFile').addEventListener('change', e => handleFiles(id, e.target.files));
+    return;
+  }
+  if (status === 'processing') { det.innerHTML = head + `<div style="margin-top:16px;color:var(--text2);">⏳ AI processing in progress…</div>`; return; }
+  // complete / failed → full detail
   const [sections, obs] = await Promise.all([
     supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
     supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
   ]);
-  const pmap = {};
-  const fpIds = obs.map(o => o.front_photo_id).filter(Boolean);
-  if (fpIds.length) { (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => pmap[p.id] = p.file_path); }
-  const prices = await supa(`shop_out_price_history?shop_out_id=eq.${id}&order=created_at.desc&limit=50&select=brand,product_name,previous_price,retail_price,price_change_pct,price_change_direction`);
-
-  const head = r ? kv([
-    ['Location', r.store_location_text], ['Visit date', fmtDate(r.shop_date)],
-    ['Status', statusBadge(r.status || r.processing_status), true],
-    ['Photos', r.total_photos], ['Observations', r.total_observations],
-  ]) : '';
-  const actions = `<div style="margin:12px 0;">
-      <input type="file" id="soFile" accept="image/*" multiple style="display:none;">
-      <button class="act-btn" id="soUpload">📤 Upload Photos</button>
-      <button class="act-btn ghost" id="soProcess">⚙ Run AI Processing</button>
-      <div class="so-status" id="soActStatus"></div>
-    </div>`;
-  const secList = sections.length ? sections.map(s => `<div class="sub-item">
-      <div class="si-title">${esc(s.department || s.category_detected || 'Section')}</div>
-      <div class="si-meta">${[s.brand_summary && preview(s.brand_summary, 140), s.estimated_linear_feet && s.estimated_linear_feet + ' ft'].filter(Boolean).map(esc).join(' · ') || '—'}</div>
-    </div>`).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
+  const pmap = {}; const fpIds = obs.map(o => o.front_photo_id).filter(Boolean);
+  if (fpIds.length) (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => pmap[p.id] = p.file_path);
+  const prices = await loadPriceChanges(id);
+  const clearance = obs.filter(o => o.is_clearance).length;
+  const secCards = sections.length ? sections.map(sec => `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(sec.department || sec.category_detected || 'Section')}</div><div class="acc-meta">${[sec.estimated_linear_feet && sec.estimated_linear_feet + ' ft', sec.ai_confidence != null && 'conf ' + sec.ai_confidence].filter(Boolean).map(esc).join(' · ')}</div></div><div class="acc-right">${sec.category_override ? esc(sec.category_override) : ''}</div></div><div class="acc-body">${esc(sec.brand_summary || 'No brand summary.')}</div></div>`).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
   const obsCards = obs.length ? '<div class="obs-grid">' + obs.map(o => {
-    const fp = pmap[o.front_photo_id];
-    const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
-    const match = o.factory_match_id ? '<span class="match-badge">Factory match</span>' : '';
-    return `<div class="obs-card" data-id="${esc(o.id)}">${thumb}<div class="obs-info">
-        <div class="obs-brand">${esc(o.brand || '—')}${match}</div>
-        <div class="obs-prod">${esc(o.product_name || '')}</div>
-        <div class="obs-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
-        ${o.ml_observation_comment ? '<div class="obs-meta" style="margin-top:4px;">🤖 ' + esc(preview(o.ml_observation_comment, 80)) + '</div>' : ''}
+    const fp = pmap[o.front_photo_id]; const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+    const cross = crossSearch(o); const crossBadge = cross ? `<span class="chip">seen at ${cross.length} retailers</span>` : '';
+    return `<div class="obs-card"><div class="obs-thumb-wrap" data-fp="${esc(fp || '')}">${thumb}</div><div class="obs-info">
+        <div class="obs-brand">${esc(o.brand || '—')}${factoryBadge(o)}</div><div class="obs-prod">${esc(o.product_name || '')}${o.pack_size ? ' · ' + esc(o.pack_size) + (o.pack_size_unit ? ' ' + esc(o.pack_size_unit) : '') : ''}</div>
+        <div class="obs-meta">${[o.retail_price != null && money(o.retail_price), o.is_clearance && 'CLEARANCE'].filter(Boolean).map(esc).join(' · ')} ${crossBadge}</div>
+        ${o.ml_observation ? '<div class="obs-meta" style="margin-top:4px;">🤖 ' + esc(preview(o.ml_observation, 90)) + '</div>' : ''}
+        <textarea class="ml-box" data-obs="${esc(o.id)}" placeholder="Reviewer comment…">${esc(o.ml_observation_comment || '')}</textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;align-items:center;"><select class="ml-box" style="margin:0;width:auto;flex:1;" data-status="${esc(o.id)}"><option value="">—</option><option ${o.ml_observation_status === 'confirmed' ? 'selected' : ''}>confirmed</option><option ${o.ml_observation_status === 'rejected' ? 'selected' : ''}>rejected</option><option ${o.ml_observation_status === 'adjusted' ? 'selected' : ''}>adjusted</option></select>
+        <button class="btn btn-sec" data-save="${esc(o.id)}">Save</button><button class="btn btn-sec" data-rfq="${esc(o.id)}">RFQ</button></div>
       </div></div>`;
   }).join('') + '</div>' : '<div class="empty" style="padding:12px;">No observations.</div>';
-  const priceTable = prices.length ? `<table class="data-table"><thead><tr><th>Product</th><th>Was</th><th>Now</th><th>Change</th></tr></thead><tbody>${
-    prices.map(p => { const col = (p.price_change_direction || '').toLowerCase() === 'up' ? '#f87171' : '#4ade80'; const v = p.price_change_pct != null ? (p.price_change_pct > 0 ? '+' : '') + Number(p.price_change_pct).toFixed(0) + '%' : '—';
-      return `<tr><td>${esc(p.product_name || p.brand || '—')}</td><td>${money(p.previous_price)}</td><td>${money(p.retail_price)}</td><td style="color:${col};font-weight:600;">${esc(v)}</td></tr>`; }).join('')
-  }</tbody></table>` : '<div class="empty" style="padding:12px;">No price changes recorded.</div>';
-
-  box.innerHTML = `<span class="back-link" id="soBack">← All shop-outs</span>
-    <div class="panel-section"><h3>Run</h3>${head}${actions}</div>
-    <div class="panel-section"><h3>Section Intelligence (${sections.length})</h3><div class="sub-list">${secList}</div></div>
+  const priceCards = prices.length ? `<table class="data-table"><thead><tr><th>Product</th><th>Was</th><th>Now</th><th>Δ</th><th>Validation</th></tr></thead><tbody>${prices.map(p => { const col = (p.price_change_direction || '').toLowerCase() === 'up' ? '#f87171' : '#4ade80'; const v = p.price_change_pct != null ? (p.price_change_pct > 0 ? '+' : '') + Number(p.price_change_pct).toFixed(0) + '%' : '—'; return `<tr><td>${esc(p.product_name || p.brand || '—')}</td><td>${money(p.previous_price)}</td><td>${money(p.retail_price)}</td><td style="color:${col};font-weight:600;">${esc(v)}</td><td>${esc(p.ml_validation_status || '—')}</td></tr>`; }).join('')}</tbody></table>` : '<div class="empty" style="padding:12px;">No price changes.</div>';
+  det.innerHTML = `<span class="back-link" id="soBackTop">▾ Detail</span>${head}
+    <div style="margin:12px 0;display:flex;gap:14px;flex-wrap:wrap;"><div class="dstat"><div class="dstat-l">Photos</div><div class="dstat-v">${s.total_photos || 0}</div></div><div class="dstat"><div class="dstat-l">Observations</div><div class="dstat-v">${obs.length}</div></div><div class="dstat"><div class="dstat-l">Clearance signals</div><div class="dstat-v">${clearance}</div></div><div class="dstat"><div class="dstat-l">Sections</div><div class="dstat-v">${sections.length}</div></div></div>
+    <div class="d-actions" style="padding:0 0 12px;"><button class="btn btn-sec" id="soArchBtn">${s.archived_at ? 'Restore' : 'Archive'}</button><button class="btn btn-sec" id="soDelBtn">Delete</button><button class="btn btn-sec" id="soLocBtn">Edit location</button></div>
+    <div class="panel-section"><h3>Section Intelligence (${sections.length})</h3><div class="acc-list">${secCards}</div></div>
     <div class="panel-section"><h3>Observations (${obs.length})</h3>${obsCards}</div>
-    <div class="panel-section"><h3>Competitor Price Intel (${prices.length})</h3>${priceTable}</div>`;
-  document.getElementById('soBack').addEventListener('click', renderShopHome);
-  document.getElementById('soUpload').addEventListener('click', () => document.getElementById('soFile').click());
-  document.getElementById('soFile').addEventListener('change', e => uploadPhotos(id, e.target.files));
-  document.getElementById('soProcess').addEventListener('click', () => processRun(id));
-  box.querySelectorAll('.obs-card').forEach(c => c.addEventListener('click', () => openObs(obs.find(x => x.id === c.dataset.id))));
+    <div class="panel-section"><h3>Cross-Retailer Price Intelligence (${prices.length})</h3>${priceCards}</div>`;
+  // wire
+  det.querySelectorAll('.obs-thumb-wrap[data-fp]').forEach(el => { const fp = el.dataset.fp; if (fp) el.style.cursor = 'zoom-in', el.addEventListener('click', () => openLightbox([photoUrl(fp)], 0)); });
+  det.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', () => saveMlComment(b.dataset.save)));
+  det.querySelectorAll('[data-rfq]').forEach(b => b.addEventListener('click', () => { const o = obs.find(x => x.id === b.dataset.rfq); rfqFromObservation(o); }));
+  document.getElementById('soArchBtn').addEventListener('click', () => toggleArchive(s));
+  document.getElementById('soDelBtn').addEventListener('click', () => deleteShopOut(s));
+  document.getElementById('soLocBtn').addEventListener('click', () => editLocationFor(s));
 }
-async function uploadPhotos(shopOutId, files) {
-  const status = document.getElementById('soActStatus');
-  if (!files || !files.length) return;
-  status.textContent = 'Uploading ' + files.length + ' photo(s)…';
-  let ok = 0, fail = 0;
-  for (const f of files) {
-    const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = shopOutId + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + safe;
+async function loadPriceChanges(id) { return await supa(`shop_out_price_history?shop_out_id=eq.${id}&order=created_at.desc&limit=50&select=brand,product_name,previous_price,retail_price,price_change_pct,price_change_direction,ml_validation_status,shop_outs!inner(tenant_id)&shop_outs.tenant_id=eq.${TID}`); }
+function setupDropzone(id) {
+  const dz = document.getElementById('dz'), file = document.getElementById('dzFile');
+  dz.addEventListener('click', () => file.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); handleFiles(id, e.dataTransfer.files); });
+  file.addEventListener('change', e => handleFiles(id, e.target.files));
+}
+async function reencodeHeic(file) {
+  // best-effort HEIC/large image re-encode to JPEG via canvas
+  try {
+    const bmp = await createImageBitmap(file);
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
+    return blob || file;
+  } catch (e) { return file; }
+}
+async function uploadOneWithRetry(id, file, seq) {
+  let body = file, ct = file.type || 'image/jpeg';
+  if (/heic|heif/i.test(file.type) || /\.heic$/i.test(file.name)) { body = await reencodeHeic(file); ct = 'image/jpeg'; }
+  const path = id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2, 8) + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/\.heic$/i, '.jpg');
+  for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt++) {
     try {
-      const r = await fetch(SUPA_URL + '/storage/v1/object/shop-out-photos/' + path, {
-        method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f,
-      });
-      if (r.ok) ok++; else fail++;
-    } catch (e) { fail++; }
+      const r = await fetch(SUPA_URL + '/storage/v1/object/shop-out-photos/' + path, { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': ct }, body });
+      if (r.ok) { await sbPost('shop_out_photos', { shop_out_id: id, file_path: path, photo_sequence_number: seq, tenant_id: TID, upload_status: 'uploaded' }).catch(() => {}); return true; }
+    } catch (e) {}
+    await new Promise(res => setTimeout(res, 400 * attempt));
   }
-  status.textContent = `Uploaded ${ok}, failed ${fail}. ${fail ? 'Photo storage may require admin permission; run AI processing to ingest.' : 'Now run AI processing to extract observations.'}`;
+  return false;
 }
-async function processRun(shopOutId) {
-  const status = document.getElementById('soActStatus');
-  status.textContent = 'Triggering AI processing…';
+async function handleFiles(id, files) {
+  const status = document.getElementById('soActStatus'); if (!files || !files.length) return;
+  const arr = Array.from(files); let done = 0, ok = 0; status.textContent = 'Uploading 0/' + arr.length + '…';
+  // simple concurrency pool
+  let i = 0;
+  async function worker() { while (i < arr.length) { const idx = i++; const r = await uploadOneWithRetry(id, arr[idx], idx); if (r) ok++; done++; status.textContent = 'Uploading ' + done + '/' + arr.length + '…'; } }
+  await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, arr.length) }, worker));
+  await sbPatch('shop_outs?id=eq.' + id, { total_photos: (shops.find(x => x.id === id).total_photos || 0) + ok, processing_status: 'pending' }).catch(() => {});
+  status.textContent = `Uploaded ${ok}/${arr.length}. ${ok < arr.length ? 'Some uploads need admin storage permission.' : 'Ready to process.'}`;
+  const sh = shops.find(x => x.id === id); if (sh) sh.total_photos = (sh.total_photos || 0) + ok;
+  setTimeout(() => renderDetail(id), 800);
+}
+async function triggerProcessing(id) {
+  const status = document.getElementById('soActStatus'); status.textContent = 'Starting AI processing…';
+  const photos = await supa(`shop_out_photos?shop_out_id=eq.${id}&order=photo_sequence_number.asc&select=id,file_path,photo_type`);
+  if (!photos.length) { status.textContent = 'No photos to process.'; return; }
+  await sbPatch('shop_outs?id=eq.' + id, { processing_status: 'processing' }).catch(() => {});
+  const s = shops.find(x => x.id === id); const rname = retailerName(s);
   try {
-    const r = await fetch('/api/process-shop-out-v2', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shop_out_id: shopOutId, tenant_id: TID }) });
-    const d = await r.json().catch(() => ({}));
-    status.textContent = r.ok ? 'AI processing started. Refresh shortly to see new observations.' : ('Processing error: ' + (d.error || ('HTTP ' + r.status)));
-  } catch (e) { status.textContent = 'Could not reach the processing service.'; }
+    // PASS 0 — classify
+    status.textContent = 'Pass 0/3 — classifying photos…';
+    await pool(photos, CLASSIFY_CONCURRENCY, p => fetch('/api/classify-shop-out-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
+    // PASS 1 — sections
+    status.textContent = 'Pass 1/3 — analyzing sections…';
+    const sects = photos.filter(p => p.photo_type === 'section');
+    await pool(sects, PAIR_CONCURRENCY, p => fetch('/api/process-shop-out-section', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
+    // PASS 2 — pair products (front+back)
+    status.textContent = 'Pass 2/3 — pairing products…';
+    const prods = photos.filter(p => p.photo_type !== 'section');
+    const pairs = []; for (let k = 0; k < prods.length; k += 2) pairs.push([prods[k], prods[k + 1]]);
+    await pool(pairs, PAIR_CONCURRENCY, async pr => { for (let a = 0; a < 3; a++) { const r = await fetch('/api/process-shop-out-pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id, frontPhotoId: pr[0] && pr[0].id, backPhotoId: pr[1] && pr[1].id, frontPath: pr[0] && pr[0].file_path, backPath: pr[1] && pr[1].file_path, retailerName: rname, retailerCountry: 'USA' }) }).catch(() => ({ status: 0 })); if (r && r.status !== 429) break; await new Promise(res => setTimeout(res, 1500 * (a + 1))); } });
+    // PASS 3 + location
+    status.textContent = 'Finalizing…';
+    await fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id }) }).catch(() => {});
+    await sbPatch('shop_outs?id=eq.' + id, { processing_status: 'complete' }).catch(() => {});
+    status.textContent = 'Processing complete.';
+    await loadShops(); selectShop(id);
+  } catch (e) { status.textContent = 'Processing error: ' + e.message; await sbPatch('shop_outs?id=eq.' + id, { processing_status: 'failed' }).catch(() => {}); }
 }
-function openObs(o) {
-  if (!o) return;
-  let detail = document.getElementById('obs-detail');
-  if (detail) detail.remove();
-  detail = document.createElement('div');
-  detail.id = 'obs-detail'; detail.className = 'panel-section';
-  const photoIds = [o.front_photo_id, o.back_photo_id].concat(Array.isArray(o.supplemental_photo_ids) ? o.supplemental_photo_ids : []).filter(Boolean);
-  const info = kv([
-    ['Brand', o.brand], ['Sub-brand', o.sub_brand], ['Product', o.product_name],
-    ['Retail price', o.retail_price != null ? money(o.retail_price) : null], ['Compare-at', o.compare_at_price != null ? money(o.compare_at_price) : null],
-    ['Unit price', o.unit_price != null ? money(o.unit_price) : null], ['Pack', [o.pack_size, o.pack_size_unit].filter(Boolean).join(' ')],
-    ['UPC', o.upc], ['Country', o.country_of_origin], ['Clearance', o.is_clearance ? 'Yes' : null],
-    ['Factory match', o.factory_match_id ? 'Yes' : null], ['ML comment', o.ml_observation_comment || o.ml_observation],
-  ]);
-  detail.innerHTML = `<h3>Observation: ${esc(o.brand || '—')} ${esc(o.product_name || '')}</h3>${info}
-    <div class="obs-photos" id="obsPhotos"></div>
-    <div style="margin-top:10px;"><button class="act-btn" id="obsRfq">➕ Add to RFQ Pipeline</button></div>
-    <div class="so-status" id="obsRfqStatus"></div>`;
-  document.getElementById('box-shopout').appendChild(detail);
-  if (photoIds.length) supa(`shop_out_photos?id=in.(${photoIds.join(',')})&select=file_path`).then(ph => {
-    document.getElementById('obsPhotos').innerHTML = ph.map(p => p.file_path ? `<img src="${esc(photoUrl(p.file_path))}" loading="lazy" onerror="this.style.display='none'">` : '').join('');
+async function pool(items, n, fn) { let i = 0; async function w() { while (i < items.length) { const idx = i++; await fn(items[idx]); } } await Promise.all(Array.from({ length: Math.min(n, items.length || 1) }, w)); }
+async function saveMlComment(obsId) {
+  const det = document.getElementById('soDetail');
+  const comment = det.querySelector(`[data-obs="${obsId}"]`).value;
+  const st = det.querySelector(`[data-status="${obsId}"]`).value;
+  await sbPatch('shop_out_observations?id=eq.' + obsId, { ml_observation_comment: comment, ml_observation_status: st || null }).catch(() => {});
+  const btn = det.querySelector(`[data-save="${obsId}"]`); if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => btn.textContent = 'Save', 1500); }
+}
+async function toggleArchive(s) { await sbPatch('shop_outs?id=eq.' + s.id, { archived_at: s.archived_at ? null : new Date().toISOString() }).catch(() => {}); await loadShops(); selectShop(s.id); }
+async function deleteShopOut(s) { if (!confirm('Delete this shop-out?')) return; await sbPatch('shop_outs?id=eq.' + s.id, { deleted_at: new Date().toISOString() }).catch(() => {}); selectedShop = null; await loadShops(); document.getElementById('soDetail').innerHTML = '<div class="empty">Deleted.</div>'; }
+function editLocationFor(s) { const v = prompt('Store location:', s.store_location_text || ''); if (v == null) return; sbPatch('shop_outs?id=eq.' + s.id, { store_location_text: v }).then(() => { s.store_location_text = v; renderDetail(s.id); }); }
+function detectLocationFor(id) { fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id }) }).catch(() => {}); }
+function newShopOut() {
+  const opts = Object.entries(custMap).map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
+  openModal(`<h3>New Shop Out</h3>
+    <label style="font-size:11px;color:var(--text2);">Retailer (customer)</label><select id="nsRetailer"><option value="">— select —</option>${opts}<option value="__new">+ New retailer…</option></select>
+    <input id="nsNewName" placeholder="New retailer name" style="display:none;">
+    <input id="nsLoc" placeholder="Store location (optional)">
+    <div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-sec" id="nsCancel">Cancel</button><button class="btn btn-pri" id="nsSave">Create</button></div>`);
+  document.getElementById('nsRetailer').addEventListener('change', e => { document.getElementById('nsNewName').style.display = e.target.value === '__new' ? 'block' : 'none'; });
+  document.getElementById('nsCancel').addEventListener('click', closeModal);
+  document.getElementById('nsSave').addEventListener('click', async () => {
+    let cid = document.getElementById('nsRetailer').value;
+    if (cid === '__new') { const nm = document.getElementById('nsNewName').value.trim(); if (!nm) return; const r = await sbPost('customers', { customer_name: nm, tenant_id: TID, is_active: true }, 'return=representation'); const d = await r.json().catch(() => []); cid = d[0] && d[0].id; }
+    await sbPost('shop_outs', { tenant_id: TID, customer_id: cid || null, store_location_text: document.getElementById('nsLoc').value.trim() || null, shop_date: new Date().toISOString().slice(0, 10), processing_status: 'pending', status: 'pending' }).catch(() => {});
+    closeModal(); await loadShops();
   });
-  document.getElementById('obsRfq').addEventListener('click', () => addToPipeline(o));
-  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
-async function addToPipeline(o) {
-  const status = document.getElementById('obsRfqStatus');
-  status.textContent = 'Adding to RFQ pipeline…';
-  try {
-    const r = await fetch(SUPA_URL + '/rest/v1/shop_out_rfq_pipeline', {
-      method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ tenant_id: TID, observation_id: o.id, shop_out_id: o.shop_out_id, status: 'new', spotted_brand: o.brand, spotted_product: o.product_name, spotted_retail_price: o.retail_price }),
-    });
-    status.textContent = r.ok ? 'Added to RFQ pipeline ✓' : 'Could not add (may require write permission).';
-  } catch (e) { status.textContent = 'Could not add to pipeline.'; }
+function rfqFromObservation(o) {
+  if (!o) return;
+  openModal(`<h3>Create RFQ from spotted item</h3>
+    <div style="font-size:13px;color:var(--text);margin-bottom:12px;">${esc(o.brand || '')} — ${esc(o.product_name || '')}</div>
+    <input id="rfqVal" placeholder="Target wholesale (optional)" type="number">
+    <div style="display:flex;gap:8px;justify-content:flex-end;"><button class="btn btn-sec" id="rfqCancel">Cancel</button><button class="btn btn-pri" id="rfqSave">Add to pipeline</button></div>`);
+  document.getElementById('rfqCancel').addEventListener('click', closeModal);
+  document.getElementById('rfqSave').addEventListener('click', async () => {
+    const tw = parseFloat(document.getElementById('rfqVal').value) || null;
+    await sbPost('shop_out_rfq_pipeline', { tenant_id: TID, observation_id: o.id, shop_out_id: o.shop_out_id, status: 'new', spotted_brand: o.brand, spotted_product: o.product_name, spotted_retail_price: o.retail_price, target_wholesale: tw }).catch(() => {});
+    closeModal();
+  });
 }
-async function loadAllObservations() {
-  const box = document.getElementById('box-shopout');
-  box.innerHTML = '<span class="back-link" id="aoBack">← Shop-out runs</span><div class="toolbar"><input class="search-input" id="aoSearch" placeholder="Search by brand or product…"></div><div id="ao-grid"><div class="loading">Loading observations…</div></div>';
-  document.getElementById('aoBack').addEventListener('click', renderShopHome);
-  observations = await supa(`shop_out_observations?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_outs(store_location_text)`);
-  const fpIds = observations.map(o => o.front_photo_id).filter(Boolean);
-  photoMap = {};
-  if (fpIds.length) (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => photoMap[p.id] = p.file_path);
+
+// ── TAB 3: Factory Intel (read-only; factory_prospects global) ──
+async function loadFactory() {
+  const box = document.getElementById('box-factory');
+  const rows = await supa(`factory_prospects?order=created_at.desc&limit=200`);
+  if (!rows.length) { comingSoon('box-factory', 'Factory Intel', '🏭'); return; }
+  box.innerHTML = `<div class="toolbar"><input class="search-input" id="fpSearch" placeholder="Search factory / country / category…"></div><div id="fpList"></div>`;
   const render = () => {
-    const q = (document.getElementById('aoSearch').value || '').toLowerCase().trim();
-    let rows = observations.filter(o => !q || [o.brand, o.product_name, o.sub_brand].some(v => (v || '').toLowerCase().includes(q)));
-    const g = document.getElementById('ao-grid');
-    if (!rows.length) { g.innerHTML = '<div class="empty">No observations.</div>'; return; }
-    g.innerHTML = '<div class="obs-grid">' + rows.map(o => { const fp = photoMap[o.front_photo_id];
-      const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
-      return `<div class="obs-card" data-id="${esc(o.id)}">${thumb}<div class="obs-info"><div class="obs-brand">${esc(o.brand || '—')}</div><div class="obs-prod">${esc(o.product_name || '')}</div><div class="obs-meta">${[o.retail_price != null && money(o.retail_price), o.shop_outs && o.shop_outs.store_location_text].filter(v => v || v === 0).map(esc).join(' · ')}</div></div></div>`;
-    }).join('') + '</div>';
-    g.querySelectorAll('.obs-card').forEach(c => c.addEventListener('click', () => openObs(observations.find(x => x.id === c.dataset.id))));
+    const q = (document.getElementById('fpSearch').value || '').toLowerCase().trim();
+    const f = rows.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
+    document.getElementById('fpList').innerHTML = '<div class="acc-list">' + f.map(r => `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(r.factory_name || 'Factory')}</div><div class="acc-meta">${[r.city, r.country, r.status].filter(Boolean).map(esc).join(' · ')}</div></div><div class="acc-right">${esc(r.discovery_source || '')}</div></div><div class="acc-body">${esc(JSON.stringify(r, null, 1))}</div></div>`).join('') + '</div>';
+    wireAccordion(document.getElementById('fpList'));
   };
-  document.getElementById('aoSearch').addEventListener('input', render);
-  render();
+  document.getElementById('fpSearch').addEventListener('input', render); render();
 }
 
-// ── TAB 3: Factory Intel (BETA — no factory_prospects table) ──
-function loadFactory() { comingSoon('box-factory', 'Factory Intel', '🏭'); }
-
-// ── TAB 4: Brand Watch ──
+// ── TAB 4: Brand Watch (4-tier grid) ──
+let bwBrands = [], bwRun = {}, bwSel = null;
+const BW_TIERS = { 1: ['Celebrity-Founded', 'Steep launch curves, trickle to mass and off-price'], 2: ['DTC Challenger', 'Originate formulation and positioning shifts'], 3: ['Wellness Adjacent', 'Fragrance, body, hair, wellness crossing into beauty'], 4: ['K-Beauty Originator', 'Upstream of US trends by 12–18 months'] };
 async function loadBrandwatch() {
+  const [brands, runs] = await Promise.all([
+    supa('brand_watch_brands?select=*&order=tier.asc,name.asc'),
+    supa('brand_watch_runs?select=brand_id,status,started_at,products_discovered&order=started_at.desc&limit=300'),
+  ]);
+  bwBrands = brands; bwRun = {}; runs.forEach(r => { if (!bwRun[r.brand_id]) bwRun[r.brand_id] = r; });
   const box = document.getElementById('box-brandwatch');
-  const rs = await supa(`brand_watch_runs?tenant_id=eq.${TID}&order=started_at.desc&select=*,brand_watch_brands(name)`);
-  if (!rs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">👁️</span>No brand watch runs yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rs.map(r => `<div class="acc" data-run="${esc(r.id)}">
-    <div class="acc-head"><div><div class="acc-title">${esc(r.brand_watch_brands && r.brand_watch_brands.name || 'Brand')}</div>
-      <div class="acc-meta">${r.products_discovered != null ? r.products_discovered + ' products' : '—'} · ${statusBadge(r.status)}</div></div>
-      <div class="acc-right">${fmtDate(r.started_at)}</div></div>
-    <div class="acc-body"><div class="loading" style="padding:10px;">Loading products…</div></div></div>`).join('') + '</div>';
-  box.querySelectorAll('.acc').forEach(el => el.querySelector('.acc-head').addEventListener('click', async () => {
-    el.classList.toggle('open'); const body = el.querySelector('.acc-body'); if (body.dataset.done) return; body.dataset.done = '1';
-    const ps = await supa(`brand_watch_products?run_id=eq.${el.dataset.run}&order=product_title.asc&select=product_title,vendor,price_current_cents,in_stock,product_url`);
-    body.innerHTML = ps.length ? '<div class="sub-list">' + ps.map(p => `<div class="sub-item"><div class="si-title">${esc(p.product_title || 'Product')}</div><div class="si-meta">${[p.vendor, p.price_current_cents != null && money(p.price_current_cents / 100), p.in_stock ? 'in stock' : 'out of stock'].filter(v => v || v === 0).map(esc).join(' · ')}${p.product_url ? ' · <a href="' + esc(p.product_url) + '" target="_blank" style="color:#60a5fa;">view</a>' : ''}</div></div>`).join('') + '</div>' : '<div class="empty" style="padding:10px;">No products captured.</div>';
-  }));
+  box.innerHTML = `<div class="split"><div class="split-left" id="bwList"></div><div class="split-right" id="bwDetail"><div class="empty">Select a brand to view details.</div></div></div>`;
+  const list = document.getElementById('bwList');
+  list.innerHTML = [1, 2, 3, 4].map(t => {
+    const bs = bwBrands.filter(b => b.tier === t);
+    return `<div class="tier-sec"><div class="tier-head"><div class="tier-name">Tier ${t} — ${BW_TIERS[t][0]}</div><div class="tier-count">${bs.length} brands</div><div class="tier-desc">${BW_TIERS[t][1]}</div></div>
+      <div class="grid">${bs.map(b => { const run = bwRun[b.id]; let pc = 'awaiting', pt = 'AWAITING CRAWL'; if (run) { if (run.status === 'success') { pc = 'live'; pt = 'LIVE DATA'; } else if (run.status === 'failed' || run.status === 'blocked') { pc = 'failed'; pt = 'FAILED'; } }
+        const meta = (run && run.status === 'success' && run.products_discovered) ? run.products_discovered + ' products' : '';
+        return `<div class="dcard" data-id="${esc(b.id)}"><div class="dcard-name">${esc(b.name)}</div><div class="dcard-sub">${esc(b.domain || '')}</div><div class="dcard-foot"><span class="pill ${pc}">${pt}</span><span class="dcard-meta">${esc(meta)}</span></div></div>`; }).join('')}</div></div>`;
+  }).join('');
+  list.querySelectorAll('.dcard').forEach(el => el.addEventListener('click', () => selectBrand(el.dataset.id)));
+}
+function selectBrand(id) {
+  bwSel = id; document.querySelectorAll('#bwList .dcard').forEach(el => el.classList.toggle('sel', el.dataset.id === id));
+  const b = bwBrands.find(x => x.id === id); if (!b) return; const run = bwRun[id]; const hasLive = run && run.status === 'success';
+  const freq = b.crawl_frequency_hours || (b.tier === 3 ? 336 : 168);
+  document.getElementById('bwDetail').innerHTML = `<div class="d-head"><div class="d-name">${esc(b.name)}</div>
+    <div class="d-sub"><a href="${esc(b.storefront_url || ('https://' + (b.domain || '')))}" target="_blank">${esc(b.domain || '')} ↗</a></div>
+    <span class="tier-badge tb${b.tier}">Tier ${b.tier} · ${BW_TIERS[b.tier][0]}</span>
+    <div class="dstat-grid"><div class="dstat"><div class="dstat-l">Platform</div><div class="dstat-v">${esc((b.platform || 'unknown').replace(/_/g, ' '))}</div></div>
+      <div class="dstat"><div class="dstat-l">Crawl Frequency</div><div class="dstat-v">${freq < 48 ? freq + 'h' : Math.round(freq / 24) + 'd'}</div></div>
+      <div class="dstat"><div class="dstat-l">Last Crawl</div><div class="dstat-v" style="font-size:11px;">${run ? new Date(run.started_at).toLocaleString() : 'Never'}</div></div>
+      <div class="dstat"><div class="dstat-l">Products Found</div><div class="dstat-v">${run ? (run.products_discovered || 0) : '—'}</div></div></div></div>
+    <div class="d-actions"><button class="btn btn-pri" id="bwCrawl">▶ Run Crawl Now</button><button class="btn btn-sec" id="bwVisit">Visit Site ↗</button></div>
+    <div id="bwProducts" style="padding:14px 18px;"></div>`;
+  document.getElementById('bwVisit').addEventListener('click', () => window.open(b.storefront_url || ('https://' + b.domain), '_blank'));
+  document.getElementById('bwCrawl').addEventListener('click', () => runCrawl(b.id));
+  if (hasLive) loadBrandProducts(id); else document.getElementById('bwProducts').innerHTML = '<div class="empty" style="padding:14px;">No crawl data yet. Click Run Crawl Now to fetch the catalog.</div>';
+}
+async function loadBrandProducts(brandId) {
+  const [products, variants] = await Promise.all([
+    supa('brand_watch_products?brand_id=eq.' + brandId + '&order=observed_at.desc&limit=500'),
+    supa('brand_watch_variants?brand_id=eq.' + brandId + '&order=observed_at.desc&limit=2000'),
+  ]);
+  const sec = document.getElementById('bwProducts');
+  if (!products.length) { sec.innerHTML = '<div class="empty" style="padding:14px;">No products captured.</div>'; return; }
+  const vByP = {}; variants.forEach(v => (vByP[v.product_id] = vByP[v.product_id] || []).push(v));
+  const money2 = c => c == null ? '' : '$' + (c / 100).toFixed(2);
+  sec.innerHTML = `<div class="acc-meta" style="margin-bottom:8px;">${products.length} products · ${variants.length} variants <input class="search-input" id="bwFilter" placeholder="Filter…" style="float:right;width:160px;padding:4px 8px;"></div><div id="bwProdList">` +
+    products.map(p => { const vs = vByP[p.id] || []; let pr = ''; if (p.price_min_cents === p.price_max_cents) pr = money2(p.price_min_cents); else if (p.price_min_cents && p.price_max_cents) pr = money2(p.price_min_cents) + ' – ' + money2(p.price_max_cents); else if (p.price_current_cents) pr = money2(p.price_current_cents);
+      return `<div class="prod" data-s="${esc((p.product_title || '').toLowerCase())}"><div class="prod-head"><div class="prod-img">${p.image_url ? '<img src="' + esc(p.image_url) + '" loading="lazy">' : ''}</div><div style="flex:1;min-width:0;"><div class="prod-title">${esc(p.product_title || '')}</div><div class="prod-meta">${vs.length} variants${p.product_type ? ' · ' + esc(p.product_type) : ''}</div></div><div class="prod-price">${pr}</div></div>
+        <div class="variants">${vs.length ? vs.map(v => { const so = v.size_text ? esc(v.size_text) : (v.shade_or_scent ? esc(v.shade_or_scent) : (v.variant_title && v.variant_title !== 'Default Title' ? esc(v.variant_title) : '')); const stock = v.in_stock === true ? '<span class="vstock in">IN</span>' : (v.in_stock === false ? '<span class="vstock out">OUT</span>' : ''); return `<div class="vrow"><div>${so}</div><div class="prod-price">${money2(v.price_current_cents)}</div><div>${stock}</div></div>`; }).join('') : '<div style="font-size:11px;color:var(--text2);padding:6px 0;">No variants captured</div>'}</div></div>`;
+    }).join('') + '</div>';
+  document.querySelector('.prod-head') && sec.querySelectorAll('.prod-head').forEach(h => h.addEventListener('click', () => h.parentNode.classList.toggle('open')));
+  document.getElementById('bwFilter').addEventListener('input', e => { const q = e.target.value.toLowerCase().trim(); sec.querySelectorAll('#bwProdList .prod').forEach(el => el.style.display = (!q || (el.dataset.s || '').includes(q)) ? '' : 'none'); });
+}
+function runCrawl(brandId) {
+  const btn = document.getElementById('bwCrawl'); btn.disabled = true; btn.textContent = 'Crawling…';
+  fetch('/api/scrape-brand-shopify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brand_id: brandId }) }).then(r => r.json()).then(d => {
+    if (d.success) { btn.textContent = '✓ ' + d.products_discovered + ' products'; setTimeout(() => { loadBrandwatch(); }, 1200); }
+    else { btn.disabled = false; btn.textContent = '▶ Run Crawl Now'; alert('Crawl failed: ' + (d.error || 'unknown')); }
+  }).catch(e => { btn.disabled = false; btn.textContent = '▶ Run Crawl Now'; alert('Crawl error: ' + e.message); });
 }
 
-// ── TAB 5: Online Catalog (SOON) ──
+// ── TAB 5 / 7: SOON ──
 function loadCatalog() { comingSoon('box-catalog', 'Online Catalog', '🗂️'); }
-
-// ── TAB 6: Retailer Intel ──
-async function loadRetailer() {
-  const box = document.getElementById('box-retailer');
-  const rows = await supa(`retailer_intel_summaries?tenant_id=eq.${TID}&order=summary_date.desc&select=*,retailers(name)`);
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🏬</span>No retailer intel summaries yet.</div>'; return; }
-  box.innerHTML = '<div class="acc-list">' + rows.map(r => `<div class="acc">
-    <div class="acc-head"><div><div class="acc-title">${esc(r.retailers && r.retailers.name || 'Retailer')}</div>
-      <div class="acc-meta">${esc(preview(r.summary_text, 120) || 'No summary')}</div></div><div class="acc-right">${fmtDate(r.summary_date)}</div></div>
-    <div class="acc-body">${esc(r.summary_text || 'No summary text.')}</div></div>`).join('') + '</div>';
-  wireAccordion(box);
-}
-
-// ── TAB 7: Social Trends (SOON) ──
 function loadSocial() { comingSoon('box-social', 'Social Trends', '📱'); }
 
-// ── TAB 8: News & Editorial ──
-async function loadNews() {
-  const box = document.getElementById('box-news');
-  const since = new Date(Date.now() - 7 * 864e5).toISOString();
-  const [summaries, recent] = await Promise.all([
-    supa(`news_daily_summaries?tenant_id=eq.${TID}&order=summary_date.desc&limit=10`),
-    supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles!inner(headline,source_name,external_url,published_at,ai_highlight),retailers(name)&news_articles.published_at=gte.${since}&order=ingested_at.desc&limit=60`),
+// ── TAB 6: Retailer Intel (4-tier + filings/news) ──
+let rtRetailers = [], rtSel = null, rtSubtab = 'filings';
+const RT_TIERS = { 1: ['Off-Price', "TBG's primary sell-in channel"], 2: ['Mass + Dollar / Value', 'Volume channels, private-label pressure'], 3: ['Drug + Beauty Specialty', 'Beauty-category specific signals'], 4: ['Club + Department', 'Adjacent channels'] };
+async function loadRetailer() {
+  const [rets, filings, news] = await Promise.all([
+    supa('retailers?select=*&order=tier.asc,name.asc'),
+    supa('retailer_filings?select=retailer_id&limit=2000'),
+    supa('retailer_news?select=retailer_id&limit=2000'),
   ]);
-  let html = '';
-  if (summaries.length) {
-    html += '<div class="acc-list" style="margin-bottom:18px;">' + summaries.map(s => `<div class="acc"><div class="acc-head"><div>
-      <div class="acc-title">Daily summary · ${fmtDate(s.summary_date)}</div><div class="acc-meta">${s.article_count != null ? s.article_count + ' headlines' : preview(s.summary_text, 100)}</div></div>
-      <div class="acc-right">${s.article_count != null ? s.article_count + ' 📰' : ''}</div></div><div class="acc-body">${esc(s.summary_text || '')}</div></div>`).join('') + '</div>';
-  }
-  let news = recent;
-  if (!news.length) news = await supa(`retailer_news?tenant_id=eq.${TID}&select=id,ingested_at,news_articles(headline,source_name,external_url,published_at),retailers(name)&order=ingested_at.desc&limit=60`);
-  html += '<div class="acc-list">' + (news.length ? news.map(r => { const a = r.news_articles || {};
-    return `<a class="news-item" href="${esc(a.external_url || '#')}" target="_blank" rel="noopener"><div class="news-head">${esc(a.headline || '(Untitled)')}</div>
-      <div class="news-meta">${[a.source_name, r.retailers && r.retailers.name, fmtDate(a.published_at || r.ingested_at)].filter(Boolean).map(esc).join(' · ')} ↗</div></a>`; }).join('') : '<div class="empty">No news yet.</div>') + '</div>';
-  box.innerHTML = html;
-  wireAccordion(box);
+  rtRetailers = rets;
+  const fc = {}, nc = {}; filings.forEach(f => fc[f.retailer_id] = (fc[f.retailer_id] || 0) + 1); news.forEach(n => nc[n.retailer_id] = (nc[n.retailer_id] || 0) + 1);
+  const box = document.getElementById('box-retailer');
+  box.innerHTML = `<div class="split"><div class="split-left" id="rtList"></div><div class="split-right" id="rtDetail"><div class="empty">Select a retailer.</div></div></div>`;
+  document.getElementById('rtList').innerHTML = [1, 2, 3, 4].map(t => { const rs = rtRetailers.filter(r => r.tier === t);
+    return `<div class="tier-sec"><div class="tier-head"><div class="tier-name">Tier ${t} — ${RT_TIERS[t][0]}</div><div class="tier-count">${rs.length}</div><div class="tier-desc">${RT_TIERS[t][1]}</div></div>
+      <div class="grid">${rs.map(r => { const has = (fc[r.id] || 0) + (nc[r.id] || 0) > 0; return `<div class="dcard" data-id="${esc(r.id)}"><div class="dcard-name">${esc(r.name)}${r.ticker ? ' <span class="dcard-meta">' + esc(r.ticker) + '</span>' : ''}</div><div class="dcard-sub">${[r.hq_city, r.hq_state].filter(Boolean).map(esc).join(', ')}</div><div class="dcard-foot"><span class="pill ${has ? 'live' : 'awaiting'}">${has ? 'TRACKED' : 'AWAITING PULL'}</span><span class="dcard-meta">${fc[r.id] || 0} filings · ${nc[r.id] || 0} news</span></div></div>`; }).join('')}</div></div>`;
+  }).join('');
+  document.getElementById('rtList').querySelectorAll('.dcard').forEach(el => el.addEventListener('click', () => selectRetailer(el.dataset.id)));
+}
+function selectRetailer(id) {
+  rtSel = id; rtSubtab = 'filings'; document.querySelectorAll('#rtList .dcard').forEach(el => el.classList.toggle('sel', el.dataset.id === id));
+  const r = rtRetailers.find(x => x.id === id); if (!r) return;
+  document.getElementById('rtDetail').innerHTML = `<div class="d-head"><div class="d-name">${esc(r.name)}${r.ticker ? ' <span class="tier-badge tb' + r.tier + '">' + esc(r.ticker) + '</span>' : ''}</div>
+    <div class="d-sub">Tier ${r.tier} — ${RT_TIERS[r.tier][0]} · ${[r.hq_city, r.hq_state].filter(Boolean).map(esc).join(', ')}${r.ir_url ? ' · <a href="' + esc(r.ir_url) + '" target="_blank">IR ↗</a>' : ''}</div>
+    <div class="dstat-grid"><div class="dstat"><div class="dstat-l">CIK</div><div class="dstat-v">${esc(r.cik || '—')}</div></div><div class="dstat"><div class="dstat-l">Status</div><div class="dstat-v">${esc(r.status || '—')}</div></div></div></div>
+    <div class="subtabs"><button class="subtab active" data-st="filings">SEC Filings</button><button class="subtab" data-st="news">News</button></div>
+    <div id="rtBody" style="padding:14px 18px;"><div class="loading">Loading…</div></div>`;
+  document.querySelectorAll('#rtDetail .subtab').forEach(b => b.addEventListener('click', () => { rtSubtab = b.dataset.st; document.querySelectorAll('#rtDetail .subtab').forEach(x => x.classList.toggle('active', x === b)); rtSubtab === 'filings' ? loadFilings(id) : loadRetailerNews(id); }));
+  loadFilings(id);
+}
+async function loadFilings(id) {
+  const rows = await supa('retailer_filings?retailer_id=eq.' + id + '&order=filing_date.desc.nullslast&limit=30');
+  const body = document.getElementById('rtBody');
+  if (!rows.length) { body.innerHTML = '<div class="empty" style="padding:12px;">No SEC filings pulled yet.</div>'; return; }
+  body.innerHTML = rows.map(f => { const sig = f.ai_extracted_signals || {}; let tags = '';
+    if (sig.inventory_trend && sig.inventory_trend !== 'not_mentioned') tags += `<span class="rtag ${sig.inventory_trend === 'rising' ? 'inv-rising' : sig.inventory_trend === 'falling' ? 'inv-falling' : ''}">Inventory: ${esc(sig.inventory_trend)}</span>`;
+    if (sig.margin_pressure && sig.margin_pressure !== 'not_mentioned') tags += `<span class="rtag ${sig.margin_pressure === 'high' ? 'margin-high' : ''}">Margin: ${esc(sig.margin_pressure)}</span>`;
+    if (sig.private_label_intentions && sig.private_label_intentions !== 'not_mentioned') tags += `<span class="rtag private-label">Private label: ${esc(sig.private_label_intentions)}</span>`;
+    if (sig.tariff_mentions) tags += '<span class="rtag">Tariffs mentioned</span>';
+    (sig.category_signals || []).slice(0, 3).forEach(s => tags += `<span class="rtag">${esc(s)}</span>`);
+    (sig.exec_moves || []).slice(0, 2).forEach(s => tags += `<span class="rtag">Exec: ${esc(s)}</span>`);
+    return `<div class="ne-art"><div class="ne-src">${esc(f.form_type || 'Filing')} · ${fmtDate(f.filing_date)}${f.filing_url ? ' · <a href="' + esc(f.filing_url) + '" target="_blank" style="color:#60a5fa;">SEC ↗</a>' : ''}</div><div class="ne-hl" style="margin-top:6px;">${esc(f.ai_summary || 'No AI summary.')}</div><div style="margin-top:6px;">${tags}</div></div>`;
+  }).join('');
+}
+async function loadRetailerNews(id) {
+  const rows = await supa('retailer_news?retailer_id=eq.' + id + '&select=ingested_at,news_articles(headline,external_url,source_name,published_at,ai_highlight,signal_types)&order=ingested_at.desc&limit=50');
+  const body = document.getElementById('rtBody');
+  if (!rows.length) { body.innerHTML = '<div class="empty" style="padding:12px;">No news pulled yet.</div>'; return; }
+  body.innerHTML = rows.map(r => { const a = r.news_articles || {}; let tags = ''; (a.signal_types || []).forEach(s => tags += `<span class="netag">${esc(s)}</span>`);
+    return `<div class="ne-art"><div class="ne-src">${esc(a.source_name || '')} · ${timeAgo(a.published_at || r.ingested_at)}</div><div class="ne-head"><a href="${esc(a.external_url || '#')}" target="_blank">${esc(a.headline || '(Untitled)')}</a></div>${a.ai_highlight ? '<div class="ne-hl">' + esc(a.ai_highlight) + '</div>' : ''}<div>${tags}</div></div>`;
+  }).join('');
 }
 
-// ── TAB 9: Trade Intel ──
-async function loadTrade() {
-  const box = document.getElementById('box-trade');
-  const rows = await supa(`trade_intelligence_searches?tenant_id=eq.${TID}&order=searched_at.desc`);
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🌐</span>No trade intelligence searches yet.</div>'; return; }
-  box.innerHTML = `<table class="data-table"><thead><tr><th>Query</th><th>HTS code</th><th>Ruling #</th><th>Searched</th></tr></thead><tbody>${
-    rows.map(r => `<tr><td>${esc(r.keyword || '—')}</td><td>${esc(r.hts_code || '—')}</td><td>${esc(r.ruling_number || '—')}</td><td>${fmtDate(r.searched_at)}</td></tr>`).join('')
-  }</tbody></table>`;
+// ── TAB 8: News & Editorial ──
+let neArticles = [], neStream = 'all', neHideFluff = true;
+const NE_THRESHOLD = 0.35;
+function neWeight(a, s) { const w = a.stream_weights || {}; return w[s] || 0; }
+async function loadNews() {
+  const box = document.getElementById('box-news');
+  const brief = (await supa('news_daily_summaries?order=summary_date.desc&limit=1'))[0];
+  neArticles = await supa('news_articles?order=published_at.desc&limit=200');
+  box.innerHTML = `<div class="grad"><div class="g-label">Daily Trend Summary</div><div class="g-date">${brief ? fmtDate(brief.summary_date) + ' · ' + (brief.article_count || 0) + ' articles' : ''}</div><div class="g-text">${esc(brief ? (brief.summary_text || '') : 'No daily summary yet.')}</div></div>
+    <div class="toolbar"><label style="font-size:12px;color:var(--text2);"><input type="checkbox" id="neFluff" checked> Hide fluff</label><span style="font-size:12px;color:var(--text2);" id="neCount"></span><button class="btn btn-sec" id="neRefresh" style="margin-left:auto;">↻ Refresh Feed</button></div>
+    <div class="ne-streams" id="neStreams">${['all', 'trade', 'consumer', 'celebrity', 'lifestyle'].map(s => `<button class="ne-stream${s === 'all' ? ' active' : ''}" data-s="${s}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
+    <div id="neFeed"></div>`;
+  document.getElementById('neFluff').addEventListener('change', e => { neHideFluff = e.target.checked; renderNews(); });
+  document.getElementById('neRefresh').addEventListener('click', () => { const b = document.getElementById('neRefresh'); b.disabled = true; b.textContent = 'Refreshing…'; fetch('/api/fetch-news-alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(() => loadNews()).catch(() => { b.disabled = false; b.textContent = '↻ Refresh Feed'; }); });
+  document.querySelectorAll('#neStreams .ne-stream').forEach(b => b.addEventListener('click', () => { neStream = b.dataset.s; document.querySelectorAll('#neStreams .ne-stream').forEach(x => x.classList.toggle('active', x === b)); renderNews(); }));
+  renderNews();
+}
+function renderNews() {
+  let f = neHideFluff ? neArticles.filter(a => !a.is_fluff) : neArticles.slice();
+  if (neStream !== 'all') f = f.filter(a => neWeight(a, neStream) >= NE_THRESHOLD).sort((x, y) => neWeight(y, neStream) - neWeight(x, neStream));
+  document.getElementById('neCount').textContent = f.length + ' articles';
+  const feed = document.getElementById('neFeed');
+  if (!f.length) { feed.innerHTML = '<div class="empty">No articles in this stream.</div>'; return; }
+  feed.innerHTML = f.map(a => { let tags = '';
+    (a.mentioned_brands || []).slice(0, 4).forEach(b => tags += `<span class="netag">${esc(b)}</span>`);
+    (a.mentioned_celebrities || []).slice(0, 3).forEach(c => tags += `<span class="netag">${esc(c)}</span>`);
+    (a.mentioned_ingredients || []).slice(0, 3).forEach(i => tags += `<span class="netag">${esc(i)}</span>`);
+    (a.mentioned_retailers || []).slice(0, 3).forEach(r => tags += `<span class="netag">${esc(r)}</span>`);
+    (a.signal_types || []).forEach(s => tags += `<span class="netag">${esc(s)}</span>`);
+    return `<div class="ne-art ${a.is_fluff ? 'fluff' : ''}"><div class="ne-src">${esc(a.source_name || '')} · ${timeAgo(a.published_at || a.ingested_at)}${a.is_fluff ? ' · FLUFF' : ''}</div><div class="ne-head"><a href="${esc(a.external_url || '#')}" target="_blank">${esc(a.headline || '(Untitled)')}</a></div>${a.ai_highlight ? '<div class="ne-hl">' + esc(a.ai_highlight) + '</div>' : ''}<div>${tags}</div></div>`;
+  }).join('');
+}
+
+// ── TAB 9: Trade Intel (CBP CROSS) ──
+function loadTrade() {
+  document.getElementById('box-trade').innerHTML = `<div class="cbp-card">
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Search CBP CROSS Rulings for U.S. import classification precedent on a product or HTS code.</div>
+    <div class="toolbar"><input class="search-input" id="cbpQ" placeholder="Keyword or HTS code (e.g. facial serum, 3304.99)"><button class="btn btn-pri" id="cbpGo">Search</button></div>
+    <div id="cbpResults"></div></div>`;
+  document.getElementById('cbpGo').addEventListener('click', cbpSearch);
+  document.getElementById('cbpQ').addEventListener('keydown', e => { if (e.key === 'Enter') cbpSearch(); });
+}
+async function cbpSearch() {
+  const q = document.getElementById('cbpQ').value.trim(); if (!q) return;
+  const res = document.getElementById('cbpResults'); res.innerHTML = '<div class="loading">Searching CBP CROSS…</div>';
+  const isHts = /^[0-9.]+$/.test(q);
+  sbPost('trade_intelligence_searches', isHts ? { hts_code: q, searched_at: new Date().toISOString(), tenant_id: TID } : { keyword: q, searched_at: new Date().toISOString(), tenant_id: TID }).catch(() => {});
+  try {
+    const r = await fetch('/api/trade-lookup?source=cross&q=' + encodeURIComponent(q));
+    const d = await r.json().catch(() => ({}));
+    const rulings = d.rulings || d.results || [];
+    if (!rulings.length) { res.innerHTML = '<div class="empty">No rulings found.</div>'; return; }
+    res.innerHTML = '<div class="acc-list" style="margin-top:14px;">' + rulings.map(x => `<div class="ne-art"><div class="ne-src">${esc(x.ruling_number || x.rulingNumber || '')} · ${esc(x.collection || 'CROSS')} · ${esc(x.ruling_date || x.date || '')}</div>
+      <div class="ne-head">${x.url || x.link ? '<a href="' + esc(x.url || x.link) + '" target="_blank">' + esc(x.subject || x.title || 'Ruling') + ' ↗</a>' : esc(x.subject || x.title || 'Ruling')}</div>
+      ${(x.categories || []).length ? '<div>' + (x.categories || []).map(c => '<span class="chip">' + esc(c) + '</span>').join('') + '</div>' : ''}
+      ${(x.tariffs || x.hts || []).length ? '<div>' + (x.tariffs || x.hts || []).map(t => '<span class="chip">' + esc(t) + '</span>').join('') + '</div>' : ''}</div>`).join('') + '</div>';
+  } catch (e) { res.innerHTML = '<div class="empty">Search error: ' + esc(e.message) + '</div>'; }
 }
 
 // ── TAB 10: FX Watch ──
 async function loadFx() {
   const box = document.getElementById('box-fx');
-  const rows = await supa(`fx_rates?order=rate_date.desc&limit=60&select=pair,rate,rate_date,source`);
-  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">💱</span>No FX rates available.</div>'; return; }
-  const pairs = {};
-  rows.forEach(r => { (pairs[r.pair] = pairs[r.pair] || []).push(r); });
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-bottom:18px;max-width:980px;">';
-  Object.keys(pairs).forEach(p => { const latest = pairs[p][0];
-    html += `<div class="briefing" style="margin:0;"><h3>${esc(p)}</h3><div style="font-size:26px;font-weight:700;color:var(--text);">${Number(latest.rate).toFixed(4)}</div><div class="acc-meta">as of ${fmtDate(latest.rate_date)} · ${esc(latest.source || '')}</div></div>`; });
-  html += '</div>';
-  html += `<table class="data-table"><thead><tr><th>Pair</th><th>Rate</th><th>Date</th><th>Source</th></tr></thead><tbody>${
-    rows.map(r => `<tr><td>${esc(r.pair)}</td><td>${Number(r.rate).toFixed(4)}</td><td>${fmtDate(r.rate_date)}</td><td>${esc(r.source || '—')}</td></tr>`).join('')
-  }</tbody></table>`;
-  box.innerHTML = html;
+  const rows = await supa('fx_rates?pair=eq.USD%2FCNY&order=rate_date.desc&limit=30');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">💱</span>No FX data yet.</div>'; return; }
+  const latest = rows[0], prior = rows[1];
+  const delta = prior ? ((Number(latest.rate) - Number(prior.rate)) / Number(prior.rate)) * 100 : null;
+  const absD = delta == null ? 0 : Math.abs(delta);
+  const cls = absD >= 2 ? 'alert' : (absD >= 1 ? 'warn' : '');
+  const arrow = delta == null ? '—' : (delta > 0 ? '▲' : (delta < 0 ? '▼' : '·'));
+  const dtxt = delta == null ? 'no prior day' : ((delta > 0 ? '+' : '') + delta.toFixed(3) + '% d/d');
+  const note = absD >= 2 ? '⚠ Drift exceeds 2% d/d — material impact on landed cost from CN factories.' : (absD >= 1 ? '⚠ Drift exceeds 1% d/d — worth monitoring.' : '');
+  // chart
+  const data = rows.slice().reverse(); const W = 720, H = 200, padL = 48, padR = 14, padT = 14, padB = 26;
+  const rates = data.map(r => Number(r.rate)); let min = Math.min(...rates), max = Math.max(...rates); if (min === max) { min -= 0.01; max += 0.01; }
+  const X = i => padL + (W - padL - padR) * i / (data.length - 1), Y = v => padT + (H - padT - padB) * (1 - (v - min) / (max - min));
+  const pts = data.map((r, i) => X(i).toFixed(1) + ',' + Y(Number(r.rate)).toFixed(1)).join(' ');
+  const grid = [max, (min + max) / 2, min].map(v => { const yy = Y(v).toFixed(1); return `<line x1="${padL}" x2="${W - padR}" y1="${yy}" y2="${yy}" stroke="#1e2d47" stroke-width="1"/><text x="${padL - 6}" y="${Number(yy) + 3.5}" text-anchor="end" font-size="10" fill="#6b7280">${v.toFixed(3)}</text>`; }).join('');
+  const svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:200px;">${grid}<polyline fill="none" stroke="#60a5fa" stroke-width="2" points="${pts}"/><circle cx="${X(data.length - 1).toFixed(1)}" cy="${Y(rates[rates.length - 1]).toFixed(1)}" r="3.5" fill="#60a5fa"/></svg>`;
+  const t14 = rows.slice(0, 14);
+  const tbl = t14.map((r, i) => { const prev = t14[i + 1]; const d = prev ? ((Number(r.rate) - Number(prev.rate)) / Number(prev.rate)) * 100 : null; const col = d == null ? 'var(--text2)' : (d > 0 ? '#f87171' : (d < 0 ? '#4ade80' : 'var(--text2)')); const ar = d == null ? '—' : (d > 0 ? '▲' : (d < 0 ? '▼' : '·')); const tx = d == null ? '—' : ((d > 0 ? '+' : '') + d.toFixed(3) + '%'); return `<tr><td>${esc(fmtDate(r.rate_date))}</td><td style="text-align:right;">${Number(r.rate).toFixed(4)}</td><td style="text-align:right;color:${col};">${ar} ${esc(tx)}</td></tr>`; }).join('');
+  box.innerHTML = `<div class="grad ${cls}"><div class="g-label">USD → CNY · Daily Reference Rate</div><div class="g-date">${esc(fmtDate(latest.rate_date))} · source: ${esc(latest.source || '—')}</div>
+      <div style="display:flex;align-items:baseline;gap:24px;flex-wrap:wrap;"><div style="font-size:44px;font-weight:700;line-height:1;">${Number(latest.rate).toFixed(4)}</div><div style="font-size:15px;font-weight:600;padding:5px 11px;background:rgba(255,255,255,0.14);border-radius:8px;">${arrow} ${esc(dtxt)}</div></div>${note ? '<div style="font-size:11.5px;opacity:.85;margin-top:14px;">' + esc(note) + '</div>' : ''}</div>
+    <div class="panel-section"><h3>30-Day Trend</h3>${svg}</div>
+    <div class="panel-section"><h3>Recent Rates (last 14 days)</h3><table class="data-table"><thead><tr><th>Date</th><th style="text-align:right;">Rate</th><th style="text-align:right;">Δ d/d</th></tr></thead><tbody>${tbl}</tbody></table></div>`;
 }
 
-const LOADERS = { crosssource: loadCrosssource, shopout: loadShopout, factory: loadFactory, brandwatch: loadBrandwatch, catalog: loadCatalog, retailer: loadRetailer, social: loadSocial, news: loadNews, trade: loadTrade, fx: loadFx };
+// ── lightbox + modal ──
+let lbImgs = [], lbIdx = 0;
+function openLightbox(imgs, idx) { lbImgs = imgs; lbIdx = idx || 0; document.getElementById('lbImg').src = lbImgs[lbIdx]; document.getElementById('lightbox').classList.add('open'); }
+function lbStep(n) { if (!lbImgs.length) return; lbIdx = (lbIdx + n + lbImgs.length) % lbImgs.length; document.getElementById('lbImg').src = lbImgs[lbIdx]; }
+function openModal(html) { document.getElementById('modalBox').innerHTML = html; document.getElementById('modalOv').classList.add('open'); }
+function closeModal() { document.getElementById('modalOv').classList.remove('open'); }
+
+const LOADERS = { crosssource: loadCrosssource, shopout: loadShops, factory: loadFactory, brandwatch: loadBrandwatch, catalog: loadCatalog, retailer: loadRetailer, social: loadSocial, news: loadNews, trade: loadTrade, fx: loadFx };
 
 (async function init() {
   const user = await tenantAuth();
@@ -439,6 +650,10 @@ const LOADERS = { crosssource: loadCrosssource, shopout: loadShopout, factory: l
   renderSidebar(user);
   document.getElementById('pageSub').textContent = user.tenant.name + ' · intelligence';
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('lbClose').addEventListener('click', () => document.getElementById('lightbox').classList.remove('open'));
+  document.getElementById('lbPrev').addEventListener('click', () => lbStep(-1));
+  document.getElementById('lbNext').addEventListener('click', () => lbStep(1));
+  document.getElementById('modalOv').addEventListener('click', e => { if (e.target.id === 'modalOv') closeModal(); });
   window.addEventListener('hashchange', () => showTab((location.hash || '#crosssource').slice(1)));
   showTab((location.hash || '#crosssource').slice(1));
 })();
