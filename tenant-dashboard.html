@@ -44,6 +44,22 @@
   .w-empty { font-size: 12px; color: var(--text2); flex: 1; display: flex; align-items: center; }
   .w-foot { margin-top: 12px; font-size: 12px; color: #3b82f6; text-align: right; }
   .up { color: #f87171; } .down { color: #4ade80; }
+
+  .gauge-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 16px; }
+  .gauge-card.warn { border-color: #f59e0b; }
+  .gauge-card.danger { border-color: #ef4444; }
+  .gauge-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .gauge-sub { font-size: 11px; color: var(--text2); margin-bottom: 14px; }
+  .gauge-bar-wrap { position: relative; height: 20px; background: var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+  .gauge-bar-fill { height: 100%; border-radius: 10px; transition: width 0.6s ease; }
+  .gauge-bar-pct { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; color: #fff; }
+  .gauge-detail { font-size: 12px; color: var(--text2); display: flex; gap: 16px; flex-wrap: wrap; }
+  .gauge-detail strong { color: var(--text); }
+  .gauge-banner { border-radius: 8px; padding: 10px 14px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+  .gauge-banner.amber { background: rgba(251,191,36,0.12); border: 1px solid #f59e0b; color: #fbbf24; }
+  .gauge-banner.red { background: rgba(239,68,68,0.12); border: 1px solid #ef4444; color: #f87171; }
+  @keyframes gauge-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .gauge-bar-fill.capped { animation: gauge-pulse 1.5s infinite; }
 </style>
 </head>
 <body>
@@ -94,11 +110,14 @@
       <div class="w-foot">View All →</div>
     </div>
   </div>
+
+  <!-- ROW 3 — AI usage fuel gauge -->
+  <div id="gaugeWidget" class="gauge-card"><div class="loading">Loading usage…</div></div>
 </div>
 
 <script src="tenant-shared.js"></script>
 <script>
-let TID = null, TOKEN = null;
+let TID = null, TOKEN = null, user = null;
 function daysSince(iso) { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; return Math.max(0, Math.floor((Date.now() - d.getTime()) / 864e5)); }
 
 // ── AI Search ──
@@ -195,8 +214,48 @@ async function loadPD() {
   }).join('');
 }
 
+// ── Widget 5: AI Usage Fuel Gauge ──
+async function loadGauge() {
+  const cap = (user && user.tenant && user.tenant.api_cost_cap_usd) ? Number(user.tenant.api_cost_cap_usd) : 500;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  const rows = await supa(`api_cost_log?tenant_id=eq.${TID}&created_at=gte.${monthStart}&select=cost_usd_marked_up`);
+  const spent = rows.reduce((sum, r) => sum + (Number(r.cost_usd_marked_up) || 0), 0);
+  const pct = cap > 0 ? Math.min((spent / cap) * 100, 100) : 0;
+  const remaining = Math.max(cap - spent, 0);
+
+  const color = pct >= 100 ? '#ef4444' : pct >= 90 ? '#f87171' : pct >= 75 ? '#fbbf24' : '#4ade80';
+  const cardClass = pct >= 90 ? 'danger' : pct >= 75 ? 'warn' : '';
+  const capped = pct >= 100;
+
+  let banner = '';
+  if (pct >= 100) banner = '<div class="gauge-banner red">🔴 Monthly AI cap reached. AI-powered features are disabled until next month. Contact your account manager.</div>';
+  else if (pct >= 90) banner = '<div class="gauge-banner red">🚨 You are near your monthly AI usage limit. AI features may be restricted soon.</div>';
+  else if (pct >= 75) banner = '<div class="gauge-banner amber">⚠ You are approaching your monthly AI usage limit.</div>';
+
+  const el = document.getElementById('gaugeWidget');
+  if (!el) return;
+  el.className = 'gauge-card' + (cardClass ? ' ' + cardClass : '');
+  el.innerHTML = `
+    <div class="gauge-title">💡 AI Usage — ${monthName}</div>
+    <div class="gauge-sub">$${spent.toFixed(2)} of $${cap.toFixed(2)} used · resets ${nextReset}</div>
+    ${banner}
+    <div class="gauge-bar-wrap">
+      <div class="gauge-bar-fill${capped ? ' capped' : ''}" style="width:${pct.toFixed(1)}%;background:${color};"></div>
+      <span class="gauge-bar-pct">${pct.toFixed(0)}%</span>
+    </div>
+    <div class="gauge-detail">
+      <span><strong>$${spent.toFixed(2)}</strong> spent</span>
+      <span><strong>$${remaining.toFixed(2)}</strong> remaining</span>
+      <span>Cap: <strong>$${cap.toFixed(2)}/mo</strong></span>
+    </div>`;
+}
+
 (async function init() {
-  const user = await tenantAuth();
+  user = await tenantAuth();
   if (!user || !user.tenant) return;
   TID = user.tenant.id;
   TOKEN = localStorage.getItem('tenant_token');
@@ -212,6 +271,7 @@ async function loadPD() {
   loadProduction();
   loadSamples();
   loadPD();
+  loadGauge();
 })();
 </script>
 </body>
