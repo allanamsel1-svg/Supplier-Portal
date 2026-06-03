@@ -24,6 +24,7 @@
     <button class="tab" data-tab="followups">RFQ Follow-ups <span class="tab-count" id="cnt-followups"></span></button>
     <button class="tab" data-tab="compliance">Compliance Alerts <span class="tab-count" id="cnt-compliance"></span></button>
     <button class="tab" data-tab="compliance-rules">Compliance Rules</button>
+    <button class="tab" data-tab="scanner">Card Scanner</button>
   </div>
 
   <!-- ALL / PENDING share the toolbar + grid -->
@@ -51,6 +52,10 @@
     <iframe id="complianceRulesFrame" title="Compliance Rules" data-src="compliance-rules.html"
       style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
   </div>
+  <div class="tab-pane" id="pane-scanner">
+    <iframe id="scannerFrame" title="Card Scanner" data-src="scanner.html"
+      style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
+  </div>
 </div>
 
 <!-- Detail panel -->
@@ -65,7 +70,7 @@
 
 <script src="/tenant-shared.js"></script>
 <script>
-const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance', 'compliance-rules'];
+const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance', 'compliance-rules', 'scanner'];
 let TID = null;
 let factories = [];
 const loaded = {};   // lazy-load guard per tab
@@ -90,6 +95,11 @@ async function loadTab(tab) {
   if (tab === 'compliance') return loadCompliance();
   if (tab === 'compliance-rules') {
     const fr = document.getElementById('complianceRulesFrame');
+    if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load iframe once
+    return;
+  }
+  if (tab === 'scanner') {
+    const fr = document.getElementById('scannerFrame');
     if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load iframe once
     return;
   }

@@ -55,18 +55,22 @@
     <button class="tab" data-tab="accounting">Accounting</button>
     <button class="tab" data-tab="logistics">Logistics</button>
     <button class="tab" data-tab="compliance">Compliance</button>
-    <a class="zoom-link" href="zoom.html">🎥 Zoom</a>
+    <button class="tab" data-tab="zoom">🎥 Zoom</button>
   </div>
 
-  <div class="comms">
+  <div class="comms" id="commsPane">
     <div class="thread-list" id="threadList"><div class="loading">Loading…</div></div>
     <div class="msg-panel" id="msgPanel"><div class="empty"><span class="empty-icon">💬</span>Select a conversation to read it.</div></div>
+  </div>
+  <div id="zoomPane" style="display:none;">
+    <iframe id="zoomFrame" title="Zoom" data-src="zoom.html"
+      style="width:100%;height:calc(100vh - 190px);min-height:420px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
   </div>
 </div>
 
 <script src="tenant-shared.js"></script>
 <script>
-const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance'];
+const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance', 'zoom'];
 let TID = null;
 let allThreads = [];     // tenant-visible threads
 let current = 'all';
@@ -81,6 +85,17 @@ function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'all';
   current = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  const commsPane = document.getElementById('commsPane');
+  const zoomPane = document.getElementById('zoomPane');
+  if (tab === 'zoom') {
+    commsPane.style.display = 'none';
+    zoomPane.style.display = 'block';
+    const fr = document.getElementById('zoomFrame');
+    if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load once
+    return;
+  }
+  zoomPane.style.display = 'none';
+  commsPane.style.display = 'flex';
   renderThreads();
 }
 
