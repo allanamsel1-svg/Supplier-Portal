@@ -124,14 +124,28 @@
 <script src="tenant-shared.js"></script>
 <script>
 const TABS = ['crosssource', 'shopout', 'factory', 'brandwatch', 'catalog', 'retailer', 'social', 'news', 'trade', 'fx'];
+var JS = JSON['stringify'];  // request-body serializer (display rendering never dumps JSON)
 const UPLOAD_CONCURRENCY = 8, MAX_UPLOAD_ATTEMPTS = 4, CLASSIFY_CONCURRENCY = 4, PAIR_CONCURRENCY = 5;
 let TID = null, TOKEN = null;
 const loaded = {};
-function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+// shop-out-photos is a private bucket → use signed URLs (cached per file_path)
+const _signCache = {};
+function photoSrc(fp) { return _signCache[fp] || ''; }
+async function signPhotos(paths) {
+  const uniq = [...new Set((paths || []).filter(Boolean))].filter(fp => !_signCache[fp]);
+  await Promise.all(uniq.map(async fp => {
+    try {
+      const r = await fetch(SUPA_URL + '/storage/v1/object/sign/shop-out-photos/' + fp, { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' }, body: JS({ expiresIn: 3600, transform: { width: 400, height: 400, resize: 'contain', format: 'origin' } }) });
+      const d = await r.json().catch(() => ({}));
+      if (d && d.signedURL) _signCache[fp] = SUPA_URL + '/storage/v1' + d.signedURL;
+    } catch (e) {}
+  }));
+  return _signCache;
+}
 function preview(t, n) { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
 function timeAgo(s) { if (!s) return ''; const d = (Date.now() - new Date(s).getTime()) / 1000; if (d < 3600) return Math.floor(d / 60) + 'm ago'; if (d < 86400) return Math.floor(d / 3600) + 'h ago'; return Math.floor(d / 86400) + 'd ago'; }
-function sbPost(path, body, prefer) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: prefer || 'return=minimal' }, body: JSON.stringify(body) }); }
-function sbPatch(path, body) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }); }
+function sbPost(path, body, prefer) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: prefer || 'return=minimal' }, body: JS(body) }); }
+function sbPatch(path, body) { return fetch(SUPA_URL + '/rest/v1/' + path, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JS(body) }); }
 
 function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'crosssource';
@@ -182,7 +196,7 @@ async function runSearch() {
   const btn = document.getElementById('aiSend'), res = document.getElementById('aiResult');
   btn.disabled = true; res.classList.add('open'); res.textContent = 'Thinking…';
   try {
-    const r = await fetch('/api/tenant-search', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JSON.stringify({ query: q, tenant_id: TID }) });
+    const r = await fetch('/api/tenant-search', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + TOKEN }, body: JS({ query: q, tenant_id: TID }) });
     const d = await r.json().catch(() => ({}));
     res.textContent = r.ok ? (d.answer || 'No answer.') + (d.sources && d.sources.length ? '\n\nSources: ' + d.sources.join(', ') : '') : (d.error || 'Search failed.');
   } catch (e) { res.textContent = 'Connection error.'; }
@@ -194,7 +208,7 @@ let shops = [], custMap = {}, selectedShop = null, crossIndex = {};
 const cnt = a => (Array.isArray(a) && a[0] && a[0].count) || 0;
 async function loadShops() {
   const [list, custs] = await Promise.all([
-    supa(`shop_outs?tenant_id=eq.${TID}&order=created_at.desc&select=*,shop_out_sections(count),shop_out_observations(count)`),
+    supa(`shop_outs?tenant_id=eq.${TID}&order=created_at.desc&select=*`),
     supa(`customers?tenant_id=eq.${TID}&select=id,customer_name`),
   ]);
   shops = list; custMap = {}; custs.forEach(c => custMap[c.id] = c.customer_name);
@@ -204,9 +218,11 @@ async function loadShops() {
 }
 function retailerName(s) { return (s.customer_id && custMap[s.customer_id]) || s.store_location_text || 'Unknown retailer'; }
 async function buildCrossIndex() {
-  // cross-retailer price index across this tenant's observations
-  const all = await supa(`shop_out_observations?tenant_id=eq.${TID}&select=brand,product_name,retail_price,shop_out_id&limit=2000`);
+  // cross-retailer price index — scoped to this tenant's shop-outs via shop_out_id (no tenant_id col needed)
   crossIndex = {};
+  const ids = shops.map(s => s.id);
+  if (!ids.length) return;
+  const all = await supa(`shop_out_observations?shop_out_id=in.(${ids.join(',')})&select=brand,product_name,retail_price,shop_out_id&limit=2000`);
   all.forEach(o => { const k = ((o.brand || '') + '|' + (o.product_name || '')).toLowerCase().trim(); if (!k || k === '|') return; (crossIndex[k] = crossIndex[k] || []).push(o); });
 }
 function crossSearch(o) { const k = ((o.brand || '') + '|' + (o.product_name || '')).toLowerCase().trim(); const hits = (crossIndex[k] || []).filter(x => x.retail_price != null); return hits.length > 1 ? hits : null; }
@@ -264,16 +280,30 @@ async function renderDetail(id) {
   if (status === 'processing') { det.innerHTML = head + `<div style="margin-top:16px;color:var(--text2);">⏳ AI processing in progress…</div>`; return; }
   // complete / failed → full detail
   const [sections, obs] = await Promise.all([
-    supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
-    supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
+    supa(`shop_out_sections?shop_out_id=eq.${id}&order=sequence_number.asc`),
+    supa(`shop_out_observations?shop_out_id=eq.${id}&order=created_at.desc`),
   ]);
   const pmap = {}; const fpIds = obs.map(o => o.front_photo_id).filter(Boolean);
   if (fpIds.length) (await supa(`shop_out_photos?id=in.(${fpIds.join(',')})&select=id,file_path`)).forEach(p => pmap[p.id] = p.file_path);
+  const sm = await signPhotos(Object.values(pmap));  // signed thumbnail URLs (private bucket)
   const prices = await loadPriceChanges(id);
   const clearance = obs.filter(o => o.is_clearance).length;
-  const secCards = sections.length ? sections.map(sec => `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(sec.department || sec.category_detected || 'Section')}</div><div class="acc-meta">${[sec.estimated_linear_feet && sec.estimated_linear_feet + ' ft', sec.ai_confidence != null && 'conf ' + sec.ai_confidence].filter(Boolean).map(esc).join(' · ')}</div></div><div class="acc-right">${sec.category_override ? esc(sec.category_override) : ''}</div></div><div class="acc-body">${esc(sec.brand_summary || 'No brand summary.')}</div></div>`).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
+  const secCards = sections.length ? sections.map(sec => {
+    let bs = sec.brand_summary;
+    if (typeof bs === 'string' && bs.trim().charAt(0) === '[') { try { bs = JSON.parse(bs); } catch (e) {} }
+    let body;
+    if (Array.isArray(bs) && bs.length) {
+      body = `<table class="data-table"><thead><tr><th>Brand</th><th>Product Type</th><th>Facings</th><th>SKUs</th><th>Notes</th></tr></thead><tbody>${bs.map(b => `<tr><td>${esc(b.brand || b.name || '—')}</td><td>${esc(b.product_type || b.type || '')}</td><td>${esc(b.facings != null ? b.facings : '')}</td><td>${esc(b.skus != null ? b.skus : (b.sku_count != null ? b.sku_count : ''))}</td><td>${esc(b.notes || '')}</td></tr>`).join('')}</tbody></table>`;
+    } else {
+      body = `<div style="white-space:pre-wrap;">${esc((typeof bs === 'string' ? bs : '') || 'No brand summary.')}</div>`;
+    }
+    if (sec.section_comment) body += `<div class="acc-meta" style="margin-top:8px;">💬 ${esc(sec.section_comment)}</div>`;
+    const cat = sec.category_override || sec.category_detected || sec.department || 'Section';
+    const meta = [sec.estimated_linear_feet && sec.estimated_linear_feet + ' ft', sec.ai_confidence != null && 'AI conf ' + sec.ai_confidence].filter(Boolean).map(esc).join(' · ');
+    return `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(cat)}</div><div class="acc-meta">${meta}</div></div><div class="acc-right">${sec.category_override ? 'override' : ''}</div></div><div class="acc-body">${body}</div></div>`;
+  }).join('') : '<div class="empty" style="padding:12px;">No section intelligence.</div>';
   const obsCards = obs.length ? '<div class="obs-grid">' + obs.map(o => {
-    const fp = pmap[o.front_photo_id]; const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+    const fp = pmap[o.front_photo_id]; const src = fp ? photoSrc(fp) : ''; const thumb = src ? `<img class="obs-thumb" src="${esc(src)}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
     const cross = crossSearch(o); const crossBadge = cross ? `<span class="chip">seen at ${cross.length} retailers</span>` : '';
     return `<div class="obs-card"><div class="obs-thumb-wrap" data-fp="${esc(fp || '')}">${thumb}</div><div class="obs-info">
         <div class="obs-brand">${esc(o.brand || '—')}${factoryBadge(o)}</div><div class="obs-prod">${esc(o.product_name || '')}${o.pack_size ? ' · ' + esc(o.pack_size) + (o.pack_size_unit ? ' ' + esc(o.pack_size_unit) : '') : ''}</div>
@@ -292,7 +322,7 @@ async function renderDetail(id) {
     <div class="panel-section"><h3>Observations (${obs.length})</h3>${obsCards}</div>
     <div class="panel-section"><h3>Cross-Retailer Price Intelligence (${prices.length})</h3>${priceCards}</div>`;
   // wire
-  det.querySelectorAll('.obs-thumb-wrap[data-fp]').forEach(el => { const fp = el.dataset.fp; if (fp) el.style.cursor = 'zoom-in', el.addEventListener('click', () => openLightbox([photoUrl(fp)], 0)); });
+  det.querySelectorAll('.obs-thumb-wrap[data-fp]').forEach(el => { const fp = el.dataset.fp; if (fp && photoSrc(fp)) el.style.cursor = 'zoom-in', el.addEventListener('click', () => openLightbox([photoSrc(fp)], 0)); });
   det.querySelectorAll('[data-save]').forEach(b => b.addEventListener('click', () => saveMlComment(b.dataset.save)));
   det.querySelectorAll('[data-rfq]').forEach(b => b.addEventListener('click', () => { const o = obs.find(x => x.id === b.dataset.rfq); rfqFromObservation(o); }));
   document.getElementById('soArchBtn').addEventListener('click', () => toggleArchive(s));
@@ -352,19 +382,19 @@ async function triggerProcessing(id) {
   try {
     // PASS 0 — classify
     status.textContent = 'Pass 0/3 — classifying photos…';
-    await pool(photos, CLASSIFY_CONCURRENCY, p => fetch('/api/classify-shop-out-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
+    await pool(photos, CLASSIFY_CONCURRENCY, p => fetch('/api/classify-shop-out-photo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
     // PASS 1 — sections
     status.textContent = 'Pass 1/3 — analyzing sections…';
     const sects = photos.filter(p => p.photo_type === 'section');
-    await pool(sects, PAIR_CONCURRENCY, p => fetch('/api/process-shop-out-section', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
+    await pool(sects, PAIR_CONCURRENCY, p => fetch('/api/process-shop-out-section', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ photoId: p.id, photoPath: p.file_path, shopOutId: id }) }).catch(() => {}));
     // PASS 2 — pair products (front+back)
     status.textContent = 'Pass 2/3 — pairing products…';
     const prods = photos.filter(p => p.photo_type !== 'section');
     const pairs = []; for (let k = 0; k < prods.length; k += 2) pairs.push([prods[k], prods[k + 1]]);
-    await pool(pairs, PAIR_CONCURRENCY, async pr => { for (let a = 0; a < 3; a++) { const r = await fetch('/api/process-shop-out-pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id, frontPhotoId: pr[0] && pr[0].id, backPhotoId: pr[1] && pr[1].id, frontPath: pr[0] && pr[0].file_path, backPath: pr[1] && pr[1].file_path, retailerName: rname, retailerCountry: 'USA' }) }).catch(() => ({ status: 0 })); if (r && r.status !== 429) break; await new Promise(res => setTimeout(res, 1500 * (a + 1))); } });
+    await pool(pairs, PAIR_CONCURRENCY, async pr => { for (let a = 0; a < 3; a++) { const r = await fetch('/api/process-shop-out-pair', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ shopOutId: id, frontPhotoId: pr[0] && pr[0].id, backPhotoId: pr[1] && pr[1].id, frontPath: pr[0] && pr[0].file_path, backPath: pr[1] && pr[1].file_path, retailerName: rname, retailerCountry: 'USA' }) }).catch(() => ({ status: 0 })); if (r && r.status !== 429) break; await new Promise(res => setTimeout(res, 1500 * (a + 1))); } });
     // PASS 3 + location
     status.textContent = 'Finalizing…';
-    await fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id }) }).catch(() => {});
+    await fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ shopOutId: id }) }).catch(() => {});
     await sbPatch('shop_outs?id=eq.' + id, { processing_status: 'complete' }).catch(() => {});
     status.textContent = 'Processing complete.';
     await loadShops(); selectShop(id);
@@ -381,7 +411,7 @@ async function saveMlComment(obsId) {
 async function toggleArchive(s) { await sbPatch('shop_outs?id=eq.' + s.id, { archived_at: s.archived_at ? null : new Date().toISOString() }).catch(() => {}); await loadShops(); selectShop(s.id); }
 async function deleteShopOut(s) { if (!confirm('Delete this shop-out?')) return; await sbPatch('shop_outs?id=eq.' + s.id, { deleted_at: new Date().toISOString() }).catch(() => {}); selectedShop = null; await loadShops(); document.getElementById('soDetail').innerHTML = '<div class="empty">Deleted.</div>'; }
 function editLocationFor(s) { const v = prompt('Store location:', s.store_location_text || ''); if (v == null) return; sbPatch('shop_outs?id=eq.' + s.id, { store_location_text: v }).then(() => { s.store_location_text = v; renderDetail(s.id); }); }
-function detectLocationFor(id) { fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shopOutId: id }) }).catch(() => {}); }
+function detectLocationFor(id) { fetch('/api/detect-location', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ shopOutId: id }) }).catch(() => {}); }
 function newShopOut() {
   const opts = Object.entries(custMap).map(([id, n]) => `<option value="${esc(id)}">${esc(n)}</option>`).join('');
   openModal(`<h3>New Shop Out</h3>
@@ -420,8 +450,22 @@ async function loadFactory() {
   box.innerHTML = `<div class="toolbar"><input class="search-input" id="fpSearch" placeholder="Search factory / country / category…"></div><div id="fpList"></div>`;
   const render = () => {
     const q = (document.getElementById('fpSearch').value || '').toLowerCase().trim();
-    const f = rows.filter(r => !q || JSON.stringify(r).toLowerCase().includes(q));
-    document.getElementById('fpList').innerHTML = '<div class="acc-list">' + f.map(r => `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(r.factory_name || 'Factory')}</div><div class="acc-meta">${[r.city, r.country, r.status].filter(Boolean).map(esc).join(' · ')}</div></div><div class="acc-right">${esc(r.discovery_source || '')}</div></div><div class="acc-body">${esc(JSON.stringify(r, null, 1))}</div></div>`).join('') + '</div>';
+    const f = rows.filter(r => !q || [r.factory_name, r.city, r.region, r.country, r.status, r.discovery_source, (Array.isArray(r.primary_categories) ? r.primary_categories.join(' ') : r.categories)].some(v => (v || '').toString().toLowerCase().includes(q)));
+    document.getElementById('fpList').innerHTML = '<div class="acc-list">' + f.map(r => {
+      const loc = [r.city, r.region, r.country].filter(Boolean).map(esc).join(', ');
+      const cats = Array.isArray(r.primary_categories) ? r.primary_categories.join(', ') : (r.categories || '');
+      const contact = [r.primary_contact_name, r.primary_contact_title, r.primary_contact_email, r.primary_contact_phone].filter(Boolean).map(esc).join(' · ');
+      const web = [r.website_url && '<a href="' + esc(r.website_url) + '" target="_blank" style="color:#60a5fa;">Website ↗</a>', r.linkedin_url && '<a href="' + esc(r.linkedin_url) + '" target="_blank" style="color:#60a5fa;">LinkedIn ↗</a>', r.alibaba_url && '<a href="' + esc(r.alibaba_url) + '" target="_blank" style="color:#60a5fa;">Alibaba ↗</a>'].filter(Boolean).join(' · ');
+      const disc = [r.discovery_source, r.discovery_date && fmtDate(r.discovery_date)].filter(Boolean).map(esc).join(' · ');
+      const body = kv([
+        ['Location', loc], ['Status', statusBadge(r.status), true], ['Categories', cats],
+        ['Contact', contact], ['Web', web, true],
+        ['Years in business', r.years_in_business], ['Employees', r.employee_count_range],
+        ['Certifications', Array.isArray(r.certifications) ? r.certifications.join(', ') : r.certifications],
+        ['Discovery', disc], ['Notes', r.discovery_notes || r.internal_notes],
+      ]);
+      return `<div class="acc"><div class="acc-head"><div><div class="acc-title">${esc(r.factory_name || 'Factory')}</div><div class="acc-meta">${loc}</div></div><div class="acc-right">${esc(r.status || '')}</div></div><div class="acc-body">${body}</div></div>`;
+    }).join('') + '</div>';
     wireAccordion(document.getElementById('fpList'));
   };
   document.getElementById('fpSearch').addEventListener('input', render); render();
@@ -484,7 +528,7 @@ async function loadBrandProducts(brandId) {
 }
 function runCrawl(brandId) {
   const btn = document.getElementById('bwCrawl'); btn.disabled = true; btn.textContent = 'Crawling…';
-  fetch('/api/scrape-brand-shopify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brand_id: brandId }) }).then(r => r.json()).then(d => {
+  fetch('/api/scrape-brand-shopify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JS({ brand_id: brandId }) }).then(r => r.json()).then(d => {
     if (d.success) { btn.textContent = '✓ ' + d.products_discovered + ' products'; setTimeout(() => { loadBrandwatch(); }, 1200); }
     else { btn.disabled = false; btn.textContent = '▶ Run Crawl Now'; alert('Crawl failed: ' + (d.error || 'unknown')); }
   }).catch(e => { btn.disabled = false; btn.textContent = '▶ Run Crawl Now'; alert('Crawl error: ' + e.message); });
