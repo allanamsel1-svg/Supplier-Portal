@@ -200,8 +200,7 @@
 
 <script>
 const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
-const SUPABASE_KEY = document.cookie.match(/admin_key=([^;]+)/)?.[1] || localStorage.getItem('admin_supabase_key') || prompt('Admin API key:');
-if (SUPABASE_KEY) localStorage.setItem('admin_supabase_key', SUPABASE_KEY);
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 
 const FEATURES = ['rfq','shop_out','po_management','sku_library','brand_watch','retail_intel','trade_intel','compliance','factory_portal','financial'];
 const FEATURE_LABELS = {rfq:'RFQ',shop_out:'Shop Out',po_management:'Purchase Orders',sku_library:'SKU Library',brand_watch:'Brand Watch',retail_intel:'Retail Intel',trade_intel:'Trade Intel',compliance:'Compliance',factory_portal:'Factory Portal',financial:'Financials'};
@@ -370,7 +369,26 @@ document.getElementById('tenantModal').addEventListener('click', e => {
   if (e.target === document.getElementById('tenantModal')) closeModal();
 });
 
-loadTenants();
+(async function checkAdminAuth() {
+  const tok = localStorage.getItem('admin_session');
+  if (!tok) { window.location.href = 'admin.html'; return; }
+  try {
+    const r = await fetch('/api/admin-auth?action=verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: tok })
+    });
+    const d = await r.json().catch(() => ({}));
+    if (d && (d.ok || d.unconfigured)) {
+      loadTenants();
+    } else {
+      localStorage.removeItem('admin_session');
+      window.location.href = 'admin.html';
+    }
+  } catch (e) {
+    loadTenants(); // network error — don't lock out
+  }
+})();
 </script>
 </body>
 </html>
