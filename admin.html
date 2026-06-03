@@ -30,8 +30,14 @@
     .logout:hover { color: #1a1a2e; }
     .body { display: flex; flex: 1; overflow: hidden; }
     .sidebar { width: 190px; border-right: 1px solid #e0e0d8; background: #fff; padding: 1rem 0; flex-shrink: 0; overflow-y: auto; }
-    .slabel { font-size: 10px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.08em; padding: 0 1rem; margin-bottom: 4px; margin-top: 1rem; }
+    .slabel { font-size: 10px; font-weight: 600; color: #bbb; text-transform: uppercase; letter-spacing: 0.08em; padding: 0 1rem; margin-bottom: 4px; margin-top: 1rem; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 5px; }
     .slabel:first-child { margin-top: 0; }
+    .slabel:hover { color: #999; }
+    .slabel .chev { font-size: 8px; color: #ccc; transition: transform 0.22s ease; display: inline-block; }
+    .slabel.collapsed .chev { transform: rotate(-90deg); }
+    /* Collapsible section body — smooth max-height transition */
+    .ssec { overflow: hidden; transition: max-height 0.28s ease; max-height: 600px; }
+    .ssec.collapsed { max-height: 0; }
     .sitem { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin: 0 6px; border-radius: 7px; font-size: 13px; color: #888; cursor: pointer; border: none; background: none; width: calc(100% - 12px); text-align: left; font-family: inherit; transition: all 0.1s; }
     .sitem:hover { background: #f5f5f0; color: #1a1a2e; }
     .sitem.on { background: #f0f0e8; color: #1a1a2e; font-weight: 500; }
@@ -418,19 +424,24 @@
   </div>
   <div class="body">
     <div class="sidebar">
-      <div class="slabel">Overview</div>
+      <div class="slabel" id="slbl-overview" onclick="toggleSection('overview')"><span class="chev">▾</span>Overview</div>
+      <div class="ssec" id="ssec-overview">
       <button class="sitem on" id="nav-dashboard" onclick="showPanel('dashboard')"><span class="sicon">▦</span> Dashboard</button>
       <button class="sitem" id="nav-banking" onclick="location.href='mercury.html'"><span class="sicon">🏦</span> Banking</button>
       <button class="sitem" id="nav-intel" onclick="location.href='intelligence_hub.html'"><span class="sicon">🎯</span> Intel<span id="nav-intel-daily" onclick="event.stopPropagation();location.href='intel_daily.html'" title="Daily Intel Report" style="font-size:10px;color:#bbb;margin-left:8px;cursor:pointer;letter-spacing:0.02em;">+ Daily</span></button>
       <button class="sitem" id="nav-roadmap" onclick="location.href='roadmap.html'"><span class="sicon">🗺</span> System</button>
-      <div class="slabel">Operations</div>
+      </div>
+      <div class="slabel" id="slbl-operations" onclick="toggleSection('operations')"><span class="chev">▾</span>Operations</div>
+      <div class="ssec" id="ssec-operations">
       <button class="sitem" id="nav-orders" onclick="showPanel('orders');loadOpenOrders();"><span class="sicon">📋</span> Open Orders <span class="scount" id="cnt-orders-urgent" style="background:#fff0f0;color:#b00;border:1px solid #fdd;font-weight:600;">3</span></button>
       <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-accounting" onclick="showPanel('accounting');loadAccounting();"><span class="sicon">💰</span> Accounting <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-credit" onclick="showPanel('credit');loadCreditWatch();"><span class="sicon">🔍</span> Credit Watch <span class="scount" id="cnt-credit" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
       <button class="sitem" id="nav-forecasting" onclick="showPanel('forecasting');loadForecasting();"><span class="sicon">🔮</span> Forecasting <span style="font-size:9px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-projections" onclick="location.href='projections.html'"><span class="sicon">📊</span> Projections</button>
-      <div class="slabel">Factories</div>
+      </div>
+      <div class="slabel" id="slbl-factories" onclick="toggleSection('factories')"><span class="chev">▾</span>Factories</div>
+      <div class="ssec" id="ssec-factories">
       <button class="sitem" id="nav-all" onclick="showPanel('all')"><span class="sicon">🏭</span> All Factories <span class="scount" id="cnt-all">0</span></button>
       <button class="sitem" id="nav-pending" onclick="showPanel('pending')"><span class="sicon">⏳</span> Pending <span class="scount" id="cnt-pending">0</span></button>
       <button class="sitem" id="nav-scanner" onclick="location.href='scanner.html'"><span class="sicon">📇</span> Card Scanner</button>
@@ -439,7 +450,9 @@
       <button class="sitem" id="nav-rfq-followup" onclick="showPanel('rfq-followup');loadRFQFollowups();"><span class="sicon">⏰</span> RFQ Follow-ups <span class="scount" id="cnt-rfq-followup">0</span></button>
       <button class="sitem" id="nav-compliance" onclick="showPanel('compliance');loadComplianceAlerts();"><span class="sicon">🛡</span> Compliance Alerts <span class="scount" id="cnt-compliance" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
       <button class="sitem" id="nav-compliance-rules" onclick="location.href='compliance-rules.html'"><span class="sicon">📋</span> Compliance Rules</button>
-      <div class="slabel">Communications</div>
+      </div>
+      <div class="slabel" id="slbl-communications" onclick="toggleSection('communications')"><span class="chev">▾</span>Communications</div>
+      <div class="ssec" id="ssec-communications">
       <button class="sitem" id="nav-comms-messages" onclick="location.href='communications.html'"><span class="sicon">💬</span> Messages</button>
       <button class="sitem" id="nav-comms-zoom" onclick="location.href='zoom.html'"><span class="sicon">🎥</span> Zoom</button>
       <button class="sitem" id="nav-comms-allan" onclick="location.href='communications.html?tab=allan'"><span class="sicon">👤</span> Allan</button>
@@ -449,16 +462,39 @@
       <button class="sitem" id="nav-comms-accounting" onclick="location.href='communications.html?tab=accounting'"><span class="sicon">💰</span> Accounting</button>
       <button class="sitem" id="nav-comms-logistics" onclick="location.href='communications.html?tab=logistics'"><span class="sicon">🚚</span> Logistics</button>
       <button class="sitem" id="nav-comms-compliance" onclick="location.href='communications.html?tab=compliance'"><span class="sicon">🛡</span> Compliance</button>
-      <div class="slabel">RFQ & Products</div>
+      </div>
+      <div class="slabel" id="slbl-rfq" onclick="toggleSection('rfq')"><span class="chev">▾</span>RFQ &amp; Products</div>
+      <div class="ssec" id="ssec-rfq">
       <button class="sitem" id="nav-rfq" onclick="showPanel('rfq')"><span class="sicon">📋</span> RFQs <span class="scount" id="cnt-rfq">0</span></button>
       <button class="sitem" id="nav-pd" onclick="showPanel('pd');loadPDList();"><span class="sicon">🧪</span> Product Development <span class="scount" id="cnt-pd">0</span></button>
-      <div class="slabel">Products</div>
+      </div>
+      <div class="slabel" id="slbl-products" onclick="toggleSection('products')"><span class="chev">▾</span>Products</div>
+      <div class="ssec" id="ssec-products">
       <button class="sitem" id="nav-setup" onclick="window.open('setup.html','_blank')"><span class="sicon">⚙</span> Setup</button>
       <button class="sitem" id="nav-skus" onclick="location.href='skus.html'"><span class="sicon">📦</span> SKU Library</button>
-      <div class="slabel">System</div>
+      </div>
+      <div class="slabel" id="slbl-system" onclick="toggleSection('system')"><span class="chev">▾</span>System</div>
+      <div class="ssec" id="ssec-system">
       <button class="sitem" id="nav-upload" onclick="showPanel('upload')"><span class="sicon">📤</span> Upload Files</button>
       <button class="sitem" id="nav-settings" onclick="showPanel('settings')"><span class="sicon">⚙</span> Settings</button>
+      </div>
     </div>
+    <script>
+    // Collapsible sidebar sections — persisted to localStorage (default: all expanded)
+    function toggleSection(name){
+      var sec=document.getElementById('ssec-'+name), lbl=document.getElementById('slbl-'+name);
+      if(!sec||!lbl)return;
+      var collapsed=sec.classList.toggle('collapsed');
+      lbl.classList.toggle('collapsed',collapsed);
+      try{ var st=JSON.parse(localStorage.getItem('admin_sidebar_sections')||'{}'); st[name]=collapsed; localStorage.setItem('admin_sidebar_sections',JSON.stringify(st)); }catch(e){}
+    }
+    (function initSidebarSections(){
+      var st={}; try{ st=JSON.parse(localStorage.getItem('admin_sidebar_sections')||'{}'); }catch(e){}
+      ['overview','operations','factories','communications','rfq','products','system'].forEach(function(name){
+        if(st[name]){ var sec=document.getElementById('ssec-'+name), lbl=document.getElementById('slbl-'+name); if(sec)sec.classList.add('collapsed'); if(lbl)lbl.classList.add('collapsed'); }
+      });
+    })();
+    </script>
 
     <div class="panel on" id="panel-dashboard">
       <div class="ph"><div class="ph-title">Dashboard</div><div class="ph-sub">Supplier network overview</div></div>
