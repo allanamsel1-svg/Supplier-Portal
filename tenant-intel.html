@@ -185,7 +185,7 @@ async function loadCrosssource() {
   ];
   box.innerHTML =
     `<div class="grad"><div class="g-label">Daily Briefing</div><div class="g-date">${brief ? fmtDate(brief.summary_date) : ''}</div><div class="g-text">${esc(brief ? (brief.summary_text || 'No summary text.') : 'No cross-source briefing yet.')}</div></div>
-     <div class="ai-search"><div class="ai-row"><input class="ai-input" id="aiInput" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Ask anything about your sourcing, factories, products, intel..."><script>setTimeout(function(){document.getElementById('aiInput').removeAttribute('readonly');},100);</script><button class="ai-send" id="aiSend">➤</button></div><div class="ai-result" id="aiResult"></div></div>
+     <div class="ai-search"><div class="ai-row"><input class="ai-input" id="aiInput" type="search" placeholder="Ask anything about your sourcing, factories, products, intel..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="AI search"><button class="ai-send" id="aiSend">➤</button></div><div class="ai-result" id="aiResult"></div></div>
      <div class="mods">${mods.map(m => `<div class="mod" data-go="${m.t}"><div><div class="m-name">${esc(m.n)}</div><div class="m-sub">${esc(m.s)}</div></div><div class="m-val">${esc(String(m.v))}</div></div>`).join('')}</div>`;
   box.querySelectorAll('.mod').forEach(el => el.addEventListener('click', () => goTab(el.dataset.go)));
   document.getElementById('aiSend').addEventListener('click', runSearch);

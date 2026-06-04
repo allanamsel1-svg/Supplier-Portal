@@ -80,8 +80,7 @@
   <!-- ROW 1 — AI Search -->
   <div class="ai-search">
     <div class="ai-row">
-      <input class="ai-input" id="aiInput" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')" placeholder="Ask anything about your sourcing, factories, products, intel...">
-      <script>setTimeout(function(){document.getElementById('aiInput').removeAttribute('readonly');},100);</script>
+      <input class="ai-input" id="aiInput" type="search" placeholder="Ask anything about your sourcing, factories, products, intel..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="AI search">
       <button class="ai-send" id="aiSend" title="Ask">➤</button>
     </div>
     <div class="ai-result" id="aiResult">
@@ -317,7 +316,7 @@ async function loadGauge() {
   el.className = 'gauge-card' + (cardClass ? ' ' + cardClass : '');
   el.innerHTML = `
     <div class="gauge-title">💡 AI Usage — ${monthName}</div>
-    <div class="gauge-sub">$${spent.toFixed(2)} of $${cap.toFixed(2)} used · resets ${nextReset}</div>
+    <div class="gauge-sub">$${spent.toFixed(2)} of $${cap.toFixed(2)} used this month · resets ${nextReset}</div>
     ${banner}
     <div class="gauge-bar-wrap">
       <div class="gauge-bar-fill${capped ? ' capped' : ''}" style="width:${pct.toFixed(1)}%;background:${color};"></div>
@@ -326,12 +325,12 @@ async function loadGauge() {
     <div class="gauge-detail">
       <span><strong>$${spent.toFixed(2)}</strong> spent</span>
       <span><strong>$${remaining.toFixed(2)}</strong> remaining</span>
-      <span>Cap: <strong>$${cap.toFixed(2)}/mo</strong></span>
+      <span>Monthly cap: <strong>$${cap.toFixed(2)}</strong> · resets 1st of each month</span>
     </div>
     <div class="gauge-actions" style="margin-top:12px;">
       <button class="gauge-add-btn" id="gaugeAddBtn" onclick="startCapIncrease()">+ $25 to cap</button>
       <div class="gauge-confirm" id="gaugeConfirm" style="display:none;">
-        <span style="font-size:12px;color:var(--text);">Add $25? Cap: <strong>$${cap.toFixed(2)}</strong> → <strong>$${(cap+25).toFixed(2)}</strong></span>
+        <span style="font-size:12px;color:var(--text);">Add $25/mo to cap? $${cap.toFixed(2)} → $${(cap+25).toFixed(2)}/mo</span>
         <button class="gauge-confirm-yes" id="gaugeConfirmYes" onclick="confirmCapIncrease()">Confirm</button>
         <button class="gauge-confirm-no" onclick="cancelCapIncrease()">Cancel</button>
       </div>
