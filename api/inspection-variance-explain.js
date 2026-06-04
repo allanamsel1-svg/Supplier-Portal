@@ -59,11 +59,16 @@ export default async function handler(req, res) {
     const d = await r.json();
     const text = (d.content && d.content[0] && d.content[0].text) || '';
 
-    // Parse bullet points into a clean array.
+    // Parse bullet points into a clean array: drop markdown headers/label lines,
+    // strip list markers and bold markup, keep only real sentences.
     const reasons = text
       .split('\n')
-      .map(l => l.replace(/^\s*[-*•\d.)\]]+\s*/, '').trim())
-      .filter(l => l.length > 0);
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'))            // drop markdown headers
+      .map(l => l.replace(/^\s*[-*•]\s*/, '')          // drop bullet markers
+                 .replace(/^\s*\d+[.)]\s*/, '')        // drop numbered markers
+                 .replace(/\*\*/g, '').trim())         // drop bold markup
+      .filter(l => l.length > 8 && /\s/.test(l) && !/:\s*$/.test(l)); // sentences, not labels
 
     logCost((d.usage && d.usage.input_tokens) || 0, (d.usage && d.usage.output_tokens) || 0,
       `${measurement_type} ${spec_value}->${actual_value}`);
