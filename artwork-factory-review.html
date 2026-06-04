@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artwork Review — TBG Sourcing</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+  .card{background:#0d1424;border:1px solid #1e2d47;border-radius:16px;padding:2rem;width:560px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.4);}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;}
+  .brand .mk{width:34px;height:34px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .brand .nm{font-size:15px;font-weight:700;}.brand .nm span{display:block;font-size:11px;font-weight:400;color:#94a3b8;}
+  h1{font-size:19px;font-weight:700;margin-bottom:6px;}
+  .lead{font-size:13px;color:#94a3b8;margin-bottom:1.25rem;line-height:1.5;}
+  .actions{display:flex;flex-direction:column;gap:10px;margin-top:1.25rem;}
+  .btn{border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;color:#fff;}
+  .btn.dl{background:#2563eb;}.btn.ok{background:#16a34a;}.btn.flag{background:#dc2626;}.btn.die{background:#a16207;}
+  .btn.alt{background:#0a0e1a;border:1px solid #1e2d47;color:#e2e8f0;}
+  .box{display:none;margin-top:12px;background:#0a0e1a;border:1px solid #1e2d47;border-radius:10px;padding:14px;}
+  .box.open{display:block;}
+  .box .conf{font-size:12px;color:#cbd5e1;line-height:1.6;margin-bottom:10px;}
+  label{display:block;font-size:12px;font-weight:600;color:#94a3b8;margin:8px 0 4px;}
+  input,select,textarea{width:100%;background:#0d1424;border:1px solid #1e2d47;border-radius:8px;padding:10px;color:#e2e8f0;font-size:13px;font-family:inherit;}
+  textarea{min-height:80px;resize:vertical;}
+  .msg{text-align:center;padding:2rem 0;}.msg .ic{font-size:42px;margin-bottom:12px;}.msg h2{font-size:18px;margin-bottom:6px;}.msg p{font-size:13px;color:#94a3b8;}
+  .loading,.err{text-align:center;color:#94a3b8;font-size:14px;padding:2rem 0;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="mk">🎨</div><div class="nm">TBG Sourcing<span>Artwork Review Portal</span></div></div>
+  <div id="content"><div class="loading">Loading…</div></div>
+</div>
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function qp(k){return new URLSearchParams(location.search).get(k);}
+var TOKEN=qp('token'), PROJ=null, FILEURL='', VERSION=null;
+async function sbGet(p){try{var r=await fetch(SB+'/rest/v1/'+p,{headers:H});if(!r.ok)return [];var d=await r.json();return Array.isArray(d)?d:[];}catch(e){return [];}}
+async function sbPatch(p,b){try{return (await fetch(SB+'/rest/v1/'+p,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(b)})).ok;}catch(e){return false;}}
+async function sbPost(p,b){try{return (await fetch(SB+'/rest/v1/'+p,{method:'POST',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(b)})).ok;}catch(e){return false;}}
+
+async function load(){
+  if(!TOKEN){g('content').innerHTML='<div class="err">Invalid or expired link.</div>';return;}
+  var rows=await sbGet('artwork_projects?factory_link_token=eq.'+encodeURIComponent(TOKEN)+'&select=id,tenant_id,status,product_name,factory_link_expires_at,factory_approved_at,factory_download_count&limit=1');
+  if(!rows.length){g('content').innerHTML='<div class="err">Invalid or expired link.</div>';return;}
+  PROJ=rows[0];
+  if(PROJ.factory_link_expires_at && new Date(PROJ.factory_link_expires_at)<new Date()){g('content').innerHTML='<div class="err">This link has expired. Please contact your TBG sourcing manager for a new link.</div>';return;}
+  if(PROJ.factory_approved_at || PROJ.status==='factory_approved'){g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>Artwork Approved</h2><p>Thank you for your confirmation.</p></div>';return;}
+  // latest version file
+  var vs=await sbGet('artwork_versions?artwork_project_id=eq.'+PROJ.id+'&order=version_number.desc&limit=1&select=id,version_number,factory_file_url,file_url');
+  if(vs.length){VERSION=vs[0];FILEURL=vs[0].factory_file_url||vs[0].file_url||'';}
+  render();
+}
+function render(){
+  g('content').innerHTML=
+    '<h1>'+esc(PROJ.product_name||'Artwork')+'</h1>'+
+    '<div class="lead">Please review and confirm the attached artwork file.</div>'+
+    '<div class="actions">'+
+      '<button class="btn dl" onclick="downloadFile()">⬇ Download Artwork</button>'+
+      '<button class="btn ok" onclick="toggle(\'approveBox\')">✓ Approve Artwork</button>'+
+      '<button class="btn flag" onclick="toggle(\'flagBox\')">⚠ Flag an Issue</button>'+
+      '<button class="btn die" onclick="requestDieline()">📋 Request New Dieline</button>'+
+    '</div>'+
+    '<div class="box" id="approveBox"><div class="conf">By approving this artwork, you confirm that:<br>• You have reviewed the file against your production dieline<br>• The UPC barcode is correct and scannable<br>• All dimensions and specifications are within tolerance<br>• You can produce this artwork as submitted</div>'+
+      '<label>Please enter your name to confirm approval</label><input id="appName" placeholder="Your full name">'+
+      '<button class="btn ok" style="margin-top:10px;" onclick="doApprove()">Confirm Approval</button></div>'+
+    '<div class="box" id="flagBox"><label>Issue type</label><select id="issueType"><option value="wrong_dieline">Wrong dieline</option><option value="bom_impact">BOM impact</option><option value="treatment_change">Treatment change</option><option value="color_mismatch">Color mismatch</option><option value="structural_change">Structural change</option><option value="other">Other</option></select>'+
+      '<label>Description</label><textarea id="issueDesc" placeholder="Describe the issue…"></textarea>'+
+      '<button class="btn flag" style="margin-top:10px;" onclick="doFlag()">Submit Issue</button></div>';
+}
+function toggle(id){var b=g(id);if(b)b.classList.toggle('open');}
+async function downloadFile(){
+  if(!FILEURL){alert('No artwork file available yet.');return;}
+  await sbPatch('artwork_projects?id=eq.'+PROJ.id,{factory_download_count:(PROJ.factory_download_count||0)+1,factory_last_download_at:new Date().toISOString()});
+  PROJ.factory_download_count=(PROJ.factory_download_count||0)+1;
+  window.open(FILEURL,'_blank');
+}
+function done(ic,h,p){g('content').innerHTML='<div class="msg"><div class="ic">'+ic+'</div><h2>'+esc(h)+'</h2><p>'+esc(p)+'</p></div>';}
+async function doApprove(){
+  var name=(g('appName').value||'').trim(); if(!name){alert('Please enter your name.');return;}
+  var now=new Date().toISOString();
+  await sbPatch('artwork_projects?id=eq.'+PROJ.id,{factory_approved_by:name,factory_approved_at:now,factory_approval_version:(VERSION?VERSION.version_number:null),status:'factory_approved'});
+  if(PROJ.tenant_id)await sbPost('tenant_action_items',{tenant_id:PROJ.tenant_id,type:'factory_artwork_approved',reference_id:PROJ.id,reference_type:'artwork_project',title:'Factory approved artwork — '+(PROJ.product_name||''),description:'Approved by '+name,priority:'medium',status:'open'});
+  done('✅','Approval Recorded','Thank you, '+name+'. Your confirmation has been logged.');
+}
+async function doFlag(){
+  var type=g('issueType').value, desc=(g('issueDesc').value||'').trim();
+  if(!desc){alert('Please describe the issue.');return;}
+  await flagIssue(type,desc);
+  done('⚠️','Issue Reported','Your TBG sourcing manager will be in touch shortly.');
+}
+async function requestDieline(){
+  await flagIssue('wrong_dieline','Factory requested a new dieline.');
+  done('📋','Request Submitted','Dieline revision request submitted.');
+}
+async function flagIssue(type,desc){
+  var now=new Date().toISOString();
+  await sbPost('artwork_factory_issues',{artwork_project_id:PROJ.id,version_id:VERSION?VERSION.id:null,issue_type:type,issue_description:desc,reported_at:now,resolved:false});
+  await sbPatch('artwork_projects?id=eq.'+PROJ.id,{status:'factory_flagged'});
+  if(PROJ.tenant_id)await sbPost('tenant_action_items',{tenant_id:PROJ.tenant_id,type:'factory_artwork_flagged',reference_id:PROJ.id,reference_type:'artwork_project',title:'Factory flagged artwork — '+(PROJ.product_name||''),description:type.replace(/_/g,' ')+': '+desc,priority:'critical',status:'open'});
+}
+load();
+</script>
+</body>
+</html>

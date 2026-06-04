@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Artwork — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<script src="paste-upload.js"></script>
+<script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+<script src="admin-theme.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  #login{display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  .lb{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:2.5rem;width:340px;max-width:100%;}
+  .lb h1{font-size:18px;font-weight:600;margin-bottom:4px;}.lb p{font-size:13px;color:#888;margin-bottom:1.5rem;}
+  .lb input{width:100%;padding:9px 11px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:14px;margin-bottom:10px;font-family:inherit;}
+  .lb-btn{width:100%;padding:10px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .lb-err{font-size:13px;color:#c00;margin-top:8px;display:none;}
+  #main{display:none;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  .topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;}
+  .topbar-l{display:flex;align-items:center;gap:12px;}.tm{width:28px;height:28px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+  .topbar-title{font-size:14px;font-weight:600;}.back-link{font-size:13px;color:#888;text-decoration:none;}
+  .ic-btn{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:1.25rem 1.5rem 0;}
+  .pstat{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px;min-height:160px;display:flex;flex-direction:column;}
+  .pstat-label{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;}.pstat-val{font-size:32px;font-weight:700;margin:8px 0 10px;line-height:1;}.pstat-sub{font-size:12px;color:#888;flex:1;}
+  .layout{display:grid;grid-template-columns:380px 1fr;gap:0;height:calc(100vh - 52px - 200px);min-height:420px;}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;height:auto;}}
+  .lpanel{border-right:1px solid var(--border);overflow-y:auto;background:var(--bg2);}
+  .rpanel{overflow-y:auto;padding:1.5rem;}
+  .lp-head{padding:14px 16px;border-bottom:1px solid var(--border);font-size:16px;font-weight:700;}
+  .tabs{display:flex;gap:2px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .tab{padding:5px 10px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;color:#888;border-radius:6px;font-family:inherit;}
+  .tab.active{background:var(--bg);color:var(--text);}
+  .lp-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+  .lp-search input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .arow{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .arow:hover,.arow.sel{background:var(--bg);}.arow.sel{border-left:3px solid #2244cc;}
+  .arow-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px;}.arow-pn{font-size:13px;font-weight:700;}
+  .badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;margin-right:4px;}
+  .sec{border-top:1px solid var(--border);padding-top:14px;margin-top:14px;}.sec:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .sec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2);margin-bottom:10px;}
+  .kvr{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}.kvr .k{color:var(--text2);}.kvr .v{font-weight:600;text-align:right;}
+  .preview{width:100%;height:380px;border:1px solid var(--border);border-radius:8px;background:var(--bg);}
+  .btn{background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.green{background:#1a7a1a;}.btn.red{background:#b00;}.btn.alt{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+  .ffield{margin:8px 0;}.ffield label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2);}
+  .ffield input,.ffield select,.ffield textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .ffield textarea{min-height:60px;resize:vertical;}
+  .cmt{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;}.cmt .ch{font-size:11px;color:var(--text2);margin-bottom:4px;}
+  .empty{color:#aaa;text-align:center;padding:2rem 1rem;font-size:14px;}
+  .copybox{display:flex;gap:6px;align-items:center;margin-top:6px;}.copybox input{flex:1;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);}
+</style>
+</head>
+<body>
+<div id="login">
+  <div class="lb"><h1>Artwork</h1><p>Admin sign-in required.</p>
+    <input id="l-user" placeholder="Username"><input id="l-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="lb-btn" onclick="doLogin()">Sign in</button><div class="lb-err" id="l-err"></div></div>
+</div>
+<div id="main">
+  <div class="topbar"><div class="topbar-l"><a class="back-link" href="admin.html">← Admin</a><div class="tm">🎨</div><div class="topbar-title">Artwork</div></div>
+    <div><button class="ic-btn" id="adminThemeToggle" onclick="toggleAdminTheme()">🌙</button> <button class="ic-btn" onclick="doLogout()">Logout</button></div></div>
+  <div class="stats" id="aw-stats"></div>
+  <div class="layout">
+    <div class="lpanel">
+      <div class="lp-head">Projects</div>
+      <div class="tabs" id="aw-tabs">
+        <button class="tab active" data-f="all" onclick="setF('all')">All</button>
+        <button class="tab" data-f="review" onclick="setF('review')">Awaiting Review</button>
+        <button class="tab" data-f="factory" onclick="setF('factory')">Factory</button>
+        <button class="tab" data-f="approved" onclick="setF('approved')">Approved</button>
+      </div>
+      <div class="lp-search"><input id="aw-search" placeholder="Search by product name…" oninput="renderList()"></div>
+      <div id="aw-list"></div>
+    </div>
+    <div class="rpanel" id="aw-detail"><div class="empty">Select a project.</div></div>
+  </div>
+</div>
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function fmtDate(s){if(!s)return '—';var d=new Date(s);return isNaN(d)?'—':d.toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});}
+async function sbGet(p){try{var r=await fetch(SB+'/rest/v1/'+p,{headers:H});if(!r.ok)return [];var d=await r.json();return Array.isArray(d)?d:[];}catch(e){return [];}}
+async function sbPatch(p,b){try{return (await fetch(SB+'/rest/v1/'+p,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(b)})).ok;}catch(e){return false;}}
+async function sbPost(p,b,rep){try{var r=await fetch(SB+'/rest/v1/'+p,{method:'POST',headers:Object.assign({},H,{Prefer:rep?'return=representation':'return=minimal'}),body:JSON.stringify(b)});if(!r.ok)return null;return rep?await r.json():true;}catch(e){return null;}}
+
+var PROJECTS=[], FILTER='all', SEL=null;
+function statusBadge(s){var amber=['submitted','internal_review','tenant_review','in_progress','factory_reviewing','negotiating','brief_created','assets_uploaded','designer_assigned'];var green=['tenant_approved','factory_approved','locked','sent_to_factory'];var red=['revision_requested','factory_flagged'];var c=red.indexOf(s)>-1?['#b00','rgba(176,0,0,0.12)']:green.indexOf(s)>-1?['#1a7a1a','rgba(26,122,26,0.15)']:['#a86b00','rgba(245,158,11,0.15)'];return '<span class="badge" style="color:'+c[0]+';background:'+c[1]+';">'+esc((s||'').replace(/_/g,' '))+'</span>';}
+function typeBadges(t){return (Array.isArray(t)?t:[]).map(function(x){return '<span class="badge" style="background:rgba(34,68,204,0.12);color:#2244cc;">'+esc(x)+'</span>';}).join('');}
+function firstName(p){var n=(p.tenant_users&&p.tenant_users.full_name)||'';return n?n.split(/\s+/)[0]:'Unassigned';}
+
+async function loadStats(){
+  var now=new Date();var monthStart=new Date(now.getFullYear(),now.getMonth(),1).toISOString();
+  var month=await sbGet('artwork_projects?created_at=gte.'+encodeURIComponent(monthStart)+'&select=id');
+  var review=await sbGet('artwork_projects?status=in.(submitted,internal_review)&select=id');
+  var facApproved=await sbGet('artwork_projects?status=eq.factory_approved&factory_approved_at=gte.'+encodeURIComponent(monthStart)+'&select=id');
+  var revs=await sbGet('artwork_revisions?select=artwork_project_id');
+  var projAll=await sbGet('artwork_projects?select=id');
+  var avg=projAll.length?(revs.length/projAll.length).toFixed(1):'0';
+  g('aw-stats').innerHTML=
+    '<div class="pstat"><div class="pstat-label">Active Projects (month)</div><div class="pstat-val">'+month.length+'</div><div class="pstat-sub">created this month</div></div>'+
+    '<div class="pstat"><div class="pstat-label">Awaiting Review</div><div class="pstat-val">'+review.length+'</div><div class="pstat-sub">submitted + internal review</div></div>'+
+    '<div class="pstat"><div class="pstat-label">Factory Approved (month)</div><div class="pstat-val">'+facApproved.length+'</div><div class="pstat-sub">this month</div></div>'+
+    '<div class="pstat"><div class="pstat-label">Avg Revision Cycles</div><div class="pstat-val">'+avg+'</div><div class="pstat-sub">revisions per project</div></div>';
+}
+async function loadProjects(){
+  PROJECTS=await sbGet('artwork_projects?order=created_at.desc&select=*,skus(model_number),tenant_users(full_name),artwork_versions(id)');
+  renderList();
+  if(SEL){var s=PROJECTS.find(function(x){return x.id===SEL;});if(s)renderDetail(s);}
+}
+function matchesF(p){if(FILTER==='all')return true;if(FILTER==='review')return ['submitted','internal_review','tenant_review'].indexOf(p.status)>-1;if(FILTER==='factory')return ['sent_to_factory','factory_reviewing','factory_flagged','negotiating','factory_approved'].indexOf(p.status)>-1;if(FILTER==='approved')return ['tenant_approved','locked'].indexOf(p.status)>-1;return true;}
+function setF(f){FILTER=f;document.querySelectorAll('#aw-tabs .tab').forEach(function(t){t.classList.toggle('active',t.dataset.f===f);});renderList();}
+function renderList(){
+  var q=(g('aw-search').value||'').toLowerCase().trim();
+  var rows=PROJECTS.filter(matchesF).filter(function(p){return !q||(p.product_name||'').toLowerCase().indexOf(q)>-1;});
+  var box=g('aw-list');
+  if(!rows.length){box.innerHTML='<div class="empty">No projects.</div>';return;}
+  box.innerHTML=rows.map(function(p){var vc=(p.artwork_versions||[]).length;return '<div class="arow'+(p.id===SEL?' sel':'')+'" onclick="selectProject(\''+p.id+'\')">'+
+    '<div class="arow-top"><span class="arow-pn">'+esc(p.product_name||'Untitled')+'</span>'+statusBadge(p.status)+'</div>'+
+    '<div style="margin:3px 0;">'+typeBadges(p.artwork_types)+'</div>'+
+    '<div style="font-size:11px;color:var(--text2);">'+esc(firstName(p))+' · '+vc+' version'+(vc===1?'':'s')+(p.due_date?' · due '+fmtDate(p.due_date):'')+'</div></div>';}).join('');
+}
+function selectProject(id){SEL=id;renderList();var p=PROJECTS.find(function(x){return x.id===id;});if(p)renderDetail(p);}
+
+async function renderDetail(p){
+  var sku=p.skus||{};
+  var versions=await sbGet('artwork_versions?artwork_project_id=eq.'+p.id+'&order=version_number.desc&select=*');
+  var current=versions[0]||null;
+  var html='<div class="sec"><div style="font-size:20px;font-weight:700;">'+esc(p.product_name||'Untitled')+'</div>'+
+    '<div style="font-size:13px;color:var(--text2);">'+esc(sku.model_number||'')+'</div>'+
+    '<div style="margin-top:6px;">'+statusBadge(p.status)+typeBadges(p.artwork_types)+'</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Designer: <strong>'+esc(firstName(p))+'</strong>'+(p.due_date?' · due '+fmtDate(p.due_date):'')+'</div></div>';
+
+  if(current){
+    var isPdf=(current.file_type||'').toLowerCase()==='pdf'||/\.pdf($|\?)/i.test(current.file_url||'');
+    var prev=current.file_url?(isPdf?'<iframe class="preview" src="'+esc(current.file_url)+'"></iframe>':'<img class="preview" style="object-fit:contain;" src="'+esc(current.file_url)+'">'):'<div class="empty">No file.</div>';
+    var ai=current.upc_ai_result||{};var dpiOk=current.resolution_dpi!=null&&Number(current.resolution_dpi)>=300;
+    html+='<div class="sec"><h3>Current Version — v'+esc(current.version_number)+' '+statusBadge(current.status)+'</h3>'+prev+
+      '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Submitted '+fmtDate(current.submitted_at||current.created_at)+(current.designer_notes?' · '+esc(current.designer_notes):'')+'</div>'+
+      (current.file_url?'<div style="margin-top:6px;"><a class="btn alt" style="text-decoration:none;" href="'+esc(current.file_url)+'" target="_blank">Download</a></div>':'')+
+      '<div style="margin-top:10px;font-size:12px;">UPC: '+(ai.match?'✓ Match':'✗ '+(ai.upc_format||'check'))+' · Resolution: '+(dpiOk?'✓':'✗')+' · Dimensions: '+(current.dimensions_mm?'✓':'✗')+'</div>'+
+      '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn green" onclick="adminApprove(\''+p.id+'\',\''+current.id+'\')">✓ Approve (internal → tenant)</button>'+
+      '<button class="btn red" onclick="adminReject(\''+p.id+'\',\''+current.id+'\')">✗ Reject</button></div><div id="adRej"></div></div>';
+  }
+
+  html+='<div class="sec"><h3>Version History</h3>'+(versions.length?versions.map(function(v){return '<div class="kvr"><span class="k">v'+esc(v.version_number)+' · '+fmtDate(v.submitted_at||v.created_at)+' '+statusBadge(v.status)+'</span><span class="v" style="font-weight:400;">'+(v.file_url?'<a href="'+esc(v.file_url)+'" target="_blank" style="color:#2266cc;">download</a>':'')+'</span></div>';}).join(''):'<div class="empty">No versions.</div>')+'</div>';
+
+  // comments — admin sees ALL (incl internal), can post internal
+  var cmts=await sbGet('artwork_comments?artwork_project_id=eq.'+p.id+'&order=created_at.asc&select=*');
+  html+='<div class="sec"><h3>Comments</h3>'+(cmts.length?cmts.map(function(c){return '<div class="cmt"><div class="ch">'+esc(c.author_name||c.author_type||'')+' · '+fmtDate(c.created_at)+(c.is_internal?' <span class="badge" style="background:rgba(245,158,11,0.15);color:#a86b00;">Internal</span>':'')+'</div>'+esc(c.comment_text||'')+'</div>';}).join(''):'<div class="empty">No comments.</div>')+
+    '<div class="ffield" style="margin-top:8px;"><textarea id="adCmt" placeholder="Add a comment…"></textarea></div>'+
+    '<label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:8px;"><input type="checkbox" id="adCmtInt" checked> Internal (hidden from designer)</label>'+
+    '<button class="btn" onclick="adminComment(\''+p.id+'\')">Post Comment</button></div>';
+
+  // assets — admin can upload
+  var assets=await sbGet('artwork_assets?artwork_project_id=eq.'+p.id+'&order=created_at.desc&select=*');
+  html+='<div class="sec"><h3>Brief Assets</h3>'+(assets.length?assets.map(function(a){return '<div class="kvr"><span class="k">'+esc(a.file_name||'file')+' <span class="badge" style="background:rgba(148,163,184,0.15);color:#888;">'+esc(a.asset_type||'')+'</span></span><span class="v" style="font-weight:400;">'+(a.file_url?'<a href="'+esc(a.file_url)+'" target="_blank" style="color:#2266cc;">download</a>':'')+'</span></div>';}).join(''):'<div class="empty">No assets.</div>')+
+    '<div class="ffield" style="margin-top:8px;"><label>Upload asset</label><select id="ad-asset-type"><option value="dieline">Dieline</option><option value="step_file">STEP File</option><option value="rendering">Rendering</option><option value="hi_res_image">Hi-Res Image</option><option value="user_manual">User Manual</option><option value="brand_guidelines">Brand Guidelines</option><option value="color_standard">Color Standard</option><option value="reference_sample">Reference Sample</option><option value="other">Other</option></select></div>'+
+    '<input type="file" id="ad-asset-file" onchange="adminUploadAsset(\''+p.id+'\')"><div class="hint" id="ad-asset-status" style="font-size:11px;color:var(--text2);"></div></div>';
+
+  // brief
+  html+='<div class="sec"><h3>Brief &amp; Specs</h3>'+
+    '<div class="kvr"><span class="k">Color profile</span><span class="v">'+esc(p.color_profile||'—')+'</span></div>'+
+    '<div class="kvr"><span class="k">Print finish</span><span class="v">'+esc(p.print_finish||'—')+'</span></div>'+
+    '<div style="font-size:13px;margin-top:8px;white-space:pre-wrap;">'+esc(p.brief_notes||'')+'</div></div>';
+
+  // factory distribution
+  if(['tenant_approved','sent_to_factory','factory_reviewing','factory_flagged','negotiating','factory_approved','locked'].indexOf(p.status)>-1){
+    var link=p.factory_link_token?('https://portal.tbgsourcing.net/artwork-factory-review.html?token='+encodeURIComponent(p.factory_link_token)):'';
+    var fStatus=p.status==='factory_approved'?('Approved by '+esc(p.factory_approved_by||'factory')):p.status==='factory_flagged'?'Flagged':'Pending';
+    html+='<div class="sec"><h3>Factory Distribution</h3>'+
+      (p.factory_link_token?'<div class="copybox"><input id="adLink" value="'+esc(link)+'" readonly><button class="btn alt" onclick="copyAdLink()">Copy</button></div><div style="font-size:12px;color:var(--text2);margin-top:6px;">Expires '+fmtDate(p.factory_link_expires_at)+' · '+(p.factory_download_count||0)+' downloads</div>':'')+
+      '<div style="margin-top:8px;"><button class="btn" onclick="adminSendFactory(\''+p.id+'\')">'+(p.factory_link_token?'Regenerate Link':'Generate Factory Link')+'</button></div>'+
+      '<div style="font-size:12px;margin-top:8px;">Factory approval: <strong>'+fStatus+'</strong></div></div>';
+  }
+  g('aw-detail').innerHTML=html;
+}
+async function adminApprove(pid,vid){await sbPatch('artwork_versions?id=eq.'+vid,{status:'internal_review',reviewed_at:new Date().toISOString()});await sbPatch('artwork_projects?id=eq.'+pid,{status:'tenant_review'});await loadProjects();loadStats();}
+function adminReject(pid,vid){var el=g('adRej');if(!el)return;el.innerHTML='<div class="ffield" style="margin-top:8px;"><label>Reason</label><select id="ad-rc"><option value="wrong_upc">Wrong UPC</option><option value="color_issue">Color issue</option><option value="text_error">Text error</option><option value="layout">Layout</option><option value="dimensions">Dimensions</option><option value="missing_element">Missing element</option><option value="brand_compliance">Brand compliance</option><option value="other">Other</option></select></div><div class="ffield"><textarea id="ad-rn" placeholder="Notes…"></textarea></div><button class="btn red" onclick="adminRejectSubmit(\''+pid+'\',\''+vid+'\')">Submit Rejection</button>';}
+async function adminRejectSubmit(pid,vid){var cat=g('ad-rc').value,notes=(g('ad-rn').value||'').trim();var p=PROJECTS.find(function(x){return x.id===pid;});await sbPost('artwork_revisions',{artwork_project_id:pid,version_id:vid,requested_at:new Date().toISOString(),reason_category:cat,reason_notes:notes,resolved:false});await sbPatch('artwork_versions?id=eq.'+vid,{status:'rejected',reviewed_at:new Date().toISOString()});await sbPatch('artwork_projects?id=eq.'+pid,{status:'revision_requested'});if(p&&p.tenant_id)await sbPost('tenant_action_items',{tenant_id:p.tenant_id,type:'revision_requested',reference_id:pid,reference_type:'artwork_project',title:'Revision requested — '+(p.product_name||''),description:cat.replace(/_/g,' ')+': '+notes,priority:'high',status:'open'});await loadProjects();loadStats();}
+async function adminComment(pid){var txt=(g('adCmt').value||'').trim();if(!txt)return;await sbPost('artwork_comments',{artwork_project_id:pid,author_type:'admin',author_name:'Admin',comment_text:txt,is_internal:g('adCmtInt').checked});var p=PROJECTS.find(function(x){return x.id===pid;});if(p)renderDetail(p);}
+async function adminUploadAsset(pid){var f=g('ad-asset-file').files[0];if(!f)return;var st=g('ad-asset-status');st.textContent='Uploading…';var path=pid+'/assets/'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');var up=await fetch(SB+'/storage/v1/object/artwork-files/'+encodeURIComponent(path),{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream'},body:f});if(!up.ok){st.textContent='Upload failed.';return;}await sbPost('artwork_assets',{artwork_project_id:pid,asset_type:g('ad-asset-type').value,file_name:f.name,file_url:SB+'/storage/v1/object/public/artwork-files/'+path,file_size_bytes:f.size});st.textContent='Uploaded.';var p=PROJECTS.find(function(x){return x.id===pid;});if(p)renderDetail(p);}
+function copyAdLink(){var i=g('adLink');if(!i)return;i.select();try{document.execCommand('copy');}catch(e){}alert('Copied.');}
+function randToken(){try{return 'awk_'+crypto.randomUUID().replace(/-/g,'');}catch(e){return 'awk_'+Date.now()+Math.round(Math.random()*1e9).toString(36);}}
+async function adminSendFactory(pid){var p=PROJECTS.find(function(x){return x.id===pid;});var token=(p&&p.factory_link_token)||randToken();var patch={factory_link_token:token,factory_link_expires_at:new Date(Date.now()+5*864e5).toISOString()};if(p&&p.status==='tenant_approved')patch.status='sent_to_factory';await sbPatch('artwork_projects?id=eq.'+pid,patch);await loadProjects();}
+
+function enter(){g('login').style.display='none';g('main').style.display='block';loadStats();loadProjects();}
+function doLogout(){localStorage.removeItem('admin_session');g('main').style.display='none';g('login').style.display='flex';}
+async function doLogin(){var u=g('l-user').value.trim(),pw=g('l-pass').value,e=g('l-err');try{var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:pw})});var d=await r.json().catch(function(){return {};});if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);e.style.display='none';enter();return;}e.textContent=(d&&d.unconfigured)?'Admin auth not configured.':'Incorrect username or password.';e.style.display='block';}catch(x){e.textContent='Login error.';e.style.display='block';}}
+(async function(){var tok=localStorage.getItem('admin_session');if(!tok)return;try{var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});var d=await r.json().catch(function(){return {};});if(d&&(d.ok||d.unconfigured))enter();else localStorage.removeItem('admin_session');}catch(e){}})();
+</script>
+</body>
+</html>

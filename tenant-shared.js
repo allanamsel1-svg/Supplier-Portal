@@ -118,6 +118,7 @@ const TENANT_NAV = [
   { section: 'Factories', items: [
     { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html', feature: 'factory_portal' },
     { icon: '🗂', label: 'Factory Audits', href: 'factory-audits.html', feature: 'factory_portal' },
+    { icon: '🎨', label: 'Artwork', href: 'tenant-artwork.html', feature: 'factory_portal' },
     { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending', feature: 'factory_pending' },
     { icon: '📇', label: 'Card Scanner', href: 'tenant-factories.html#scanner', feature: 'card_scanner' },
     { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews', feature: 'factory_reviews' },

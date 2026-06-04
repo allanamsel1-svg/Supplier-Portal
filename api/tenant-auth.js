@@ -33,6 +33,8 @@ function userPayload(u, tenantId) {
     email: u.email,
     full_name: u.full_name,
     role: u.role,
+    // Role-based landing page. Designers go to the creative portal; everyone else to the dashboard.
+    redirect: u.role === 'designer' ? 'designer-portal.html' : 'tenant-dashboard.html',
     tenant: {
       id: tenantId,
       name: u.tenants.name,

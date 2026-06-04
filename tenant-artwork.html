@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Artwork — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<script src="paste-upload.js"></script>
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .aw-layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start;}
+  @media(max-width:900px){.aw-layout{grid-template-columns:1fr;}}
+  .aw-left{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .aw-lhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .aw-lhead h2{font-size:16px;font-weight:700;}
+  .aw-tabs{display:flex;gap:2px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .aw-tab{padding:5px 9px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text2);border-radius:6px;font-family:inherit;}
+  .aw-tab.active{background:var(--bg);color:var(--text);}
+  .aw-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+  .aw-search input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .aw-row{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .aw-row:hover,.aw-row.sel{background:var(--bg);}.aw-row.sel{border-left:3px solid #3b82f6;}
+  .aw-row-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px;}
+  .aw-pn{font-size:13px;font-weight:700;}
+  .aw-right{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;min-height:300px;}
+  .badge{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;margin-right:4px;}
+  .aw-sec{border-top:1px solid var(--border);padding-top:14px;margin-top:14px;}
+  .aw-sec:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .aw-sec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2);margin-bottom:10px;}
+  .kvr{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:4px 0;}.kvr .k{color:var(--text2);}.kvr .v{font-weight:600;text-align:right;}
+  .ffield{margin:8px 0;}.ffield label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2);}
+  .ffield input,.ffield select,.ffield textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .ffield textarea{min-height:60px;resize:vertical;}
+  .btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.green{background:#16a34a;}.btn.red{background:#dc2626;}.btn.alt{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+  .preview{width:100%;height:420px;border:1px solid var(--border);border-radius:8px;background:var(--bg);}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;}
+  .cmt{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:13px;}
+  .cmt .ch{font-size:11px;color:var(--text2);margin-bottom:4px;}
+  .copybox{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .copybox input{flex:1;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-size:16px;font-weight:700;margin-bottom:1rem;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;}
+  .cklist{display:flex;flex-wrap:wrap;gap:10px;}.cklist label{font-size:13px;display:flex;gap:6px;align-items:center;}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+<div class="main">
+  <div class="page-header"><div class="page-title">Artwork</div><div class="page-sub" id="pageSub">Design briefs and version review</div></div>
+  <div class="aw-layout">
+    <div class="aw-left">
+      <div class="aw-lhead"><h2>Projects</h2><button class="btn" onclick="openNewModal()">+ New Project</button></div>
+      <div class="aw-tabs" id="awTabs">
+        <button class="aw-tab active" data-f="all" onclick="setAwFilter('all')">All</button>
+        <button class="aw-tab" data-f="in_progress" onclick="setAwFilter('in_progress')">In Progress</button>
+        <button class="aw-tab" data-f="awaiting_review" onclick="setAwFilter('awaiting_review')">Awaiting Review</button>
+        <button class="aw-tab" data-f="approved" onclick="setAwFilter('approved')">Approved</button>
+        <button class="aw-tab" data-f="factory_review" onclick="setAwFilter('factory_review')">Factory Review</button>
+      </div>
+      <div class="aw-search"><input id="awSearch" placeholder="Search by product name…" oninput="renderList()"></div>
+      <div id="awList"><div class="loading">Loading…</div></div>
+    </div>
+    <div class="aw-right" id="awDetail"><div class="empty"><span class="empty-icon">🎨</span>Select a project, or create a new one.</div></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="newModal">
+  <div class="modal">
+    <h2>New Artwork Project</h2>
+    <div class="ffield"><label>Product name</label><input id="np-name"></div>
+    <div class="ffield"><label>Link to SKU (optional)</label><select id="np-sku"><option value="">None</option></select></div>
+    <div class="ffield"><label>Artwork types</label><div class="cklist" id="np-types">
+      <label><input type="checkbox" value="packaging" checked> Packaging</label>
+      <label><input type="checkbox" value="label"> Label</label>
+      <label><input type="checkbox" value="catalog"> Catalog</label>
+      <label><input type="checkbox" value="cmf"> CMF</label>
+      <label><input type="checkbox" value="other"> Other</label>
+    </div></div>
+    <div class="ffield"><label>Color profile</label><select id="np-color"><option>CMYK</option><option>Pantone</option><option>CMYK+Pantone</option><option>RGB</option></select></div>
+    <div class="ffield"><label>Print finish</label><select id="np-finish"><option>Gloss</option><option>Matte</option><option>Soft Touch</option><option>Uncoated</option><option>Other</option></select></div>
+    <div class="ffield"><label>Due date</label><input id="np-due" type="date"></div>
+    <div class="ffield"><label>Assign designer</label><select id="np-designer"><option value="">Unassigned</option></select></div>
+    <div class="ffield"><label>Brief notes</label><textarea id="np-brief"></textarea></div>
+    <div class="ffield"><label>Special instructions</label><textarea id="np-special"></textarea></div>
+    <label style="font-size:13px;display:flex;gap:8px;align-items:center;"><input type="checkbox" id="np-dieline" checked> Dieline required</label>
+    <div class="ffield"><div class="err" id="np-err" style="color:#f87171;font-size:12px;display:none;"></div></div>
+    <div class="modal-actions"><button class="btn alt" onclick="closeNewModal()">Cancel</button><button class="btn" id="np-save" onclick="saveProject()">Create Project</button></div>
+  </div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+let TID=null, ME=null, PROJECTS=[], AW_FILTER='all', SEL=null, DESIGNERS=[], SKUS=[];
+function awHeaders(){return {apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json'};}
+async function awPost(p,b,rep){try{const r=await fetch(SUPA_URL+'/rest/v1/'+p,{method:'POST',headers:Object.assign({},awHeaders(),{Prefer:rep?'return=representation':'return=minimal'}),body:JSON.stringify(b)});if(!r.ok)return null;return rep?await r.json():true;}catch(e){return null;}}
+async function awPatch(p,b){try{return (await fetch(SUPA_URL+'/rest/v1/'+p,{method:'PATCH',headers:Object.assign({},awHeaders(),{Prefer:'return=minimal'}),body:JSON.stringify(b)})).ok;}catch(e){return false;}}
+function g(id){return document.getElementById(id);}
+function tok(){return localStorage.getItem('tenant_token');}
+
+function statusBadge(s){
+  var amber=['submitted','internal_review','tenant_review','in_progress','factory_reviewing','negotiating','brief_created','assets_uploaded','designer_assigned'];
+  var green=['tenant_approved','factory_approved','locked','sent_to_factory'];
+  var red=['revision_requested','factory_flagged'];
+  var c=red.indexOf(s)>-1?['#ef4444','rgba(239,68,68,0.15)']:green.indexOf(s)>-1?['#22c55e','rgba(34,197,94,0.15)']:['#f59e0b','rgba(245,158,11,0.15)'];
+  return '<span class="badge" style="color:'+c[0]+';background:'+c[1]+';">'+esc((s||'').replace(/_/g,' '))+'</span>';
+}
+function typeBadges(t){return (Array.isArray(t)?t:[]).map(function(x){return '<span class="badge" style="background:rgba(59,130,246,0.12);color:#60a5fa;">'+esc(x)+'</span>';}).join('');}
+function designerName(p){return (p.tenant_users&&p.tenant_users.full_name)||'Unassigned';}
+
+async function loadProjects(){
+  PROJECTS=await supa('artwork_projects?tenant_id=eq.'+TID+'&order=created_at.desc&select=*,skus(model_number),tenant_users(full_name)');
+  renderList();
+  if(SEL){var s=PROJECTS.find(function(x){return x.id===SEL;});if(s)renderDetail(s);}
+}
+function awMatches(p){
+  if(AW_FILTER==='all')return true;
+  if(AW_FILTER==='in_progress')return ['brief_created','assets_uploaded','designer_assigned','in_progress','submitted','internal_review','revision_requested'].indexOf(p.status)>-1;
+  if(AW_FILTER==='awaiting_review')return ['submitted','internal_review','tenant_review'].indexOf(p.status)>-1;
+  if(AW_FILTER==='approved')return ['tenant_approved','locked'].indexOf(p.status)>-1;
+  if(AW_FILTER==='factory_review')return ['sent_to_factory','factory_reviewing','factory_flagged','negotiating','factory_approved'].indexOf(p.status)>-1;
+  return true;
+}
+function setAwFilter(f){AW_FILTER=f;document.querySelectorAll('.aw-tab').forEach(function(t){t.classList.toggle('active',t.dataset.f===f);});renderList();}
+function renderList(){
+  var q=(g('awSearch').value||'').toLowerCase().trim();
+  var rows=PROJECTS.filter(awMatches).filter(function(p){return !q||(p.product_name||'').toLowerCase().indexOf(q)>-1;});
+  var box=g('awList');
+  if(!rows.length){box.innerHTML='<div class="empty" style="padding:2rem 1rem;">No projects.</div>';return;}
+  box.innerHTML=rows.map(function(p){return '<div class="aw-row'+(p.id===SEL?' sel':'')+'" onclick="selectProject(\''+p.id+'\')">'+
+    '<div class="aw-row-top"><span class="aw-pn">'+esc(p.product_name||'Untitled')+'</span>'+statusBadge(p.status)+'</div>'+
+    '<div style="margin:3px 0;">'+typeBadges(p.artwork_types)+'</div>'+
+    '<div style="font-size:11px;color:var(--text2);">'+esc(designerName(p))+(p.due_date?' · due '+fmtDate(p.due_date):'')+'</div></div>';}).join('');
+}
+function selectProject(id){SEL=id;renderList();var p=PROJECTS.find(function(x){return x.id===id;});if(p)renderDetail(p);}
+
+async function renderDetail(p){
+  var sku=p.skus||{};
+  var html='';
+  // SECTION 1 — header
+  html+='<div class="aw-sec"><div style="font-size:20px;font-weight:700;">'+esc(p.product_name||'Untitled')+'</div>'+
+    '<div style="font-size:13px;color:var(--text2);margin-top:2px;">'+esc(sku.model_number||'')+'</div>'+
+    '<div style="margin-top:8px;">'+statusBadge(p.status)+(p.due_date?'<span style="font-size:12px;color:var(--text2);">due '+fmtDate(p.due_date)+'</span>':'')+'</div>'+
+    '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Designer: <strong>'+esc(designerName(p))+'</strong> <span style="font-size:11px;">(communication via portal only)</span></div>'+
+    '<div style="margin-top:6px;">'+typeBadges(p.artwork_types)+'</div></div>';
+
+  // load versions
+  var versions=await supa('artwork_versions?artwork_project_id=eq.'+p.id+'&order=version_number.desc&select=*');
+  var current=versions[0]||null;
+
+  // SECTION 2 — current version review
+  if(current && ['submitted','internal_review','tenant_review'].indexOf(p.status)>-1){
+    var isPdf=(current.file_type||'').toLowerCase()==='pdf'||/\.pdf($|\?)/i.test(current.file_url||'');
+    var prev=current.file_url?(isPdf?'<iframe class="preview" src="'+esc(current.file_url)+'"></iframe>':'<img class="preview" style="object-fit:contain;" src="'+esc(current.file_url)+'">'):'<div class="empty">No file.</div>';
+    var ai=current.upc_ai_result||{};
+    var dpiOk=current.resolution_dpi!=null&&Number(current.resolution_dpi)>=300;
+    html+='<div class="aw-sec"><h3>Current Version Review — v'+esc(current.version_number)+'</h3>'+prev+
+      '<div style="margin-top:8px;font-size:12px;color:var(--text2);">Submitted '+fmtDate(current.submitted_at||current.created_at)+(current.designer_notes?' · '+esc(current.designer_notes):'')+'</div>'+
+      (current.file_url?'<div style="margin-top:6px;"><a class="btn alt" style="text-decoration:none;" href="'+esc(current.file_url)+'" target="_blank">Download</a></div>':'')+
+      '<div style="margin-top:12px;"><h3>AI Pre-Press Check</h3>'+
+        '<div class="chk">'+(ai.match?'✓':'✗')+' UPC verification: '+(ai.match?'Match':'Mismatch (spec vs artwork)')+'</div>'+
+        '<div class="chk">'+(dpiOk?'✓':'✗')+' Resolution: '+(dpiOk?'300+ DPI':'Below minimum / not provided')+'</div>'+
+        '<div class="chk">'+(current.dimensions_mm?'✓':'✗')+' Dimensions: '+(current.dimensions_mm?'Within tolerance':'Check required')+'</div></div>'+
+      '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'+
+        '<button class="btn green" onclick="approveVersion(\''+p.id+'\',\''+current.id+'\')">✓ Approve Version</button>'+
+        '<button class="btn red" onclick="showRevisionForm(\''+p.id+'\',\''+current.id+'\')">✗ Request Revision</button></div>'+
+      '<div id="revForm"></div></div>';
+  }
+
+  // SECTION 3 — version history
+  html+='<div class="aw-sec"><h3>Version History</h3>'+(versions.length?versions.map(function(v){return '<div class="kvr"><span class="k">v'+esc(v.version_number)+' · '+fmtDate(v.submitted_at||v.created_at)+' '+statusBadge(v.status)+'</span><span class="v" style="font-weight:400;">'+(v.designer_notes?esc(v.designer_notes)+' ':'')+(v.file_url?'<a href="'+esc(v.file_url)+'" target="_blank" style="color:#60a5fa;">download</a>':'')+'</span></div>';}).join(''):'<div class="empty">No versions yet.</div>')+'</div>';
+
+  // SECTION 4 — comments (tenant sees all)
+  var cmts=await supa('artwork_comments?artwork_project_id=eq.'+p.id+'&order=created_at.asc&select=*');
+  html+='<div class="aw-sec"><h3>Comments</h3><div id="awCmts">'+(cmts.length?cmts.map(function(c){return '<div class="cmt"><div class="ch">'+esc(c.author_name||c.author_type||'')+' · '+fmtDate(c.created_at)+(c.is_internal?' <span class="badge" style="background:rgba(245,158,11,0.15);color:#f59e0b;">Internal</span>':'')+'</div>'+esc(c.comment_text||'')+'</div>';}).join(''):'<div class="empty">No comments.</div>')+'</div>'+
+    '<div class="ffield" style="margin-top:8px;"><textarea id="awCmtInput" placeholder="Add a comment…"></textarea></div>'+
+    '<label style="font-size:12px;display:flex;gap:6px;align-items:center;margin-bottom:8px;"><input type="checkbox" id="awCmtInternal"> Mark as internal (hidden from designer)</label>'+
+    '<button class="btn" onclick="postComment(\''+p.id+'\')">Post Comment</button></div>';
+
+  // SECTION 5 — brief & specs
+  html+='<div class="aw-sec"><h3>Brief &amp; Specs</h3>'+
+    '<div class="kvr"><span class="k">Color profile</span><span class="v">'+esc(p.color_profile||'—')+'</span></div>'+
+    '<div class="kvr"><span class="k">Print finish</span><span class="v">'+esc(p.print_finish||'—')+'</span></div>'+
+    '<div class="kvr"><span class="k">Dieline required</span><span class="v">'+(p.dieline_required?'Yes':'No')+'</span></div>'+
+    '<div style="font-size:13px;margin-top:8px;white-space:pre-wrap;line-height:1.55;">'+esc(p.brief_notes||'')+'</div>'+
+    (p.special_instructions?'<div style="margin-top:8px;background:rgba(245,158,11,0.12);border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;">'+esc(p.special_instructions)+'</div>':'')+'</div>';
+
+  // SECTION 6 — factory distribution (after tenant_approved)
+  if(['tenant_approved','sent_to_factory','factory_reviewing','factory_flagged','negotiating','factory_approved','locked'].indexOf(p.status)>-1){
+    var hasLink=p.factory_link_token&&p.factory_link_expires_at;
+    var link=p.factory_link_token?('https://portal.tbgsourcing.net/artwork-factory-review.html?token='+encodeURIComponent(p.factory_link_token)):'';
+    var fStatus=p.status==='factory_approved'?'Approved':p.status==='factory_flagged'?'Flagged':'Pending';
+    html+='<div class="aw-sec"><h3>Factory Distribution</h3>'+
+      (hasLink?
+        '<div class="copybox"><input id="awLink" value="'+esc(link)+'" readonly><button class="btn alt" onclick="copyAwLink()">Copy</button></div>'+
+        '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Link expires '+fmtDate(p.factory_link_expires_at)+' · '+(p.factory_download_count||0)+' downloads</div>'+
+        '<div style="margin-top:8px;"><button class="btn alt" onclick="sendToFactory(\''+p.id+'\',\''+(current?current.id:'')+'\')">Regenerate Link</button></div>'+
+        '<div style="font-size:12px;margin-top:8px;">Factory approval status: <strong>'+fStatus+'</strong></div>'
+        :
+        '<button class="btn" onclick="sendToFactory(\''+p.id+'\',\''+(current?current.id:'')+'\')">Send to Factory</button>')+
+    '</div>';
+  }
+
+  g('awDetail').innerHTML=html;
+}
+
+async function approveVersion(pid,vid){
+  await awPatch('artwork_versions?id=eq.'+vid,{status:'approved',reviewed_by:ME.id,reviewed_at:new Date().toISOString()});
+  await awPatch('artwork_projects?id=eq.'+pid,{status:'tenant_approved'});
+  await loadProjects();
+}
+function showRevisionForm(pid,vid){
+  var el=g('revForm'); if(!el)return;
+  el.innerHTML='<div class="ffield" style="margin-top:10px;"><label>Reason category</label><select id="rev-cat"><option value="wrong_upc">Wrong UPC</option><option value="color_issue">Color issue</option><option value="text_error">Text error</option><option value="layout">Layout</option><option value="dimensions">Dimensions</option><option value="missing_element">Missing element</option><option value="brand_compliance">Brand compliance</option><option value="other">Other</option></select></div>'+
+    '<div class="ffield"><label>Notes (min 20 chars)</label><textarea id="rev-notes"></textarea></div>'+
+    '<button class="btn red" onclick="submitRevision(\''+pid+'\',\''+vid+'\')">Submit Revision Request</button>';
+}
+async function submitRevision(pid,vid){
+  var cat=g('rev-cat').value, notes=(g('rev-notes').value||'').trim();
+  if(notes.length<20){alert('Please provide at least 20 characters of notes.');return;}
+  await awPost('artwork_revisions',{artwork_project_id:pid,version_id:vid,requested_by:ME.id,requested_at:new Date().toISOString(),reason_category:cat,reason_notes:notes,resolved:false});
+  await awPatch('artwork_versions?id=eq.'+vid,{status:'rejected',reviewed_by:ME.id,reviewed_at:new Date().toISOString()});
+  await awPatch('artwork_projects?id=eq.'+pid,{status:'revision_requested'});
+  var p=PROJECTS.find(function(x){return x.id===pid;});
+  await awPost('tenant_action_items',{tenant_id:TID,type:'revision_requested',reference_id:pid,reference_type:'artwork_project',title:'Revision requested — '+((p&&p.product_name)||''),description:cat.replace(/_/g,' ')+': '+notes,priority:'high',status:'open'});
+  await loadProjects();
+}
+async function postComment(pid){
+  var txt=(g('awCmtInput').value||'').trim(); if(!txt)return;
+  var internal=g('awCmtInternal').checked;
+  await awPost('artwork_comments',{artwork_project_id:pid,author_id:ME.id,author_type:'tenant',author_name:ME.full_name||'Tenant',comment_text:txt,is_internal:internal});
+  var p=PROJECTS.find(function(x){return x.id===pid;});if(p)renderDetail(p);
+}
+function copyAwLink(){var i=g('awLink');if(!i)return;i.select();try{document.execCommand('copy');}catch(e){}alert('Link copied.');}
+function randToken(){try{return 'awk_'+crypto.randomUUID().replace(/-/g,'');}catch(e){return 'awk_'+Date.now()+Math.round(Math.random()*1e9).toString(36);}}
+async function sendToFactory(pid,vid){
+  var p=PROJECTS.find(function(x){return x.id===pid;});
+  var token=(p&&p.factory_link_token)||randToken();
+  var expiry=new Date(Date.now()+5*864e5).toISOString();
+  var patch={factory_link_token:token,factory_link_expires_at:expiry};
+  if(p&&p.status==='tenant_approved')patch.status='sent_to_factory';
+  await awPatch('artwork_projects?id=eq.'+pid,patch);
+  await loadProjects();
+}
+
+// ── New Project modal ──
+function openNewModal(){g('newModal').classList.add('open');g('np-due').value='';}
+function closeNewModal(){g('newModal').classList.remove('open');}
+async function saveProject(){
+  var name=(g('np-name').value||'').trim(), err=g('np-err'); err.style.display='none';
+  if(!name){err.textContent='Product name is required.';err.style.display='block';return;}
+  var types=Array.prototype.slice.call(document.querySelectorAll('#np-types input:checked')).map(function(c){return c.value;});
+  var btn=g('np-save'); btn.disabled=true; btn.textContent='Creating…';
+  var body={tenant_id:TID,product_name:name,artwork_types:types,color_profile:g('np-color').value,print_finish:g('np-finish').value,due_date:g('np-due').value||null,brief_notes:g('np-brief').value||null,special_instructions:g('np-special').value||null,dieline_required:g('np-dieline').checked,status:'brief_created'};
+  var skuId=g('np-sku').value; if(skuId)body.sku_id=skuId;
+  var designerId=g('np-designer').value; if(designerId){body.designer_id=designerId;body.status='designer_assigned';}
+  var created=await awPost('artwork_projects',body,true);
+  btn.disabled=false; btn.textContent='Create Project';
+  if(!created||!created[0]){err.textContent='Could not create project.';err.style.display='block';return;}
+  await awPost('tenant_action_items',{tenant_id:TID,type:'artwork_brief_created',reference_id:created[0].id,reference_type:'artwork_project',title:'Artwork brief created — '+name,description:'New artwork project created.'+(designerId?' Assigned to designer.':' Awaiting designer assignment.'),priority:'medium',status:'open'});
+  closeNewModal();
+  await loadProjects(); selectProject(created[0].id);
+}
+
+(async function init(){
+  ME=await tenantAuth();
+  if(!ME||!ME.tenant)return;
+  TID=ME.tenant.id;
+  renderSidebar(ME);
+  g('pageSub').textContent=ME.tenant.name+' · artwork';
+  DESIGNERS=await supa('tenant_users?tenant_id=eq.'+TID+'&role=eq.designer&select=id,full_name&order=full_name.asc');
+  g('np-designer').innerHTML='<option value="">Unassigned</option>'+DESIGNERS.map(function(d){return '<option value="'+d.id+'">'+esc(d.full_name||d.id)+'</option>';}).join('');
+  SKUS=await supa('skus?tenant_id=eq.'+TID+'&select=id,model_number,description&order=created_at.desc&limit=300');
+  g('np-sku').innerHTML='<option value="">None</option>'+SKUS.map(function(s){return '<option value="'+s.id+'">'+esc(s.model_number||s.description||s.id)+'</option>';}).join('');
+  await loadProjects();
+})();
+</script>
+</body>
+</html>

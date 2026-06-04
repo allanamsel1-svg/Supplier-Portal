@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Creative Portal — TBG Sourcing</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
+  .card{background:#0d1424;border:1px solid #1e2d47;border-radius:16px;padding:2.5rem;width:380px;max-width:100%;box-shadow:0 8px 40px rgba(0,0,0,0.4);}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:1.5rem;}
+  .brand .mk{width:34px;height:34px;background:#2563eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .brand .nm{font-size:15px;font-weight:700;}
+  h1{font-size:21px;font-weight:700;margin-bottom:4px;}
+  .sub{font-size:13px;color:#94a3b8;margin-bottom:1.5rem;}
+  label{display:block;font-size:12px;font-weight:600;color:#94a3b8;margin-bottom:5px;margin-top:12px;}
+  input{width:100%;background:#0a0e1a;border:1px solid #1e2d47;border-radius:8px;padding:11px 12px;color:#e2e8f0;font-size:14px;font-family:inherit;}
+  input:focus{outline:none;border-color:#3b82f6;}
+  .btn{width:100%;margin-top:18px;background:#2563eb;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .btn:hover{background:#1d4ed8;}.btn:disabled{opacity:0.6;cursor:not-allowed;}
+  .err{font-size:13px;color:#f87171;margin-top:12px;display:none;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="mk">🎨</div><div class="nm">TBG Sourcing</div></div>
+  <h1>Creative Portal</h1>
+  <div class="sub">Sign in to access your design briefs</div>
+  <label for="email">Email</label>
+  <input type="email" id="email" placeholder="you@studio.com" autocomplete="email">
+  <label for="password">Password</label>
+  <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+  <button class="btn" id="loginBtn" onclick="doLogin()">Sign In</button>
+  <div class="err" id="err"></div>
+</div>
+<script>
+function g(id){return document.getElementById(id);}
+function showErr(m){var e=g('err');e.textContent=m;e.style.display='block';}
+async function doLogin(){
+  var email=g('email').value.trim(), password=g('password').value, btn=g('loginBtn');
+  g('err').style.display='none';
+  if(!email||!password){showErr('Please enter your email and password.');return;}
+  btn.disabled=true;btn.textContent='Signing in…';
+  try{
+    var res=await fetch('/api/tenant-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:password})});
+    var data=await res.json().catch(function(){return {};});
+    if(!res.ok||!data.token){showErr(data.error||'Invalid email or password.');btn.disabled=false;btn.textContent='Sign In';return;}
+    if(!data.user||data.user.role!=='designer'){showErr('This login is for designers only. Please use the main portal.');btn.disabled=false;btn.textContent='Sign In';return;}
+    localStorage.setItem('tenant_token',data.token);
+    window.location.href='designer-portal.html';
+  }catch(e){showErr('Connection error. Please try again.');btn.disabled=false;btn.textContent='Sign In';}
+}
+(function(){var pre=new URLSearchParams(location.search).get('email');if(pre)g('email').value=pre.trim();})();
+</script>
+</body>
+</html>
