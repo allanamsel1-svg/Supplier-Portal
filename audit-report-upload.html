@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Upload Audit Report — TBG Sourcing</title>
+<script src="paste-upload.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0a0e1a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;}
@@ -65,6 +66,19 @@ function render(){
     '<div class="field"><label>Notes (optional)</label><textarea id="f-notes"></textarea></div>'+
     '<button class="btn" id="f-submit" onclick="submitUpload()">Upload Report</button>'+
     '<div class="err" id="f-err" style="display:none;padding:8px 0;color:#f87171;"></div>';
+  setTimeout(function() {
+    var uploadArea = document.querySelector('.upload-zone') || document.getElementById('content') || document.querySelector('form') || document.body;
+    if (window.registerPasteZone) {
+      registerPasteZone(uploadArea, function(file) {
+        var input = document.querySelector('input[type=file]');
+        if (input) {
+          try { var dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; } catch(e) {}
+          var hint = uploadArea.querySelector('.paste-hint');
+          if (hint) hint.textContent = 'Image pasted — click Upload to submit';
+        }
+      });
+    }
+  }, 100);
 }
 function done(msg){g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>Thank you</h2><p>'+esc(msg)+'</p></div>';}
 async function submitUpload(){

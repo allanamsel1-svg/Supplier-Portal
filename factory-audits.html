@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Factory Audits — TBG Sourcing</title>
 <link rel="stylesheet" href="tenant-portal.css">
+<script src="paste-upload.js"></script>
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
 <style>
   .fa-layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start;}
@@ -208,6 +209,12 @@ async function renderAuditDetail(a) {
 
   document.getElementById('faDetail').innerHTML = html;
   renderReportSection(a);
+  setTimeout(function() {
+    var reportEl = document.getElementById('fa-report');
+    if (reportEl && window.registerPasteZone) {
+      registerPasteZone(reportEl, function(file) { tenantUploadReport(SEL, file); });
+    }
+  }, 50);
   if (a.cap_required) renderCapSection(a);
   loadFindings(a);
   loadDocs(a);
@@ -248,6 +255,19 @@ async function loadDocs(a) {
       <input placeholder="notes" value="${esc(d.notes || '')}" onblur="setDocNotes('${d.id}',this.value)" style="width:120px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:11px;">
       ${fileBtn}</div>`;
   }).join('') + '</div>').join('');
+  setTimeout(function() {
+    var docsEl = document.getElementById('fa-docs');
+    if (docsEl && window.registerPasteZone && !docsEl.dataset.pasteRegistered) {
+      docsEl.dataset.pasteRegistered = '1';
+      registerPasteZone(docsEl, function(file) {
+        var inputs = docsEl.querySelectorAll('input[type=file]');
+        if (inputs.length) {
+          var input = inputs[inputs.length - 1];
+          try { var dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; input.dispatchEvent(new Event('change')); } catch(e) {}
+        }
+      });
+    }
+  }, 100);
 }
 async function setDocStatus(id, val) { const patch = { status: val }; if (val === 'received') patch.received_at = new Date().toISOString(); await faPatch('factory_audit_documents?id=eq.' + id, patch); const a = AUDITS.find(x => x.id === SEL); if (a) loadDocs(a); }
 async function setDocNotes(id, val) { await faPatch('factory_audit_documents?id=eq.' + id, { notes: val || null }); }
@@ -278,8 +298,12 @@ function renderReportSection(a) {
     <div class="hint" id="fa-upstatus" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>`;
 }
 function copyLink() { const i = document.getElementById('fa-link'); if (!i) return; i.select(); try { document.execCommand('copy'); } catch (e) {} alert('Link copied.'); }
-async function tenantUploadReport(auditId, input) {
-  const f = input.files[0]; if (!f) return;
+async function tenantUploadReport(auditId, fileOrEvent) {
+  var f = (fileOrEvent instanceof File) ? fileOrEvent
+    : (fileOrEvent && fileOrEvent.target && fileOrEvent.target.files) ? fileOrEvent.target.files[0]
+    : (fileOrEvent && fileOrEvent.files) ? fileOrEvent.files[0]
+    : null;
+  if (!f) return;
   const st = document.getElementById('fa-upstatus'); if (st) st.textContent = 'Uploading…';
   const path = auditId + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const up = await fetch(FA_SB + '/storage/v1/object/audit-documents/' + encodeURIComponent(path), { method: 'POST', headers: { apikey: FA_KEY, Authorization: 'Bearer ' + FA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f });

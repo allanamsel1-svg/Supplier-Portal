@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Inspections — Supplier Portal</title>
 <link rel="stylesheet" href="ri_shared.css">
+<script src="paste-upload.js"></script>
 <script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
 <script src="admin-theme.js"></script>
 <style>
@@ -387,7 +388,7 @@ async function renderDetail(insp){
 
   // SECTION 5 — Document upload
   html+='<div class="sec"><h3>Document Upload</h3><div class="sub">Upload the inspection report (PDF or image) — measurements are auto-extracted.</div>'+
-    '<div class="uploader" id="uploader" onclick="g(\'file-input\').click()">📄 Drag &amp; drop or click to upload</div>'+
+    '<div class="uploader" id="uploader" onclick="g(\'file-input\').click()">📄 Drag &amp; drop, click to browse, or paste (Ctrl+V)</div>'+
     '<input type="file" id="file-input" style="display:none" accept="application/pdf,image/*" onchange="handleUpload(\''+insp.id+'\')">'+
     '<div class="hint" id="upload-status"></div>'+
   '</div>';
@@ -425,6 +426,12 @@ async function renderDetail(insp){
   html+='<div class="sec" id="rework-history" style="display:none;"><h3>Rework History</h3><div id="rework-list"></div></div>';
 
   g('detail').innerHTML=html;
+  setTimeout(function() {
+    var uploaderEl = document.getElementById('uploader');
+    if (uploaderEl && window.registerPasteZone) {
+      registerPasteZone(uploaderEl, function(file) { handleUpload(SELECTED, file); });
+    }
+  }, 50);
   if(insp.status==='scheduled')recalcAQL();
   loadMeasurements(insp);
   loadConfirmations(insp.id);
@@ -674,8 +681,8 @@ async function runVarianceAI(mismatches,insp){
 }
 
 // ── Document upload ──
-async function handleUpload(id){
-  var f=g('file-input').files[0]; if(!f)return;
+async function handleUpload(id, pastedFile){
+  var f=pastedFile||(g('file-input')&&g('file-input').files[0]); if(!f)return;
   var status=g('upload-status'); status.textContent='Uploading…';
   var path=id+'/'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
   try{
@@ -807,6 +814,19 @@ function toggleAddDefect(id){
     '<div class="field"><label>Photo (optional)</label><input id="df-photo" type="file" accept="image/*"></div></div>'+
     '<button class="btn" id="df-save" onclick="saveDefect(\''+id+'\')">Save Defect</button>'+
     '<div class="hint" id="df-status"></div>';
+  setTimeout(function() {
+    var defZone = document.getElementById('add-defect-form');
+    if (defZone && window.registerPasteZone) {
+      registerPasteZone(defZone, function(file) {
+        var input = document.getElementById('df-photo');
+        if (input) {
+          try { var dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; } catch(e) {}
+          var st = document.getElementById('df-status');
+          if (st) st.textContent = 'Image pasted — click Save Defect to upload';
+        }
+      });
+    }
+  }, 50);
 }
 function defectType(t){DEFECT_TYPE=t;document.querySelectorAll('#defect-type-seg button').forEach(function(b){b.classList.toggle('on',b.dataset.v===t);});}
 async function saveDefect(id){
