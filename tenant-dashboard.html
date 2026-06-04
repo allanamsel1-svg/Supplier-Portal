@@ -116,6 +116,13 @@
       <div class="w-foot">View All →</div>
     </div>
 
+    <div class="widget" id="inspectionWidget" data-href="tenant-operations.html#orders">
+      <div class="w-head"><span class="w-icon">🔍</span><span class="w-title">Upcoming Inspections</span></div>
+      <div class="w-count" id="insp-count">—</div>
+      <div class="w-list" id="insp-list"></div>
+      <div class="w-foot">View All →</div>
+    </div>
+
     <!-- 5th card — AI usage fuel gauge -->
     <div id="gaugeWidget" class="gauge-card"><div class="loading">Loading usage…</div></div>
   </div>
@@ -217,6 +224,39 @@ async function loadPD() {
   list.innerHTML = active.slice(0, 3).map(r => {
     const days = daysSince(r.created_at);
     return `<div class="w-item"><strong>${esc(r.item_description || r.pd_number || 'Project')}</strong><br>${esc(r.category || '—')} · ${esc(r.status || r.sku_lifecycle_status || '')}${days != null ? ' · ' + days + 'd' : ''}</div>`;
+  }).join('');
+}
+
+// ── Widget 6: Upcoming Inspections ──
+function daysUntil(iso) { if (!iso) return null; const d = new Date(iso + 'T00:00:00'); if (isNaN(d)) return null; const t = new Date(); t.setHours(0,0,0,0); return Math.round((d.getTime() - t.getTime()) / 864e5); }
+function inspStatusBadge(s) {
+  const map = {
+    scheduled: ['#6b7280', 'rgba(107,114,128,0.15)'],
+    factory_confirmed: ['#3b82f6', 'rgba(59,130,246,0.15)'],
+    inspector_booked: ['#f59e0b', 'rgba(245,158,11,0.15)'],
+    in_progress: ['#f59e0b', 'rgba(245,158,11,0.15)'],
+    conditional_pass: ['#f59e0b', 'rgba(245,158,11,0.15)'],
+    rework_required: ['#ef4444', 'rgba(239,68,68,0.15)'],
+  };
+  const [c, bg] = map[s] || ['#6b7280', 'rgba(107,114,128,0.15)'];
+  return `<span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:6px;color:${c};background:${bg};">${esc((s || '').replace(/_/g, ' '))}</span>`;
+}
+async function loadInspections() {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = await supa(`inspections?tenant_id=eq.${TID}&scheduled_date=gte.${today}&status=not.in.(pass,fail,waived)&order=scheduled_date.asc&limit=10&select=id,scheduled_date,status,inspection_type,inspection_method,purchase_orders(po_number),factories(factory_name_english)`);
+  const next30 = rows.filter(r => { const d = daysUntil(r.scheduled_date); return d != null && d <= 30; });
+  const countEl = document.getElementById('insp-count');
+  if (countEl) countEl.textContent = next30.length;
+  const list = document.getElementById('insp-list');
+  if (!list) return;
+  if (!rows.length) { list.innerHTML = '<div class="w-empty">No upcoming inspections</div>'; return; }
+  list.innerHTML = rows.slice(0, 3).map(r => {
+    const po = (r.purchase_orders && r.purchase_orders.po_number) || 'PO';
+    const fac = (r.factories && r.factories.factory_name_english) || '—';
+    const d = daysUntil(r.scheduled_date);
+    const dColor = d != null && d <= 3 ? '#ef4444' : d != null && d <= 7 ? '#f59e0b' : '#4ade80';
+    const away = d != null ? `<span style="color:${dColor};font-weight:600;">${d}d away</span>` : '';
+    return `<div class="w-item"><strong>${esc(po)}</strong> · ${esc(fac)}<br>${fmtDate(r.scheduled_date)} · ${away} ${inspStatusBadge(r.status)}</div>`;
   }).join('');
 }
 
@@ -340,6 +380,7 @@ async function confirmCapIncrease() {
   loadProduction();
   loadSamples();
   loadPD();
+  loadInspections();
   loadGauge();
 })();
 </script>

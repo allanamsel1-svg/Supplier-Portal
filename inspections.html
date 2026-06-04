@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inspections — Supplier Portal</title>
+<link rel="stylesheet" href="ri_shared.css">
+<script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+<script src="admin-theme.js"></script>
+<style>
+  *{box-sizing:border-box;}
+  /* Admin login gate (matches admin.html / financials.html) */
+  #login { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+  .lb { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 2.5rem; width: 340px; max-width: 100%; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+  .lb h1 { font-size: 18px; font-weight: 600; margin-bottom: 4px; color:var(--text); }
+  .lb p { font-size: 13px; color: #888; margin-bottom: 1.5rem; }
+  .lb input { width: 100%; padding: 9px 11px; background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; color:var(--text); font-size: 14px; margin-bottom: 10px; font-family: inherit; }
+  .lb-btn { width: 100%; padding: 10px; background: #1a1a2e; color:#fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .lb-err { font-size: 13px; color: #c00; margin-top: 8px; display: none; }
+  #main { display: none; }
+
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  .topbar{height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.25rem;position:sticky;top:0;z-index:50;}
+  .topbar-l{display:flex;align-items:center;gap:12px;}
+  .tm{width:28px;height:28px;background:#1a1a2e;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+  .topbar-title{font-size:14px;font-weight:600;}
+  .back-link{font-size:13px;color:#888;text-decoration:none;}
+  .topbar-r{display:flex;align-items:center;gap:10px;}
+  .ic-btn{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:13px;cursor:pointer;color:var(--text);font-family:inherit;}
+
+  .layout{display:grid;grid-template-columns:380px 1fr;gap:0;height:calc(100vh - 52px);}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;height:auto;}}
+  .lpanel{border-right:1px solid var(--border);overflow-y:auto;background:var(--bg2);}
+  .rpanel{overflow-y:auto;padding:1.5rem;}
+
+  .lp-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .lp-head h2{font-size:16px;font-weight:700;}
+  .btn-new{background:#1a1a2e;color:#fff;border:none;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .tabs{display:flex;gap:2px;padding:8px 12px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .tab{padding:5px 10px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;color:#888;border-radius:6px;font-family:inherit;}
+  .tab.active{background:var(--bg);color:var(--text);}
+  .lp-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+  .lp-search input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+
+  .irow{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .irow:hover{background:var(--bg);}
+  .irow.sel{background:var(--bg);border-left:3px solid #2244cc;}
+  .irow-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;}
+  .irow-po{font-size:13px;font-weight:700;}
+  .irow-fac{font-size:12px;color:var(--text2);}
+  .irow-meta{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;white-space:nowrap;}
+  .type-badge{background:rgba(34,68,204,0.12);color:#2244cc;}
+  .empty{color:#aaa;text-align:center;padding:3rem 1rem;font-size:14px;}
+
+  .sec{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.1rem 1.25rem;margin-bottom:1rem;}
+  .sec h3{font-size:13px;font-weight:700;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2);}
+  .sec .sub{font-size:12px;color:#999;margin-bottom:12px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2);}
+  .field input,.field select,.field textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .field textarea{resize:vertical;min-height:64px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap;}
+  .seg button{border:none;background:var(--bg);font-size:12px;font-weight:600;padding:7px 13px;cursor:pointer;font-family:inherit;color:#888;border-right:1px solid var(--border);}
+  .seg button.on{background:#1a1a2e;color:#fff;}
+  .btn{background:#1a1a2e;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.alt{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+  .btn.green{background:#1a7a1a;} .btn.red{background:#b00;} .btn.amber{background:#a86b00;}
+  .calc-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0;}
+  .mtable-wrap{overflow-x:auto;}
+  table.mt{border-collapse:collapse;font-size:11px;min-width:760px;}
+  table.mt th,table.mt td{border:1px solid var(--border);padding:4px 6px;text-align:center;}
+  table.mt th{background:var(--bg);font-weight:700;}
+  table.mt input{width:62px;padding:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg2);color:var(--text);font-size:11px;font-family:inherit;}
+  table.mt input.upc{width:120px;}
+  .ok{color:#1a7a1a;font-weight:700;} .bad{color:#b00;font-weight:700;}
+  .var-card{background:rgba(245,158,11,0.1);border:1px solid #f0d860;border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12px;}
+  .var-card h4{font-size:12px;margin-bottom:6px;color:#a86b00;}
+  .var-card ul{margin:4px 0 0 16px;} .var-card li{margin-bottom:3px;line-height:1.45;}
+  .conf-row{display:flex;align-items:center;justify-content:space-between;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border);}
+  .uploader{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;color:#999;font-size:13px;}
+  .uploader.drag{border-color:#2244cc;color:#2244cc;}
+  .hint{font-size:11px;color:#aaa;margin-top:4px;}
+  .detail-head{margin-bottom:1rem;}
+  .detail-head .dh-po{font-size:20px;font-weight:700;}
+  .detail-head .dh-sub{font-size:13px;color:var(--text2);margin-top:2px;}
+  .detail-head .dh-meta{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;}
+
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;align-items:center;justify-content:center;z-index:100;padding:1rem;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:460px;max-width:100%;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-size:16px;font-weight:700;margin-bottom:1rem;}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;}
+
+  @keyframes ipulse{0%,100%{opacity:1}50%{opacity:0.45}}
+  .pulse{animation:ipulse 1.2s infinite;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN GATE -->
+<div id="login">
+  <div class="lb">
+    <h1>Inspections</h1>
+    <p>Admin sign-in required.</p>
+    <input id="l-user" placeholder="Username" autocomplete="username">
+    <input id="l-pass" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="lb-btn" onclick="doLogin()">Sign in</button>
+    <div class="lb-err" id="l-err"></div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-l">
+      <a class="back-link" href="admin.html">← Admin</a>
+      <div class="tm">🔍</div>
+      <div class="topbar-title">Inspections</div>
+    </div>
+    <div class="topbar-r">
+      <button class="ic-btn" id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle theme">🌙</button>
+      <button class="ic-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="lpanel">
+      <div class="lp-head">
+        <h2>Inspections</h2>
+        <button class="btn-new" onclick="openNewModal()">+ New</button>
+      </div>
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-f="all" onclick="setFilter('all')">All</button>
+        <button class="tab" data-f="scheduled" onclick="setFilter('scheduled')">Scheduled</button>
+        <button class="tab" data-f="in_progress" onclick="setFilter('in_progress')">In Progress</button>
+        <button class="tab" data-f="completed" onclick="setFilter('completed')">Completed</button>
+        <button class="tab" data-f="rework_required" onclick="setFilter('rework_required')">Rework Required</button>
+      </div>
+      <div class="lp-search"><input id="search" placeholder="Search by PO or factory…" oninput="renderList()"></div>
+      <div id="list"></div>
+    </div>
+
+    <div class="rpanel" id="detail">
+      <div class="empty">Select an inspection from the list, or create a new one.</div>
+    </div>
+  </div>
+</div>
+
+<!-- NEW INSPECTION MODAL -->
+<div class="modal-bg" id="newModal">
+  <div class="modal">
+    <h2>New Inspection</h2>
+    <div class="field">
+      <label>Tenant</label>
+      <select id="nm-tenant" onchange="nmFilterPOs()"><option value="">All tenants</option></select>
+    </div>
+    <div class="field">
+      <label>Purchase Order</label>
+      <select id="nm-po"><option value="">Select a PO…</option></select>
+    </div>
+    <div class="field">
+      <label>Inspection Type</label>
+      <div class="seg" id="nm-type">
+        <button class="on" data-v="PSI" onclick="nmType('PSI')">PSI</button>
+        <button data-v="DUPRO" onclick="nmType('DUPRO')">DUPRO</button>
+        <button data-v="IPC" onclick="nmType('IPC')">IPC</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Scheduled Date</label>
+      <input id="nm-date" type="date">
+    </div>
+    <div class="lb-err" id="nm-err"></div>
+    <div class="modal-actions">
+      <button class="btn alt" onclick="closeNewModal()">Cancel</button>
+      <button class="btn" id="nm-save" onclick="saveNewInspection()">Create Inspection</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+function g(id){return document.getElementById(id);}
+function esc(s){if(s==null)return '';return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function todayStr(){return new Date().toISOString().slice(0,10);}
+
+async function sbGet(path){try{var r=await fetch(SB+'/rest/v1/'+path,{headers:H});if(!r.ok)return [];var d=await r.json();return Array.isArray(d)?d:[];}catch(e){return [];}}
+async function sbPatch(path,body){try{var r=await fetch(SB+'/rest/v1/'+path,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(body)});return r.ok;}catch(e){return false;}}
+async function sbPost(path,body,rep){try{var r=await fetch(SB+'/rest/v1/'+path,{method:'POST',headers:Object.assign({},H,{Prefer:rep?'return=representation':'return=minimal'}),body:JSON.stringify(body)});if(!r.ok)return null;return rep?await r.json():true;}catch(e){return null;}}
+
+// ── State ──
+var INSPECTIONS=[], TENANTS={}, FILTER='all', SELECTED=null, MEAS={};
+
+// ── AQL engine ──
+var AQL_BRACKETS=[
+  [2,8,{I:2,II:3,III:5}],[9,15,{I:3,II:5,III:8}],[16,25,{I:5,II:8,III:13}],
+  [26,50,{I:8,II:13,III:20}],[51,90,{I:13,II:20,III:32}],[91,150,{I:20,II:32,III:50}],
+  [151,280,{I:32,II:50,III:80}],[281,500,{I:50,II:80,III:125}],[501,1200,{I:80,II:125,III:200}],
+  [1201,3200,{I:125,II:200,III:315}],[3201,10000,{I:200,II:315,III:500}],
+  [10001,35000,{I:315,II:500,III:800}],[35001,Infinity,{I:500,II:800,III:1250}]
+];
+// Major/Minor allowed per 80 samples, by AQL level. Critical always 0.
+var AQL_ACCEPT={'1.0':{major:1,minor:3},'1.5':{major:2,minor:5},'2.5':{major:3,minor:7},'4.0':{major:5,minor:10}};
+function sampleSizeFor(qty,level){
+  qty=Number(qty)||0; level=level||'II';
+  for(var i=0;i<AQL_BRACKETS.length;i++){var b=AQL_BRACKETS[i];if(qty>=b[0]&&qty<=b[1])return b[2][level]||b[2].II;}
+  return 0;
+}
+function acceptanceFor(aql,sampleSize){
+  var base=AQL_ACCEPT[String(aql)]||AQL_ACCEPT['2.5'];
+  var scale=(sampleSize||0)/80;
+  return {critical:0,major:Math.max(0,Math.round(base.major*scale)),minor:Math.max(0,Math.round(base.minor*scale))};
+}
+
+// ── List ──
+async function loadList(){
+  INSPECTIONS=await sbGet('inspections?select=*,purchase_orders(po_number,quantity,sku_id),factories(factory_name_english),tenants(name)&order=scheduled_date.asc');
+  renderList();
+  if(SELECTED){var s=INSPECTIONS.find(function(x){return x.id===SELECTED;});if(s)renderDetail(s);}
+}
+function methodIcon(m){return m==='third_party'?'🔍':m==='self_inspection'?'🏭':m==='tbg_arranged'?'📋':'•';}
+function statusBadge(s){
+  var map={scheduled:['#6b7280','rgba(107,114,128,0.15)'],factory_confirmed:['#2563eb','rgba(37,99,235,0.15)'],inspector_booked:['#a86b00','rgba(245,158,11,0.15)'],in_progress:['#a86b00','rgba(245,158,11,0.15)'],pass:['#1a7a1a','rgba(26,122,26,0.15)'],fail:['#b00','rgba(176,0,0,0.12)'],conditional_pass:['#a86b00','rgba(245,158,11,0.15)'],waived:['#6b7280','rgba(107,114,128,0.15)'],rework_required:['#b00','rgba(176,0,0,0.12)']};
+  var c=map[s]||['#6b7280','rgba(107,114,128,0.15)'];
+  var pulse=(s==='in_progress')?' pulse':'';
+  return '<span class="badge'+pulse+'" style="color:'+c[0]+';background:'+c[1]+';">'+esc((s||'').replace(/_/g,' '))+'</span>';
+}
+function matchesFilter(insp){
+  if(FILTER==='all')return true;
+  if(FILTER==='scheduled')return insp.status==='scheduled';
+  if(FILTER==='in_progress')return insp.status==='in_progress'||insp.status==='inspector_booked'||insp.status==='factory_confirmed';
+  if(FILTER==='completed')return ['pass','fail','conditional_pass','waived'].indexOf(insp.status)>-1;
+  if(FILTER==='rework_required')return insp.status==='rework_required';
+  return true;
+}
+function setFilter(f){FILTER=f;document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.f===f);});renderList();}
+function renderList(){
+  var q=(g('search').value||'').toLowerCase().trim();
+  var rows=INSPECTIONS.filter(matchesFilter).filter(function(insp){
+    if(!q)return true;
+    var po=(insp.purchase_orders&&insp.purchase_orders.po_number||'').toLowerCase();
+    var fac=(insp.factories&&insp.factories.factory_name_english||'').toLowerCase();
+    return po.indexOf(q)>-1||fac.indexOf(q)>-1;
+  });
+  if(!rows.length){g('list').innerHTML='<div class="empty">No inspections.</div>';return;}
+  g('list').innerHTML=rows.map(function(insp){
+    var po=insp.purchase_orders&&insp.purchase_orders.po_number||insp.po_id||'—';
+    var fac=insp.factories&&insp.factories.factory_name_english||'—';
+    var ten=insp.tenants&&insp.tenants.name||'—';
+    return '<div class="irow'+(insp.id===SELECTED?' sel':'')+'" onclick="selectInspection(\''+insp.id+'\')">'+
+      '<div class="irow-top"><span class="irow-po">'+esc(po)+'</span>'+statusBadge(insp.status)+'</div>'+
+      '<div class="irow-fac">'+esc(fac)+' · '+esc(ten)+'</div>'+
+      '<div class="irow-meta"><span class="badge type-badge">'+esc(insp.inspection_type||'—')+'</span>'+
+      '<span style="font-size:11px;color:var(--text2);">'+methodIcon(insp.inspection_method)+' '+esc(insp.scheduled_date||'—')+'</span></div>'+
+    '</div>';
+  }).join('');
+}
+function selectInspection(id){SELECTED=id;var insp=INSPECTIONS.find(function(x){return x.id===id;});renderList();if(insp)renderDetail(insp);}
+
+// ── Detail ──
+function daysLabel(dateStr){
+  if(!dateStr)return '';
+  var t=new Date();t.setHours(0,0,0,0);var d=new Date(dateStr+'T00:00:00');if(isNaN(d))return '';
+  var diff=Math.round((d.getTime()-t.getTime())/864e5);
+  if(diff>0)return diff+' day'+(diff===1?'':'s')+' until inspection';
+  if(diff<0)return Math.abs(diff)+' day'+(diff===-1?'':'s')+' since inspection';
+  return 'Inspection is today';
+}
+async function renderDetail(insp){
+  var po=insp.purchase_orders||{};
+  var fac=insp.factories||{};
+  var ten=insp.tenants||{};
+  var html='';
+  // SECTION 1 — header
+  html+='<div class="detail-head">'+
+    '<div class="dh-po">'+esc(po.po_number||insp.po_id||'—')+'</div>'+
+    '<div class="dh-sub">'+esc(fac.factory_name_english||'—')+' · '+esc(ten.name||'—')+'</div>'+
+    '<div class="dh-meta"><span class="badge type-badge">'+esc(insp.inspection_type||'—')+'</span>'+statusBadge(insp.status)+
+    '<span style="font-size:12px;color:var(--text2);">'+esc(insp.scheduled_date||'—')+'</span>'+
+    '<span style="font-size:12px;font-weight:600;">'+esc(daysLabel(insp.scheduled_date))+'</span></div>'+
+  '</div>';
+
+  // SECTION 2 — AQL (when scheduled)
+  if(insp.status==='scheduled'){
+    var qty=po.quantity||0;
+    html+='<div class="sec" id="sec-aql">'+
+      '<h3>AQL Configuration</h3><div class="sub">PO quantity: <strong>'+esc(qty)+'</strong> units</div>'+
+      '<div class="row2">'+
+        '<div class="field"><label>AQL Level</label><select id="aql-level" onchange="recalcAQL()">'+
+          ['1.0','1.5','2.5','4.0'].map(function(v){return '<option value="'+v+'"'+((insp.aql_level!=null&&String(insp.aql_level)===v)||(insp.aql_level==null&&v==='2.5')?' selected':'')+'>'+v+'</option>';}).join('')+
+        '</select></div>'+
+        '<div class="field"><label>Inspection Level</label><select id="insp-level" onchange="recalcAQL()">'+
+          ['I','II','III'].map(function(v){return '<option value="'+v+'"'+((insp.inspection_level===v)||(!insp.inspection_level&&v==='II')?' selected':'')+'>Level '+v+'</option>';}).join('')+
+        '</select></div>'+
+      '</div>'+
+      '<div class="calc-box" id="aql-calc"></div>'+
+      '<button class="btn" onclick="saveAQL(\''+insp.id+'\','+qty+')">Save AQL Config</button>'+
+    '</div>';
+  }
+
+  // SECTION 3 — Method
+  var m=insp.inspection_method||'';
+  html+='<div class="sec"><h3>Inspection Method</h3>'+
+    '<div class="seg" id="method-seg">'+
+      '<button class="'+(m==='third_party'?'on':'')+'" onclick="setMethod(\''+insp.id+'\',\'third_party\')">🔍 Third Party</button>'+
+      '<button class="'+(m==='self_inspection'?'on':'')+'" onclick="setMethod(\''+insp.id+'\',\'self_inspection\')">🏭 Self-Inspection</button>'+
+      '<button class="'+(m==='tbg_arranged'?'on':'')+'" onclick="setMethod(\''+insp.id+'\',\'tbg_arranged\')">📋 TBG Arranged</button>'+
+    '</div>'+
+    '<div id="method-detail" style="margin-top:12px;">'+methodDetailHtml(insp)+'</div>'+
+  '</div>';
+
+  // SECTION 4 — Measurements
+  html+='<div class="sec"><h3>Measurements Verification</h3><div class="sub">Spec auto-filled from the linked SKU where available · ✓ within 2% tolerance</div>'+
+    '<div class="mtable-wrap" id="meas-table">Loading…</div>'+
+    '<div style="margin-top:10px;"><button class="btn" onclick="saveMeasurements(\''+insp.id+'\')">Save Measurements</button></div>'+
+    '<div id="variance-alerts"></div>'+
+  '</div>';
+
+  // SECTION 5 — Document upload
+  html+='<div class="sec"><h3>Document Upload</h3><div class="sub">Upload the inspection report (PDF or image) — measurements are auto-extracted.</div>'+
+    '<div class="uploader" id="uploader" onclick="g(\'file-input\').click()">📄 Drag &amp; drop or click to upload</div>'+
+    '<input type="file" id="file-input" style="display:none" accept="application/pdf,image/*" onchange="handleUpload(\''+insp.id+'\')">'+
+    '<div class="hint" id="upload-status"></div>'+
+  '</div>';
+
+  // SECTION 6 — Factory confirmation log
+  html+='<div class="sec"><h3>Factory Confirmation Log</h3>'+
+    '<div id="conf-log">Loading…</div>'+
+    '<div style="margin-top:10px;"><button class="btn alt" onclick="sendConfirmRequest(\''+insp.id+'\')">Send Confirmation Request Now</button></div>'+
+  '</div>';
+
+  // SECTION 7 — Outcome (in_progress or complete)
+  var showOutcome=['in_progress','inspector_booked','factory_confirmed','pass','fail','conditional_pass','rework_required'].indexOf(insp.status)>-1;
+  if(showOutcome){
+    html+='<div class="sec"><h3>Outcome</h3>'+
+      '<div class="seg">'+
+        '<button class="green" onclick="setOutcome(\''+insp.id+'\',\'pass\')">Pass</button>'+
+        '<button class="red" onclick="setOutcome(\''+insp.id+'\',\'fail\')">Fail</button>'+
+        '<button class="amber" onclick="setOutcome(\''+insp.id+'\',\'conditional_pass\')">Conditional Pass</button>'+
+      '</div>'+
+      '<div class="field" style="margin-top:12px;"><label>Outcome notes</label><textarea id="outcome-notes" onblur="saveOutcomeNotes(\''+insp.id+'\')">'+esc(insp.outcome_notes||'')+'</textarea></div>'+
+      (insp.outcome?'<div class="calc-box">Current outcome: <strong>'+esc(insp.outcome.replace(/_/g," "))+'</strong></div>':'')+
+    '</div>';
+  }
+
+  g('detail').innerHTML=html;
+  if(insp.status==='scheduled')recalcAQL();
+  loadMeasurements(insp);
+  loadConfirmations(insp.id);
+}
+
+function methodDetailHtml(insp){
+  var m=insp.inspection_method||'';
+  if(m==='third_party'){
+    return '<div class="row2">'+
+      '<div class="field"><label>Inspector Company</label><select id="mf-company" onchange="saveMethodFields(\''+insp.id+'\')">'+
+        ['','SGS','Bureau Veritas','Intertek','QIMA','Other'].map(function(v){return '<option'+(insp.inspector_company===v?' selected':'')+'>'+v+'</option>';}).join('')+
+      '</select></div>'+
+      '<div class="field"><label>Contact Name</label><input id="mf-name" value="'+esc(insp.inspector_contact_name||'')+'" onblur="saveMethodFields(\''+insp.id+'\')"></div>'+
+      '</div>'+
+      '<div class="field"><label>Contact Email</label><input id="mf-email" value="'+esc(insp.inspector_contact_email||'')+'" onblur="saveMethodFields(\''+insp.id+'\')"></div>';
+  }
+  if(m==='self_inspection'){
+    return '<div class="field"><label>Waiver Reason</label><textarea id="mf-waiver" onblur="saveMethodFields(\''+insp.id+'\')">'+esc(insp.waiver_reason||'')+'</textarea></div>'+
+      '<label style="font-size:12px;display:flex;gap:8px;align-items:center;cursor:pointer;"><input type="checkbox" id="mf-ack" '+(insp.waiver_acknowledged_at?'checked':'')+' onchange="saveMethodFields(\''+insp.id+'\')" style="width:auto;"> I acknowledge the third-party inspection waiver.</label>';
+  }
+  if(m==='tbg_arranged'){
+    return '<div class="field"><label>Notes</label><textarea id="mf-notes" onblur="saveMethodFields(\''+insp.id+'\')">'+esc(insp.outcome_notes||'')+'</textarea></div>';
+  }
+  return '<div class="hint">Select a method above.</div>';
+}
+
+// ── AQL ──
+function recalcAQL(){
+  var qtyEl=g('aql-calc'); if(!qtyEl)return;
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;}); if(!insp)return;
+  var qty=(insp.purchase_orders&&insp.purchase_orders.quantity)||0;
+  var level=g('insp-level').value, aql=g('aql-level').value;
+  var ss=sampleSizeFor(qty,level), acc=acceptanceFor(aql,ss);
+  qtyEl.innerHTML='Sample size: <strong>'+ss+' units</strong> | Critical: <strong>0</strong> allowed | Major: <strong>'+acc.major+'</strong> allowed | Minor: <strong>'+acc.minor+'</strong> allowed';
+}
+async function saveAQL(id,qty){
+  var level=g('insp-level').value, aql=g('aql-level').value;
+  var ss=sampleSizeFor(qty,level), acc=acceptanceFor(aql,ss);
+  var ok=await sbPatch('inspections?id=eq.'+id,{aql_level:Number(aql),inspection_level:level,sample_size:ss,critical_defects_allowed:0,major_defects_allowed:acc.major,minor_defects_allowed:acc.minor,updated_at:new Date().toISOString()});
+  if(ok){await loadList();} else alert('Could not save AQL config.');
+}
+
+// ── Method ──
+async function setMethod(id,method){
+  var ok=await sbPatch('inspections?id=eq.'+id,{inspection_method:method,updated_at:new Date().toISOString()});
+  if(ok)await loadList();
+}
+async function saveMethodFields(id){
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;}); if(!insp)return;
+  var body={updated_at:new Date().toISOString()};
+  if(insp.inspection_method==='third_party'){
+    body.inspector_company=g('mf-company').value||null;
+    body.inspector_contact_name=g('mf-name').value||null;
+    body.inspector_contact_email=g('mf-email').value||null;
+  }else if(insp.inspection_method==='self_inspection'){
+    body.waiver_reason=g('mf-waiver').value||null;
+    body.waiver_acknowledged_at=g('mf-ack').checked?new Date().toISOString():null;
+  }else if(insp.inspection_method==='tbg_arranged'){
+    body.outcome_notes=g('mf-notes').value||null;
+  }
+  await sbPatch('inspections?id=eq.'+id,body);
+  Object.assign(insp,body);
+}
+
+// ── Measurements ──
+var MEAS_TYPES=['unit','inner','master'];
+var MEAS_LABELS={unit:'Unit',inner:'Inner Carton',master:'Master Carton'};
+function skuSpec(sku,keys){if(!sku)return null;for(var i=0;i<keys.length;i++){if(sku[keys[i]]!=null&&sku[keys[i]]!=='')return sku[keys[i]];}return null;}
+async function loadMeasurements(insp){
+  MEAS={};
+  var rows=await sbGet('inspection_measurements?inspection_id=eq.'+insp.id+'&select=*');
+  rows.forEach(function(r){MEAS[r.measurement_type]=r;});
+  // Best-effort spec auto-fill from linked SKU for the unit row.
+  var sku=null;
+  var skuId=insp.purchase_orders&&insp.purchase_orders.sku_id;
+  if(skuId){var sr=await sbGet('skus?id=eq.'+skuId+'&select=*&limit=1');sku=sr[0]||null;}
+  if(sku){
+    var u=MEAS.unit||{measurement_type:'unit'};
+    if(u.weight_spec==null)u.weight_spec=skuSpec(sku,['unit_weight','unit_weight_kg','weight','net_weight']);
+    if(u.length_spec==null)u.length_spec=skuSpec(sku,['unit_length','unit_length_cm','length']);
+    if(u.width_spec==null)u.width_spec=skuSpec(sku,['unit_width','unit_width_cm','width']);
+    if(u.height_spec==null)u.height_spec=skuSpec(sku,['unit_height','unit_height_cm','height']);
+    if(u.upc_spec==null)u.upc_spec=skuSpec(sku,['upc','upc_code','barcode']);
+    MEAS.unit=u;
+  }
+  renderMeasTable();
+}
+function num(v){var n=parseFloat(v);return isNaN(n)?null:n;}
+function within2(spec,actual){var s=num(spec),a=num(actual);if(s==null||a==null||s===0)return null;return Math.abs((a-s)/s)<=0.02;}
+function matchCell(spec,actual){var w=within2(spec,actual);if(w==null)return '<span style="color:#bbb;">—</span>';return w?'<span class="ok">✓</span>':'<span class="bad">✗</span>';}
+function renderMeasTable(){
+  var cols=[['weight','Weight'],['length','L'],['width','W'],['height','H']];
+  var head='<table class="mt"><tr><th>Measurement</th>';
+  cols.forEach(function(c){head+='<th>'+c[1]+' Spec</th><th>'+c[1]+' Actual</th><th>✓/✗</th>';});
+  head+='<th>Qty/Pack Spec</th><th>Qty/Pack Actual</th><th>✓/✗</th><th>UPC Spec</th><th>UPC Actual</th><th>✓/✗</th></tr>';
+  var body=MEAS_TYPES.map(function(t){
+    var r=MEAS[t]||{measurement_type:t};
+    var tr='<tr data-type="'+t+'"><td style="font-weight:600;">'+MEAS_LABELS[t]+'</td>';
+    cols.forEach(function(c){
+      var sp=r[c[0]+'_spec'], ac=r[c[0]+'_actual'];
+      tr+='<td><input data-k="'+c[0]+'_spec" value="'+(sp==null?'':esc(sp))+'" oninput="onMeasInput()"></td>'+
+          '<td><input data-k="'+c[0]+'_actual" value="'+(ac==null?'':esc(ac))+'" oninput="onMeasInput()"></td>'+
+          '<td data-m="'+c[0]+'">'+matchCell(sp,ac)+'</td>';
+    });
+    tr+='<td><input data-k="qty_per_pack_spec" value="'+(r.qty_per_pack_spec==null?'':esc(r.qty_per_pack_spec))+'" oninput="onMeasInput()"></td>'+
+        '<td><input data-k="qty_per_pack_actual" value="'+(r.qty_per_pack_actual==null?'':esc(r.qty_per_pack_actual))+'" oninput="onMeasInput()"></td>'+
+        '<td data-m="qty">'+matchCell(r.qty_per_pack_spec,r.qty_per_pack_actual)+'</td>'+
+        '<td><input class="upc" data-k="upc_spec" value="'+(r.upc_spec==null?'':esc(r.upc_spec))+'" oninput="onMeasInput()"></td>'+
+        '<td><input class="upc" data-k="upc_actual" value="'+(r.upc_actual==null?'':esc(r.upc_actual))+'" oninput="onMeasInput()"></td>'+
+        '<td data-m="upc">'+(r.upc_spec&&r.upc_actual?(String(r.upc_spec).trim()===String(r.upc_actual).trim()?'<span class="ok">✓</span>':'<span class="bad">✗</span>'):'<span style="color:#bbb;">—</span>')+'</td>';
+    tr+='</tr>';
+    return tr;
+  }).join('');
+  g('meas-table').innerHTML=head+body+'</table>';
+}
+function readMeasFromDom(){
+  var out={};
+  document.querySelectorAll('#meas-table tr[data-type]').forEach(function(tr){
+    var t=tr.dataset.type,obj={measurement_type:t};
+    tr.querySelectorAll('input[data-k]').forEach(function(inp){obj[inp.dataset.k]=inp.value;});
+    out[t]=obj;
+  });
+  return out;
+}
+function onMeasInput(){
+  // live-update match cells
+  document.querySelectorAll('#meas-table tr[data-type]').forEach(function(tr){
+    var get=function(k){var i=tr.querySelector('input[data-k="'+k+'"]');return i?i.value:'';};
+    ['weight','length','width','height'].forEach(function(c){
+      var cell=tr.querySelector('td[data-m="'+c+'"]');if(cell)cell.innerHTML=matchCell(get(c+'_spec'),get(c+'_actual'));
+    });
+    var qc=tr.querySelector('td[data-m="qty"]');if(qc)qc.innerHTML=matchCell(get('qty_per_pack_spec'),get('qty_per_pack_actual'));
+    var uc=tr.querySelector('td[data-m="upc"]');var us=get('upc_spec'),ua=get('upc_actual');
+    if(uc)uc.innerHTML=(us&&ua)?(us.trim()===ua.trim()?'<span class="ok">✓</span>':'<span class="bad">✗</span>'):'<span style="color:#bbb;">—</span>';
+  });
+}
+async function saveMeasurements(id){
+  var data=readMeasFromDom();
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  var anyMismatch=false, mismatches=[];
+  for(var t in data){
+    var d=data[t], row={inspection_id:id,measurement_type:t};
+    [['weight','weight'],['length','length'],['width','width'],['height','height']].forEach(function(c){
+      row[c[0]+'_spec']=num(d[c[0]+'_spec']); row[c[0]+'_actual']=num(d[c[0]+'_actual']);
+      var w=within2(d[c[0]+'_spec'],d[c[0]+'_actual']); row[c[0]+'_match']=w;
+      if(w===false){anyMismatch=true;mismatches.push({type:t,measurement:c[0],spec:d[c[0]+'_spec'],actual:d[c[0]+'_actual']});}
+    });
+    row.qty_per_pack_spec=(d.qty_per_pack_spec===''||d.qty_per_pack_spec==null)?null:parseInt(d.qty_per_pack_spec,10);
+    row.qty_per_pack_actual=(d.qty_per_pack_actual===''||d.qty_per_pack_actual==null)?null:parseInt(d.qty_per_pack_actual,10);
+    var qm=within2(d.qty_per_pack_spec,d.qty_per_pack_actual); row.qty_match=qm; if(qm===false)anyMismatch=true;
+    row.upc_spec=d.upc_spec||null; row.upc_actual=d.upc_actual||null;
+    row.upc_match=(d.upc_spec&&d.upc_actual)?(String(d.upc_spec).trim()===String(d.upc_actual).trim()):null;
+    if(row.upc_match===false)anyMismatch=true;
+    // upsert: delete existing row of this type then insert
+    await fetch(SB+'/rest/v1/inspection_measurements?inspection_id=eq.'+id+'&measurement_type=eq.'+t,{method:'DELETE',headers:Object.assign({},H,{Prefer:'return=minimal'})});
+    await sbPost('inspection_measurements',row);
+  }
+  await sbPatch('inspections?id=eq.'+id,{measurements_verified:!anyMismatch,updated_at:new Date().toISOString()});
+  alert('Measurements saved.'+(anyMismatch?' Variances detected — see AI analysis.':''));
+  if(anyMismatch&&mismatches.length)runVarianceAI(mismatches,insp);
+  else g('variance-alerts').innerHTML='';
+  loadMeasurements(insp);
+}
+async function runVarianceAI(mismatches,insp){
+  var box=g('variance-alerts'); if(!box)return;
+  box.innerHTML='<div class="var-card"><h4>⚠ Analyzing variances…</h4></div>';
+  var cat=(insp&&insp.purchase_orders&&insp.purchase_orders.category)||'consumer goods';
+  var cards=[];
+  for(var i=0;i<mismatches.length;i++){
+    var m=mismatches[i];
+    var sp=num(m.spec),ac=num(m.actual);
+    var pct=(sp&&sp!==0)?(((ac-sp)/sp)*100).toFixed(1):'?';
+    try{
+      var r=await fetch('/api/inspection-variance-explain',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({measurement_type:m.type+' '+m.measurement,spec_value:m.spec,actual_value:m.actual,variance_pct:pct,product_category:cat})});
+      var d=await r.json().catch(function(){return {};});
+      var reasons=(d&&d.reasons)||[];
+      cards.push('<div class="var-card"><h4>⚠ '+esc(MEAS_LABELS[m.type]+' '+m.measurement)+' variance: '+esc(m.spec)+' → '+esc(m.actual)+' ('+(pct>=0?'+':'')+pct+'%)</h4><ul>'+reasons.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul></div>');
+    }catch(e){
+      cards.push('<div class="var-card"><h4>⚠ '+esc(MEAS_LABELS[m.type]+' '+m.measurement)+' variance: '+esc(m.spec)+' → '+esc(m.actual)+'</h4><div class="hint">AI analysis unavailable.</div></div>');
+    }
+    box.innerHTML=cards.join('');
+  }
+}
+
+// ── Document upload ──
+async function handleUpload(id){
+  var f=g('file-input').files[0]; if(!f)return;
+  var status=g('upload-status'); status.textContent='Uploading…';
+  var path=id+'/'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  try{
+    var up=await fetch(SB+'/storage/v1/object/inspection-reports/'+encodeURIComponent(path),{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream'},body:f});
+    if(!up.ok){status.textContent='Upload failed: '+up.status;return;}
+    var fileUrl=SB+'/storage/v1/object/public/inspection-reports/'+path;
+    status.textContent='Uploaded. Extracting measurements…';
+    var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+    var cat=(insp&&insp.purchase_orders&&insp.purchase_orders.category)||'general';
+    var r=await fetch('/api/inspection-parse-document',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inspection_id:id,file_url:fileUrl,product_category:cat})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.measurements_updated!=null){status.textContent='Document processed — '+d.measurements_updated+' measurement set(s) extracted.';loadMeasurements(insp);}
+    else status.textContent='Document uploaded'+(d&&d.warning?' ('+d.warning+')':'')+'.';
+  }catch(e){status.textContent='Upload error: '+e.message;}
+}
+
+// ── Confirmations ──
+async function loadConfirmations(id){
+  var rows=await sbGet('inspection_confirmations?inspection_id=eq.'+id+'&select=*&order=sent_at.desc');
+  var el=g('conf-log'); if(!el)return;
+  if(!rows.length){el.innerHTML='<div class="hint">No confirmation requests sent yet.</div>';return;}
+  el.innerHTML=rows.map(function(c){
+    var st=c.factory_responded_at?(c.confirmed?'<span class="ok">✓ Confirmed</span>':'<span class="bad">⚠ Flagged</span>'):'<span style="color:#a86b00;">Awaiting response</span>';
+    return '<div class="conf-row"><span>Sent '+esc((c.sent_at||'').slice(0,10))+(c.days_before!=null?' · '+c.days_before+'d before':'')+'</span>'+st+'</div>'+
+      (c.response_notes?'<div class="hint" style="margin-bottom:6px;">"'+esc(c.response_notes)+'"</div>':'');
+  }).join('');
+}
+async function sendConfirmRequest(id){
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  var du=null;
+  if(insp&&insp.scheduled_date){var t=new Date();t.setHours(0,0,0,0);var d=new Date(insp.scheduled_date+'T00:00:00');du=Math.round((d-t)/864e5);}
+  try{
+    var r=await fetch('/api/inspection-confirm-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inspection_id:id,days_before:du})});
+    var d=await r.json().catch(function(){return {};});
+    if(r.ok&&d.sent)alert('Confirmation request sent to '+d.to);
+    else alert('Could not send: '+(d.error||r.status));
+  }catch(e){alert('Error: '+e.message);}
+  loadConfirmations(id);
+}
+
+// ── Outcome ──
+async function setOutcome(id,outcome){
+  var status=outcome; // pass/fail/conditional_pass map directly to status values
+  await sbPatch('inspections?id=eq.'+id,{outcome:outcome,status:status,updated_at:new Date().toISOString()});
+  await loadList();
+}
+async function saveOutcomeNotes(id){
+  var v=g('outcome-notes'); if(!v)return;
+  await sbPatch('inspections?id=eq.'+id,{outcome_notes:v.value||null,updated_at:new Date().toISOString()});
+}
+
+// ── New inspection modal ──
+var NM_TYPE='PSI', NM_POS=[];
+function openNewModal(){g('newModal').classList.add('open');g('nm-date').value=todayStr();loadNewModalData();}
+function closeNewModal(){g('newModal').classList.remove('open');}
+function nmType(t){NM_TYPE=t;document.querySelectorAll('#nm-type button').forEach(function(b){b.classList.toggle('on',b.dataset.v===t);});}
+async function loadNewModalData(){
+  var tenants=await sbGet('tenants?select=id,name&order=name.asc');
+  g('nm-tenant').innerHTML='<option value="">All tenants</option>'+tenants.map(function(t){return '<option value="'+t.id+'">'+esc(t.name)+'</option>';}).join('');
+  NM_POS=await sbGet('purchase_orders?select=id,po_number,tenant_id,factory_id,factories(factory_name_english)&order=created_at.desc&limit=500');
+  nmFilterPOs();
+}
+function nmFilterPOs(){
+  var tid=g('nm-tenant').value;
+  var rows=NM_POS.filter(function(p){return !tid||p.tenant_id===tid;});
+  g('nm-po').innerHTML='<option value="">Select a PO…</option>'+rows.map(function(p){
+    var fac=p.factories&&p.factories.factory_name_english||'';
+    return '<option value="'+p.id+'" data-factory="'+(p.factory_id||'')+'" data-tenant="'+(p.tenant_id||'')+'">'+esc(p.po_number||p.id)+(fac?' — '+esc(fac):'')+'</option>';
+  }).join('');
+}
+async function saveNewInspection(){
+  var poSel=g('nm-po'); var poId=poSel.value;
+  var err=g('nm-err'); err.style.display='none';
+  if(!poId){err.textContent='Please select a purchase order.';err.style.display='block';return;}
+  var opt=poSel.options[poSel.selectedIndex];
+  var factoryId=opt.getAttribute('data-factory')||null;
+  var tenantId=g('nm-tenant').value||opt.getAttribute('data-tenant')||null;
+  var date=g('nm-date').value||todayStr();
+  var poNum=(opt.textContent||'').split(' — ')[0];
+  var btn=g('nm-save'); btn.disabled=true; btn.textContent='Creating…';
+  var created=await sbPost('inspections',{tenant_id:tenantId,po_id:poId,factory_id:factoryId,inspection_type:NM_TYPE,scheduled_date:date,status:'scheduled'},true);
+  if(created&&created[0]){
+    var insp=created[0];
+    // Create tenant action item
+    if(tenantId){
+      await sbPost('tenant_action_items',{tenant_id:tenantId,type:'inspection_scheduled',reference_id:insp.id,reference_type:'inspection',title:'Inspection scheduled for PO '+poNum,description:'Select your inspection method and AQL level',priority:'high',status:'open',due_date:date});
+    }
+    btn.disabled=false; btn.textContent='Create Inspection';
+    closeNewModal();
+    await loadList();
+    selectInspection(insp.id);
+  }else{
+    btn.disabled=false; btn.textContent='Create Inspection';
+    err.textContent='Could not create inspection. Check that the PO is valid.';err.style.display='block';
+  }
+}
+
+// ── Auth ──
+function enter(){g('login').style.display='none';g('main').style.display='block';loadList();}
+async function doLogin(){
+  var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
+  try{
+    var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);localStorage.setItem('admin_user',u||'admin');if(errEl)errEl.style.display='none';enter();return;}
+    if(errEl){errEl.textContent=(d&&d.unconfigured)?'Admin auth not configured yet — set ADMIN_PASSWORD in Vercel.':'Incorrect username or password.';errEl.style.display='block';}
+  }catch(e){if(errEl){errEl.textContent='Login error — please try again.';errEl.style.display='block';}}
+}
+function doLogout(){localStorage.removeItem('admin_session');g('main').style.display='none';g('login').style.display='flex';}
+(async function(){
+  var tok=localStorage.getItem('admin_session'); if(!tok)return;
+  try{
+    var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});
+    var d=await r.json().catch(function(){return {};});
+    if(d&&(d.ok||d.unconfigured))enter(); else localStorage.removeItem('admin_session');
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
