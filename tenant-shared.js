@@ -112,10 +112,12 @@ const TENANT_NAV = [
     { icon: '📒', label: 'Accounting', href: 'tenant-operations.html#accounting', badge: 'BETA', feature: 'accounting' },
     { icon: '🔔', label: 'Credit Watch', href: 'tenant-operations.html#credit', feature: 'credit_watch' },
     { icon: '🔍', label: 'Inspections', href: 'tenant-inspections.html', feature: 'inspections' },
+    { icon: '📜', label: 'Certifications', href: 'factory-audits.html#certs', feature: 'factory_portal' },
     { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA', feature: 'forecasting' },
   ]},
   { section: 'Factories', items: [
     { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html', feature: 'factory_portal' },
+    { icon: '🗂', label: 'Factory Audits', href: 'factory-audits.html', feature: 'factory_portal' },
     { icon: '⏳', label: 'Pending', href: 'tenant-factories.html#pending', feature: 'factory_pending' },
     { icon: '📇', label: 'Card Scanner', href: 'tenant-factories.html#scanner', feature: 'card_scanner' },
     { icon: '🔍', label: 'Pending Reviews', href: 'tenant-factories.html#reviews', feature: 'factory_reviews' },

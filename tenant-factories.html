@@ -114,6 +114,23 @@ async function loadFactories() {
   renderFactoryGrid('pending');
 }
 
+// Cert-expiry badge for a factory card: 🔴 expired / ⚠ expiring within 90d / 🔒 active.
+function certBadgeFor(f) {
+  const certs = f.factory_certifications || [];
+  if (!certs.length) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let expired = false, soon = false, active = false;
+  certs.forEach(c => {
+    if (!c.expiry_date) { active = true; return; }
+    const d = new Date(c.expiry_date + 'T00:00:00'); if (isNaN(d)) return;
+    const days = Math.round((d - today) / 864e5);
+    if (days <= 0) expired = true; else if (days <= 90) soon = true; else active = true;
+  });
+  if (expired) return '<span title="Certification expired" style="font-size:13px;">🔴</span>';
+  if (soon) return '<span title="Certification expiring soon" style="font-size:13px;">⚠️</span>';
+  if (active) return '<span title="Active certification" style="font-size:13px;">🔒</span>';
+  return '';
+}
 function factoryCats(f) {
   const fromJoin = (f.factory_categories || []).map(c => c.sub_category || c.category).filter(Boolean);
   const fromCol = Array.isArray(f.product_categories) ? f.product_categories : [];
@@ -142,7 +159,7 @@ function renderFactoryGrid(tab) {
     const certs = (f.factory_certifications || []).length || (Array.isArray(f.certifications) ? f.certifications.length : 0);
     const loc = [f.city, f.country].filter(Boolean).join(', ') || '—';
     return `<div class="card" data-id="${esc(f.id)}">
-      <div class="card-title">${esc(f.factory_name_english || 'Unnamed factory')}</div>
+      <div class="card-title">${esc(f.factory_name_english || 'Unnamed factory')} ${certBadgeFor(f)}</div>
       <div class="card-meta">📍 ${esc(loc)}</div>
       <div>${statusBadge(f.status)}</div>
       <div class="card-row">${cats.slice(0, 4).map(c => `<span class="chip">${esc(c)}</span>`).join('') || '<span class="card-meta">No categories</span>'}</div>
@@ -213,7 +230,41 @@ async function openFactory(id) {
     <div class="panel-section"><h3>Contacts</h3><div class="sub-list">${sales.map(s => `<div class="sub-item"><div class="si-title">Sales</div><div class="si-meta">${esc(s)}</div></div>`).join('')}${contactItems}</div>${(!sales.length && !contacts.length) ? '<div class="empty" style="padding:12px;">No contacts.</div>' : ''}</div>
     <div class="panel-section"><h3>Certifications (${certs.length})</h3><div class="sub-list">${certItems}</div></div>
     <div class="panel-section"><h3>Documents (${documents.length})</h3><div class="sub-list">${docItems}</div></div>
+    <div class="panel-section" id="fac-audits-sec"><h3>Certifications &amp; Audits</h3><div id="fac-audits-body"><div class="loading">Loading…</div></div></div>
   `;
+  loadFactoryAuditsSection(id);
+}
+
+// PART 5 — Certifications & Audits section in the factory detail panel.
+function certStatusBadge(status) {
+  const map = { active: ['#22c55e', 'rgba(34,197,94,0.15)'], expiring_soon: ['#f59e0b', 'rgba(245,158,11,0.15)'], expired: ['#ef4444', 'rgba(239,68,68,0.15)'] };
+  const c = map[status] || ['#94a3b8', 'rgba(148,163,184,0.15)'];
+  return `<span class="badge" style="color:${c[0]};background:${c[1]};padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;">${esc((status || 'pending').replace(/_/g, ' '))}</span>`;
+}
+function colorBadgeFA(c) {
+  const map = { green: ['#1a7a1a', 'rgba(26,122,26,0.15)'], yellow: ['#a86b00', 'rgba(245,158,11,0.15)'], orange: ['#c2410c', 'rgba(234,88,12,0.15)'], red: ['#b00', 'rgba(176,0,0,0.12)'] };
+  const x = map[c] || ['#6b7280', 'rgba(107,114,128,0.15)'];
+  return `<span class="badge" style="color:${x[0]};background:${x[1]};padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;">${esc(c || 'pending')}</span>`;
+}
+async function loadFactoryAuditsSection(factoryId) {
+  const el = document.getElementById('fac-audits-body'); if (!el) return;
+  const [certs, audits] = await Promise.all([
+    supa(`factory_certifications?factory_id=eq.${factoryId}&tenant_id=eq.${TID}&select=*&order=expiry_date.asc`),
+    supa(`factory_audits?factory_id=eq.${factoryId}&tenant_id=eq.${TID}&select=*,factory_audit_types(name)&order=conducted_date.desc&limit=3`),
+  ]);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const certHtml = certs.length ? certs.map(c => {
+    let days = null; if (c.expiry_date) { const d = new Date(c.expiry_date + 'T00:00:00'); if (!isNaN(d)) days = Math.round((d - today) / 864e5); }
+    return `<div class="sub-item"><div class="si-title">${esc(c.certification_name)} ${certStatusBadge(c.status)}</div>
+      <div class="si-meta">${c.expiry_date ? 'expires ' + fmtDate(c.expiry_date) : 'no expiry'}${days != null ? ' · ' + (days < 0 ? Math.abs(days) + 'd overdue' : days + 'd remaining') : ''}</div></div>`;
+  }).join('') : '<div class="empty" style="padding:10px;">No certifications.</div>';
+  const auditHtml = audits.length ? audits.map(a =>
+    `<div class="sub-item"><div class="si-title">${esc((a.factory_audit_types && a.factory_audit_types.name) || 'Audit')} ${colorBadgeFA(a.color_rating)}</div>
+      <div class="si-meta">${a.conducted_date ? 'conducted ' + fmtDate(a.conducted_date) : 'scheduled ' + fmtDate(a.scheduled_date)}</div></div>`).join('') : '<div class="empty" style="padding:10px;">No audits yet.</div>';
+  el.innerHTML = `<div class="grp-h" style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;">CERTIFICATIONS</div>${certHtml}
+    <div style="margin:10px 0;"><button class="btn-sm" style="font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;" onclick="location.href='factory-audits.html?factory=${encodeURIComponent(factoryId)}'">+ Schedule Audit</button></div>
+    <div class="grp-h" style="font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 6px;">RECENT AUDITS</div>${auditHtml}
+    <div style="margin-top:8px;"><a href="factory-audits.html" style="color:#60a5fa;font-size:12px;text-decoration:none;">View All Audits →</a></div>`;
 }
 
 // ── Pending Reviews ──

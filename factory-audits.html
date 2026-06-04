@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Factory Audits — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .fa-layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start;}
+  @media(max-width:900px){.fa-layout{grid-template-columns:1fr;}}
+  .fa-left{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .fa-lhead{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border);}
+  .fa-lhead h2{font-size:16px;font-weight:700;}
+  .fa-tabs{display:flex;gap:2px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+  .fa-tab{padding:5px 9px;font-size:11px;font-weight:600;border:none;background:none;cursor:pointer;color:var(--text2);border-radius:6px;font-family:inherit;}
+  .fa-tab.active{background:var(--bg);color:var(--text);}
+  .fa-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+  .fa-search input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .fa-row{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .fa-row:hover,.fa-row.sel{background:var(--bg);}
+  .fa-row.sel{border-left:3px solid #3b82f6;}
+  .fa-row-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px;}
+  .fa-fac{font-size:13px;font-weight:700;}
+  .fa-sub{font-size:12px;color:var(--text2);}
+  .fa-meta{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+  .badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;white-space:nowrap;}
+  .fa-right{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;min-height:300px;}
+  .fa-sec{border-top:1px solid var(--border);padding-top:14px;margin-top:14px;}
+  .fa-sec:first-child{border-top:none;padding-top:0;margin-top:0;}
+  .fa-sec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2);margin-bottom:10px;}
+  .bar{height:18px;border-radius:9px;background:var(--border);overflow:hidden;position:relative;margin:6px 0;}
+  .bar-fill{height:100%;border-radius:9px;}
+  .bar-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:700;color:#fff;}
+  .ffield{margin:8px 0;}.ffield label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2);}
+  .ffield input,.ffield select,.ffield textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;}
+  .ffield textarea{min-height:54px;resize:vertical;}
+  .btn{background:#1a1a2e;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .btn.blue{background:#2563eb;}.btn.green{background:#16a34a;}.btn.alt{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-wrap:wrap;}
+  .seg button{border:none;background:var(--bg);font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;font-family:inherit;color:var(--text2);border-right:1px solid var(--border);}
+  .seg button.on{background:#2563eb;color:#fff;}
+  .alertbox{border-radius:8px;padding:10px 12px;font-size:12px;margin:8px 0;}
+  .alertbox.amber{background:rgba(245,158,11,0.12);border:1px solid #f59e0b;color:#fbbf24;}
+  .alertbox.red{background:rgba(239,68,68,0.12);border:1px solid #ef4444;color:#f87171;}
+  .grp{margin-bottom:12px;}.grp-h{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text2);margin:10px 0 6px;}
+  .docrow{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;}
+  .docrow .dn{flex:1;min-width:140px;}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:1.5rem;width:560px;max-width:100%;max-height:90vh;overflow-y:auto;}
+  .modal h2{font-size:17px;font-weight:700;margin-bottom:4px;}
+  .steplabel{font-size:12px;color:var(--text2);margin-bottom:14px;}
+  .catcard,.typecard{border:1px solid var(--border);border-radius:10px;padding:12px;cursor:pointer;margin-bottom:8px;}
+  .catcard:hover,.typecard:hover{border-color:#3b82f6;}
+  .catcard.sel,.typecard.sel{border-color:#3b82f6;background:rgba(59,130,246,0.08);}
+  .catgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  @media(max-width:560px){.catgrid{grid-template-columns:1fr;}}
+  .modal-actions{display:flex;gap:8px;justify-content:space-between;margin-top:1rem;}
+  .copybox{display:flex;gap:6px;align-items:center;margin-top:6px;}
+  .copybox input{flex:1;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Factory Audits</div>
+    <div class="page-sub" id="pageSub">Schedule audits, track findings, and manage certifications</div>
+  </div>
+
+  <div class="fa-layout">
+    <div class="fa-left">
+      <div class="fa-lhead"><h2>Audits</h2><button class="btn blue" onclick="openWizard()">+ Schedule Audit</button></div>
+      <div class="fa-tabs" id="faTabs">
+        <button class="fa-tab active" data-f="all" onclick="setFaFilter('all')">All</button>
+        <button class="fa-tab" data-f="scheduled" onclick="setFaFilter('scheduled')">Scheduled</button>
+        <button class="fa-tab" data-f="report_pending" onclick="setFaFilter('report_pending')">Report Pending</button>
+        <button class="fa-tab" data-f="completed" onclick="setFaFilter('completed')">Completed</button>
+        <button class="fa-tab" data-f="expiring" onclick="setFaFilter('expiring')">Expiring</button>
+      </div>
+      <div class="fa-search"><input id="faSearch" placeholder="Search by factory name…" oninput="renderFaList()"></div>
+      <div id="faList"><div class="loading">Loading audits…</div></div>
+    </div>
+    <div class="fa-right" id="faDetail"><div class="empty"><span class="empty-icon">🗂</span>Select an audit, or schedule a new one.</div></div>
+  </div>
+</div>
+
+<!-- Schedule wizard -->
+<div class="modal-bg" id="wizard">
+  <div class="modal">
+    <h2 id="wzTitle">Schedule Audit</h2>
+    <div class="steplabel" id="wzStep">Step 1 of 5 — Select Factory</div>
+    <div id="wzBody"></div>
+    <div class="modal-actions">
+      <button class="btn alt" id="wzBack" onclick="wzNav(-1)">Back</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn alt" onclick="closeWizard()">Cancel</button>
+        <button class="btn blue" id="wzNext" onclick="wzNav(1)">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+let TID = null, USER = null;
+const FA_SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+const FA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+const FAH = { apikey: FA_KEY, Authorization: 'Bearer ' + FA_KEY, 'Content-Type': 'application/json' };
+async function faPatch(p, b) { try { return (await fetch(FA_SB + '/rest/v1/' + p, { method: 'PATCH', headers: Object.assign({}, FAH, { Prefer: 'return=minimal' }), body: JSON.stringify(b) })).ok; } catch (e) { return false; } }
+async function faPost(p, b, rep) { try { const r = await fetch(FA_SB + '/rest/v1/' + p, { method: 'POST', headers: Object.assign({}, FAH, { Prefer: rep ? 'return=representation' : 'return=minimal' }), body: JSON.stringify(b) }); if (!r.ok) return null; return rep ? await r.json() : true; } catch (e) { return null; } }
+
+let AUDITS = [], FA_FILTER = 'all', SEL = null, FACTORIES = [], CATS = [], TYPES_BY_CAT = {};
+
+// ── Color & status ──
+const COLOR_BADGE = {
+  green: { bg: 'rgba(26,122,26,0.15)', color: '#1a7a1a', label: 'Green — Approved' },
+  yellow: { bg: 'rgba(245,158,11,0.15)', color: '#a86b00', label: 'Yellow — Conditions' },
+  orange: { bg: 'rgba(234,88,12,0.15)', color: '#c2410c', label: 'Orange — Action Required' },
+  red: { bg: 'rgba(176,0,0,0.12)', color: '#b00', label: 'Red — Not Approved' },
+};
+function colorBadge(c) { const b = COLOR_BADGE[c] || { bg: 'rgba(107,114,128,0.15)', color: '#6b7280', label: 'Pending' }; return `<span class="badge" style="background:${b.bg};color:${b.color};">${b.label}</span>`; }
+function colorHex(c) { return (COLOR_BADGE[c] || {}).color || '#6b7280'; }
+function statBadge(s) {
+  const map = { scheduled: ['#6b7280', 'rgba(107,114,128,0.15)'], in_progress: ['#a86b00', 'rgba(245,158,11,0.15)'], report_pending: ['#a86b00', 'rgba(245,158,11,0.15)'], completed: ['#1a7a1a', 'rgba(26,122,26,0.15)'], cancelled: ['#6b7280', 'rgba(107,114,128,0.15)'] };
+  const c = map[s] || ['#6b7280', 'rgba(107,114,128,0.15)'];
+  return `<span class="badge" style="color:${c[0]};background:${c[1]};">${esc((s || '').replace(/_/g, ' '))}</span>`;
+}
+function methodIcon(m) { return m === 'third_party' ? '🔍' : m === 'self_audit' ? '🏭' : m === 'tbg_arranged' ? '📋' : '•'; }
+function dUntil(d) { if (!d) return null; const t = new Date(); t.setHours(0, 0, 0, 0); const x = new Date(d + 'T00:00:00'); if (isNaN(x)) return null; return Math.round((x - t) / 864e5); }
+
+const SECTION_NAMES = {
+  BV_FA: { QMS: 'Quality Management Standard', GMP: 'Good Manufacturing Practice', PC: 'Product Control', PROC: 'Process Control' },
+  BSCI: { LABOR: 'Labor Conditions', HS: 'Health & Safety', ENV: 'Environment', ETHICS: 'Business Ethics' },
+  SMETA: { LABOR: 'Labor Conditions', HS: 'Health & Safety', ENV: 'Environment', ETHICS: 'Business Ethics' },
+  ISO9001: { PLAN: 'Plan', DO: 'Do', CHECK: 'Check', ACT: 'Act' },
+};
+function sectionName(typeCode, code) { return (SECTION_NAMES[typeCode] && SECTION_NAMES[typeCode][code]) || code; }
+
+// ── List ──
+async function loadAudits() {
+  AUDITS = await supa(`factory_audits?tenant_id=eq.${TID}&select=*,factories(factory_name_english),factory_audit_types(name,code,generates_certification,certification_name,category_id,default_validity_months,issuing_body)&order=scheduled_date.desc`);
+  renderFaList();
+}
+function faMatches(a) {
+  if (FA_FILTER === 'all') return true;
+  if (FA_FILTER === 'expiring') return a.next_audit_due && dUntil(a.next_audit_due) != null && dUntil(a.next_audit_due) <= 90;
+  return a.status === FA_FILTER;
+}
+function setFaFilter(f) { FA_FILTER = f; document.querySelectorAll('.fa-tab').forEach(t => t.classList.toggle('active', t.dataset.f === f)); renderFaList(); }
+function renderFaList() {
+  const q = (document.getElementById('faSearch').value || '').toLowerCase().trim();
+  const rows = AUDITS.filter(faMatches).filter(a => { if (!q) return true; return ((a.factories && a.factories.factory_name_english) || '').toLowerCase().indexOf(q) > -1; });
+  const box = document.getElementById('faList');
+  if (!rows.length) { box.innerHTML = '<div class="empty" style="padding:2rem 1rem;">No audits.</div>'; return; }
+  box.innerHTML = rows.map(a => {
+    const fac = (a.factories && a.factories.factory_name_english) || '—';
+    const at = (a.factory_audit_types && a.factory_audit_types.name) || '—';
+    return `<div class="fa-row${a.id === SEL ? ' sel' : ''}" onclick="selectAudit('${a.id}')">
+      <div class="fa-row-top"><span class="fa-fac">${esc(fac)}</span>${colorBadge(a.color_rating)}</div>
+      <div class="fa-sub">${esc(at)}</div>
+      <div class="fa-meta">${statBadge(a.status)}<span style="font-size:11px;color:var(--text2);">${methodIcon(a.inspection_method)} ${esc(a.scheduled_date || '—')}</span></div>
+    </div>`;
+  }).join('');
+}
+function selectAudit(id) { SEL = id; renderFaList(); const a = AUDITS.find(x => x.id === id); if (a) renderAuditDetail(a); }
+
+// ── Detail (7 sections) ──
+async function renderAuditDetail(a) {
+  const fac = (a.factories && a.factories.factory_name_english) || '—';
+  const at = a.factory_audit_types || {};
+  const typeCode = at.code || '';
+  let html = '';
+
+  // SECTION 1 — header
+  const dateLine = a.conducted_date ? 'Conducted ' + fmtDate(a.conducted_date) : 'Scheduled: ' + fmtDate(a.scheduled_date);
+  const method = a.inspection_method ? `${methodIcon(a.inspection_method)} ${esc((a.inspection_method || '').replace(/_/g, ' '))}${a.inspector_company ? ' — ' + esc(a.inspector_company) : ''}${a.inspector_contact ? ' · ' + esc(a.inspector_contact) : ''}${a.inspector_email ? ' · ' + esc(a.inspector_email) : ''}` : 'Method not set';
+  const pct = a.overall_pct != null ? Number(a.overall_pct) : null;
+  let reaudit = '';
+  if (a.next_audit_due) { const du = dUntil(a.next_audit_due); if (du != null && du < 0) reaudit = `<div class="alertbox red">Re-audit OVERDUE since ${fmtDate(a.next_audit_due)}</div>`; else if (du != null && du <= 90) reaudit = `<div class="alertbox amber">Re-audit due ${fmtDate(a.next_audit_due)} (${du} days)</div>`; }
+  html += `<div class="fa-sec"><div style="font-size:20px;font-weight:700;">${esc(fac)}</div>
+    <div style="font-size:13px;color:var(--text2);margin-top:2px;">${esc(at.name || '—')}</div>
+    <div class="fa-meta" style="margin-top:8px;">${statBadge(a.status)}${colorBadge(a.color_rating)}<span style="font-size:12px;color:var(--text2);">${esc(dateLine)}</span></div>
+    <div style="font-size:12px;color:var(--text2);margin-top:8px;">${method}</div>
+    ${pct != null ? `<div class="bar"><div class="bar-fill" style="width:${Math.min(pct,100)}%;background:${colorHex(a.color_rating)};"></div><span class="bar-pct">${pct.toFixed(0)}%</span></div>` : ''}
+    ${reaudit}</div>`;
+
+  // SECTION 2 — section scores
+  html += '<div class="fa-sec"><h3>Section Scores</h3>';
+  const ss = a.section_scores && typeof a.section_scores === 'object' ? a.section_scores : null;
+  if (ss && Object.keys(ss).length) {
+    html += Object.keys(ss).map(code => {
+      const s = ss[code] || {}; const p = s.pct != null ? Number(s.pct) : (s.max_score ? (s.score / s.max_score) * 100 : 0);
+      return `<div style="margin-bottom:8px;"><div style="font-size:12px;display:flex;justify-content:space-between;"><span>${esc(s.name || sectionName(typeCode, code))}</span><span style="color:var(--text2);">${s.findings_count != null ? s.findings_count + ' findings' : ''}</span></div>
+        <div class="bar"><div class="bar-fill" style="width:${Math.min(p,100)}%;background:${colorHex(a.color_rating)};"></div><span class="bar-pct">${p.toFixed(0)}%</span></div></div>`;
+    }).join('');
+  } else { html += '<div class="empty" style="padding:10px;">Scores will be available after report upload.</div>'; }
+  html += '</div>';
+
+  // Placeholders for async sections
+  html += '<div class="fa-sec"><h3>Findings</h3><div id="fa-findings">Loading…</div></div>';
+  html += '<div class="fa-sec"><h3>Document Checklist</h3><div id="fa-docs">Loading…</div><div style="margin-top:8px;"><button class="btn alt" onclick="addCustomDoc()">+ Add Custom Document</button><div id="fa-customdoc"></div></div></div>';
+  html += `<div class="fa-sec"><h3>Audit Report</h3><div id="fa-report"></div></div>`;
+  if (a.cap_required) html += `<div class="fa-sec"><h3>Corrective Action Plan</h3><div id="fa-cap"></div></div>`;
+  if (at.generates_certification) html += `<div class="fa-sec"><h3>Certification</h3><div id="fa-cert">Loading…</div></div>`;
+
+  document.getElementById('faDetail').innerHTML = html;
+  renderReportSection(a);
+  if (a.cap_required) renderCapSection(a);
+  loadFindings(a);
+  loadDocs(a);
+  if (at.generates_certification) loadCert(a);
+}
+
+async function loadFindings(a) {
+  const rows = await supa(`factory_audit_findings?audit_id=eq.${a.id}&select=*&order=section_code.asc,clause_number.asc`);
+  const el = document.getElementById('fa-findings'); if (!el) return;
+  if (!rows.length) { el.innerHTML = '<div class="empty" style="padding:10px;">No findings recorded yet — upload report to auto-extract findings.</div>'; return; }
+  const bySec = {}; rows.forEach(r => { (bySec[r.section_code || '—'] = bySec[r.section_code || '—'] || []).push(r); });
+  const cb = { 0: '🔴 Not Compliant', 1: '🟠 Partial', 2: '🟡 Minor Gap', 3: '🟢 Compliant' };
+  el.innerHTML = Object.keys(bySec).map(sc => {
+    const items = bySec[sc];
+    return `<div class="grp"><div class="grp-h">${esc(sectionName((a.factory_audit_types || {}).code, sc))} (${items.length} findings)</div>` +
+      items.map(f => `<div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:12px;font-weight:600;">${esc(f.clause_number || '')} ${esc(f.clause_requirement || '')}</div>
+        <div style="font-size:11px;margin:3px 0;">${f.compliance_level == null ? '⬜ N/A' : (cb[f.compliance_level] || '')}</div>
+        <div style="font-size:12px;color:var(--text2);">${esc(f.finding_text || '')}</div>
+        <div class="ffield"><label>Corrective action</label><textarea onblur="saveFinding('${f.id}',this.value)">${esc(f.corrective_action || '')}</textarea></div>
+      </div>`).join('') + '</div>';
+  }).join('');
+}
+async function saveFinding(id, val) { await faPatch('factory_audit_findings?id=eq.' + id, { corrective_action: val || null }); }
+
+const DOC_STATUS = { pending: ['#a86b00', 'rgba(245,158,11,0.15)'], received: ['#1a7a1a', 'rgba(26,122,26,0.15)'], not_applicable: ['#6b7280', 'rgba(107,114,128,0.15)'], outstanding: ['#b00', 'rgba(176,0,0,0.12)'] };
+async function loadDocs(a) {
+  const rows = await supa(`factory_audit_documents?audit_id=eq.${a.id}&select=*&order=document_category.asc,document_name.asc`);
+  const el = document.getElementById('fa-docs'); if (!el) return;
+  if (!rows.length) { el.innerHTML = '<div class="empty" style="padding:10px;">No documents in checklist.</div>'; return; }
+  const byCat = {}; rows.forEach(r => { (byCat[r.document_category || 'General'] = byCat[r.document_category || 'General'] || []).push(r); });
+  el.innerHTML = Object.keys(byCat).map(cat => `<div class="grp"><div class="grp-h">${esc(cat)}</div>` + byCat[cat].map(d => {
+    const opts = ['pending', 'received', 'not_applicable', 'outstanding'].map(s => `<option value="${s}"${d.status === s ? ' selected' : ''}>${s.replace(/_/g, ' ')}</option>`).join('');
+    const fileBtn = d.file_url ? `<a class="btn alt" href="${esc(d.file_url)}" target="_blank" style="text-decoration:none;">Download</a>` : `<input type="file" style="font-size:11px;width:auto;" onchange="uploadDoc('${d.id}','${a.id}',this)">`;
+    return `<div class="docrow"><span class="dn">${esc(d.document_name)}${d.required ? ' <span class="badge" style="background:rgba(176,0,0,0.1);color:#b00;">required</span>' : ''}</span>
+      <select onchange="setDocStatus('${d.id}',this.value)" style="width:auto;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:11px;">${opts}</select>
+      ${d.received_at ? '<span style="font-size:10px;color:var(--text2);">' + fmtDate(d.received_at) + '</span>' : ''}
+      <input placeholder="notes" value="${esc(d.notes || '')}" onblur="setDocNotes('${d.id}',this.value)" style="width:120px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:11px;">
+      ${fileBtn}</div>`;
+  }).join('') + '</div>').join('');
+}
+async function setDocStatus(id, val) { const patch = { status: val }; if (val === 'received') patch.received_at = new Date().toISOString(); await faPatch('factory_audit_documents?id=eq.' + id, patch); const a = AUDITS.find(x => x.id === SEL); if (a) loadDocs(a); }
+async function setDocNotes(id, val) { await faPatch('factory_audit_documents?id=eq.' + id, { notes: val || null }); }
+async function uploadDoc(id, auditId, input) {
+  const f = input.files[0]; if (!f) return;
+  const path = auditId + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const up = await fetch(FA_SB + '/storage/v1/object/audit-documents/' + encodeURIComponent(path), { method: 'POST', headers: { apikey: FA_KEY, Authorization: 'Bearer ' + FA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+  if (up.ok) { await faPatch('factory_audit_documents?id=eq.' + id, { file_url: FA_SB + '/storage/v1/object/public/audit-documents/' + path, status: 'received', received_at: new Date().toISOString() }); const a = AUDITS.find(x => x.id === SEL); if (a) loadDocs(a); }
+  else alert('Upload failed (' + up.status + ').');
+}
+function addCustomDoc() {
+  const el = document.getElementById('fa-customdoc'); if (!el) return;
+  el.innerHTML = `<div class="ffield"><label>Document name</label><input id="cd-name"></div><div class="ffield"><label>Category</label><input id="cd-cat" value="Custom"></div><button class="btn" onclick="saveCustomDoc()">Save</button>`;
+}
+async function saveCustomDoc() {
+  const name = (document.getElementById('cd-name') || {}).value || ''; if (!name.trim()) { alert('Enter a name.'); return; }
+  await faPost('factory_audit_documents', { audit_id: SEL, document_name: name.trim(), document_category: (document.getElementById('cd-cat') || {}).value || 'Custom', required: false, status: 'pending' });
+  document.getElementById('fa-customdoc').innerHTML = ''; const a = AUDITS.find(x => x.id === SEL); if (a) loadDocs(a);
+}
+
+function renderReportSection(a) {
+  const el = document.getElementById('fa-report'); if (!el) return;
+  if (a.report_url) { el.innerHTML = `<div>📄 <a href="${esc(a.report_url)}" target="_blank" style="color:#60a5fa;">${esc(a.report_filename || 'Report')}</a></div><div style="font-size:11px;color:var(--text2);margin-top:4px;">Uploaded ${a.report_uploaded_at ? fmtDate(a.report_uploaded_at) : ''}</div>`; return; }
+  const link = 'https://portal.tbgsourcing.net/audit-report-upload.html?token=' + encodeURIComponent(a.report_upload_token || '');
+  el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:6px;">Report Pending — share the upload link with your inspector:</div>
+    <div class="copybox"><input id="fa-link" value="${esc(link)}" readonly><button class="btn alt" onclick="copyLink()">Copy Link</button></div>
+    <div style="margin-top:10px;"><label style="font-size:12px;color:var(--text2);">Or upload directly: </label><input type="file" accept="application/pdf,image/*" style="font-size:11px;" onchange="tenantUploadReport('${a.id}',this)"></div>
+    <div class="hint" id="fa-upstatus" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>`;
+}
+function copyLink() { const i = document.getElementById('fa-link'); if (!i) return; i.select(); try { document.execCommand('copy'); } catch (e) {} alert('Link copied.'); }
+async function tenantUploadReport(auditId, input) {
+  const f = input.files[0]; if (!f) return;
+  const st = document.getElementById('fa-upstatus'); if (st) st.textContent = 'Uploading…';
+  const path = auditId + '/' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const up = await fetch(FA_SB + '/storage/v1/object/audit-documents/' + encodeURIComponent(path), { method: 'POST', headers: { apikey: FA_KEY, Authorization: 'Bearer ' + FA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+  if (!up.ok) { if (st) st.textContent = 'Upload failed.'; return; }
+  const fileUrl = FA_SB + '/storage/v1/object/public/audit-documents/' + path;
+  await faPatch('factory_audits?id=eq.' + auditId, { report_url: fileUrl, report_filename: f.name, report_uploaded_at: new Date().toISOString(), status: 'report_pending' });
+  try { await fetch('/api/audit-report-received', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audit_id: auditId }) }); } catch (e) {}
+  await loadAudits(); const a = AUDITS.find(x => x.id === auditId); if (a) renderAuditDetail(a);
+}
+function renderCapSection(a) {
+  const el = document.getElementById('fa-cap'); if (!el) return;
+  const du = dUntil(a.cap_due_date);
+  let html = `<div style="font-size:12px;">CAP Due: ${fmtDate(a.cap_due_date)}${du != null && du < 14 ? ' <span class="badge" style="background:rgba(176,0,0,0.1);color:#b00;">' + (du < 0 ? 'overdue' : du + ' days left') + '</span>' : ''}</div>`;
+  if (a.cap_submitted_at) html += `<div style="margin-top:6px;">✓ Submitted ${fmtDate(a.cap_submitted_at)} ${a.cap_url ? '· <a href="' + esc(a.cap_url) + '" target="_blank" style="color:#60a5fa;">Download</a>' : ''}</div>`;
+  else html += `<div style="margin-top:8px;"><input type="file" accept="application/pdf,image/*" style="font-size:11px;" onchange="uploadCap('${a.id}',this)"></div>`;
+  el.innerHTML = html;
+}
+async function uploadCap(auditId, input) {
+  const f = input.files[0]; if (!f) return;
+  const path = auditId + '/cap_' + Date.now() + '_' + f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const up = await fetch(FA_SB + '/storage/v1/object/audit-documents/' + encodeURIComponent(path), { method: 'POST', headers: { apikey: FA_KEY, Authorization: 'Bearer ' + FA_KEY, 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+  if (up.ok) { await faPatch('factory_audits?id=eq.' + auditId, { cap_url: FA_SB + '/storage/v1/object/public/audit-documents/' + path, cap_submitted_at: new Date().toISOString() }); await loadAudits(); const a = AUDITS.find(x => x.id === auditId); if (a) renderAuditDetail(a); }
+}
+async function loadCert(a) {
+  const el = document.getElementById('fa-cert'); if (!el) return;
+  const rows = await supa(`factory_certifications?audit_id=eq.${a.id}&limit=1`);
+  if (rows.length) {
+    const c = rows[0]; const du = dUntil(c.expiry_date);
+    const col = du == null ? '#6b7280' : du < 30 ? '#ef4444' : du < 90 ? '#f59e0b' : '#22c55e';
+    el.innerHTML = `<div style="font-size:13px;font-weight:600;">${esc(c.certification_name)} <span class="badge" style="background:rgba(34,197,94,0.12);color:${col};">${esc(c.status || '')}</span></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;">Issued by: ${esc(c.issued_by || '—')} | Issue: ${fmtDate(c.issue_date)} | Expires: ${fmtDate(c.expiry_date)}</div>
+      ${du != null ? `<div style="font-size:12px;color:${col};font-weight:600;margin-top:4px;">${du < 0 ? 'Expired ' + Math.abs(du) + ' days ago' : du + ' days until expiry'}</div>` : ''}`;
+  } else if (a.status === 'completed') { el.innerHTML = '<div class="empty" style="padding:10px;">Certification will be issued after audit is finalized.</div>'; }
+  else { el.innerHTML = '<div class="empty" style="padding:10px;">Certification pending audit completion.</div>'; }
+}
+
+// ── Schedule wizard (5 steps) ──
+const DOC_TEMPLATE = {
+  _core: [['Business License', true], ['Factory Profile', true], ['Floor Plan / Layout', true], ['Organization Chart', false], ['Employee Roster', false]],
+  SOCIAL: [['Working Hours Records', true], ['Payroll Records', true], ['Age Verification / ID Records', true], ['Fire Safety Certificate', true], ['Social Insurance Proof', false], ['Grievance Mechanism Policy', false], ['Building Safety Certificate', false]],
+  QMS: [['Quality Manual', true], ['Inspection Procedures', true], ['Calibration Records', false], ['Nonconformance Log', false], ['Training Records', false]],
+  ENV: [['Environmental Permit', true], ['Waste Disposal Records', false], ['Emissions Test Report', false]],
+  ELEC: [['Product Test Reports', true], ['RoHS/REACH Certificates', true], ['Component Declarations', false]],
+  RETAIL: [['Supplier Agreement', true], ['Capacity Statement', false]],
+};
+let WZ = { step: 1, factory: null, category: null, type: null, docs: [] };
+function openWizard(presetFactoryId) {
+  WZ = { step: 1, factory: null, category: null, type: null, docs: [] };
+  if (presetFactoryId) { const f = FACTORIES.find(x => x.id === presetFactoryId); if (f) WZ.factory = f; }
+  document.getElementById('wizard').classList.add('open');
+  wzRender();
+}
+function closeWizard() { document.getElementById('wizard').classList.remove('open'); }
+function wzNav(dir) {
+  if (dir === 1) {
+    if (WZ.step === 1 && !WZ.factory) { alert('Select a factory.'); return; }
+    if (WZ.step === 2 && !WZ.category) { alert('Select a category.'); return; }
+    if (WZ.step === 3 && !WZ.type) { alert('Select an audit type.'); return; }
+    if (WZ.step === 5) { return saveAudit(); }
+    WZ.step++;
+  } else { if (WZ.step === 1) return; WZ.step--; }
+  wzRender();
+}
+function wzRender() {
+  const labels = { 1: 'Select Factory', 2: 'Select Audit Category', 3: 'Select Audit Type', 4: 'Audit Details', 5: 'Document Checklist' };
+  document.getElementById('wzStep').textContent = `Step ${WZ.step} of 5 — ${labels[WZ.step]}`;
+  document.getElementById('wzBack').style.visibility = WZ.step === 1 ? 'hidden' : 'visible';
+  document.getElementById('wzNext').textContent = WZ.step === 5 ? 'Schedule Audit' : 'Next';
+  const body = document.getElementById('wzBody');
+  if (WZ.step === 1) {
+    body.innerHTML = `<div class="ffield"><label>Factory</label><select id="wz-factory" onchange="wzPickFactory(this.value)"><option value="">Select a factory…</option>${FACTORIES.map(f => `<option value="${f.id}"${WZ.factory && WZ.factory.id === f.id ? ' selected' : ''}>${esc(f.factory_name_english)}${f.city ? ' — ' + esc(f.city) : ''}${f.country ? ', ' + esc(f.country) : ''}</option>`).join('')}</select></div>`;
+  } else if (WZ.step === 2) {
+    const facCats = (WZ.factory && Array.isArray(WZ.factory.product_categories)) ? WZ.factory.product_categories.map(c => (c || '').toLowerCase()) : [];
+    body.innerHTML = `<div class="catgrid">${CATS.map(c => {
+      const universal = c.applies_to_all;
+      const applic = Array.isArray(c.applicable_product_types) ? c.applicable_product_types.map(x => (x || '').toLowerCase()) : [];
+      const overlap = applic.some(x => facCats.includes(x));
+      let note = '';
+      if (universal) note = '<span class="badge" style="background:rgba(34,197,94,0.12);color:#22c55e;">Universal — applies to all factories</span>';
+      else if (overlap) note = '<span class="badge" style="background:rgba(59,130,246,0.12);color:#3b82f6;">Recommended for this factory</span>';
+      if (c.code === 'SOCIAL') note = '<span class="badge" style="background:rgba(34,197,94,0.12);color:#22c55e;">Recommended — BSCI and Sedex apply to all factories</span>';
+      return `<div class="catcard${WZ.category && WZ.category.id === c.id ? ' sel' : ''}" onclick="wzPickCategory('${c.id}')"><div style="font-weight:700;font-size:13px;">${esc(c.name)}</div><div style="font-size:11px;color:var(--text2);margin:4px 0;">${esc(c.description || '')}</div>${note}</div>`;
+    }).join('')}</div>`;
+  } else if (WZ.step === 3) {
+    const types = (TYPES_BY_CAT[WZ.category.id] || []);
+    const universal = types.filter(t => t.applies_to_all);
+    const specific = types.filter(t => !t.applies_to_all);
+    const facCats = (WZ.factory && Array.isArray(WZ.factory.product_categories)) ? WZ.factory.product_categories.map(c => (c || '').toLowerCase()) : [];
+    const card = t => {
+      const note = t.code === 'BSCI' ? 'Required by many European retailers (Lidl, Aldi, etc.)' : t.code === 'SMETA' ? 'Required by Walmart, Target, and most major US retailers' : '';
+      return `<div class="typecard${WZ.type && WZ.type.id === t.id ? ' sel' : ''}" onclick="wzPickType('${t.id}')">
+        <div style="font-weight:700;font-size:13px;">${esc(t.name)}${t.generates_certification ? ' <span class="badge" style="background:rgba(59,130,246,0.12);color:#3b82f6;">Generates ' + esc(t.certification_name || 'cert') + '</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--text2);margin:3px 0;">${esc(t.issuing_body || '')}${t.default_validity_months ? ' · valid ' + t.default_validity_months + ' months' : ''}</div>
+        ${t.description ? '<div style="font-size:11px;color:var(--text2);">' + esc(t.description) + '</div>' : ''}
+        ${note ? '<div style="font-size:11px;color:#3b82f6;margin-top:3px;">' + note + '</div>' : ''}</div>`;
+    };
+    let html = '';
+    html += `<div class="grp-h">Universal Standards</div>${universal.length ? universal.map(card).join('') : '<div class="empty" style="padding:8px;">None.</div>'}`;
+    const specificMatch = specific.filter(t => { const applic = Array.isArray(t.applicable_product_types) ? t.applicable_product_types.map(x => (x || '').toLowerCase()) : []; return !applic.length || applic.some(x => facCats.includes(x)); });
+    html += `<div class="grp-h" style="margin-top:12px;">Product-Specific Standards</div>${specificMatch.length ? specificMatch.map(card).join('') : '<div class="empty" style="padding:8px;">No product-specific standards match this factory.</div>'}`;
+    body.innerHTML = html;
+  } else if (WZ.step === 4) {
+    body.innerHTML = `<div class="ffield"><label>Scheduled date</label><input id="wz-date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="ffield"><label>Inspector method</label><div class="seg" id="wz-method"><button class="on" data-v="third_party" onclick="wzMethod('third_party')">Third Party</button><button data-v="self_audit" onclick="wzMethod('self_audit')">Self Audit</button><button data-v="tbg_arranged" onclick="wzMethod('tbg_arranged')">TBG Arranged</button></div></div>
+      <div id="wz-method-fields"></div>
+      <div class="ffield"><label>Reference / PO (optional)</label><select id="wz-po"><option value="">None</option></select></div>`;
+    WZ.method = WZ.method || 'third_party'; wzMethod(WZ.method); wzLoadPOs();
+  } else if (WZ.step === 5) {
+    const tmpl = (DOC_TEMPLATE._core).concat(DOC_TEMPLATE[WZ.category.code] || []);
+    WZ.docs = tmpl.map(d => ({ name: d[0], required: d[1], checked: d[1], category: d[1] ? 'Required' : 'Optional' }));
+    body.innerHTML = `<div id="wz-doclist"></div><div class="alertbox amber" id="wz-advisory" style="margin-top:10px;"></div>`;
+    wzRenderDocs();
+  }
+}
+function wzPickFactory(id) { WZ.factory = FACTORIES.find(x => x.id === id) || null; }
+function wzPickCategory(id) { WZ.category = CATS.find(x => x.id === id) || null; WZ.type = null; wzRender(); }
+function wzPickType(id) { const types = TYPES_BY_CAT[WZ.category.id] || []; WZ.type = types.find(x => x.id === id) || null; wzRender(); }
+function wzMethod(m) { WZ.method = m; document.querySelectorAll('#wz-method button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); const f = document.getElementById('wz-method-fields'); if (!f) return; if (m === 'third_party') f.innerHTML = `<div class="ffield"><label>Inspector company</label><select id="wz-company"><option>Bureau Veritas</option><option>Intertek</option><option>UL</option><option>QIMA</option><option>SGS</option><option>Other</option></select></div><div class="ffield"><label>Contact name</label><input id="wz-contact"></div><div class="ffield"><label>Contact email</label><input id="wz-email"></div>`; else f.innerHTML = ''; }
+async function wzLoadPOs() { const pos = await supa(`purchase_orders?tenant_id=eq.${TID}&select=id,po_number&order=created_at.desc&limit=200`); const sel = document.getElementById('wz-po'); if (sel) sel.innerHTML = '<option value="">None</option>' + pos.map(p => `<option value="${p.id}">${esc(p.po_number || p.id)}</option>`).join(''); }
+function wzToggleDoc(i) { WZ.docs[i].checked = !WZ.docs[i].checked; wzRenderDocs(); }
+function wzRenderDocs() {
+  const req = WZ.docs.filter(d => d.required), opt = WZ.docs.filter(d => !d.required);
+  const row = (d) => { const i = WZ.docs.indexOf(d); return `<div class="docrow"><input type="checkbox" ${d.checked ? 'checked' : ''} ${d.required ? 'disabled' : ''} onchange="wzToggleDoc(${i})"><span class="dn">${esc(d.name)}</span></div>`; };
+  document.getElementById('wz-doclist').innerHTML = `<div class="grp-h">Required</div>${req.map(row).join('')}<div class="grp-h" style="margin-top:10px;">Optional</div>${opt.map(row).join('')}`;
+  const n = WZ.docs.filter(d => d.checked).length;
+  const adv = document.getElementById('wz-advisory');
+  if (n < 10) adv.textContent = 'Good starting point — covers core requirements.';
+  else if (n <= 20) adv.textContent = 'Thorough audit scope. Suitable for established factories.';
+  else adv.textContent = '⚠ Comprehensive audit. Note: factories with fewer than 3 years experience may struggle to provide all documents. Consider a phased approach.';
+}
+function randToken() { try { return 'aud_' + crypto.randomUUID().replace(/-/g, ''); } catch (e) { return 'aud_' + Date.now() + Math.round(Math.random() * 1e9).toString(36); } }
+async function saveAudit() {
+  const date = (document.getElementById('wz-date') || {}).value || new Date().toISOString().slice(0, 10);
+  const method = WZ.method || 'third_party';
+  const token = randToken();
+  const body = { factory_id: WZ.factory.id, tenant_id: TID, audit_type_id: WZ.type.id, scheduled_date: date, inspection_method: method, status: 'scheduled', report_upload_token: token };
+  if (method === 'third_party') { body.inspector_company = (document.getElementById('wz-company') || {}).value || null; body.inspector_contact = (document.getElementById('wz-contact') || {}).value || null; body.inspector_email = (document.getElementById('wz-email') || {}).value || null; }
+  const poVal = (document.getElementById('wz-po') || {}).value; if (poVal) body.po_id = poVal;
+  const created = await faPost('factory_audits', body, true);
+  if (!created || !created[0]) { alert('Could not schedule audit.'); return; }
+  const auditId = created[0].id;
+  const checked = WZ.docs.filter(d => d.checked);
+  if (checked.length) await faPost('factory_audit_documents', checked.map(d => ({ audit_id: auditId, document_name: d.name, document_category: d.required ? 'Required' : 'Optional', required: d.required, status: 'pending' })));
+  await faPost('tenant_action_items', { tenant_id: TID, type: 'audit_scheduled', reference_id: auditId, reference_type: 'factory_audit', title: 'Factory audit scheduled — ' + (WZ.factory.factory_name_english || ''), description: 'Share the report upload link with your inspector when the audit is complete.', priority: 'high', status: 'open', due_date: date });
+  closeWizard();
+  await loadAudits(); selectAudit(auditId);
+}
+
+(async function init() {
+  USER = await tenantAuth();
+  if (!USER || !USER.tenant) return;
+  TID = USER.tenant.id;
+  renderSidebar(USER);
+  document.getElementById('pageSub').textContent = USER.tenant.name + ' · factory audits';
+  FACTORIES = await supa(`factories?tenant_id=eq.${TID}&select=id,factory_name_english,product_categories,country,city&order=factory_name_english.asc`);
+  CATS = await supa(`factory_audit_categories?select=*&order=sort_order.asc`);
+  const types = await supa(`factory_audit_types?select=*&order=applies_to_all.desc,sort_order.asc`);
+  TYPES_BY_CAT = {}; types.forEach(t => { (TYPES_BY_CAT[t.category_id] = TYPES_BY_CAT[t.category_id] || []).push(t); });
+  await loadAudits();
+  const pf = new URLSearchParams(location.search).get('factory');
+  if (pf) openWizard(pf);
+})();
+</script>
+</body>
+</html>
