@@ -49,10 +49,41 @@
     .ph { padding: 1.25rem 1.5rem; border-bottom: 1px solid #e0e0d8; background: #fff; position: sticky; top: 0; z-index: 10; }
     .ph-title { font-size: 15px; font-weight: 600; color: #1a1a2e; }
     .ph-sub { font-size: 12px; color: #888; margin-top: 2px; }
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 1.25rem 1.5rem; }
-    .stat { background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; padding: 1rem; }
-    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
-    .stat-val { font-size: 28px; font-weight: 600; color: #1a1a2e; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      padding: 1.25rem 1.5rem;
+    }
+    .stat {
+      background: #fff;
+      border: 1px solid #e0e0d8;
+      border-radius: 12px;
+      padding: 18px;
+      min-height: 160px;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.15s;
+    }
+    .stat:hover { border-color: #bbb; }
+    .stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+    .stat-val {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 8px 0 10px;
+      line-height: 1;
+    }
+    .stat-sub {
+      font-size: 12px;
+      color: #888;
+      flex: 1;
+    }
     .factory-list { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 10px; }
     .fc { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 1rem 1.25rem; cursor: pointer; transition: border-color 0.15s; }
     .fc:hover { border-color: #bbb; }
@@ -419,6 +450,17 @@
     body.admin-dark .empty,
     body.admin-dark .set-section h3,
     body.admin-dark .set-section p { color: #94a3b8 !important; }
+    body.admin-dark .stat {
+      background: #0d1424 !important;
+      border-color: #1e2d47 !important;
+    }
+    body.admin-dark .stat-label,
+    body.admin-dark .stat-val {
+      color: #e2e8f0 !important;
+    }
+    body.admin-dark .stat-sub {
+      color: #94a3b8 !important;
+    }
     body.admin-dark .sitem:hover,
     body.admin-dark .sitem.on,
     body.admin-dark .cat-tree-node:hover { background: #0f1e35 !important; color: #e2e8f0 !important; }
@@ -604,10 +646,10 @@
       </div>
 
       <div class="stats">
-        <div class="stat"><div class="stat-label">Total Factories</div><div class="stat-val" id="s-total">—</div></div>
-        <div class="stat"><div class="stat-label">Pending Review</div><div class="stat-val" id="s-pending">—</div></div>
-        <div class="stat"><div class="stat-label">Approved</div><div class="stat-val" id="s-approved">—</div></div>
-        <div class="stat"><div class="stat-label">With Files</div><div class="stat-val" id="s-files">—</div></div>
+        <div class="stat"><div class="stat-label">Total Factories</div><div class="stat-val" id="s-total">—</div><div class="stat-sub">in your network</div></div>
+        <div class="stat"><div class="stat-label">Pending Review</div><div class="stat-val" id="s-pending">—</div><div class="stat-sub">awaiting approval</div></div>
+        <div class="stat"><div class="stat-label">Approved</div><div class="stat-val" id="s-approved">—</div><div class="stat-sub">verified suppliers</div></div>
+        <div class="stat"><div class="stat-label">With Files</div><div class="stat-val" id="s-files">—</div><div class="stat-sub">documents uploaded</div></div>
       </div>
 
       <!-- Production Pipeline widget — Demo placeholder -->
@@ -1875,10 +1917,10 @@
           <strong>⚠ Beta module:</strong> Warehouse functionality is in development. The structure shown below reflects the planned data model. Live inventory tracking will be enabled in a future release.
         </div>
         <div class="stats">
-          <div class="stat"><div class="stat-label">Total SKUs Tracked</div><div class="stat-val" id="wh-total-skus">—</div></div>
-          <div class="stat"><div class="stat-label">In Stock</div><div class="stat-val" id="wh-in-stock">—</div></div>
-          <div class="stat"><div class="stat-label">In Transit</div><div class="stat-val" id="wh-in-transit">—</div></div>
-          <div class="stat"><div class="stat-label">Low Stock Alerts</div><div class="stat-val" id="wh-low-stock">—</div></div>
+          <div class="stat"><div class="stat-label">Total SKUs Tracked</div><div class="stat-val" id="wh-total-skus">—</div><div class="stat-sub">active products</div></div>
+          <div class="stat"><div class="stat-label">In Stock</div><div class="stat-val" id="wh-in-stock">—</div><div class="stat-sub">available now</div></div>
+          <div class="stat"><div class="stat-label">In Transit</div><div class="stat-val" id="wh-in-transit">—</div><div class="stat-sub">incoming shipments</div></div>
+          <div class="stat"><div class="stat-label">Low Stock Alerts</div><div class="stat-val" id="wh-low-stock">—</div><div class="stat-sub">need reordering</div></div>
         </div>
         <div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:0;margin-top:1rem;overflow:hidden;">
           <div style="padding:14px 16px;border-bottom:1px solid #f0f0e8;display:flex;align-items:center;justify-content:space-between;">
@@ -1929,11 +1971,11 @@
 
         <!-- KPIs row -->
         <div class="stats">
-          <div class="stat"><div class="stat-label">Open Invoices</div><div class="stat-val" id="acct-open-inv">—</div></div>
-          <div class="stat"><div class="stat-label">AR Outstanding</div><div class="stat-val" id="acct-ar-balance">—</div></div>
-          <div class="stat"><div class="stat-label">AP Outstanding</div><div class="stat-val" id="acct-ap-balance">—</div></div>
-          <div class="stat"><div class="stat-label">YTD Revenue</div><div class="stat-val" id="acct-ytd-rev">—</div></div>
-          <div class="stat"><div class="stat-label">YTD Spend</div><div class="stat-val" id="acct-ytd-spend">—</div></div>
+          <div class="stat"><div class="stat-label">Open Invoices</div><div class="stat-val" id="acct-open-inv">—</div><div class="stat-sub">awaiting payment</div></div>
+          <div class="stat"><div class="stat-label">AR Outstanding</div><div class="stat-val" id="acct-ar-balance">—</div><div class="stat-sub">receivable balance</div></div>
+          <div class="stat"><div class="stat-label">AP Outstanding</div><div class="stat-val" id="acct-ap-balance">—</div><div class="stat-sub">payable balance</div></div>
+          <div class="stat"><div class="stat-label">YTD Revenue</div><div class="stat-val" id="acct-ytd-rev">—</div><div class="stat-sub">year to date</div></div>
+          <div class="stat"><div class="stat-label">YTD Spend</div><div class="stat-val" id="acct-ytd-spend">—</div><div class="stat-sub">year to date</div></div>
         </div>
 
         <!-- Integration status -->
@@ -2032,10 +2074,10 @@
       <div style="padding:1.25rem 1.5rem;">
         <!-- KPIs -->
         <div class="stats">
-          <div class="stat"><div class="stat-label">Pending Today</div><div class="stat-val" id="cw-pending-today">—</div></div>
-          <div class="stat"><div class="stat-label">On Watch</div><div class="stat-val" id="cw-total-watch">—</div></div>
-          <div class="stat"><div class="stat-label">Critical Alerts (7d)</div><div class="stat-val" id="cw-critical-7d">—</div></div>
-          <div class="stat"><div class="stat-label">Avg. PAYDEX</div><div class="stat-val" id="cw-avg-paydex">—</div></div>
+          <div class="stat"><div class="stat-label">Pending Today</div><div class="stat-val" id="cw-pending-today">—</div><div class="stat-sub">reviews due today</div></div>
+          <div class="stat"><div class="stat-label">On Watch</div><div class="stat-val" id="cw-total-watch">—</div><div class="stat-sub">monitored entities</div></div>
+          <div class="stat"><div class="stat-label">Critical Alerts (7d)</div><div class="stat-val" id="cw-critical-7d">—</div><div class="stat-sub">past 7 days</div></div>
+          <div class="stat"><div class="stat-label">Avg. PAYDEX</div><div class="stat-val" id="cw-avg-paydex">—</div><div class="stat-sub">credit score</div></div>
         </div>
 
         <!-- Filter chips -->
@@ -2068,10 +2110,10 @@
           <strong>🔮 Beta module:</strong> AI forecasting is in development. Once production data flows through the system (sales orders, inventory movements), the AI engine will generate per-SKU demand forecasts, reorder recommendations, and trend alerts. Showing sample projections below for illustration.
         </div>
         <div class="stats">
-          <div class="stat"><div class="stat-label">SKUs Monitored</div><div class="stat-val" id="fc-skus-count">—</div></div>
-          <div class="stat"><div class="stat-label">Active Alerts</div><div class="stat-val" id="fc-active-alerts">—</div></div>
-          <div class="stat"><div class="stat-label">Forecast Accuracy</div><div class="stat-val">—</div></div>
-          <div class="stat"><div class="stat-label">Last Run</div><div class="stat-val" style="font-size:14px;">Pending</div></div>
+          <div class="stat"><div class="stat-label">SKUs Monitored</div><div class="stat-val" id="fc-skus-count">—</div><div class="stat-sub">active products</div></div>
+          <div class="stat"><div class="stat-label">Active Alerts</div><div class="stat-val" id="fc-active-alerts">—</div><div class="stat-sub">need attention</div></div>
+          <div class="stat"><div class="stat-label">Forecast Accuracy</div><div class="stat-val">—</div><div class="stat-sub">model precision</div></div>
+          <div class="stat"><div class="stat-label">Last Run</div><div class="stat-val" style="font-size:14px;">Pending</div><div class="stat-sub">forecast cycle</div></div>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;">
