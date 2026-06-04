@@ -6,6 +6,14 @@
 <title>Operations — TBG Sourcing</title>
 <link rel="stylesheet" href="tenant-portal.css">
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .btn-sm{font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:7px;border:1px solid var(--border,#334155);background:var(--card-bg,#1e293b);color:var(--text,#e2e8f0);cursor:pointer;}
+  .btn-sm:hover{opacity:0.88;}
+  .ti-field{margin:8px 0;}
+  .ti-field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2,#94a3b8);}
+  .ti-field input,.ti-field select,.ti-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--card-bg,#0f172a);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;}
+  .ti-field textarea{min-height:60px;resize:vertical;}
+</style>
 </head>
 <body>
 <div id="sidebar"></div>
@@ -22,6 +30,7 @@
     <button class="tab" data-tab="accounting">Accounting</button>
     <button class="tab" data-tab="credit">Credit Watch <span class="tab-count" id="cnt-credit"></span></button>
     <button class="tab" data-tab="forecasting">Forecasting</button>
+    <button class="tab" data-tab="actions">Actions <span class="tab-count" id="cnt-actions"></span></button>
   </div>
 
   <div class="tab-pane" id="pane-orders"><div id="box-orders"><div class="loading">Loading open orders…</div></div></div>
@@ -29,6 +38,7 @@
   <div class="tab-pane" id="pane-accounting"></div>
   <div class="tab-pane" id="pane-credit"><div id="box-credit"><div class="loading">Loading credit checks…</div></div></div>
   <div class="tab-pane" id="pane-forecasting"></div>
+  <div class="tab-pane" id="pane-actions"><div id="box-actions"><div class="loading">Loading action items…</div></div></div>
 </div>
 
 <div class="panel-overlay" id="panelOverlay"></div>
@@ -42,9 +52,16 @@
 
 <script src="tenant-shared.js"></script>
 <script>
-const TABS = ['orders', 'warehouse', 'accounting', 'credit', 'forecasting'];
+const TABS = ['orders', 'warehouse', 'accounting', 'credit', 'forecasting', 'actions'];
 const BETA = { warehouse: 'Warehouse', accounting: 'Accounting', forecasting: 'Forecasting' };
 let TID = null;
+function opsToken() { return localStorage.getItem('tenant_token'); }
+const OPS_SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+const OPS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+async function opsPatch(path, body) { try { const r = await fetch(OPS_SB + '/rest/v1/' + path, { method: 'PATCH', headers: { apikey: OPS_KEY, Authorization: 'Bearer ' + OPS_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }); return r.ok; } catch (e) { return false; } }
+async function tenantInspApi(body) { const r = await fetch('/api/tenant-inspection-update', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + opsToken() }, body: JSON.stringify(body) }); return r.json().catch(() => ({})); }
+async function tenantActionApi(body) { const r = await fetch('/api/tenant-action-update', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + opsToken() }, body: JSON.stringify(body) }); return r.json().catch(() => ({})); }
+let ACTION_ITEMS = [], ACTION_FILTER = 'open';
 let orders = [], milestonesByPo = {}, factoryMap = {};
 const loaded = {};
 
@@ -59,6 +76,7 @@ function showTab(tab) {
   document.getElementById('pane-' + tab).classList.add('active');
   if (BETA[tab]) { document.getElementById('pane-' + tab).innerHTML = comingSoon(BETA[tab] + ' — Coming Soon'); return; }
   if (tab === 'credit' && !loaded.credit) { loaded.credit = true; loadCredit(); }
+  if (tab === 'actions' && !loaded.actions) { loaded.actions = true; loadActions(); }
 }
 function goTab(tab) { location.hash = tab === 'orders' ? '' : '#' + tab; }
 
@@ -152,7 +170,233 @@ async function openPO(id) {
     <div class="panel-section"><h3>Line Items (${lines.length})</h3>${lineItems}</div>
     <div class="panel-section"><h3>Milestones (${ms.length})</h3><div class="sub-list">${msItems}</div></div>
     <div class="panel-section"><h3>Documents</h3><div class="sub-list">${docItems}</div></div>
+    <div class="panel-section" id="po-inspection"><h3>Inspection</h3><div class="loading">Loading inspection…</div></div>
   `;
+  loadPOInspection(o);
+}
+
+// ── PART 3: Inspection panel on the PO detail ──
+function inspStatusBadgeOps(s) {
+  const map = { scheduled: ['#6b7280', 'rgba(107,114,128,0.15)'], factory_confirmed: ['#3b82f6', 'rgba(59,130,246,0.15)'], inspector_booked: ['#f59e0b', 'rgba(245,158,11,0.15)'], in_progress: ['#f59e0b', 'rgba(245,158,11,0.15)'], pass: ['#22c55e', 'rgba(34,197,94,0.15)'], fail: ['#ef4444', 'rgba(239,68,68,0.15)'], conditional_pass: ['#f59e0b', 'rgba(245,158,11,0.15)'], waived: ['#6b7280', 'rgba(107,114,128,0.15)'], rework_required: ['#ef4444', 'rgba(239,68,68,0.15)'] };
+  const c = map[s] || ['#6b7280', 'rgba(107,114,128,0.15)'];
+  return `<span class="badge" style="color:${c[0]};background:${c[1]};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${esc((s || '').replace(/_/g, ' '))}</span>`;
+}
+function daysUntilOps(d) { if (!d) return null; const t = new Date(); t.setHours(0, 0, 0, 0); const x = new Date(d + 'T00:00:00'); if (isNaN(x)) return null; return Math.round((x - t) / 864e5); }
+function aqlRecommendation(qty, firstTime) {
+  let rec;
+  if (firstTime) rec = 'New supplier — recommend AQL 1.0 Level II';
+  else if (qty < 500) rec = 'Skip formal AQL — recommend 100% visual for small orders';
+  else if (qty <= 2000) rec = 'Recommend AQL 2.5 Level II (standard) — sample ~80 units | Critical: 0 | Major: 5 | Minor: 14';
+  else if (qty <= 10000) rec = 'Recommend AQL 2.5 Level II — sample ~125-200 units | Critical: 0 | Major: 7 | Minor: 21';
+  else rec = 'Recommend AQL 1.5 Level II (tighter for large orders) — sample ~200+ units | Critical: 0 | Major: 3 | Minor: 10';
+  // recommended config to apply on "Use Recommended"
+  let cfg;
+  if (firstTime) cfg = { aql_level: 1.0, inspection_level: 'II', sample_size: 80, critical_defects_allowed: 0, major_defects_allowed: 1, minor_defects_allowed: 3 };
+  else if (qty < 500) cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 0, critical_defects_allowed: 0, major_defects_allowed: 0, minor_defects_allowed: 0 };
+  else if (qty <= 2000) cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 80, critical_defects_allowed: 0, major_defects_allowed: 5, minor_defects_allowed: 14 };
+  else if (qty <= 10000) cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 200, critical_defects_allowed: 0, major_defects_allowed: 7, minor_defects_allowed: 21 };
+  else cfg = { aql_level: 1.5, inspection_level: 'II', sample_size: 200, critical_defects_allowed: 0, major_defects_allowed: 3, minor_defects_allowed: 10 };
+  return { rec, cfg };
+}
+let CUR_INSP = null, CUR_PO = null;
+async function loadPOInspection(o) {
+  CUR_PO = o;
+  const box = document.getElementById('po-inspection');
+  if (!box) return;
+  const rows = await supa(`inspections?po_id=eq.${o.id}&tenant_id=eq.${TID}&order=created_at.desc&limit=1`);
+  if (!rows.length) { box.innerHTML = '<h3>Inspection</h3><div class="empty" style="padding:12px;">No inspection scheduled for this PO.</div>'; return; }
+  const insp = rows[0]; CUR_INSP = insp;
+  const du = daysUntilOps(insp.scheduled_date);
+  const duTxt = du == null ? '' : (du > 0 ? `${du} day${du === 1 ? '' : 's'} until inspection` : du < 0 ? `${Math.abs(du)} day${du === -1 ? '' : 's'} since` : 'Today');
+
+  let html = '<h3>Inspection</h3>';
+  // Status card
+  html += `<div class="sub-item"><div class="si-title">${inspStatusBadgeOps(insp.status)} <span class="badge" style="background:rgba(34,68,204,0.12);color:#5b8def;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${esc(insp.inspection_type || '—')}</span></div><div class="si-meta">${esc(insp.scheduled_date || '—')}${duTxt ? ' · ' + esc(duTxt) : ''}</div></div>`;
+
+  // Method selector (scheduled and no method)
+  if (insp.status === 'scheduled' && !insp.inspection_method) {
+    html += `<div class="panel-section" style="margin-top:10px;"><h3 style="font-size:13px;">Select Inspection Method</h3>
+      <div id="ti-method-seg" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+        <button class="btn-sm" onclick="tiPickMethod('third_party')">🔍 Third Party</button>
+        <button class="btn-sm" onclick="tiPickMethod('self_inspection')">🏭 Self-Inspection</button>
+        <button class="btn-sm" onclick="tiPickMethod('tbg_arranged')">📋 TBG Arranged</button>
+      </div>
+      <div id="ti-method-fields"></div></div>`;
+  } else if (insp.inspection_method) {
+    // Show AQL recommendation (before AQL saved)
+    if (insp.aql_level == null) {
+      const facInsp = await supa(`inspections?factory_id=eq.${insp.factory_id}&select=id`);
+      const firstTime = (facInsp || []).length <= 1;
+      const { rec } = aqlRecommendation(Number(o.quantity) || 0, firstTime);
+      html += `<div class="sub-item" style="border-left:3px solid #22c55e;"><div class="si-title">📐 AQL Recommendation</div><div class="si-meta">${esc(rec)}</div>
+        <div style="margin-top:8px;"><button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiUseRecommendedAQL(${Number(o.quantity) || 0},${firstTime})">Use Recommended</button></div></div>`;
+    } else {
+      html += `<div class="si-meta" style="margin-top:6px;">AQL ${esc(insp.aql_level)} / Level ${esc(insp.inspection_level || '—')} · sample ${esc(insp.sample_size || '—')}</div>`;
+    }
+  }
+
+  // Defects panel
+  const defects = await supa(`inspection_defects?inspection_id=eq.${insp.id}&select=*&order=created_at.asc`);
+  if (defects.length) {
+    const cf = defects.filter(d => d.defect_type === 'critical').length, mf = defects.filter(d => d.defect_type === 'major').length, nf = defects.filter(d => d.defect_type === 'minor').length;
+    html += `<div class="panel-section" style="margin-top:10px;"><h3 style="font-size:13px;">Defects — ${cf} critical, ${mf} major, ${nf} minor</h3>`;
+    html += defects.map(d => {
+      const photo = d.photo_url ? `<img src="${esc(d.photo_url)}" style="max-width:80px;border-radius:6px;margin-top:6px;cursor:pointer;" onclick="window.open('${esc(d.photo_url)}','_blank')">` : '';
+      const actioned = d.tenant_action ? `<div class="si-meta">Your decision: <strong>${esc(d.tenant_action)}</strong>${d.tenant_action_notes ? ' — ' + esc(d.tenant_action_notes) : ''}</div>` :
+        `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiDefect('${d.id}','accept')">✓ Accept</button>
+          <button class="btn-sm" style="background:#dc2626;color:#fff;" onclick="tiDefect('${d.id}','reject')">✗ Reject &amp; Request Rework</button>
+        </div><div id="ti-def-${d.id}"></div>`;
+      return `<div class="sub-item"><div class="si-title">${esc(d.defect_type)} · ${esc(d.defect_category || '—')}</div><div class="si-meta">${esc(d.description || '')} (qty ${esc(d.qty_affected != null ? d.qty_affected : 1)})</div>${photo}${actioned}</div>`;
+    }).join('');
+    html += '</div>';
+  }
+
+  // Measurements variance
+  const meas = await supa(`inspection_measurements?inspection_id=eq.${insp.id}&select=*`);
+  const variances = meas.filter(m => m.weight_match === false || m.length_match === false || m.width_match === false || m.height_match === false || m.qty_match === false || m.upc_match === false);
+  const upcMm = meas.find(m => m.upc_match === false);
+  if (variances.length || upcMm) {
+    html += `<div class="panel-section" style="margin-top:10px;"><h3 style="font-size:13px;">Measurement Variances</h3>`;
+    variances.forEach(m => {
+      let reasons = [];
+      try { reasons = Array.isArray(m.ai_variance_reasons) ? m.ai_variance_reasons : (m.ai_variance_reasons ? JSON.parse(m.ai_variance_reasons) : []); } catch (e) { reasons = []; }
+      html += `<div class="sub-item"><div class="si-title">${esc(m.measurement_type)} variance</div>${m.variance_notes ? '<div class="si-meta">' + esc(m.variance_notes) + '</div>' : ''}${reasons.length ? '<ul style="margin:6px 0 0 16px;font-size:12px;color:var(--text2);">' + reasons.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' : ''}</div>`;
+    });
+    if (upcMm) {
+      html += `<div class="sub-item" style="border-left:3px solid #ef4444;"><div class="si-title">🔴 UPC Mismatch</div><div class="si-meta">Spec ${esc(upcMm.upc_spec || '—')} → Actual ${esc(upcMm.upc_actual || '—')}</div>
+        <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiAcceptUpc('${esc(upcMm.upc_actual || '')}')">Accept &amp; Update SKU</button>
+          <button class="btn-sm" style="background:#dc2626;color:#fff;" onclick="tiRequestRework('UPC correction required: ${esc(upcMm.upc_actual || '')} → ${esc(upcMm.upc_spec || '')}')">Request Rework</button>
+        </div></div>`;
+    }
+    html += '</div>';
+  }
+
+  // Outcome (read-only)
+  if (insp.outcome) {
+    html += `<div class="sub-item"><div class="si-title">Outcome: ${inspStatusBadgeOps(insp.outcome)}</div>${insp.outcome_notes ? '<div class="si-meta">' + esc(insp.outcome_notes) + '</div>' : ''}${insp.report_url ? '<div style="margin-top:6px;"><a class="btn-sm" style="background:#3b82f6;color:#fff;text-decoration:none;" href="' + esc(insp.report_url) + '" target="_blank">Download Report</a></div>' : ''}</div>`;
+  }
+
+  // Factory confirmation status
+  const conf = await supa(`inspection_confirmations?inspection_id=eq.${insp.id}&select=*&order=sent_at.desc&limit=1`);
+  if (conf.length) {
+    const c = conf[0]; const dago = daysUntilOps((c.sent_at || '').slice(0, 10));
+    const st = c.factory_responded_at ? (c.confirmed ? 'Confirmed ✓' : 'Flagged ⚠') : 'Pending';
+    html += `<div class="si-meta" style="margin-top:8px;">Factory confirmation: sent ${dago != null ? Math.abs(dago) + ' day(s) ago' : (c.sent_at || '').slice(0, 10)} · ${st}</div>`;
+  }
+
+  box.innerHTML = html;
+}
+function tiPickMethod(m) {
+  document.querySelectorAll('#ti-method-seg .btn-sm').forEach(b => b.style.opacity = '0.6');
+  const f = document.getElementById('ti-method-fields'); if (!f) return;
+  if (m === 'third_party') {
+    f.innerHTML = `<div class="ti-field"><label>Inspector company</label><select id="ti-company"><option value="">Select…</option><option>SGS</option><option>Bureau Veritas</option><option>Intertek</option><option>QIMA</option><option>Other</option></select></div>
+      <div class="ti-field"><label>Contact name</label><input id="ti-name"></div>
+      <div class="ti-field"><label>Contact email</label><input id="ti-email"></div>
+      <button class="btn-sm" style="background:#3b82f6;color:#fff;margin-top:8px;" onclick="tiSaveMethod('third_party')">Save</button>`;
+  } else if (m === 'self_inspection') {
+    f.innerHTML = `<div class="ti-field"><label>Waiver reason</label><textarea id="ti-waiver"></textarea></div>
+      <label style="display:flex;gap:8px;align-items:center;font-size:12px;cursor:pointer;"><input type="checkbox" id="ti-ack"> I understand this waives third party verification</label>
+      <button class="btn-sm" style="background:#3b82f6;color:#fff;margin-top:8px;" onclick="tiSaveMethod('self_inspection')">Save</button>`;
+  } else {
+    f.innerHTML = `<div class="ti-field"><label>Notes</label><textarea id="ti-notes"></textarea></div>
+      <button class="btn-sm" style="background:#3b82f6;color:#fff;margin-top:8px;" onclick="tiSaveMethod('tbg_arranged')">Save</button>`;
+  }
+}
+async function tiSaveMethod(method) {
+  const body = { action: 'set_method', inspection_id: CUR_INSP.id, inspection_method: method };
+  if (method === 'third_party') { body.inspector_company = (document.getElementById('ti-company') || {}).value || ''; body.inspector_contact_name = (document.getElementById('ti-name') || {}).value || ''; body.inspector_contact_email = (document.getElementById('ti-email') || {}).value || ''; }
+  if (method === 'self_inspection') {
+    body.waiver_reason = (document.getElementById('ti-waiver') || {}).value || '';
+    body.waiver_acknowledged = !!(document.getElementById('ti-ack') && document.getElementById('ti-ack').checked);
+    if (!body.waiver_acknowledged) { alert('You must check the waiver acknowledgment to save self-inspection.'); return; }
+  }
+  const d = await tenantInspApi(body);
+  if (d.success) loadPOInspection(CUR_PO); else alert('Could not save method: ' + (d.error || 'error'));
+}
+async function tiUseRecommendedAQL(qty, firstTime) {
+  const { cfg } = aqlRecommendation(qty, firstTime);
+  const ok = await opsPatch('inspections?id=eq.' + CUR_INSP.id, Object.assign({}, cfg, { updated_at: new Date().toISOString() }));
+  if (ok) loadPOInspection(CUR_PO); else alert('Could not apply AQL recommendation.');
+}
+function tiDefect(defectId, action) {
+  if (action === 'accept') {
+    const slot = document.getElementById('ti-def-' + defectId);
+    if (slot) slot.innerHTML = `<div class="ti-field" style="margin-top:6px;"><label>Accept notes (optional)</label><textarea id="ti-acc-${defectId}"></textarea></div><button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiDefectSubmit('${defectId}','accept')">Confirm Accept</button>`;
+  } else {
+    const slot = document.getElementById('ti-def-' + defectId);
+    if (slot) slot.innerHTML = `<div class="ti-field" style="margin-top:6px;"><label>Rework instructions</label><textarea id="ti-rw-${defectId}"></textarea></div><button class="btn-sm" style="background:#dc2626;color:#fff;" onclick="tiDefectSubmit('${defectId}','reject')">Confirm Reject &amp; Rework</button>`;
+  }
+}
+async function tiDefectSubmit(defectId, action) {
+  const body = { action: 'defect_action', inspection_id: CUR_INSP.id, defect_id: defectId, tenant_action: action };
+  if (action === 'accept') body.tenant_action_notes = (document.getElementById('ti-acc-' + defectId) || {}).value || '';
+  else body.rework_instructions = (document.getElementById('ti-rw-' + defectId) || {}).value || '';
+  const d = await tenantInspApi(body);
+  if (d.success) loadPOInspection(CUR_PO); else alert('Could not submit: ' + (d.error || 'error'));
+}
+async function tiAcceptUpc(newUpc) {
+  const skuId = CUR_PO && CUR_PO.sku_id ? CUR_PO.sku_id : null;
+  const d = await tenantInspApi({ action: 'accept_upc', inspection_id: CUR_INSP.id, new_upc: newUpc, sku_id: skuId });
+  if (d.success) { alert('SKU updated. Customer form update action item created.'); loadPOInspection(CUR_PO); } else alert('Error: ' + (d.error || 'failed'));
+}
+async function tiRequestRework(reason) {
+  const d = await tenantInspApi({ action: 'request_rework', inspection_id: CUR_INSP.id, rework_reason: reason });
+  if (d.success) { alert('Rework inspection scheduled. Factory has been notified.'); loadPOInspection(CUR_PO); } else alert('Error: ' + (d.error || 'failed'));
+}
+
+// ── PART 6: Action items tab ──
+function priBadge(p) { const m = { critical: ['#ef4444', 'rgba(239,68,68,0.15)'], high: ['#f59e0b', 'rgba(245,158,11,0.15)'], medium: ['#3b82f6', 'rgba(59,130,246,0.15)'] }; const c = m[p] || m.medium; return `<span class="badge" style="color:${c[0]};background:${c[1]};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${esc(p || 'medium')}</span>`; }
+function daysOld(iso) { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 864e5); return d + 'd old'; }
+async function loadActions() {
+  ACTION_ITEMS = await supa(`tenant_action_items?tenant_id=eq.${TID}&order=created_at.desc`);
+  const open = ACTION_ITEMS.filter(a => a.status === 'open' || a.status === 'acknowledged').length;
+  document.getElementById('cnt-actions').textContent = open;
+  renderActions();
+}
+function setActionFilter(f) { ACTION_FILTER = f; renderActions(); }
+function renderActions() {
+  const box = document.getElementById('box-actions');
+  const filters = ['all', 'open', 'acknowledged', 'completed', 'ignored'];
+  const labelMap = { all: 'All', open: 'Open', acknowledged: 'Acknowledged', completed: 'Completed', ignored: 'Ignored' };
+  const statusFor = { open: ['open'], acknowledged: ['acknowledged'], completed: ['completed'], ignored: ['intentionally_ignored'] };
+  const bar = `<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">${filters.map(f => `<button class="btn-sm" style="${ACTION_FILTER === f ? 'background:#3b82f6;color:#fff;' : ''}" onclick="setActionFilter('${f}')">${labelMap[f]}</button>`).join('')}</div>`;
+  let rows = ACTION_ITEMS;
+  if (ACTION_FILTER !== 'all') rows = ACTION_ITEMS.filter(a => statusFor[ACTION_FILTER].includes(a.status));
+  if (!rows.length) { box.innerHTML = bar + '<div class="empty"><span class="empty-icon">✅</span>No action items.</div>'; return; }
+  box.innerHTML = bar + rows.map(a => {
+    const done = a.status === 'completed', ign = a.status === 'intentionally_ignored';
+    let footer;
+    if (done) footer = `<div class="si-meta" style="color:#22c55e;">✓ Completed ${a.completed_at ? fmtDate(a.completed_at) : ''}</div>`;
+    else if (ign) footer = `<div class="si-meta" style="color:#94a3b8;">Ignored: ${esc(a.ignore_reason || '—')}</div>`;
+    else footer = `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="actDo('${a.id}','complete')">✓ Done</button>
+        <button class="btn-sm" onclick="actDo('${a.id}','acknowledge')">👁 Acknowledge</button>
+        <button class="btn-sm" onclick="actIgnore('${a.id}')">✗ Ignore</button>
+      </div><div id="act-ig-${a.id}"></div>`;
+    return `<div class="sub-item" style="${a.priority === 'critical' ? 'border-left:3px solid #ef4444;' : ''}">
+      <div class="si-title">${priBadge(a.priority)} <span class="badge" style="background:rgba(148,163,184,0.15);color:#94a3b8;padding:2px 6px;border-radius:5px;font-size:10px;">${esc(a.type || '')}</span> ${esc(a.title || '')}</div>
+      <div class="si-meta">${esc(a.description || '')}</div>
+      <div class="si-meta">${fmtDate(a.created_at)} · ${daysOld(a.created_at)}${a.due_date ? ' · due ' + fmtDate(a.due_date) : ''}</div>
+      ${footer}</div>`;
+  }).join('');
+}
+async function actDo(id, action) {
+  const d = await tenantActionApi({ action_item_id: id, action });
+  if (d.success) loadActions(); else alert('Error: ' + (d.error || 'failed'));
+}
+function actIgnore(id) {
+  const slot = document.getElementById('act-ig-' + id); if (!slot) return;
+  slot.innerHTML = `<div class="ti-field" style="margin-top:6px;"><label>Ignore reason</label>
+    <select id="ig-reason-${id}"><option>Not applicable</option><option>Already handled externally</option><option>Error in alert</option><option>Other</option></select></div>
+    <button class="btn-sm" style="background:#64748b;color:#fff;" onclick="actIgnoreSubmit('${id}')">Confirm Ignore</button>`;
+}
+async function actIgnoreSubmit(id) {
+  const reason = (document.getElementById('ig-reason-' + id) || {}).value || 'Other';
+  const d = await tenantActionApi({ action_item_id: id, action: 'ignore', ignore_reason: reason });
+  if (d.success) loadActions(); else alert('Error: ' + (d.error || 'failed'));
 }
 
 // ── Credit Watch ── (credit_checks now has tenant_id — direct filter)

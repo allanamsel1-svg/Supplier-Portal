@@ -318,6 +318,7 @@ async function renderDetail(insp){
   html+='<div class="sec"><h3>Measurements Verification</h3><div class="sub">Spec auto-filled from the linked SKU where available · ✓ within 2% tolerance</div>'+
     '<div class="mtable-wrap" id="meas-table">Loading…</div>'+
     '<div style="margin-top:10px;"><button class="btn" onclick="saveMeasurements(\''+insp.id+'\')">Save Measurements</button></div>'+
+    '<div id="upc-alert"></div>'+
     '<div id="variance-alerts"></div>'+
   '</div>';
 
@@ -348,10 +349,19 @@ async function renderDetail(insp){
     '</div>';
   }
 
+  // SECTION 8 — Defects Recording
+  html+='<div class="sec"><h3 id="defects-h">Defects</h3>'+
+    '<div id="aql-result" class="calc-box" style="display:none;"></div>'+
+    '<button class="btn" onclick="toggleAddDefect(\''+insp.id+'\')">+ Add Defect</button>'+
+    '<div id="add-defect-form" style="display:none;margin-top:12px;"></div>'+
+    '<div id="defects-list" style="margin-top:12px;"></div>'+
+  '</div>';
+
   g('detail').innerHTML=html;
   if(insp.status==='scheduled')recalcAQL();
   loadMeasurements(insp);
   loadConfirmations(insp.id);
+  loadDefects(insp);
 }
 
 function methodDetailHtml(insp){
@@ -488,7 +498,7 @@ function onMeasInput(){
 async function saveMeasurements(id){
   var data=readMeasFromDom();
   var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
-  var anyMismatch=false, mismatches=[];
+  var anyMismatch=false, mismatches=[], upcMismatch=null;
   for(var t in data){
     var d=data[t], row={inspection_id:id,measurement_type:t};
     [['weight','weight'],['length','length'],['width','width'],['height','height']].forEach(function(c){
@@ -501,16 +511,54 @@ async function saveMeasurements(id){
     var qm=within2(d.qty_per_pack_spec,d.qty_per_pack_actual); row.qty_match=qm; if(qm===false)anyMismatch=true;
     row.upc_spec=d.upc_spec||null; row.upc_actual=d.upc_actual||null;
     row.upc_match=(d.upc_spec&&d.upc_actual)?(String(d.upc_spec).trim()===String(d.upc_actual).trim()):null;
-    if(row.upc_match===false)anyMismatch=true;
+    if(row.upc_match===false){anyMismatch=true;if(!upcMismatch)upcMismatch={type:t,spec:d.upc_spec,actual:d.upc_actual};}
     // upsert: delete existing row of this type then insert
     await fetch(SB+'/rest/v1/inspection_measurements?inspection_id=eq.'+id+'&measurement_type=eq.'+t,{method:'DELETE',headers:Object.assign({},H,{Prefer:'return=minimal'})});
     await sbPost('inspection_measurements',row);
   }
-  await sbPatch('inspections?id=eq.'+id,{measurements_verified:!anyMismatch,updated_at:new Date().toISOString()});
-  alert('Measurements saved.'+(anyMismatch?' Variances detected — see AI analysis.':''));
+  await sbPatch('inspections?id=eq.'+id,{measurements_verified:!anyMismatch,upc_verified:upcMismatch?false:(data.unit&&data.unit.upc_actual?true:null),updated_at:new Date().toISOString()});
+  alert('Measurements saved.'+(anyMismatch?' Variances detected — see analysis below.':''));
+  if(upcMismatch)renderUpcAlert(insp,upcMismatch); else g('upc-alert').innerHTML='';
   if(anyMismatch&&mismatches.length)runVarianceAI(mismatches,insp);
   else g('variance-alerts').innerHTML='';
   loadMeasurements(insp);
+}
+// ── UPC mismatch handling ──
+function renderUpcAlert(insp,mm){
+  var box=g('upc-alert'); if(!box)return;
+  var skuId=insp.purchase_orders&&insp.purchase_orders.sku_id||'';
+  box.innerHTML='<div class="var-card" style="background:rgba(176,0,0,0.1);border-color:#f5b8b8;">'+
+    '<h4 style="color:#b00;">🔴 UPC MISMATCH DETECTED</h4>'+
+    '<div style="font-size:12px;margin-bottom:8px;">Spec: <strong>'+esc(mm.spec)+'</strong> → Actual: <strong>'+esc(mm.actual)+'</strong></div>'+
+    '<div style="font-size:12px;margin-bottom:8px;">This requires one of the following actions:</div>'+
+    '<button class="btn green" onclick="upcAcceptUpdateSku(\''+insp.id+'\',\''+esc(skuId)+'\',\''+esc(mm.actual)+'\',\''+esc(mm.spec)+'\')">Accept &amp; Update SKU</button> '+
+    '<button class="btn red" onclick="upcRequestRework(\''+insp.id+'\',\''+esc(mm.actual)+'\',\''+esc(mm.spec)+'\')">Request Rework</button>'+
+    '<div class="hint" id="upc-alert-status" style="margin-top:8px;"></div>'+
+  '</div>';
+}
+async function upcAcceptUpdateSku(id,skuId,actual,spec){
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  var po=(insp&&insp.purchase_orders&&insp.purchase_orders.po_number)||id;
+  if(skuId)await sbPatch('skus?id=eq.'+skuId,{upc_code:actual,updated_at:new Date().toISOString()});
+  if(insp&&insp.tenant_id)await sbPost('tenant_action_items',{tenant_id:insp.tenant_id,type:'sku_update_required',reference_id:id,reference_type:'inspection',title:'Customer SKU forms need updating — UPC changed',description:'UPC changed from '+spec+' to '+actual+' on PO '+po+'. Update all customer vendor portals.',priority:'high',status:'open'});
+  await sbPatch('inspections?id=eq.'+id,{upc_verified:false,measurements_notes:'UPC accepted and updated in SKU library — customer form update pending',updated_at:new Date().toISOString()});
+  var st=g('upc-alert-status'); if(st)st.innerHTML='<span class="ok">✓ SKU updated. Customer form update action item created.</span>';
+}
+async function upcRequestRework(id,actual,spec){
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  await scheduleReworkChild(insp,'Factory must correct UPC '+actual+' → '+spec+' before re-inspection','UPC correction required');
+  var st=g('upc-alert-status'); if(st)st.innerHTML='<span style="color:#b00;">Rework inspection scheduled. Factory has been notified.</span>';
+  await loadList();
+}
+// Shared: flip current to rework_required, create child inspection, notify factory, action item.
+async function scheduleReworkChild(insp,desc,reworkTitleSuffix){
+  if(!insp)return null;
+  await sbPatch('inspections?id=eq.'+insp.id,{status:'rework_required',tenant_decision:'rework_requested',rework_instructions:desc,updated_at:new Date().toISOString()});
+  var child=await sbPost('inspections',{tenant_id:insp.tenant_id,po_id:insp.po_id,factory_id:insp.factory_id,inspection_type:insp.inspection_type,inspection_method:insp.inspection_method,status:'scheduled',parent_inspection_id:insp.id},true);
+  var childId=(child&&child[0]&&child[0].id)||null;
+  if(insp.tenant_id)await sbPost('tenant_action_items',{tenant_id:insp.tenant_id,type:'inspection_rework_scheduled',reference_id:childId||insp.id,reference_type:'inspection',title:'Rework inspection scheduled — '+(reworkTitleSuffix||'correction required'),description:desc,priority:'critical',status:'open',due_date:insp.scheduled_date||null});
+  if(childId){try{await fetch('/api/inspection-confirm-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({inspection_id:childId,days_before:null})});}catch(e){}}
+  return childId;
 }
 async function runVarianceAI(mismatches,insp){
   var box=g('variance-alerts'); if(!box)return;
@@ -581,11 +629,161 @@ async function sendConfirmRequest(id){
 async function setOutcome(id,outcome){
   var status=outcome; // pass/fail/conditional_pass map directly to status values
   await sbPatch('inspections?id=eq.'+id,{outcome:outcome,status:status,updated_at:new Date().toISOString()});
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  if(insp){insp.outcome=outcome;insp.status=status;await sendOutcomeEmail(insp,outcome);}
   await loadList();
+}
+// PART 8 — notify factory of the inspection outcome.
+async function sendOutcomeEmail(insp,outcome){
+  var rows=await sbGet('inspections?id=eq.'+insp.id+'&select=scheduled_date,aql_level,critical_defects_found,major_defects_found,minor_defects_found,major_defects_allowed,minor_defects_allowed,rework_instructions,purchase_orders(po_number),factories(factory_name_english,sales_email)&limit=1');
+  var r=rows[0]; if(!r)return;
+  var fac=r.factories||{}; var po=(r.purchase_orders&&r.purchase_orders.po_number)||insp.po_id||'—';
+  if(!fac.sales_email)return;
+  var name=fac.factory_name_english||'Partner', subject='', body='';
+  if(outcome==='pass'){
+    subject='Inspection Passed — PO '+po;
+    body='Dear '+name+',\n\nWe are pleased to inform you that the pre-shipment inspection for PO '+po+' has PASSED.\n\nResult: Pass\nAQL Level: '+(r.aql_level!=null?r.aql_level:'—')+'\nInspection Date: '+(r.scheduled_date||'—')+'\n\nYour goods are approved for shipment. Please proceed with cargo booking.\n\nThank you,\nTBG Sourcing';
+  }else if(outcome==='fail'){
+    subject='Inspection Failed — PO '+po+' — Action Required';
+    body='Dear '+name+',\n\nThe pre-shipment inspection for PO '+po+' has FAILED.\n\nResult: Fail\nCritical defects: '+(r.critical_defects_found||0)+'\nMajor defects: '+(r.major_defects_found||0)+' (max allowed: '+(r.major_defects_allowed||0)+')\nMinor defects: '+(r.minor_defects_found||0)+' (max allowed: '+(r.minor_defects_allowed||0)+')\n\nRework instructions: '+(r.rework_instructions||'Please contact your TBG sourcing manager')+'\n\nPlease do not ship until a re-inspection has been scheduled.\n\nTBG Sourcing';
+  }else if(outcome==='conditional_pass'){
+    subject='Inspection — Conditional Pass — PO '+po;
+    body='Dear '+name+',\n\nThe inspection for PO '+po+' has received a CONDITIONAL PASS.\n\nSome defects were found within acceptable limits but require your acknowledgment. Your TBG sourcing manager will be in touch regarding next steps.\n\nTBG Sourcing';
+  }else return;
+  try{await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:fac.sales_email,toName:name,subject:subject,body:body})});}catch(e){}
 }
 async function saveOutcomeNotes(id){
   var v=g('outcome-notes'); if(!v)return;
   await sbPatch('inspections?id=eq.'+id,{outcome_notes:v.value||null,updated_at:new Date().toISOString()});
+}
+
+// ── Defects (SECTION 8) ──
+var DEFECT_TYPE='major';
+function defectBadge(t){var m={critical:['#b00','rgba(176,0,0,0.12)'],major:['#a86b00','rgba(245,158,11,0.15)'],minor:['#6b7280','rgba(107,114,128,0.15)']};var c=m[t]||m.minor;return '<span class="badge" style="color:'+c[0]+';background:'+c[1]+';">'+esc(t)+'</span>';}
+function tenantActionBadge(a){
+  if(a==='accept')return '<span class="badge" style="color:#1a7a1a;background:rgba(26,122,26,0.15);">✓ Accepted</span>';
+  if(a==='reject')return '<span class="badge" style="color:#b00;background:rgba(176,0,0,0.12);">✗ Rejected</span>';
+  return '<span class="badge" style="color:#6b7280;background:rgba(107,114,128,0.15);">Awaiting tenant decision</span>';
+}
+function aqlVerdict(insp){
+  var c=insp.critical_defects_found||0,maj=insp.major_defects_found||0,mn=insp.minor_defects_found||0;
+  var ca=insp.critical_defects_allowed||0,ma=insp.major_defects_allowed||0,na=insp.minor_defects_allowed||0;
+  var outcome;
+  if(c>0)outcome='fail';
+  else if(maj>ma)outcome='fail';
+  else if(mn>na)outcome='conditional_pass';
+  else outcome='pass';
+  return {outcome:outcome,c:c,maj:maj,mn:mn,ca:ca,ma:ma,na:na};
+}
+async function loadDefects(insp){
+  var rows=await sbGet('inspection_defects?inspection_id=eq.'+insp.id+'&select=*&order=created_at.asc');
+  var h=g('defects-h'); if(!h)return;
+  var cf=insp.critical_defects_found||0,mf=insp.major_defects_found||0,nf=insp.minor_defects_found||0;
+  var ca=insp.critical_defects_allowed||0,ma=insp.major_defects_allowed||0,na=insp.minor_defects_allowed||0;
+  h.textContent='Defects ('+cf+' critical / '+mf+' major / '+nf+' minor found vs '+ca+' / '+ma+' / '+na+' allowed)';
+  var v=aqlVerdict(insp), rEl=g('aql-result');
+  if(rEl&&rows.length){rEl.style.display='block';rEl.innerHTML='AQL Result: <strong>'+(v.outcome==='pass'?'Pass':v.outcome==='fail'?'Fail':'Conditional Pass')+'</strong> — '+v.c+' critical, '+v.maj+' major (max '+v.ma+'), '+v.mn+' minor (max '+v.na+')';}
+  else if(rEl){rEl.style.display='none';}
+  var list=g('defects-list'); if(!list)return;
+  if(!rows.length){list.innerHTML='<div class="hint">No defects recorded.</div>';return;}
+  list.innerHTML=rows.map(function(df){
+    var photo=df.photo_url?'<img src="'+esc(df.photo_url)+'" style="max-width:90px;max-height:90px;border-radius:6px;margin-top:6px;cursor:pointer;" onclick="window.open(\''+esc(df.photo_url)+'\',\'_blank\')">':'';
+    return '<div class="sec" style="padding:12px 14px;margin-bottom:8px;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'+
+        '<div>'+defectBadge(df.defect_type)+' <strong style="font-size:13px;">'+esc(df.defect_category||'—')+'</strong></div>'+
+        tenantActionBadge(df.tenant_action)+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:6px;">'+esc(df.description||'')+'</div>'+
+      '<div class="hint">Qty affected: '+esc(df.qty_affected!=null?df.qty_affected:1)+'</div>'+
+      photo+
+      '<div style="margin-top:8px;"><button class="btn alt" onclick="deleteDefect(\''+df.id+'\',\''+insp.id+'\')">Delete</button></div>'+
+    '</div>';
+  }).join('');
+}
+function toggleAddDefect(id){
+  var f=g('add-defect-form'); if(!f)return;
+  if(f.style.display==='block'){f.style.display='none';return;}
+  DEFECT_TYPE='major';
+  f.style.display='block';
+  f.innerHTML='<div class="seg" id="defect-type-seg">'+
+      '<button data-v="critical" onclick="defectType(\'critical\')">Critical</button>'+
+      '<button class="on" data-v="major" onclick="defectType(\'major\')">Major</button>'+
+      '<button data-v="minor" onclick="defectType(\'minor\')">Minor</button>'+
+    '</div>'+
+    '<div class="field" style="margin-top:10px;"><label>Category</label><input id="df-cat" placeholder="e.g. Packaging, Labeling, Functional, Cosmetic"></div>'+
+    '<div class="field"><label>Description</label><textarea id="df-desc"></textarea></div>'+
+    '<div class="row2"><div class="field"><label>Qty affected</label><input id="df-qty" type="number" value="1" min="0"></div>'+
+    '<div class="field"><label>Photo (optional)</label><input id="df-photo" type="file" accept="image/*"></div></div>'+
+    '<button class="btn" id="df-save" onclick="saveDefect(\''+id+'\')">Save Defect</button>'+
+    '<div class="hint" id="df-status"></div>';
+}
+function defectType(t){DEFECT_TYPE=t;document.querySelectorAll('#defect-type-seg button').forEach(function(b){b.classList.toggle('on',b.dataset.v===t);});}
+async function saveDefect(id){
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  var cat=g('df-cat').value.trim(), desc=g('df-desc').value.trim(), qty=parseInt(g('df-qty').value,10)||1;
+  var btn=g('df-save'), st=g('df-status'); if(btn)btn.disabled=true;
+  var photoUrl=null, file=g('df-photo').files[0];
+  if(file){
+    if(st)st.textContent='Uploading photo…';
+    var path=id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    try{var up=await fetch(SB+'/storage/v1/object/inspection-defects-photos/'+encodeURIComponent(path),{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':file.type||'application/octet-stream'},body:file});if(up.ok)photoUrl=SB+'/storage/v1/object/public/inspection-defects-photos/'+path;}catch(e){}
+  }
+  await sbPost('inspection_defects',{inspection_id:id,defect_type:DEFECT_TYPE,defect_category:cat||null,description:desc||null,qty_affected:qty,photo_url:photoUrl});
+  // Recompute found counts from all defects of this inspection.
+  var all=await sbGet('inspection_defects?inspection_id=eq.'+id+'&select=defect_type');
+  var cf=all.filter(function(x){return x.defect_type==='critical';}).length;
+  var mf=all.filter(function(x){return x.defect_type==='major';}).length;
+  var nf=all.filter(function(x){return x.defect_type==='minor';}).length;
+  Object.assign(insp,{critical_defects_found:cf,major_defects_found:mf,minor_defects_found:nf});
+  var v=aqlVerdict(insp);
+  await sbPatch('inspections?id=eq.'+id,{critical_defects_found:cf,major_defects_found:mf,minor_defects_found:nf,outcome:v.outcome,status:v.outcome,updated_at:new Date().toISOString()});
+  Object.assign(insp,{outcome:v.outcome,status:v.outcome});
+  if(st)st.textContent='Defect saved. AQL result: '+v.outcome.replace(/_/g,' ');
+  await applyScorecard(insp,v.outcome);
+  g('add-defect-form').style.display='none';
+  await loadList();
+}
+async function deleteDefect(defectId,id){
+  if(!confirm('Delete this defect?'))return;
+  await fetch(SB+'/rest/v1/inspection_defects?id=eq.'+defectId,{method:'DELETE',headers:Object.assign({},H,{Prefer:'return=minimal'})});
+  var insp=INSPECTIONS.find(function(x){return x.id===SELECTED;});
+  var all=await sbGet('inspection_defects?inspection_id=eq.'+id+'&select=defect_type');
+  var cf=all.filter(function(x){return x.defect_type==='critical';}).length;
+  var mf=all.filter(function(x){return x.defect_type==='major';}).length;
+  var nf=all.filter(function(x){return x.defect_type==='minor';}).length;
+  Object.assign(insp,{critical_defects_found:cf,major_defects_found:mf,minor_defects_found:nf});
+  var v=aqlVerdict(insp);
+  await sbPatch('inspections?id=eq.'+id,{critical_defects_found:cf,major_defects_found:mf,minor_defects_found:nf,outcome:v.outcome,status:v.outcome,updated_at:new Date().toISOString()});
+  Object.assign(insp,{outcome:v.outcome,status:v.outcome});
+  await loadList();
+}
+// Scorecard + performance score + platform metric after a defect save.
+var SCORE_WEIGHTS={responsiveness_score:0.20,quote_quality_score:0.20,sample_performance_score:0.15,production_reliability_score:0.25,compliance_hygiene_score:0.15,communication_tone_score:0.05};
+function clamp(n){return Math.max(0,Math.min(10,n));}
+async function applyScorecard(insp,outcome){
+  if(!insp.factory_id)return;
+  var cf=insp.critical_defects_found||0,mf=insp.major_defects_found||0,nf=insp.minor_defects_found||0;
+  // 1. scorecard event
+  await sbPost('factory_scorecard_events',{factory_id:insp.factory_id,event_type:'inspection',notes:JSON.stringify({inspection_id:insp.id,outcome:outcome,critical_found:cf,major_found:mf,minor_found:nf,aql_level:insp.aql_level,passed:outcome==='pass'})});
+  // 2. performance score deltas
+  var dProd=0,dComp=0;
+  if(cf>0){dProd=-2;dComp=-1.5;}
+  else if(outcome==='pass'){dProd=0.5;dComp=0.3;}
+  else if(outcome==='conditional_pass'){dProd=0;dComp=-0.2;}
+  else if(outcome==='fail'){dProd=-1;dComp=-0.5;}
+  if(insp.status==='rework_required'){dProd-=0.8;}
+  var rows=await sbGet('factory_performance_scores?factory_id=eq.'+insp.factory_id+'&select=*&limit=1');
+  var cur=rows[0]||{};
+  function base(k){return cur[k]!=null?Number(cur[k]):5;}
+  var scores={responsiveness_score:base('responsiveness_score'),quote_quality_score:base('quote_quality_score'),sample_performance_score:base('sample_performance_score'),production_reliability_score:clamp(base('production_reliability_score')+dProd),compliance_hygiene_score:clamp(base('compliance_hygiene_score')+dComp),communication_tone_score:base('communication_tone_score')};
+  var composite=0; for(var k in SCORE_WEIGHTS){composite+=scores[k]*SCORE_WEIGHTS[k];}
+  composite=Math.round(composite*100)/100;
+  var tier=composite>=8?'A':composite>=6?'B':composite>=4?'C':'D';
+  var patch={production_reliability_score:scores.production_reliability_score,compliance_hygiene_score:scores.compliance_hygiene_score,composite_score:composite,tier:tier,computed_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  if(rows.length){await sbPatch('factory_performance_scores?factory_id=eq.'+insp.factory_id,patch);}
+  else{await sbPost('factory_performance_scores',Object.assign({factory_id:insp.factory_id},scores,{composite_score:composite,tier:tier,computed_at:new Date().toISOString()}));}
+  // 3. platform metric (no tenant_id column exists)
+  await sbPost('platform_metrics_log',{metric_type:'inspection_pass_rate',metric_value:outcome==='pass'?1:0,cohort:insp.inspection_method||null,recorded_at:new Date().toISOString()});
 }
 
 // ── New inspection modal ──

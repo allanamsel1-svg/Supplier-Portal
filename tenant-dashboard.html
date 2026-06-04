@@ -123,6 +123,13 @@
       <div class="w-foot">View All →</div>
     </div>
 
+    <div class="widget" id="actionWidget" data-href="tenant-operations.html#actions">
+      <div class="w-head"><span class="w-icon">⚡</span><span class="w-title">Action Required</span></div>
+      <div class="w-count" id="act-count">—</div>
+      <div class="w-list" id="act-list"></div>
+      <div class="w-foot">View All →</div>
+    </div>
+
     <!-- 5th card — AI usage fuel gauge -->
     <div id="gaugeWidget" class="gauge-card"><div class="loading">Loading usage…</div></div>
   </div>
@@ -260,6 +267,28 @@ async function loadInspections() {
   }).join('');
 }
 
+// ── Widget 7: Action Required ──
+function actPriBadge(p) {
+  const map = { critical: ['#ef4444', 'rgba(239,68,68,0.15)'], high: ['#f59e0b', 'rgba(245,158,11,0.15)'], medium: ['#3b82f6', 'rgba(59,130,246,0.15)'] };
+  const [c, bg] = map[p] || map.medium;
+  return `<span style="font-size:10px;font-weight:600;padding:1px 6px;border-radius:6px;color:${c};background:${bg};">${esc(p || 'medium')}</span>`;
+}
+async function loadActionItems() {
+  const rows = await supa(`tenant_action_items?tenant_id=eq.${TID}&status=in.(open,acknowledged)&order=priority.asc,created_at.asc&limit=10`);
+  const countEl = document.getElementById('act-count');
+  if (countEl) countEl.textContent = rows.length;
+  const list = document.getElementById('act-list');
+  const card = document.getElementById('actionWidget');
+  const hasCritical = rows.some(r => r.priority === 'critical');
+  if (card) card.style.borderColor = hasCritical ? '#ef4444' : '';
+  if (!list) return;
+  if (!rows.length) { list.innerHTML = '<div class="w-empty">No pending actions</div>'; return; }
+  list.innerHTML = rows.slice(0, 3).map(r => {
+    const d = daysSince(r.created_at);
+    return `<div class="w-item">${actPriBadge(r.priority)} <strong>${esc(r.title || '')}</strong>${d != null ? '<br>' + d + 'd old' : ''}</div>`;
+  }).join('');
+}
+
 // ── Widget 5: AI Usage Fuel Gauge ──
 async function loadGauge() {
   const cap = (user && user.tenant && user.tenant.api_cost_cap_usd) ? Number(user.tenant.api_cost_cap_usd) : 500;
@@ -381,6 +410,7 @@ async function confirmCapIncrease() {
   loadSamples();
   loadPD();
   loadInspections();
+  loadActionItems();
   loadGauge();
 })();
 </script>
