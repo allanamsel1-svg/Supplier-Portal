@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   const body = await readBody(req);
   const query = (body.query || '').toString().trim();
   if (!query) return res.status(400).json({ error: 'Query required' });
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'Search is not configured (missing ANTHROPIC_API_KEY).' });
+  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'AI service temporarily unavailable. Please try again.' });
 
   const etid = encodeURIComponent(tid);
 

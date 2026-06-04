@@ -145,6 +145,22 @@ function renderTx() {
 
 // ── API Costs (api_cost_log, tenant-scoped, ×1.5 markup) ──
 function monthLabel(ym) { const d = new Date(ym + '-01T00:00:00'); return isNaN(d) ? ym : d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }); }
+// Tech-stack privacy: never surface underlying AI providers to tenants.
+function titleCase(s) { return String(s || '').replace(/[_-]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).trim(); }
+function fmtService(s) {
+  // The cost-log service column always holds the underlying AI provider — mask it.
+  return (s && String(s) !== '—') ? 'AI Processing' : '—';
+}
+function fmtFeature(f) {
+  const v = String(f || '').toLowerCase();
+  const map = {
+    tenant_search: 'AI Search', inspection_variance: 'Inspection Analysis',
+    inspection_parse: 'Document Processing', inspection_parse_document: 'Document Processing',
+    shop_out: 'Shop Out Processing', brand_watch: 'Brand Intelligence',
+  };
+  if (map[v]) return map[v];
+  return v && v !== '—' ? titleCase(v) : '—';
+}
 async function loadApiCosts() {
   const all = await supa(`api_cost_log?tenant_id=eq.${TID}&select=service,feature,cost_usd,tokens_in,tokens_out,created_at`);
   const recent = await supa(`api_cost_log?tenant_id=eq.${TID}&order=created_at.desc&limit=50&select=created_at,service,feature,tokens_in,tokens_out,cost_usd`);
@@ -168,7 +184,7 @@ async function loadApiCosts() {
   else {
     const tot = { calls: 0, ti: 0, to: 0, cost: 0 };
     let h = list.map(r => { tot.calls += r.calls; tot.ti += r.ti; tot.to += r.to; tot.cost += r.cost;
-      return `<tr><td>${esc(monthLabel(r.month))}</td><td>${esc(r.service)}</td><td>${esc(r.feature)}</td>
+      return `<tr><td>${esc(monthLabel(r.month))}</td><td>${esc(fmtService(r.service))}</td><td>${esc(fmtFeature(r.feature))}</td>
         <td style="text-align:right;">${r.calls.toLocaleString()}</td><td style="text-align:right;">${r.ti.toLocaleString()}</td>
         <td style="text-align:right;">${r.to.toLocaleString()}</td><td style="text-align:right;">${money(r.cost)}</td>
         <td style="text-align:right;font-weight:600;">${money(r.cost * MARKUP)}</td></tr>`; }).join('');
@@ -179,7 +195,7 @@ async function loadApiCosts() {
     sBody.innerHTML = h;
   }
   const cBody = document.getElementById('apiCallsBody');
-  cBody.innerHTML = recent.length ? recent.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(r.service || '—')}</td><td>${esc(r.feature || '—')}</td>
+  cBody.innerHTML = recent.length ? recent.map(r => `<tr><td>${fmtDate(r.created_at)}</td><td>${esc(fmtService(r.service))}</td><td>${esc(fmtFeature(r.feature))}</td>
     <td style="text-align:right;">${(Number(r.tokens_in) || 0).toLocaleString()}</td><td style="text-align:right;">${(Number(r.tokens_out) || 0).toLocaleString()}</td>
     <td style="text-align:right;">${money(Number(r.cost_usd) || 0)}</td></tr>`).join('') : '<tr><td colspan="6" class="empty" style="padding:20px;">No calls recorded yet.</td></tr>';
 }
