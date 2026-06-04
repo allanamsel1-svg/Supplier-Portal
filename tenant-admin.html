@@ -204,6 +204,22 @@
       </div>
     </div>
 
+    <div id="designerSection" style="display:none;">
+      <hr style="border-color:#1e2d47;margin:20px 0;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:13px;font-weight:600;color:#f1f5f9;">Designer Accounts</div>
+        <button type="button" class="btn-sm" onclick="toggleDesignerForm()">+ Add Designer</button>
+      </div>
+      <div id="designerForm" style="display:none;margin-bottom:14px;border:1px solid #1e2d47;border-radius:8px;padding:12px;">
+        <div class="field"><label>Full Name</label><input type="text" id="d-name" placeholder="Jane Designer"></div>
+        <div class="field"><label>Email</label><input type="email" id="d-email" placeholder="jane@studio.com"></div>
+        <div class="field"><label>Password</label><input type="password" id="d-pass" placeholder="Temporary password"></div>
+        <button type="button" class="btn-primary" onclick="saveDesigner()">Save Designer</button>
+        <div id="d-msg" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+      <div id="designerList"><div style="font-size:12px;color:#64748b;">Loading…</div></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal()">Cancel</button>
       <button class="btn-primary" onclick="saveTenant()">Save Tenant</button>
@@ -214,6 +230,8 @@
 <script>
 const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 
 // Grouped feature keys (exact match to the features JSONB + tenant-shared.js nav keys).
 const FEATURE_GROUPS = [
@@ -347,6 +365,8 @@ function openNewTenant() {
   document.getElementById('f-markup').value = '1.50';
   document.getElementById('f-notes').value = '';
   document.getElementById('userSection').style.display = 'block';
+  document.getElementById('designerSection').style.display = 'none';  // designers added after the tenant exists
+  CURR_TENANT = null;
   buildFeaturesGrid({});  // new tenant → zero access by default; admin enables per item
   document.getElementById('tenantModal').classList.add('open');
 
@@ -371,6 +391,10 @@ function editTenant(t) {
   document.getElementById('f-notes').value = t.notes || '';
   document.getElementById('userSection').style.display = 'none';
   buildFeaturesGrid(t.features || {});
+  CURR_TENANT = t.id;
+  document.getElementById('designerSection').style.display = 'block';
+  document.getElementById('designerForm').style.display = 'none';
+  loadDesigners(t.id);
   document.getElementById('tenantModal').classList.add('open');
 }
 
@@ -423,6 +447,58 @@ async function sha256(str) {
 
 function managUsers(tenantId, tenantName) {
   alert(`User management for ${tenantName} — coming next build.`);
+}
+
+// ── Designer accounts (in the edit modal) ──
+let CURR_TENANT = null;
+function toggleDesignerForm() {
+  const f = document.getElementById('designerForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('d-msg').textContent = '';
+}
+async function loadDesigners(tenantId) {
+  const el = document.getElementById('designerList');
+  const res = await sbFetch(`/rest/v1/tenant_users?tenant_id=eq.${tenantId}&role=eq.designer&select=id,full_name,email,is_active,created_at&order=created_at.desc`);
+  const rows = res.ok ? await res.json() : [];
+  if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:#64748b;">No designers added yet.</div>'; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="color:#64748b;text-align:left;">
+    <th style="padding:6px 8px;">Name</th><th style="padding:6px 8px;">Email</th><th style="padding:6px 8px;">Active</th><th style="padding:6px 8px;">Created</th><th style="padding:6px 8px;"></th></tr></thead><tbody>${
+    rows.map(d => `<tr style="border-top:1px solid #1e2d47;">
+      <td style="padding:6px 8px;">${esc(d.full_name || '—')}</td>
+      <td style="padding:6px 8px;">${esc(d.email || '')}</td>
+      <td style="padding:6px 8px;">${d.is_active ? '✓' : '—'}</td>
+      <td style="padding:6px 8px;">${(d.created_at || '').slice(0, 10)}</td>
+      <td style="padding:6px 8px;">${d.is_active ? `<button class="btn-sm" onclick="deactivateDesigner('${d.id}','${tenantId}')">Deactivate</button>` : ''}</td>
+    </tr>`).join('')
+  }</tbody></table>`;
+}
+async function saveDesigner() {
+  const name = document.getElementById('d-name').value.trim();
+  const email = document.getElementById('d-email').value.trim();
+  const pass = document.getElementById('d-pass').value;
+  const msg = document.getElementById('d-msg');
+  if (!CURR_TENANT) { msg.style.color = '#f87171'; msg.textContent = 'Save the tenant first.'; return; }
+  if (!email || !pass) { msg.style.color = '#f87171'; msg.textContent = 'Email and password are required.'; return; }
+  msg.style.color = '#94a3b8'; msg.textContent = 'Creating…';
+  try {
+    const r = await fetch('/api/tenant-user-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('admin_session') || '') },
+      body: JSON.stringify({ tenant_id: CURR_TENANT, full_name: name, email, password: pass, role: 'designer' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) {
+      msg.style.color = '#4ade80';
+      msg.textContent = 'Designer created. Login URL: portal.tbgsourcing.net/designer-login.html';
+      document.getElementById('d-name').value = ''; document.getElementById('d-email').value = ''; document.getElementById('d-pass').value = '';
+      loadDesigners(CURR_TENANT);
+    } else { msg.style.color = '#f87171'; msg.textContent = d.error || 'Could not create designer.'; }
+  } catch (e) { msg.style.color = '#f87171'; msg.textContent = 'Connection error.'; }
+}
+async function deactivateDesigner(id, tenantId) {
+  if (!confirm('Deactivate this designer? They will no longer be able to log in.')) return;
+  await sbFetch(`/rest/v1/tenant_users?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ is_active: false }) });
+  loadDesigners(tenantId);
 }
 
 function closeModal() {
