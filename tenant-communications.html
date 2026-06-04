@@ -35,6 +35,19 @@
     padding: 8px 14px; border-radius: 8px;
   }
   .zoom-link:hover { background: var(--card-hover); }
+  /* Coming-soon placeholder cards (SMS / WhatsApp) */
+  .cs-wrap { display: flex; justify-content: center; padding: 24px 16px; }
+  .coming-soon-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 32px 36px; max-width: 560px; width: 100%; text-align: center; }
+  .cs-icon { font-size: 48px; margin-bottom: 12px; }
+  .cs-title { font-size: 19px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .cs-desc { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 18px; }
+  .cs-features { text-align: left; max-width: 420px; margin: 0 auto 18px; display: flex; flex-direction: column; gap: 8px; }
+  .cs-feature { font-size: 13px; color: var(--text); display: flex; align-items: flex-start; gap: 8px; }
+  .cs-feature .ck { color: #22c55e; font-weight: 700; flex-shrink: 0; }
+  .cs-badge { display: inline-block; font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 20px; background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid #f59e0b; margin-bottom: 14px; }
+  .cs-note { font-size: 12px; color: var(--text2); line-height: 1.55; margin-bottom: 18px; }
+  .cs-note.warn { color: #f59e0b; font-size: 11px; margin-top: 12px; margin-bottom: 0; }
+  .cs-btn-disabled { background: var(--card-bg); color: var(--text2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: not-allowed; opacity: 0.55; }
 </style>
 </head>
 <body>
@@ -56,6 +69,8 @@
     <button class="tab" data-tab="logistics">Logistics</button>
     <button class="tab" data-tab="compliance">Compliance</button>
     <button class="tab" data-tab="zoom">🎥 Zoom</button>
+    <button class="tab" data-tab="sms">💬 SMS</button>
+    <button class="tab" data-tab="whatsapp">🟢 WhatsApp</button>
   </div>
 
   <div class="comms" id="commsPane">
@@ -66,11 +81,55 @@
     <iframe id="zoomFrame" title="Zoom" data-src="zoom.html"
       style="width:100%;height:calc(100vh - 190px);min-height:420px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
   </div>
+
+  <div id="smsPane" style="display:none;">
+    <div style="margin-bottom:10px;"><div style="font-size:17px;font-weight:700;color:var(--text);">SMS</div><div style="font-size:13px;color:var(--text2);margin-top:2px;">Send and receive text messages with factories and contacts</div></div>
+    <div class="cs-wrap">
+      <div class="coming-soon-card">
+        <div class="cs-icon">💬</div>
+        <div class="cs-title">SMS Messaging</div>
+        <div class="cs-desc">Send and receive SMS messages directly from the portal. Message factories, inspectors, and contacts worldwide. All conversations are logged and searchable.</div>
+        <div class="cs-features">
+          <div class="cs-feature"><span class="ck">✓</span> Two-way SMS with factories</div>
+          <div class="cs-feature"><span class="ck">✓</span> Message templates for common requests</div>
+          <div class="cs-feature"><span class="ck">✓</span> Delivery confirmations</div>
+          <div class="cs-feature"><span class="ck">✓</span> Full conversation history</div>
+          <div class="cs-feature"><span class="ck">✓</span> AI-powered response suggestions</div>
+        </div>
+        <div><span class="cs-badge">Coming Soon</span></div>
+        <div class="cs-note">SMS integration via Twilio is in setup. You will be notified when this feature is activated for your account.</div>
+        <button class="cs-btn-disabled" disabled>Compose SMS</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="whatsappPane" style="display:none;">
+    <div style="margin-bottom:10px;"><div style="font-size:17px;font-weight:700;color:var(--text);">WhatsApp Business</div><div style="font-size:13px;color:var(--text2);margin-top:2px;">The preferred communication channel for Asian factories</div></div>
+    <div class="cs-wrap">
+      <div class="coming-soon-card">
+        <div class="cs-icon">🟢</div>
+        <div class="cs-title">WhatsApp Business Messaging</div>
+        <div class="cs-desc">Connect with factories on WhatsApp — the primary communication platform used by manufacturers in China, Vietnam, Bangladesh, and across Asia. All messages sync to your portal inbox.</div>
+        <div class="cs-features">
+          <div class="cs-feature"><span class="ck">✓</span> WhatsApp Business API integration</div>
+          <div class="cs-feature"><span class="ck">✓</span> Rich media — send photos, documents, voice notes</div>
+          <div class="cs-feature"><span class="ck">✓</span> Broadcast messages to multiple factories</div>
+          <div class="cs-feature"><span class="ck">✓</span> Read receipts and delivery status</div>
+          <div class="cs-feature"><span class="ck">✓</span> Message templates for RFQs, PO confirmations, inspection notices</div>
+          <div class="cs-feature"><span class="ck">✓</span> AI translation for non-English responses</div>
+        </div>
+        <div><span class="cs-badge">Coming Soon</span></div>
+        <div class="cs-note">WhatsApp Business verification is in progress with Meta. This process takes 2-4 weeks. You will be notified when your account is approved and activated.</div>
+        <button class="cs-btn-disabled" disabled>Open WhatsApp Business</button>
+        <div class="cs-note warn">⚠ WhatsApp Business requires a dedicated phone number not registered on personal WhatsApp.</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="tenant-shared.js"></script>
 <script>
-const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance', 'zoom'];
+const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance', 'zoom', 'sms', 'whatsapp'];
 let TID = null;
 let allThreads = [];     // tenant-visible threads
 let current = 'all';
@@ -90,14 +149,21 @@ function showTab(tab) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   const commsPane = document.getElementById('commsPane');
   const zoomPane = document.getElementById('zoomPane');
+  const smsPane = document.getElementById('smsPane');
+  const whatsappPane = document.getElementById('whatsappPane');
+  // Hide all special panes by default.
+  commsPane.style.display = 'none';
+  zoomPane.style.display = 'none';
+  smsPane.style.display = 'none';
+  whatsappPane.style.display = 'none';
   if (tab === 'zoom') {
-    commsPane.style.display = 'none';
     zoomPane.style.display = 'block';
     const fr = document.getElementById('zoomFrame');
     if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load once
     return;
   }
-  zoomPane.style.display = 'none';
+  if (tab === 'sms') { smsPane.style.display = 'block'; return; }
+  if (tab === 'whatsapp') { whatsappPane.style.display = 'block'; return; }
   commsPane.style.display = 'flex';
   renderThreads();
 }
