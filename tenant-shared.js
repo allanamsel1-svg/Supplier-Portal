@@ -170,7 +170,8 @@ function renderSidebar(user) {
     }).join('');
     // Hide the whole section if no items survived the feature filter.
     if (!items) return '';
-    return `<div class="nav-section">${esc(sec.section)}</div>${items}`;
+    const code = sec.section.toLowerCase().replace(/\s*&\s*/g, '-').replace(/\s+/g, '-');
+    return `<div class="nav-section collapsible" data-section="${esc(code)}">${esc(sec.section)} <span class="nav-collapse-icon">▾</span></div>${items}`;
   }).join('');
 
   const html = `
@@ -191,6 +192,35 @@ function renderSidebar(user) {
   else document.body.insertAdjacentHTML('afterbegin', html);
 
   document.getElementById('tenantLogoutBtn').addEventListener('click', doLogout);
+
+  // Collapsible nav sections (mirrors the admin sidebar), persisted to localStorage.
+  document.querySelectorAll('.nav-section.collapsible').forEach(function(sec) {
+    sec.addEventListener('click', function() {
+      var code = sec.dataset.section;
+      var isCollapsed = sec.classList.toggle('collapsed');
+      localStorage.setItem('nav_collapsed_' + code, isCollapsed ? '1' : '0');
+      var icon = sec.querySelector('.nav-collapse-icon');
+      if (icon) icon.textContent = isCollapsed ? '▸' : '▾';
+      var el = sec.nextElementSibling;
+      while (el && !el.classList.contains('nav-section')) {
+        el.style.display = isCollapsed ? 'none' : '';
+        el = el.nextElementSibling;
+      }
+    });
+    // Restore saved state
+    var code = sec.dataset.section;
+    var saved = localStorage.getItem('nav_collapsed_' + code);
+    if (saved === '1') {
+      sec.classList.add('collapsed');
+      var icon = sec.querySelector('.nav-collapse-icon');
+      if (icon) icon.textContent = '▸';
+      var el = sec.nextElementSibling;
+      while (el && !el.classList.contains('nav-section')) {
+        el.style.display = 'none';
+        el = el.nextElementSibling;
+      }
+    }
+  });
 
   highlightNav();
   window.addEventListener('hashchange', highlightNav);
