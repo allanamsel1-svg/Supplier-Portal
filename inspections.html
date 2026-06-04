@@ -121,6 +121,8 @@
       <div class="topbar-title">Inspections</div>
     </div>
     <div class="topbar-r">
+      <select class="ic-btn" id="tv-tenant" style="display:none;" onchange="onTenantViewSelect()"></select>
+      <button class="ic-btn" id="tv-toggle" onclick="toggleTenantView()" title="Mirror the tenant's view">👤 Tenant View</button>
       <button class="ic-btn" id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle theme">🌙</button>
       <button class="ic-btn" onclick="doLogout()">Logout</button>
     </div>
@@ -195,6 +197,7 @@ async function sbPost(path,body,rep){try{var r=await fetch(SB+'/rest/v1/'+path,{
 
 // ── State ──
 var INSPECTIONS=[], TENANTS={}, FILTER='all', SELECTED=null, MEAS={};
+var TENANT_VIEW=(localStorage.getItem('insp_tenant_view')==='1'), TV_TENANT=localStorage.getItem('insp_selected_tenant')||'';
 
 // ── AQL engine ──
 var AQL_BRACKETS=[
@@ -239,28 +242,42 @@ function matchesFilter(insp){
   return true;
 }
 function setFilter(f){FILTER=f;document.querySelectorAll('.tab').forEach(function(t){t.classList.toggle('active',t.dataset.f===f);});renderList();}
+// DFS order so rework children appear directly under their parent, with depth for indentation.
+function buildOrdered(){
+  var byParent={},idset={};
+  INSPECTIONS.forEach(function(i){idset[i.id]=i;var p=i.parent_inspection_id||'_root';(byParent[p]=byParent[p]||[]).push(i);});
+  var ordered=[];
+  function visit(insp,depth){ordered.push({insp:insp,depth:depth});(byParent[insp.id]||[]).forEach(function(c){visit(c,depth+1);});}
+  INSPECTIONS.forEach(function(i){if(!i.parent_inspection_id||!idset[i.parent_inspection_id])visit(i,0);});
+  return ordered;
+}
 function renderList(){
   var q=(g('search').value||'').toLowerCase().trim();
-  var rows=INSPECTIONS.filter(matchesFilter).filter(function(insp){
-    if(!q)return true;
-    var po=(insp.purchase_orders&&insp.purchase_orders.po_number||'').toLowerCase();
-    var fac=(insp.factories&&insp.factories.factory_name_english||'').toLowerCase();
-    return po.indexOf(q)>-1||fac.indexOf(q)>-1;
+  var ordered=buildOrdered().filter(function(o){
+    var insp=o.insp;
+    if(!matchesFilter(insp))return false;
+    if(TENANT_VIEW&&TV_TENANT&&insp.tenant_id!==TV_TENANT)return false;
+    if(q){var po=(insp.purchase_orders&&insp.purchase_orders.po_number||'').toLowerCase();var fac=(insp.factories&&insp.factories.factory_name_english||'').toLowerCase();if(po.indexOf(q)===-1&&fac.indexOf(q)===-1)return false;}
+    return true;
   });
-  if(!rows.length){g('list').innerHTML='<div class="empty">No inspections.</div>';return;}
-  g('list').innerHTML=rows.map(function(insp){
+  if(!ordered.length){g('list').innerHTML='<div class="empty">No inspections.</div>';return;}
+  g('list').innerHTML=ordered.map(function(o){
+    var insp=o.insp;
     var po=insp.purchase_orders&&insp.purchase_orders.po_number||insp.po_id||'—';
     var fac=insp.factories&&insp.factories.factory_name_english||'—';
     var ten=insp.tenants&&insp.tenants.name||'—';
-    return '<div class="irow'+(insp.id===SELECTED?' sel':'')+'" onclick="selectInspection(\''+insp.id+'\')">'+
-      '<div class="irow-top"><span class="irow-po">'+esc(po)+'</span>'+statusBadge(insp.status)+'</div>'+
+    var indent=o.depth>0?'margin-left:'+(o.depth*14)+'px;border-left:2px solid var(--border);':'';
+    var reworkLbl=o.depth>0?'<span class="badge" style="background:rgba(176,0,0,0.1);color:#b00;">↳ Rework</span> ':'';
+    return '<div class="irow'+(insp.id===SELECTED?' sel':'')+'" style="'+indent+'" onclick="selectInspection(\''+insp.id+'\')">'+
+      '<div class="irow-top"><span class="irow-po">'+reworkLbl+esc(po)+'</span>'+statusBadge(insp.status)+'</div>'+
       '<div class="irow-fac">'+esc(fac)+' · '+esc(ten)+'</div>'+
       '<div class="irow-meta"><span class="badge type-badge">'+esc(insp.inspection_type||'—')+'</span>'+
       '<span style="font-size:11px;color:var(--text2);">'+methodIcon(insp.inspection_method)+' '+esc(insp.scheduled_date||'—')+'</span></div>'+
     '</div>';
   }).join('');
 }
-function selectInspection(id){SELECTED=id;var insp=INSPECTIONS.find(function(x){return x.id===id;});renderList();if(insp)renderDetail(insp);}
+function reworkDepth(insp){var d=0,cur=insp,guard=0;while(cur&&cur.parent_inspection_id&&guard<20){var p=INSPECTIONS.find(function(x){return x.id===cur.parent_inspection_id;});if(!p)break;d++;cur=p;guard++;}return d;}
+function selectInspection(id){SELECTED=id;var insp=INSPECTIONS.find(function(x){return x.id===id;});renderList();if(insp){if(TENANT_VIEW)renderTenantDetail(insp);else renderDetail(insp);}}
 
 // ── Detail ──
 function daysLabel(dateStr){
@@ -277,7 +294,13 @@ async function renderDetail(insp){
   var ten=insp.tenants||{};
   var html='';
   // SECTION 1 — header
-  html+='<div class="detail-head">'+
+  var reworkOf='';
+  if(insp.parent_inspection_id){
+    var parent=INSPECTIONS.find(function(x){return x.id===insp.parent_inspection_id;});
+    var ppo=parent&&parent.purchase_orders&&parent.purchase_orders.po_number||'parent';
+    reworkOf='<div style="font-size:12px;margin-bottom:4px;"><a href="javascript:void(0)" onclick="selectInspection(\''+insp.parent_inspection_id+'\')" style="color:#2266cc;text-decoration:none;">↳ Rework of: PO '+esc(ppo)+'</a> <span class="badge" style="background:rgba(176,0,0,0.1);color:#b00;">Rework #'+reworkDepth(insp)+'</span></div>';
+  }
+  html+='<div class="detail-head">'+reworkOf+
     '<div class="dh-po">'+esc(po.po_number||insp.po_id||'—')+'</div>'+
     '<div class="dh-sub">'+esc(fac.factory_name_english||'—')+' · '+esc(ten.name||'—')+'</div>'+
     '<div class="dh-meta"><span class="badge type-badge">'+esc(insp.inspection_type||'—')+'</span>'+statusBadge(insp.status)+
@@ -346,6 +369,7 @@ async function renderDetail(insp){
       '</div>'+
       '<div class="field" style="margin-top:12px;"><label>Outcome notes</label><textarea id="outcome-notes" onblur="saveOutcomeNotes(\''+insp.id+'\')">'+esc(insp.outcome_notes||'')+'</textarea></div>'+
       (insp.outcome?'<div class="calc-box">Current outcome: <strong>'+esc(insp.outcome.replace(/_/g," "))+'</strong></div>':'')+
+      '<div style="margin-top:10px;"><button class="btn alt" onclick="generateReport(\''+insp.id+'\')">📄 Generate Report</button></div>'+
     '</div>';
   }
 
@@ -357,11 +381,187 @@ async function renderDetail(insp){
     '<div id="defects-list" style="margin-top:12px;"></div>'+
   '</div>';
 
+  // SECTION 9 — Rework History (child inspections)
+  html+='<div class="sec" id="rework-history" style="display:none;"><h3>Rework History</h3><div id="rework-list"></div></div>';
+
   g('detail').innerHTML=html;
   if(insp.status==='scheduled')recalcAQL();
   loadMeasurements(insp);
   loadConfirmations(insp.id);
   loadDefects(insp);
+  loadReworkHistory(insp.id);
+}
+async function loadReworkHistory(id){
+  var kids=await sbGet('inspections?parent_inspection_id=eq.'+id+'&select=*,purchase_orders(po_number),factories(factory_name_english)&order=created_at.asc');
+  var sec=g('rework-history'), list=g('rework-list'); if(!sec||!list)return;
+  if(!kids.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  list.innerHTML=kids.map(function(k){
+    var po=k.purchase_orders&&k.purchase_orders.po_number||k.po_id||'—';
+    return '<div class="conf-row"><span>'+esc(po)+' · '+esc(k.scheduled_date||'—')+' '+statusBadge(k.status)+'</span>'+
+      '<button class="btn alt" onclick="selectInspection(\''+k.id+'\')">View →</button></div>';
+  }).join('');
+}
+async function generateReport(id){
+  try{
+    var tok=localStorage.getItem('admin_session')||'';
+    var r=await fetch('/api/generate-inspection-report',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({inspection_id:id})});
+    if(!r.ok){alert('Could not generate report ('+r.status+').');return;}
+    var htmlDoc=await r.text();
+    var w=window.open('about:blank','_blank');
+    if(!w){alert('Please allow pop-ups to view the report.');return;}
+    w.document.open();w.document.write(htmlDoc);w.document.close();
+    setTimeout(function(){try{w.focus();w.print();}catch(e){}},400);
+  }catch(e){alert('Report error: '+e.message);}
+}
+
+// ── Tenant View (admin mirror) — PART 1 ──
+var CUR_TV_INSP=null;
+function adminTok(){return localStorage.getItem('admin_session')||'';}
+function tvApi(body){body.tenant_id=(CUR_TV_INSP&&CUR_TV_INSP.tenant_id)||TV_TENANT||null;return fetch('/api/tenant-inspection-update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminTok()},body:JSON.stringify(body)}).then(function(r){return r.json();}).catch(function(){return {};});}
+function tvActionApi(body){return fetch('/api/tenant-action-update',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminTok()},body:JSON.stringify(body)}).then(function(r){return r.json();}).catch(function(){return {};});}
+function tvAqlRec(qty,firstTime){
+  var rec,cfg;
+  if(firstTime){rec='New supplier — recommend AQL 1.0 Level II';cfg={aql_level:1.0,inspection_level:'II',sample_size:80,critical_defects_allowed:0,major_defects_allowed:1,minor_defects_allowed:3};}
+  else if(qty<500){rec='Skip formal AQL — recommend 100% visual for small orders';cfg={aql_level:2.5,inspection_level:'II',sample_size:0,critical_defects_allowed:0,major_defects_allowed:0,minor_defects_allowed:0};}
+  else if(qty<=2000){rec='Recommend AQL 2.5 Level II (standard) — sample ~80 units | Critical: 0 | Major: 5 | Minor: 14';cfg={aql_level:2.5,inspection_level:'II',sample_size:80,critical_defects_allowed:0,major_defects_allowed:5,minor_defects_allowed:14};}
+  else if(qty<=10000){rec='Recommend AQL 2.5 Level II — sample ~125-200 units | Critical: 0 | Major: 7 | Minor: 21';cfg={aql_level:2.5,inspection_level:'II',sample_size:200,critical_defects_allowed:0,major_defects_allowed:7,minor_defects_allowed:21};}
+  else{rec='Recommend AQL 1.5 Level II (tighter for large orders) — sample ~200+ units | Critical: 0 | Major: 3 | Minor: 10';cfg={aql_level:1.5,inspection_level:'II',sample_size:200,critical_defects_allowed:0,major_defects_allowed:3,minor_defects_allowed:10};}
+  return {rec:rec,cfg:cfg};
+}
+async function renderTenantDetail(insp){
+  CUR_TV_INSP=insp;
+  var po=insp.purchase_orders||{},fac=insp.factories||{},ten=insp.tenants||{};
+  var html='<div class="detail-head"><div style="font-size:12px;color:#a86b00;margin-bottom:4px;">👤 Tenant View — '+esc(ten.name||'—')+'</div>'+
+    '<div class="dh-po">'+esc(po.po_number||insp.po_id||'—')+'</div>'+
+    '<div class="dh-sub">'+esc(fac.factory_name_english||'—')+'</div>'+
+    '<div class="dh-meta"><span class="badge type-badge">'+esc(insp.inspection_type||'—')+'</span>'+statusBadge(insp.status)+
+    '<span style="font-size:12px;color:var(--text2);">'+esc(insp.scheduled_date||'—')+'</span>'+
+    '<span style="font-size:12px;font-weight:600;">'+esc(daysLabel(insp.scheduled_date))+'</span></div></div>';
+
+  // Method selector
+  if(insp.status==='scheduled'&&!insp.inspection_method){
+    html+='<div class="sec"><h3>Select Inspection Method</h3>'+
+      '<div class="seg" id="tv-method-seg"><button onclick="tvPickMethod(\'third_party\')">🔍 Third Party</button>'+
+      '<button onclick="tvPickMethod(\'self_inspection\')">🏭 Self-Inspection</button>'+
+      '<button onclick="tvPickMethod(\'tbg_arranged\')">📋 TBG Arranged</button></div>'+
+      '<div id="tv-method-fields" style="margin-top:10px;"></div></div>';
+  }else if(insp.inspection_method){
+    if(insp.aql_level==null){
+      var facInsp=await sbGet('inspections?factory_id=eq.'+insp.factory_id+'&select=id');
+      var firstTime=(facInsp||[]).length<=1;
+      var rec=tvAqlRec(Number(po.quantity)||0,firstTime).rec;
+      html+='<div class="sec" style="border-left:3px solid #1a7a1a;"><h3>AQL Recommendation</h3><div class="sub">'+esc(rec)+'</div>'+
+        '<button class="btn green" onclick="tvUseRecommendedAQL('+(Number(po.quantity)||0)+','+firstTime+')">Use Recommended</button></div>';
+    }else{
+      html+='<div class="sec"><h3>Inspection Method</h3><div class="sub">'+methodIcon(insp.inspection_method)+' '+esc((insp.inspection_method||'').replace(/_/g,' '))+' · AQL '+esc(insp.aql_level)+' / Level '+esc(insp.inspection_level||'—')+'</div></div>';
+    }
+  }
+
+  // Defects
+  var defects=await sbGet('inspection_defects?inspection_id=eq.'+insp.id+'&select=*&order=created_at.asc');
+  if(defects.length){
+    html+='<div class="sec"><h3>Defects</h3>'+defects.map(function(d){
+      var photo=d.photo_url?'<img src="'+esc(d.photo_url)+'" style="max-width:80px;border-radius:6px;margin-top:6px;cursor:pointer;" onclick="window.open(\''+esc(d.photo_url)+'\',\'_blank\')">':'';
+      var actions=d.tenant_action?'<div class="hint">Decision: <strong>'+esc(d.tenant_action)+'</strong>'+(d.tenant_action_notes?' — '+esc(d.tenant_action_notes):'')+'</div>':
+        '<div style="margin-top:8px;"><button class="btn green" onclick="tvDefect(\''+d.id+'\',\'accept\')">✓ Accept</button> <button class="btn red" onclick="tvDefect(\''+d.id+'\',\'reject\')">✗ Reject &amp; Request Rework</button></div>';
+      return '<div class="sec" style="padding:10px 12px;margin-bottom:8px;"><div>'+defectBadge(d.defect_type)+' <strong>'+esc(d.defect_category||'—')+'</strong></div><div class="hint">'+esc(d.description||'')+' (qty '+esc(d.qty_affected!=null?d.qty_affected:1)+')</div>'+photo+actions+'</div>';
+    }).join('')+'</div>';
+  }
+
+  // Measurements variances + UPC
+  var meas=await sbGet('inspection_measurements?inspection_id=eq.'+insp.id+'&select=*');
+  var variances=meas.filter(function(m){return m.weight_match===false||m.length_match===false||m.width_match===false||m.height_match===false||m.qty_match===false||m.upc_match===false;});
+  var upcMm=meas.find(function(m){return m.upc_match===false;});
+  if(variances.length||upcMm){
+    html+='<div class="sec"><h3>Measurement Variances</h3>';
+    variances.forEach(function(m){
+      var reasons=[];try{reasons=Array.isArray(m.ai_variance_reasons)?m.ai_variance_reasons:(m.ai_variance_reasons?JSON.parse(m.ai_variance_reasons):[]);}catch(e){reasons=[];}
+      html+='<div class="var-card"><h4>'+esc(m.measurement_type)+' variance</h4>'+(reasons.length?'<ul>'+reasons.map(function(r){return '<li>'+esc(r)+'</li>';}).join('')+'</ul>':'')+'</div>';
+    });
+    if(upcMm){
+      html+='<div class="var-card" style="background:rgba(176,0,0,0.1);border-color:#f5b8b8;"><h4 style="color:#b00;">🔴 UPC Mismatch</h4><div class="hint">Spec '+esc(upcMm.upc_spec||'—')+' → Actual '+esc(upcMm.upc_actual||'—')+'</div>'+
+        '<div style="margin-top:8px;"><button class="btn green" onclick="tvAcceptUpc(\''+esc(upcMm.upc_actual||'')+'\')">Accept &amp; Update SKU</button> <button class="btn red" onclick="tvRequestRework(\'UPC correction required\')">Request Rework</button></div></div>';
+    }
+    html+='</div>';
+  }
+
+  // Outcome read-only
+  if(insp.outcome){
+    html+='<div class="sec"><h3>Outcome</h3><div class="calc-box">'+statusBadge(insp.outcome)+(insp.outcome_notes?' '+esc(insp.outcome_notes):'')+'</div>'+(insp.report_url?'<div style="margin-top:8px;"><a class="btn alt" href="'+esc(insp.report_url)+'" target="_blank" style="text-decoration:none;">Download Report</a></div>':'')+'</div>';
+  }
+
+  // Action items for this inspection
+  var items=await sbGet('tenant_action_items?reference_id=eq.'+insp.id+'&reference_type=eq.inspection&order=created_at.desc');
+  if(items.length){
+    html+='<div class="sec"><h3>Action Items</h3>'+items.map(function(a){
+      var done=a.status==='completed'||a.status==='intentionally_ignored';
+      return '<div class="conf-row"><span><strong>'+esc(a.title||'')+'</strong> <span class="badge" style="background:rgba(107,114,128,0.15);color:#6b7280;">'+esc(a.status||'')+'</span></span>'+
+        (done?'':'<button class="btn alt" onclick="tvCompleteItem(\''+a.id+'\')">Mark Done</button>')+'</div>';
+    }).join('')+'</div>';
+  }
+
+  g('detail').innerHTML=html;
+}
+function tvPickMethod(m){
+  var f=g('tv-method-fields'); if(!f)return;
+  if(m==='third_party')f.innerHTML='<div class="field"><label>Inspector company</label><select id="tvf-company"><option value="">Select…</option><option>SGS</option><option>Bureau Veritas</option><option>Intertek</option><option>QIMA</option><option>Other</option></select></div><div class="field"><label>Contact name</label><input id="tvf-name"></div><div class="field"><label>Contact email</label><input id="tvf-email"></div><button class="btn" onclick="tvSaveMethod(\'third_party\')">Save</button>';
+  else if(m==='self_inspection')f.innerHTML='<div class="field"><label>Waiver reason</label><textarea id="tvf-waiver"></textarea></div><label style="font-size:12px;display:flex;gap:8px;align-items:center;"><input type="checkbox" id="tvf-ack" style="width:auto;"> I understand this waives third party verification</label><button class="btn" style="margin-top:8px;" onclick="tvSaveMethod(\'self_inspection\')">Save</button>';
+  else f.innerHTML='<div class="field"><label>Notes</label><textarea id="tvf-notes"></textarea></div><button class="btn" onclick="tvSaveMethod(\'tbg_arranged\')">Save</button>';
+}
+async function tvSaveMethod(method){
+  var body={action:'set_method',inspection_id:CUR_TV_INSP.id,inspection_method:method};
+  if(method==='third_party'){body.inspector_company=(g('tvf-company')||{}).value||'';body.inspector_contact_name=(g('tvf-name')||{}).value||'';body.inspector_contact_email=(g('tvf-email')||{}).value||'';}
+  if(method==='self_inspection'){body.waiver_reason=(g('tvf-waiver')||{}).value||'';body.waiver_acknowledged=!!(g('tvf-ack')&&g('tvf-ack').checked);if(!body.waiver_acknowledged){alert('Check the waiver acknowledgment to save.');return;}}
+  var d=await tvApi(body); if(d.success)await loadList(); else alert('Could not save: '+(d.error||'error'));
+}
+async function tvUseRecommendedAQL(qty,firstTime){
+  var cfg=tvAqlRec(qty,firstTime).cfg;
+  var ok=await sbPatch('inspections?id=eq.'+CUR_TV_INSP.id,Object.assign({},cfg,{updated_at:new Date().toISOString()}));
+  if(ok)await loadList(); else alert('Could not apply recommendation.');
+}
+async function tvDefect(defectId,action){
+  var notes=prompt(action==='accept'?'Accept notes (optional):':'Rework instructions:')||'';
+  var body={action:'defect_action',inspection_id:CUR_TV_INSP.id,defect_id:defectId,tenant_action:action};
+  if(action==='accept')body.tenant_action_notes=notes; else body.rework_instructions=notes;
+  var d=await tvApi(body); if(d.success)await loadList(); else alert('Error: '+(d.error||'failed'));
+}
+async function tvAcceptUpc(newUpc){
+  var skuId=(CUR_TV_INSP.purchase_orders&&CUR_TV_INSP.purchase_orders.sku_id)||null;
+  var d=await tvApi({action:'accept_upc',inspection_id:CUR_TV_INSP.id,new_upc:newUpc,sku_id:skuId});
+  if(d.success){alert('SKU updated. Customer form update action item created.');await loadList();}else alert('Error: '+(d.error||'failed'));
+}
+async function tvRequestRework(reason){
+  var d=await tvApi({action:'request_rework',inspection_id:CUR_TV_INSP.id,rework_reason:reason});
+  if(d.success){alert('Rework inspection scheduled. Factory notified.');await loadList();}else alert('Error: '+(d.error||'failed'));
+}
+async function tvCompleteItem(itemId){
+  var d=await tvActionApi({action_item_id:itemId,action:'complete'});
+  if(d.success){var i=INSPECTIONS.find(function(x){return x.id===SELECTED;});if(i)renderTenantDetail(i);}else alert('Error: '+(d.error||'failed'));
+}
+// Toggle / tenant selector
+function toggleTenantView(){
+  TENANT_VIEW=!TENANT_VIEW;
+  localStorage.setItem('insp_tenant_view',TENANT_VIEW?'1':'0');
+  applyTenantViewUI();
+  renderList();
+  if(SELECTED){var i=INSPECTIONS.find(function(x){return x.id===SELECTED;});if(i){TENANT_VIEW?renderTenantDetail(i):renderDetail(i);}}
+}
+function applyTenantViewUI(){
+  var btn=g('tv-toggle'),sel=g('tv-tenant');
+  if(btn){btn.style.background=TENANT_VIEW?'#1a1a2e':'';btn.style.color=TENANT_VIEW?'#fff':'';}
+  if(sel)sel.style.display=TENANT_VIEW?'inline-block':'none';
+}
+async function loadTenantSelector(){
+  var sel=g('tv-tenant'); if(!sel)return;
+  var tenants=await sbGet('tenants?select=id,name&order=name.asc');
+  sel.innerHTML='<option value="">All tenants</option>'+tenants.map(function(t){return '<option value="'+t.id+'"'+(t.id===TV_TENANT?' selected':'')+'>'+esc(t.name)+'</option>';}).join('');
+}
+function onTenantViewSelect(){
+  TV_TENANT=g('tv-tenant').value||'';
+  localStorage.setItem('insp_selected_tenant',TV_TENANT);
+  SELECTED=null; g('detail').innerHTML='<div class="empty">Select an inspection.</div>';
+  renderList();
 }
 
 function methodDetailHtml(insp){
@@ -772,6 +972,9 @@ async function applyScorecard(insp,outcome){
   else if(outcome==='conditional_pass'){dProd=0;dComp=-0.2;}
   else if(outcome==='fail'){dProd=-1;dComp=-0.5;}
   if(insp.status==='rework_required'){dProd-=0.8;}
+  // 2b. Repeat / systemic defect pattern detection (last 5 completed inspections for this factory).
+  var systemic=await detectSystemicDefects(insp);
+  if(systemic.length){dProd-=1.5;dComp-=1.0;}
   var rows=await sbGet('factory_performance_scores?factory_id=eq.'+insp.factory_id+'&select=*&limit=1');
   var cur=rows[0]||{};
   function base(k){return cur[k]!=null?Number(cur[k]):5;}
@@ -784,6 +987,33 @@ async function applyScorecard(insp,outcome){
   else{await sbPost('factory_performance_scores',Object.assign({factory_id:insp.factory_id},scores,{composite_score:composite,tier:tier,computed_at:new Date().toISOString()}));}
   // 3. platform metric (no tenant_id column exists)
   await sbPost('platform_metrics_log',{metric_type:'inspection_pass_rate',metric_value:outcome==='pass'?1:0,cohort:insp.inspection_method||null,recorded_at:new Date().toISOString()});
+  // 4. systemic-defect action items + metric
+  if(systemic.length){
+    var facName=(insp.factories&&insp.factories.factory_name_english)||'this factory';
+    for(var si=0;si<systemic.length;si++){
+      var s=systemic[si];
+      if(insp.tenant_id)await sbPost('tenant_action_items',{tenant_id:insp.tenant_id,type:'systemic_defect_detected',reference_id:insp.id,reference_type:'inspection',title:'Systemic defect pattern detected — '+facName,description:'Defect category "'+s.cat+'" has appeared in '+s.n+' of last 5 inspections for this factory. Review factory capability.',priority:'critical',status:'open'});
+      await sbPost('platform_metrics_log',{metric_type:'systemic_defect_pattern',metric_value:s.n,cohort:s.cat,recorded_at:new Date().toISOString()});
+    }
+  }
+}
+// Returns array of {cat,n} where a defect category recurs in >=3 of the last 5 completed inspections.
+async function detectSystemicDefects(insp){
+  if(!insp.factory_id)return [];
+  var curDefects=await sbGet('inspection_defects?inspection_id=eq.'+insp.id+'&select=defect_category');
+  var cats=[]; curDefects.forEach(function(d){if(d.defect_category&&cats.indexOf(d.defect_category)===-1)cats.push(d.defect_category);});
+  if(!cats.length)return [];
+  var last5=await sbGet('inspections?factory_id=eq.'+insp.factory_id+'&status=in.(pass,fail,conditional_pass)&order=scheduled_date.desc&limit=5&select=id');
+  var ids=last5.map(function(x){return x.id;});
+  if(!ids.length)return [];
+  var hist=await sbGet('inspection_defects?inspection_id=in.('+ids.join(',')+')&select=inspection_id,defect_category');
+  var out=[];
+  cats.forEach(function(cat){
+    var set={}; hist.forEach(function(h){if(h.defect_category===cat)set[h.inspection_id]=1;});
+    var n=Object.keys(set).length;
+    if(n>=3)out.push({cat:cat,n:n});
+  });
+  return out;
 }
 
 // ── New inspection modal ──
@@ -833,7 +1063,7 @@ async function saveNewInspection(){
 }
 
 // ── Auth ──
-function enter(){g('login').style.display='none';g('main').style.display='block';loadList();}
+function enter(){g('login').style.display='none';g('main').style.display='block';loadTenantSelector();applyTenantViewUI();loadList();}
 async function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
   try{

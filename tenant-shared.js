@@ -111,6 +111,7 @@ const TENANT_NAV = [
     { icon: '🏬', label: 'Warehouse', href: 'tenant-operations.html#warehouse', badge: 'BETA', feature: 'warehouse' },
     { icon: '📒', label: 'Accounting', href: 'tenant-operations.html#accounting', badge: 'BETA', feature: 'accounting' },
     { icon: '🔔', label: 'Credit Watch', href: 'tenant-operations.html#credit', feature: 'credit_watch' },
+    { icon: '🔍', label: 'Inspections', href: 'tenant-inspections.html', feature: 'inspections' },
     { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA', feature: 'forecasting' },
   ]},
   { section: 'Factories', items: [

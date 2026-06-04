@@ -9,6 +9,8 @@
 // ============================================================
 export const config = { runtime: 'nodejs' };
 
+import { createHmac, timingSafeEqual } from 'crypto';
+
 const SB_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
@@ -39,6 +41,19 @@ async function validateSession(req) {
   if (!s || new Date(s.expires_at) < new Date()) return null;
   return { tenant_id: s.tenant_id, tenant_user_id: s.tenant_user_id };
 }
+// Admin override: a valid admin_session HMAC token may resolve any tenant's action item.
+function isAdminToken(req) {
+  const token = bearer(req);
+  if (!token || token.indexOf('.') === -1) return false;
+  const PASS = process.env.ADMIN_PASSWORD != null ? String(process.env.ADMIN_PASSWORD).trim() : null;
+  if (!PASS) return false;
+  const key = String(process.env.ADMIN_SESSION_SECRET || PASS || '').trim();
+  const [payload, sig] = token.split('.');
+  const expected = createHmac('sha256', key).update(payload).digest('base64url');
+  if (!sig || sig.length !== expected.length) return false;
+  try { if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false; } catch { return false; }
+  try { const obj = JSON.parse(Buffer.from(payload, 'base64url').toString()); return !obj.exp || Date.now() < obj.exp; } catch { return false; }
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,18 +63,19 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!SB_KEY) return res.status(500).json({ error: 'Supabase service key not set.' });
 
-  const sess = await validateSession(req);
+  const body = await readBody(req);
+  let sess = await validateSession(req);
+  if (!sess && isAdminToken(req)) sess = { tenant_id: null, tenant_user_id: null, admin: true };
   if (!sess) return res.status(401).json({ error: 'Unauthorized' });
 
-  const body = await readBody(req);
   const { action_item_id, action, ignore_reason } = body;
   if (!action_item_id || !action) return res.status(400).json({ error: 'Missing action_item_id or action.' });
 
-  // Validate the tenant owns the action item.
+  // Validate the tenant owns the action item (admin override may act on any tenant).
   const rows = await sbGet('tenant_action_items?id=eq.' + encodeURIComponent(action_item_id) + '&select=id,tenant_id,reminder_count&limit=1');
   const item = rows[0];
   if (!item) return res.status(404).json({ error: 'Action item not found.' });
-  if (item.tenant_id !== sess.tenant_id) return res.status(403).json({ error: 'Not your action item.' });
+  if (!sess.admin && item.tenant_id !== sess.tenant_id) return res.status(403).json({ error: 'Not your action item.' });
 
   const now = new Date().toISOString();
   try {

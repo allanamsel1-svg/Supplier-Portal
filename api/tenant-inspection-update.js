@@ -13,6 +13,8 @@
 // ============================================================
 export const config = { runtime: 'nodejs' };
 
+import { createHmac, timingSafeEqual } from 'crypto';
+
 const SB_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const BASE = process.env.PUBLIC_BASE_URL || 'https://portal.tbgsourcing.net';
@@ -45,6 +47,19 @@ async function validateSession(req) {
   if (!s || new Date(s.expires_at) < new Date()) return null;
   return { tenant_id: s.tenant_id, tenant_user_id: s.tenant_user_id };
 }
+// Admin override: a valid admin_session HMAC token may act on any tenant (admin mirror view).
+function isAdminToken(req) {
+  const token = bearer(req);
+  if (!token || token.indexOf('.') === -1) return false;
+  const PASS = process.env.ADMIN_PASSWORD != null ? String(process.env.ADMIN_PASSWORD).trim() : null;
+  if (!PASS) return false;
+  const key = String(process.env.ADMIN_SESSION_SECRET || PASS || '').trim();
+  const [payload, sig] = token.split('.');
+  const expected = createHmac('sha256', key).update(payload).digest('base64url');
+  if (!sig || sig.length !== expected.length) return false;
+  try { if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false; } catch { return false; }
+  try { const obj = JSON.parse(Buffer.from(payload, 'base64url').toString()); return !obj.exp || Date.now() < obj.exp; } catch { return false; }
+}
 
 // Flip an inspection to rework_required, create the child inspection, notify factory, create the action item.
 async function scheduleReworkChild(insp, desc, sess) {
@@ -64,19 +79,21 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!SB_KEY) return res.status(500).json({ error: 'Supabase service key not set.' });
 
-  const sess = await validateSession(req);
+  const body = await readBody(req);
+  let sess = await validateSession(req);
+  if (!sess && isAdminToken(req)) sess = { tenant_id: body.tenant_id || null, tenant_user_id: null, admin: true };
   if (!sess) return res.status(401).json({ error: 'Unauthorized' });
 
-  const body = await readBody(req);
   const action = body.action;
   const inspectionId = body.inspection_id;
   if (!action || !inspectionId) return res.status(400).json({ error: 'Missing action or inspection_id.' });
 
-  // Validate the tenant owns the inspection.
+  // Validate the tenant owns the inspection (admin override may act on any tenant).
   const irows = await sbGet('inspections?id=eq.' + encodeURIComponent(inspectionId) + '&select=*&limit=1');
   const insp = irows[0];
   if (!insp) return res.status(404).json({ error: 'Inspection not found.' });
-  if (insp.tenant_id !== sess.tenant_id) return res.status(403).json({ error: 'Not your inspection.' });
+  if (sess.admin) sess.tenant_id = insp.tenant_id;
+  else if (insp.tenant_id !== sess.tenant_id) return res.status(403).json({ error: 'Not your inspection.' });
 
   try {
     if (action === 'set_method') {

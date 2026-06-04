@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inspections — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .ti-tabs{display:flex;gap:2px;margin-bottom:14px;flex-wrap:wrap;}
+  .ti-tab{padding:7px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;color:var(--text2,#94a3b8);}
+  .ti-tab.active{color:var(--text,#e2e8f0);border-bottom-color:#3b82f6;}
+  .ti-search{margin-bottom:14px;}
+  .ti-search input{width:100%;max-width:360px;padding:8px 11px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--card-bg,#0f172a);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;}
+  .btn-sm{font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:7px;border:1px solid var(--border,#334155);background:var(--card-bg,#1e293b);color:var(--text,#e2e8f0);cursor:pointer;}
+  .btn-sm:hover{opacity:0.88;}
+  .ti-field{margin:8px 0;}
+  .ti-field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2,#94a3b8);}
+  .ti-field input,.ti-field select,.ti-field textarea{width:100%;padding:8px 10px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--card-bg,#0f172a);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;}
+  .ti-field textarea{min-height:60px;resize:vertical;}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Inspections</div>
+    <div class="page-sub" id="pageSub">Pre-shipment inspections for your orders</div>
+  </div>
+
+  <div class="ti-tabs" id="tiTabs">
+    <button class="ti-tab active" data-f="all" onclick="setInspFilter('all')">All</button>
+    <button class="ti-tab" data-f="scheduled" onclick="setInspFilter('scheduled')">Scheduled</button>
+    <button class="ti-tab" data-f="in_progress" onclick="setInspFilter('in_progress')">In Progress</button>
+    <button class="ti-tab" data-f="completed" onclick="setInspFilter('completed')">Completed</button>
+    <button class="ti-tab" data-f="rework_required" onclick="setInspFilter('rework_required')">Rework Required</button>
+  </div>
+  <div class="ti-search"><input id="tiSearch" placeholder="Search by PO number…" oninput="renderInspList()"></div>
+
+  <div id="box-inspections"><div class="loading">Loading inspections…</div></div>
+</div>
+
+<div class="panel-overlay" id="panelOverlay"></div>
+<div class="detail-panel" id="detailPanel">
+  <div class="panel-head">
+    <div><h2 id="panelTitle"></h2><div class="sub" id="panelSub"></div></div>
+    <button class="panel-close" id="panelCloseBtn">×</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+let TID = null;
+let INSPS = [], INSP_FILTER = 'all', CUR = null, CUR_PO = null;
+function tok() { return localStorage.getItem('tenant_token'); }
+const TI_SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+const TI_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+async function tiPatch(path, body) { try { const r = await fetch(TI_SB + '/rest/v1/' + path, { method: 'PATCH', headers: { apikey: TI_KEY, Authorization: 'Bearer ' + TI_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(body) }); return r.ok; } catch (e) { return false; } }
+async function inspApi(body) { const r = await fetch('/api/tenant-inspection-update', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tok() }, body: JSON.stringify(body) }); return r.json().catch(() => ({})); }
+
+function inspBadge(s) {
+  const map = { scheduled: ['#6b7280', 'rgba(107,114,128,0.15)'], factory_confirmed: ['#3b82f6', 'rgba(59,130,246,0.15)'], inspector_booked: ['#f59e0b', 'rgba(245,158,11,0.15)'], in_progress: ['#f59e0b', 'rgba(245,158,11,0.15)'], pass: ['#22c55e', 'rgba(34,197,94,0.15)'], fail: ['#ef4444', 'rgba(239,68,68,0.15)'], conditional_pass: ['#f59e0b', 'rgba(245,158,11,0.15)'], waived: ['#6b7280', 'rgba(107,114,128,0.15)'], rework_required: ['#ef4444', 'rgba(239,68,68,0.15)'] };
+  const c = map[s] || ['#6b7280', 'rgba(107,114,128,0.15)'];
+  return `<span class="badge" style="color:${c[0]};background:${c[1]};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${esc((s || '').replace(/_/g, ' '))}</span>`;
+}
+function methodIcon(m) { return m === 'third_party' ? '🔍' : m === 'self_inspection' ? '🏭' : m === 'tbg_arranged' ? '📋' : '•'; }
+function dUntil(d) { if (!d) return null; const t = new Date(); t.setHours(0, 0, 0, 0); const x = new Date(d + 'T00:00:00'); if (isNaN(x)) return null; return Math.round((x - t) / 864e5); }
+function dLabel(d) { const n = dUntil(d); if (n == null) return ''; return n > 0 ? n + 'd until' : n < 0 ? Math.abs(n) + 'd since' : 'today'; }
+
+function inspMatches(insp) {
+  if (INSP_FILTER === 'all') return true;
+  if (INSP_FILTER === 'scheduled') return insp.status === 'scheduled';
+  if (INSP_FILTER === 'in_progress') return ['in_progress', 'inspector_booked', 'factory_confirmed'].includes(insp.status);
+  if (INSP_FILTER === 'completed') return ['pass', 'fail', 'conditional_pass', 'waived'].includes(insp.status);
+  if (INSP_FILTER === 'rework_required') return insp.status === 'rework_required';
+  return true;
+}
+function setInspFilter(f) { INSP_FILTER = f; document.querySelectorAll('.ti-tab').forEach(t => t.classList.toggle('active', t.dataset.f === f)); renderInspList(); }
+
+async function loadInspections() {
+  INSPS = await supa(`inspections?tenant_id=eq.${TID}&select=*,purchase_orders(po_number,quantity,sku_id),factories(factory_name_english)&order=scheduled_date.asc`);
+  renderInspList();
+}
+function renderInspList() {
+  const q = (document.getElementById('tiSearch').value || '').toLowerCase().trim();
+  const rows = INSPS.filter(inspMatches).filter(i => {
+    if (!q) return true;
+    const po = (i.purchase_orders && i.purchase_orders.po_number || '').toLowerCase();
+    return po.indexOf(q) > -1;
+  });
+  const box = document.getElementById('box-inspections');
+  if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🔍</span>No inspections.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>PO #</th><th>Factory</th><th>Type</th><th>Scheduled</th><th>When</th><th>Method</th><th>Status</th></tr></thead><tbody>${
+    rows.map(i => {
+      const po = (i.purchase_orders && i.purchase_orders.po_number) || '—';
+      const fac = (i.factories && i.factories.factory_name_english) || '—';
+      return `<tr class="clickable" data-id="${esc(i.id)}"><td>${esc(po)}</td><td>${esc(fac)}</td>
+        <td><span class="badge" style="background:rgba(34,68,204,0.12);color:#5b8def;padding:2px 6px;border-radius:5px;font-size:11px;">${esc(i.inspection_type || '—')}</span></td>
+        <td>${fmtDate(i.scheduled_date)}</td><td>${esc(dLabel(i.scheduled_date))}</td><td>${methodIcon(i.inspection_method)}</td><td>${inspBadge(i.status)}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+  box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openInsp(tr.dataset.id)));
+}
+
+function aqlRec(qty, firstTime) {
+  let rec, cfg;
+  if (firstTime) { rec = 'New supplier — recommend AQL 1.0 Level II'; cfg = { aql_level: 1.0, inspection_level: 'II', sample_size: 80, critical_defects_allowed: 0, major_defects_allowed: 1, minor_defects_allowed: 3 }; }
+  else if (qty < 500) { rec = 'Skip formal AQL — recommend 100% visual for small orders'; cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 0, critical_defects_allowed: 0, major_defects_allowed: 0, minor_defects_allowed: 0 }; }
+  else if (qty <= 2000) { rec = 'Recommend AQL 2.5 Level II (standard) — sample ~80 units | Critical: 0 | Major: 5 | Minor: 14'; cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 80, critical_defects_allowed: 0, major_defects_allowed: 5, minor_defects_allowed: 14 }; }
+  else if (qty <= 10000) { rec = 'Recommend AQL 2.5 Level II — sample ~125-200 units | Critical: 0 | Major: 7 | Minor: 21'; cfg = { aql_level: 2.5, inspection_level: 'II', sample_size: 200, critical_defects_allowed: 0, major_defects_allowed: 7, minor_defects_allowed: 21 }; }
+  else { rec = 'Recommend AQL 1.5 Level II (tighter for large orders) — sample ~200+ units | Critical: 0 | Major: 3 | Minor: 10'; cfg = { aql_level: 1.5, inspection_level: 'II', sample_size: 200, critical_defects_allowed: 0, major_defects_allowed: 3, minor_defects_allowed: 10 }; }
+  return { rec, cfg };
+}
+
+async function openInsp(id) {
+  const insp = INSPS.find(x => x.id === id); if (!insp) return;
+  CUR = insp; CUR_PO = insp.purchase_orders || {};
+  const po = CUR_PO.po_number || '—';
+  openPanel('Inspection — PO ' + po, (insp.factories && insp.factories.factory_name_english) || '', '<div class="loading">Loading…</div>');
+  renderInspDetail();
+}
+async function renderInspDetail() {
+  const insp = CUR, po = CUR_PO;
+  let html = `<div class="panel-section"><h3>Status</h3><div class="sub-item"><div class="si-title">${inspBadge(insp.status)} <span class="badge" style="background:rgba(34,68,204,0.12);color:#5b8def;padding:2px 8px;border-radius:6px;font-size:11px;">${esc(insp.inspection_type || '—')}</span></div><div class="si-meta">${fmtDate(insp.scheduled_date)} · ${esc(dLabel(insp.scheduled_date))}</div></div></div>`;
+
+  // Method selector
+  if (insp.status === 'scheduled' && !insp.inspection_method) {
+    html += `<div class="panel-section"><h3>Select Inspection Method</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+        <button class="btn-sm" onclick="tiMethod('third_party')">🔍 Third Party</button>
+        <button class="btn-sm" onclick="tiMethod('self_inspection')">🏭 Self-Inspection</button>
+        <button class="btn-sm" onclick="tiMethod('tbg_arranged')">📋 TBG Arranged</button>
+      </div><div id="tiMethodFields"></div></div>`;
+  } else if (insp.inspection_method && insp.aql_level == null) {
+    const facInsp = await supa(`inspections?factory_id=eq.${insp.factory_id}&select=id`);
+    const firstTime = (facInsp || []).length <= 1;
+    const { rec } = aqlRec(Number(po.quantity) || 0, firstTime);
+    html += `<div class="panel-section"><h3>AQL Recommendation</h3><div class="sub-item" style="border-left:3px solid #22c55e;"><div class="si-meta">${esc(rec)}</div><div style="margin-top:8px;"><button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiUseAql(${Number(po.quantity) || 0},${firstTime})">Use Recommended</button></div></div></div>`;
+  } else if (insp.inspection_method) {
+    html += `<div class="panel-section"><h3>Method</h3><div class="si-meta">${methodIcon(insp.inspection_method)} ${esc((insp.inspection_method || '').replace(/_/g, ' '))} · AQL ${esc(insp.aql_level)} / Level ${esc(insp.inspection_level || '—')}</div></div>`;
+  }
+
+  // Defects
+  const defects = await supa(`inspection_defects?inspection_id=eq.${insp.id}&select=*&order=created_at.asc`);
+  if (defects.length) {
+    html += `<div class="panel-section"><h3>Defects</h3>` + defects.map(d => {
+      const photo = d.photo_url ? `<img src="${esc(d.photo_url)}" style="max-width:80px;border-radius:6px;margin-top:6px;cursor:pointer;" onclick="window.open('${esc(d.photo_url)}','_blank')">` : '';
+      const act = d.tenant_action ? `<div class="si-meta">Your decision: <strong>${esc(d.tenant_action)}</strong></div>` :
+        `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"><button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiDefect('${d.id}','accept')">✓ Accept</button><button class="btn-sm" style="background:#dc2626;color:#fff;" onclick="tiDefect('${d.id}','reject')">✗ Reject &amp; Rework</button></div><div id="tiDef-${d.id}"></div>`;
+      return `<div class="sub-item"><div class="si-title">${esc(d.defect_type)} · ${esc(d.defect_category || '—')}</div><div class="si-meta">${esc(d.description || '')} (qty ${esc(d.qty_affected != null ? d.qty_affected : 1)})</div>${photo}${act}</div>`;
+    }).join('') + '</div>';
+  }
+
+  // Measurements variance + UPC
+  const meas = await supa(`inspection_measurements?inspection_id=eq.${insp.id}&select=*`);
+  const variances = meas.filter(m => m.weight_match === false || m.length_match === false || m.width_match === false || m.height_match === false || m.qty_match === false || m.upc_match === false);
+  const upcMm = meas.find(m => m.upc_match === false);
+  if (variances.length || upcMm) {
+    html += `<div class="panel-section"><h3>Measurement Variances</h3>`;
+    variances.forEach(m => {
+      let reasons = []; try { reasons = Array.isArray(m.ai_variance_reasons) ? m.ai_variance_reasons : (m.ai_variance_reasons ? JSON.parse(m.ai_variance_reasons) : []); } catch (e) { reasons = []; }
+      html += `<div class="sub-item"><div class="si-title">${esc(m.measurement_type)} variance</div>${reasons.length ? '<ul style="margin:6px 0 0 16px;font-size:12px;color:var(--text2);">' + reasons.map(r => '<li>' + esc(r) + '</li>').join('') + '</ul>' : ''}</div>`;
+    });
+    if (upcMm) html += `<div class="sub-item" style="border-left:3px solid #ef4444;"><div class="si-title">🔴 UPC Mismatch</div><div class="si-meta">Spec ${esc(upcMm.upc_spec || '—')} → Actual ${esc(upcMm.upc_actual || '—')}</div><div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"><button class="btn-sm" style="background:#16a34a;color:#fff;" onclick="tiAcceptUpc('${esc(upcMm.upc_actual || '')}')">Accept &amp; Update SKU</button><button class="btn-sm" style="background:#dc2626;color:#fff;" onclick="tiRework('UPC correction required')">Request Rework</button></div></div>`;
+    html += '</div>';
+  }
+
+  // Outcome
+  if (insp.outcome) html += `<div class="panel-section"><h3>Outcome</h3><div class="sub-item"><div class="si-title">${inspBadge(insp.outcome)}</div>${insp.outcome_notes ? '<div class="si-meta">' + esc(insp.outcome_notes) + '</div>' : ''}${insp.report_url ? '<div style="margin-top:6px;"><a class="btn-sm" style="background:#3b82f6;color:#fff;text-decoration:none;" href="' + esc(insp.report_url) + '" target="_blank">Download Report</a></div>' : ''}</div></div>`;
+
+  // Factory confirmation
+  const conf = await supa(`inspection_confirmations?inspection_id=eq.${insp.id}&select=*&order=sent_at.desc&limit=1`);
+  if (conf.length) { const c = conf[0]; const st = c.factory_responded_at ? (c.confirmed ? 'Confirmed ✓' : 'Flagged ⚠') : 'Pending'; html += `<div class="panel-section"><h3>Factory Confirmation</h3><div class="si-meta">Sent ${(c.sent_at || '').slice(0, 10)} · ${st}</div></div>`; }
+
+  document.getElementById('panelBody').innerHTML = html;
+}
+function tiMethod(m) {
+  const f = document.getElementById('tiMethodFields'); if (!f) return;
+  if (m === 'third_party') f.innerHTML = `<div class="ti-field"><label>Inspector company</label><select id="tim-company"><option value="">Select…</option><option>SGS</option><option>Bureau Veritas</option><option>Intertek</option><option>QIMA</option><option>Other</option></select></div><div class="ti-field"><label>Contact name</label><input id="tim-name"></div><div class="ti-field"><label>Contact email</label><input id="tim-email"></div><button class="btn-sm" style="background:#3b82f6;color:#fff;" onclick="tiSaveMethod('third_party')">Save</button>`;
+  else if (m === 'self_inspection') f.innerHTML = `<div class="ti-field"><label>Waiver reason</label><textarea id="tim-waiver"></textarea></div><label style="display:flex;gap:8px;align-items:center;font-size:12px;"><input type="checkbox" id="tim-ack"> I understand this waives third party verification</label><button class="btn-sm" style="background:#3b82f6;color:#fff;margin-top:8px;" onclick="tiSaveMethod('self_inspection')">Save</button>`;
+  else f.innerHTML = `<div class="ti-field"><label>Notes</label><textarea id="tim-notes"></textarea></div><button class="btn-sm" style="background:#3b82f6;color:#fff;" onclick="tiSaveMethod('tbg_arranged')">Save</button>`;
+}
+async function tiSaveMethod(method) {
+  const body = { action: 'set_method', inspection_id: CUR.id, inspection_method: method };
+  if (method === 'third_party') { body.inspector_company = (document.getElementById('tim-company') || {}).value || ''; body.inspector_contact_name = (document.getElementById('tim-name') || {}).value || ''; body.inspector_contact_email = (document.getElementById('tim-email') || {}).value || ''; }
+  if (method === 'self_inspection') { body.waiver_reason = (document.getElementById('tim-waiver') || {}).value || ''; body.waiver_acknowledged = !!(document.getElementById('tim-ack') && document.getElementById('tim-ack').checked); if (!body.waiver_acknowledged) { alert('Check the waiver acknowledgment to save.'); return; } }
+  const d = await inspApi(body); if (d.success) { await loadInspections(); CUR = INSPS.find(x => x.id === CUR.id); CUR_PO = CUR.purchase_orders || {}; renderInspDetail(); } else alert('Could not save: ' + (d.error || 'error'));
+}
+async function tiUseAql(qty, firstTime) { const { cfg } = aqlRec(qty, firstTime); const ok = await tiPatch('inspections?id=eq.' + CUR.id, Object.assign({}, cfg, { updated_at: new Date().toISOString() })); if (ok) { await loadInspections(); CUR = INSPS.find(x => x.id === CUR.id); CUR_PO = CUR.purchase_orders || {}; renderInspDetail(); } else alert('Could not apply AQL.'); }
+function tiDefect(defectId, action) {
+  const slot = document.getElementById('tiDef-' + defectId); if (!slot) return;
+  const label = action === 'accept' ? 'Accept notes (optional)' : 'Rework instructions';
+  slot.innerHTML = `<div class="ti-field" style="margin-top:6px;"><label>${label}</label><textarea id="tiDefNotes-${defectId}"></textarea></div><button class="btn-sm" style="background:${action === 'accept' ? '#16a34a' : '#dc2626'};color:#fff;" onclick="tiDefectSubmit('${defectId}','${action}')">Confirm</button>`;
+}
+async function tiDefectSubmit(defectId, action) {
+  const notes = (document.getElementById('tiDefNotes-' + defectId) || {}).value || '';
+  const body = { action: 'defect_action', inspection_id: CUR.id, defect_id: defectId, tenant_action: action };
+  if (action === 'accept') body.tenant_action_notes = notes; else body.rework_instructions = notes;
+  const d = await inspApi(body); if (d.success) { await loadInspections(); renderInspDetail(); } else alert('Error: ' + (d.error || 'failed'));
+}
+async function tiAcceptUpc(newUpc) { const d = await inspApi({ action: 'accept_upc', inspection_id: CUR.id, new_upc: newUpc, sku_id: CUR_PO.sku_id || null }); if (d.success) { alert('SKU updated. Customer form update item created.'); await loadInspections(); renderInspDetail(); } else alert('Error: ' + (d.error || 'failed')); }
+async function tiRework(reason) { const d = await inspApi({ action: 'request_rework', inspection_id: CUR.id, rework_reason: reason }); if (d.success) { alert('Rework inspection scheduled. Factory notified.'); await loadInspections(); renderInspDetail(); } else alert('Error: ' + (d.error || 'failed')); }
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · inspections';
+  document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
+  document.getElementById('panelOverlay').addEventListener('click', closePanel);
+  await loadInspections();
+})();
+</script>
+</body>
+</html>
