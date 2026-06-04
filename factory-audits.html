@@ -176,7 +176,7 @@ async function renderAuditDetail(a) {
 
   // SECTION 1 — header
   const dateLine = a.conducted_date ? 'Conducted ' + fmtDate(a.conducted_date) : 'Scheduled: ' + fmtDate(a.scheduled_date);
-  const method = a.inspection_method ? `${methodIcon(a.inspection_method)} ${esc((a.inspection_method || '').replace(/_/g, ' '))}${a.inspector_company ? ' — ' + esc(a.inspector_company) : ''}${a.inspector_contact ? ' · ' + esc(a.inspector_contact) : ''}${a.inspector_email ? ' · ' + esc(a.inspector_email) : ''}` : 'Method not set';
+  const method = a.inspection_method ? `${methodIcon(a.inspection_method)} ${esc((a.inspection_method || '').replace(/_/g, ' '))}${a.inspector_company ? ' — ' + esc(a.inspector_company) : ''}${a.inspector_contact_name ? ' · ' + esc(a.inspector_contact_name) : ''}${a.inspector_contact_email ? ' · ' + esc(a.inspector_contact_email) : ''}` : 'Method not set';
   const pct = a.overall_pct != null ? Number(a.overall_pct) : null;
   let reaudit = '';
   if (a.next_audit_due) { const du = dUntil(a.next_audit_due); if (du != null && du < 0) reaudit = `<div class="alertbox red">Re-audit OVERDUE since ${fmtDate(a.next_audit_due)}</div>`; else if (du != null && du <= 90) reaudit = `<div class="alertbox amber">Re-audit due ${fmtDate(a.next_audit_due)} (${du} days)</div>`; }
@@ -397,7 +397,7 @@ function wzRender() {
 function wzPickFactory(id) { WZ.factory = FACTORIES.find(x => x.id === id) || null; }
 function wzPickCategory(id) { WZ.category = CATS.find(x => x.id === id) || null; WZ.type = null; wzRender(); }
 function wzPickType(id) { const types = TYPES_BY_CAT[WZ.category.id] || []; WZ.type = types.find(x => x.id === id) || null; wzRender(); }
-function wzMethod(m) { WZ.method = m; document.querySelectorAll('#wz-method button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); const f = document.getElementById('wz-method-fields'); if (!f) return; if (m === 'third_party') f.innerHTML = `<div class="ffield"><label>Inspector company</label><select id="wz-company"><option>Bureau Veritas</option><option>Intertek</option><option>UL</option><option>QIMA</option><option>SGS</option><option>Other</option></select></div><div class="ffield"><label>Contact name</label><input id="wz-contact"></div><div class="ffield"><label>Contact email</label><input id="wz-email"></div>`; else f.innerHTML = ''; }
+function wzMethod(m) { WZ.method = m; document.querySelectorAll('#wz-method button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); const f = document.getElementById('wz-method-fields'); if (!f) return; if (m === 'third_party') f.innerHTML = `<div class="ffield"><label>Inspector company</label><select id="wz-company"><option value="">Select inspector…</option><option>Bureau Veritas</option><option>Intertek</option><option>SGS</option><option>UL</option><option>QIMA</option><option>amfori (BSCI)</option><option>Sedex (SMETA)</option><option>SA8000 / SAI</option><option>Other</option></select></div><div class="ffield"><label>Contact name</label><input id="wz-contact"></div><div class="ffield"><label>Contact email</label><input id="wz-email"></div>`; else f.innerHTML = ''; }
 async function wzLoadPOs() { const pos = await supa(`purchase_orders?tenant_id=eq.${TID}&select=id,po_number&order=created_at.desc&limit=200`); const sel = document.getElementById('wz-po'); if (sel) sel.innerHTML = '<option value="">None</option>' + pos.map(p => `<option value="${p.id}">${esc(p.po_number || p.id)}</option>`).join(''); }
 function wzToggleDoc(i) { WZ.docs[i].checked = !WZ.docs[i].checked; wzRenderDocs(); }
 function wzRenderDocs() {
@@ -416,7 +416,7 @@ async function saveAudit() {
   const method = WZ.method || 'third_party';
   const token = randToken();
   const body = { factory_id: WZ.factory.id, tenant_id: TID, audit_type_id: WZ.type.id, scheduled_date: date, inspection_method: method, status: 'scheduled', report_upload_token: token };
-  if (method === 'third_party') { body.inspector_company = (document.getElementById('wz-company') || {}).value || null; body.inspector_contact = (document.getElementById('wz-contact') || {}).value || null; body.inspector_email = (document.getElementById('wz-email') || {}).value || null; }
+  if (method === 'third_party') { body.inspector_company = (document.getElementById('wz-company') || {}).value || null; body.inspector_contact_name = (document.getElementById('wz-contact') || {}).value || null; body.inspector_contact_email = (document.getElementById('wz-email') || {}).value || null; }
   const poVal = (document.getElementById('wz-po') || {}).value; if (poVal) body.po_id = poVal;
   const created = await faPost('factory_audits', body, true);
   if (!created || !created[0]) { alert('Could not schedule audit.'); return; }
