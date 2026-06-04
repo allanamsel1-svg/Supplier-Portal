@@ -18,6 +18,7 @@
 
   <div class="tabs" id="tabs">
     <button class="tab" data-tab="all">All Factories <span class="tab-count" id="cnt-all"></span></button>
+    <button class="tab" data-tab="audits">🗂 Factory Audits</button>
     <button class="tab" data-tab="pending">Pending <span class="tab-count" id="cnt-pending"></span></button>
     <button class="tab" data-tab="reviews">Pending Reviews <span class="tab-count" id="cnt-reviews"></span></button>
     <button class="tab" data-tab="invitations">Invitations <span class="tab-count" id="cnt-invitations"></span></button>
@@ -56,6 +57,10 @@
     <iframe id="scannerFrame" title="Card Scanner" data-src="scanner.html"
       style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
   </div>
+  <div class="tab-pane" id="pane-audits">
+    <iframe id="auditsFrame" title="Factory Audits" data-src="factory-audits.html?embed=1"
+      style="width:100%;height:calc(100vh - 200px);min-height:520px;border:1px solid var(--border);border-radius:10px;background:var(--bg2);"></iframe>
+  </div>
 </div>
 
 <!-- Detail panel -->
@@ -70,7 +75,7 @@
 
 <script src="/tenant-shared.js"></script>
 <script>
-const TABS = ['all', 'pending', 'reviews', 'invitations', 'followups', 'compliance', 'compliance-rules', 'scanner'];
+const TABS = ['all', 'audits', 'pending', 'reviews', 'invitations', 'followups', 'compliance', 'compliance-rules', 'scanner'];
 let TID = null;
 let factories = [];
 const loaded = {};   // lazy-load guard per tab
@@ -100,6 +105,11 @@ async function loadTab(tab) {
   }
   if (tab === 'scanner') {
     const fr = document.getElementById('scannerFrame');
+    if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load iframe once
+    return;
+  }
+  if (tab === 'audits') {
+    const fr = document.getElementById('auditsFrame');
     if (fr && !fr.src && fr.dataset.src) fr.src = fr.dataset.src;  // lazy-load iframe once
     return;
   }

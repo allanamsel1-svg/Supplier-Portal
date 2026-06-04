@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="ri_shared.css">
 <script src="paste-upload.js"></script>
 <script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+<script>(function(){if(new URLSearchParams(location.search).get('embed')==='1'){var s=document.createElement('style');s.textContent='.topbar{display:none!important}';(document.head||document.documentElement).appendChild(s);}})();</script>
 <script src="admin-theme.js"></script>
 <style>
   *{box-sizing:border-box;}
@@ -112,6 +113,7 @@
   .an-bar{height:14px;border-radius:7px;background:#3b82f6;}
   .an-track{flex:1;height:14px;border-radius:7px;background:var(--border);overflow:hidden;}
 </style>
+<script src="admin-backlink.js"></script>
 </head>
 <body>
 
@@ -1111,7 +1113,7 @@ async function loadAnalytics(){
   body.innerHTML=s1+s2+s3+s4;
 }
 
-function enter(){g('login').style.display='none';g('main').style.display='block';loadList();loadAudits();loadAuditStats();showAdmTab('audits');}
+function enter(){g('login').style.display='none';g('main').style.display='block';loadList();loadAudits();loadAuditStats();var _h=(location.hash||'').toLowerCase();showAdmTab(_h.indexOf('psi')>-1?'psi':_h.indexOf('analytics')>-1?'analytics':'audits');}
 async function doLogin(){
   var u=g('l-user').value.trim(),p=g('l-pass').value,errEl=g('l-err');
   try{

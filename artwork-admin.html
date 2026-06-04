@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="ri_shared.css">
 <script src="paste-upload.js"></script>
 <script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+<script>(function(){if(new URLSearchParams(location.search).get('embed')==='1'){var s=document.createElement('style');s.textContent='.topbar{display:none!important}';(document.head||document.documentElement).appendChild(s);}})();</script>
 <script src="admin-theme.js"></script>
 <style>
   *{box-sizing:border-box;}
@@ -52,6 +53,7 @@
   .empty{color:#aaa;text-align:center;padding:2rem 1rem;font-size:14px;}
   .copybox{display:flex;gap:6px;align-items:center;margin-top:6px;}.copybox input{flex:1;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);}
 </style>
+<script src="admin-backlink.js"></script>
 </head>
 <body>
 <div id="login">
@@ -137,18 +139,17 @@ async function renderDetail(p){
     '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Designer: <strong>'+esc(firstName(p))+'</strong>'+(p.due_date?' · due '+fmtDate(p.due_date):'')+'</div></div>';
 
   if(current){
-    var isPdf=(current.file_type||'').toLowerCase()==='pdf'||/\.pdf($|\?)/i.test(current.file_url||'');
-    var prev=current.file_url?(isPdf?'<iframe class="preview" src="'+esc(current.file_url)+'"></iframe>':'<img class="preview" style="object-fit:contain;" src="'+esc(current.file_url)+'">'):'<div class="empty">No file.</div>';
     var ai=current.upc_ai_result||{};var dpiOk=current.resolution_dpi!=null&&Number(current.resolution_dpi)>=300;
+    // Landlord rule: admin CANNOT see or download designer-submitted artwork files.
+    var prev='<div class="empty" style="border:1px dashed var(--border);border-radius:8px;padding:24px;">🔒 File available for tenant review only</div>';
     html+='<div class="sec"><h3>Current Version — v'+esc(current.version_number)+' '+statusBadge(current.status)+'</h3>'+prev+
       '<div style="font-size:12px;color:var(--text2);margin-top:6px;">Submitted '+fmtDate(current.submitted_at||current.created_at)+(current.designer_notes?' · '+esc(current.designer_notes):'')+'</div>'+
-      (current.file_url?'<div style="margin-top:6px;"><a class="btn alt" style="text-decoration:none;" href="'+esc(current.file_url)+'" target="_blank">Download</a></div>':'')+
       '<div style="margin-top:10px;font-size:12px;">UPC: '+(ai.match?'✓ Match':'✗ '+(ai.upc_format||'check'))+' · Resolution: '+(dpiOk?'✓':'✗')+' · Dimensions: '+(current.dimensions_mm?'✓':'✗')+'</div>'+
       '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn green" onclick="adminApprove(\''+p.id+'\',\''+current.id+'\')">✓ Approve (internal → tenant)</button>'+
       '<button class="btn red" onclick="adminReject(\''+p.id+'\',\''+current.id+'\')">✗ Reject</button></div><div id="adRej"></div></div>';
   }
 
-  html+='<div class="sec"><h3>Version History</h3>'+(versions.length?versions.map(function(v){return '<div class="kvr"><span class="k">v'+esc(v.version_number)+' · '+fmtDate(v.submitted_at||v.created_at)+' '+statusBadge(v.status)+'</span><span class="v" style="font-weight:400;">'+(v.file_url?'<a href="'+esc(v.file_url)+'" target="_blank" style="color:#2266cc;">download</a>':'')+'</span></div>';}).join(''):'<div class="empty">No versions.</div>')+'</div>';
+  html+='<div class="sec"><h3>Version History</h3>'+(versions.length?versions.map(function(v){return '<div class="kvr"><span class="k">v'+esc(v.version_number)+' · '+fmtDate(v.submitted_at||v.created_at)+' '+statusBadge(v.status)+'</span><span class="v" style="font-weight:400;color:var(--text2);font-size:11px;">tenant review only</span></div>';}).join(''):'<div class="empty">No versions.</div>')+'</div>';
 
   // comments — admin sees ALL (incl internal), can post internal
   var cmts=await sbGet('artwork_comments?artwork_project_id=eq.'+p.id+'&order=created_at.asc&select=*');

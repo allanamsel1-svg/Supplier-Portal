@@ -576,9 +576,9 @@
       <div class="slabel" id="slbl-operations" onclick="toggleSection('operations')"><span class="chev">▾</span>Operations</div>
       <div class="ssec" id="ssec-operations">
       <button class="sitem" id="nav-orders" onclick="showPanel('orders');loadOpenOrders();"><span class="sicon">📋</span> Open Orders <span class="scount" id="cnt-orders-urgent" style="background:#fff0f0;color:#b00;border:1px solid #fdd;font-weight:600;">3</span></button>
-      <button class="sitem" id="nav-inspections" onclick="location.href='inspections.html'"><span class="sicon">🔍</span> Inspections <span style="font-size:9px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">NEW</span></button>
-      <button class="sitem" id="nav-factory-audits" onclick="location.href='inspections.html#audits'"><span class="sicon">🗂</span> Factory Audits</button>
-      <button class="sitem" id="nav-artwork" onclick="location.href='artwork-admin.html'"><span class="sicon">🎨</span> Artwork</button>
+      <button class="sitem" id="nav-inspections" onclick="showPanel('inspections')"><span class="sicon">🔍</span> Inspections <span style="font-size:9px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">NEW</span></button>
+      <button class="sitem" id="nav-factory-audits" onclick="showPanel('factory-audits')"><span class="sicon">🗂</span> Factory Audits</button>
+      <button class="sitem" id="nav-artwork" onclick="showPanel('artwork')"><span class="sicon">🎨</span> Artwork</button>
       <button class="sitem" id="nav-warehouse" onclick="showPanel('warehouse');loadWarehouse();"><span class="sicon">📦</span> Warehouse <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-accounting" onclick="showPanel('accounting');loadAccounting();"><span class="sicon">💰</span> Accounting <span style="font-size:9px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 5px;border-radius:8px;margin-left:4px;font-weight:500;">BETA</span></button>
       <button class="sitem" id="nav-credit" onclick="showPanel('credit');loadCreditWatch();"><span class="sicon">🔍</span> Credit Watch <span class="scount" id="cnt-credit" style="background:#fff0f0;color:#b00;border:1px solid #fdd;">0</span></button>
@@ -830,6 +830,16 @@
 
       <div style="padding:0 1.5rem;font-size:13px;color:#888;margin-bottom:12px;font-weight:500;">Recent Registrations</div>
       <div class="factory-list" id="recent-list"></div>
+    </div>
+
+    <div class="panel" id="panel-inspections">
+      <iframe data-src="inspections.html?embed=1#psi" style="width:100%;height:calc(100vh - 64px);border:none;background:transparent;"></iframe>
+    </div>
+    <div class="panel" id="panel-factory-audits">
+      <iframe data-src="inspections.html?embed=1#audits" style="width:100%;height:calc(100vh - 64px);border:none;background:transparent;"></iframe>
+    </div>
+    <div class="panel" id="panel-artwork">
+      <iframe data-src="artwork-admin.html?embed=1" style="width:100%;height:calc(100vh - 64px);border:none;background:transparent;"></iframe>
     </div>
 
     <div class="panel" id="panel-all">
@@ -2709,6 +2719,11 @@ function showPanel(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
   g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
+  // Embedded tool panels (inspections / factory audits / artwork) — lazy-load their iframe once.
+  if(name==='inspections'||name==='factory-audits'||name==='artwork'){
+    var _fr=document.querySelector('#panel-'+name+' iframe');
+    if(_fr&&!_fr.src&&_fr.dataset.src)_fr.src=_fr.dataset.src;
+  }
   if(name==='upload')initAdminUpload();
   if(name==='rfq'){loadRFQs();loadCategories();loadCustAndBrandsForRFQ();}
   if(name==='rfq-followup')loadRFQFollowups();
