@@ -54,6 +54,7 @@
   .copybox{display:flex;gap:6px;align-items:center;margin-top:6px;}.copybox input{flex:1;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);}
 </style></head>
 <body>
+<div id="admin-sidebar"></div>
 <div id="login">
   <div class="lb"><h1>Artwork</h1><p>Admin sign-in required.</p>
     <input id="l-user" placeholder="Username"><input id="l-pass" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
@@ -193,5 +194,6 @@ function doLogout(){localStorage.removeItem('admin_session');g('main').style.dis
 async function doLogin(){var u=g('l-user').value.trim(),pw=g('l-pass').value,e=g('l-err');try{var r=await fetch('/api/admin-auth?action=login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:pw})});var d=await r.json().catch(function(){return {};});if(d&&d.ok&&d.token){localStorage.setItem('admin_session',d.token);e.style.display='none';enter();return;}e.textContent=(d&&d.unconfigured)?'Admin auth not configured.':'Incorrect username or password.';e.style.display='block';}catch(x){e.textContent='Login error.';e.style.display='block';}}
 (async function(){var tok=localStorage.getItem('admin_session');if(!tok)return;try{var r=await fetch('/api/admin-auth?action=verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:tok})});var d=await r.json().catch(function(){return {};});if(d&&(d.ok||d.unconfigured))enter();else localStorage.removeItem('admin_session');}catch(e){}})();
 </script>
+<script src="admin-shared.js"></script>
 </body>
 </html>
