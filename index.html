@@ -229,7 +229,13 @@
     .submit-quote-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .existing-quote { background: #edfaed; border: 1px solid #a0d8a0; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; color: #1a7a1a; }
     .existing-quote strong { display: block; margin-bottom: 4px; }
+    /* EN / 中文 language toggle — matches the muted header controls */
+    .lang-toggle { font-size: 12px; color: #888; cursor: pointer; background: none; border: none; font-family: inherit; padding: 0; display: inline-flex; align-items: center; gap: 4px; }
+    .lang-toggle .sep { color: #ccc; }
+    .lang-toggle [data-lang] { color: inherit; }
+    .lang-toggle:hover { color: #1a1a2e; }
   </style>
+  <script src="translations.js"></script>
 </head>
 <body>
 
@@ -292,20 +298,21 @@
       <div class="topbar-title">Supplier Portal</div>
     </div>
     <div class="topbar-r">
+      <button class="lang-toggle" onclick="Lang.set(Lang.get() === 'en' ? 'zh' : 'en')" aria-label="Toggle language"><span data-lang="en">EN</span><span class="sep">|</span><span data-lang="zh">中文</span></button>
       <span class="u-email" id="u-email"></span>
       <button class="signout-btn" onclick="signout()">Sign out</button>
     </div>
   </div>
   <div class="portal-tabs">
-    <button class="ptab on" onclick="ptab('details')">Factory Details</button>
-    <button class="ptab" onclick="ptab('rfqs');loadRFQs();">RFQs <span id="rfq-badge" style="font-size:10px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;"></span></button>
-    <button class="ptab" onclick="ptab('samples');loadSamples();">Product Development <span id="samples-badge" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
-    <button class="ptab" onclick="ptab('orders');loadOrders();">Orders <span id="orders-badge" style="font-size:10px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
-    <button class="ptab" onclick="ptab('catalogs')">Catalog</button>
-    <button class="ptab" onclick="ptab('overview')">Company Deck</button>
-    <button class="ptab" onclick="ptab('quotes')">Quote Sheets</button>
-    <button class="ptab" onclick="ptab('compliance');loadComplianceDocs();">Compliance <span id="compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
-    <button class="ptab" onclick="ptab('skus');loadFactorySkus();">Product Compliance <span id="sku-compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab on" onclick="ptab('details')"><span data-i18n="nav.tabDetails">Factory Details</span></button>
+    <button class="ptab" onclick="ptab('rfqs');loadRFQs();"><span data-i18n="nav.tabRfqs">RFQs</span> <span id="rfq-badge" style="font-size:10px;background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;"></span></button>
+    <button class="ptab" onclick="ptab('samples');loadSamples();"><span data-i18n="nav.tabSamples">Product Development</span> <span id="samples-badge" style="font-size:10px;background:#fff8e0;color:#886600;border:1px solid #f0d860;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('orders');loadOrders();"><span data-i18n="nav.tabOrders">Orders</span> <span id="orders-badge" style="font-size:10px;background:#edfaed;color:#1a7a1a;border:1px solid #a0d8a0;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('catalogs')"><span data-i18n="nav.tabCatalog">Catalog</span></button>
+    <button class="ptab" onclick="ptab('overview')"><span data-i18n="nav.tabDeck">Company Deck</span></button>
+    <button class="ptab" onclick="ptab('quotes')"><span data-i18n="nav.tabQuotes">Quote Sheets</span></button>
+    <button class="ptab" onclick="ptab('compliance');loadComplianceDocs();"><span data-i18n="nav.tabCompliance">Compliance</span> <span id="compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
+    <button class="ptab" onclick="ptab('skus');loadFactorySkus();"><span data-i18n="nav.tabProductCompliance">Product Compliance</span> <span id="sku-compl-badge" style="font-size:10px;background:#fff0f0;color:#b00;border:1px solid #fdd;padding:1px 6px;border-radius:10px;margin-left:4px;display:none;font-weight:600;"></span></button>
   </div>
 
   <!-- Details pane -->
