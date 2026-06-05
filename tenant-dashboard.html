@@ -487,7 +487,9 @@ async function confirmCapIncrease() {
   user = await tenantAuth();
   if (!user || !user.tenant) return;
   TID = user.tenant.id;
-  TOKEN = localStorage.getItem('tenant_token');
+  // Tenant users authenticate with tenant_token; admins (admin_session, no tenant_token)
+  // fall back to their admin session so the dashboard's API calls authenticate too.
+  TOKEN = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session');
   renderSidebar(user);
   document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + (user.full_name || (user.email || '').split('@')[0]);
   document.title = user.tenant.name + ' — TBG Sourcing';
