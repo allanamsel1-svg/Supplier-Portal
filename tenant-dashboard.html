@@ -246,22 +246,27 @@ async function loadPriceTremors() {
 
 // ── Widget 2: Production Pipeline ──
 async function loadProduction() {
-  const pos = await supa(`purchase_orders?tenant_id=eq.${TID}&status=not.in.(cancelled,closed,complete,completed)&select=id,po_number&order=created_at.desc`);
+  // Active production = all open PO statuses (everything except closed / cancelled).
+  const OPEN = 'draft,pending_admin_signature,sent_to_factory,accepted_by_factory,in_production,shipped,received';
+  const pos = await supa(`purchase_orders?tenant_id=eq.${TID}&status=in.(${OPEN})&select=id,po_number,status&order=created_at.desc`);
   document.getElementById('pp-count').textContent = pos.length;
   const list = document.getElementById('pp-list');
   if (!pos.length) { list.innerHTML = '<div class="w-empty">No active production</div>'; return; }
   const ids = pos.map(p => p.id);
   const poNum = {}; pos.forEach(p => { poNum[p.id] = p.po_number; });
-  const ms = await supa(`po_milestones?purchase_order_id=in.(${ids.join(',')})&select=purchase_order_id,milestone_type,agreed_date,revised_date,status&order=agreed_date.asc`);
-  const upcoming = ms
+  const ms = await supa(`po_milestones?purchase_order_id=in.(${ids.join(',')})&select=purchase_order_id,milestone_type,agreed_date,revised_date,status,completed_at,display_order&order=display_order.asc,agreed_date.asc`);
+  // Next upcoming INCOMPLETE milestone per PO (milestones are ordered, take the first not-done for each PO).
+  const isDone = m => !!m.completed_at || /complete|done/i.test(m.status || '');
+  const nextByPo = {};
+  ms.forEach(m => { if (isDone(m)) return; if (!nextByPo[m.purchase_order_id]) nextByPo[m.purchase_order_id] = m; });
+  const rows = pos.map(p => nextByPo[p.id]).filter(Boolean)
     .map(m => ({ ...m, due: m.revised_date || m.agreed_date }))
-    .filter(m => m.due && daysSince(m.due) === 0 || (m.due && new Date(m.due) >= new Date(Date.now() - 864e5)))
-    .filter(m => !/complete|done/i.test(m.status || ''))
-    .sort((a, b) => new Date(a.due) - new Date(b.due))
+    .sort((a, b) => new Date(a.due || '2999-01-01') - new Date(b.due || '2999-01-01'))
     .slice(0, 3);
-  list.innerHTML = (upcoming.length ? upcoming : ms.slice(0, 3)).map(m =>
+  if (!rows.length) { list.innerHTML = '<div class="w-empty">No upcoming milestones</div>'; return; }
+  list.innerHTML = rows.map(m =>
     `<div class="w-item"><strong>${esc(poNum[m.purchase_order_id] || 'PO')}</strong> · ${esc(m.milestone_type || 'milestone')}<br>${fmtDate(m.revised_date || m.agreed_date)}</div>`
-  ).join('') || '<div class="w-empty">No upcoming milestones</div>';
+  ).join('');
 }
 
 // ── Widget 3: Sample Approval Queue ──

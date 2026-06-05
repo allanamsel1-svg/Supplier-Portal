@@ -76,7 +76,7 @@ QUERY intents (user wants DATA answered in text):
 - general_query: any other question about their data
 
 COMPARISON intents (user wants AI ANALYSIS across multiple records):
-- quote_comparison: compare factories/quotes on price, quality, lead time for a product or category
+- quote_comparison: compare factories/quotes on price, quality, lead time for a product or category, OR any pricing question over historical quote data (e.g. "what was the lowest price we paid for X", "what do our serums cost", "cheapest quote for facial cleanser", "price range for candles")
 - factory_comparison: compare factories on capabilities, certs, scores
 
 Return JSON only:
@@ -240,12 +240,15 @@ export default async function handler(req, res) {
         const certs = await sbGet('factory_certifications?tenant_id=eq.' + etid + '&expiry_date=lte.' + cutoff + '&select=certification_name,expiry_date,status,factories(factory_name_english)&order=expiry_date.asc&limit=50');
         dataCtx = { expiring_certifications: certs.map(c => ({ factory: c.factories && c.factories.factory_name_english, cert: c.certification_name, expiry: c.expiry_date, status: c.status })) }; sources = ['factory_certifications'];
       } else {
-        const [skus, pos, items] = await Promise.all([
-          sbGet('skus?tenant_id=eq.' + etid + '&select=model_number,description,status&order=created_at.desc&limit=30'),
-          sbGet('purchase_orders?tenant_id=eq.' + etid + '&select=po_number,status,factory_name_snapshot&order=created_at.desc&limit=30'),
+        const [skus, pos, items, quotes] = await Promise.all([
+          sbGet('skus?tenant_id=eq.' + etid + '&select=model_number,description,status,upc_code&order=created_at.desc&limit=40'),
+          sbGet('purchase_orders?tenant_id=eq.' + etid + '&select=po_number,status,factory_name_snapshot,description_snapshot,unit_fob_price,quantity&order=created_at.desc&limit=40'),
           sbGet('tenant_action_items?tenant_id=eq.' + etid + '&status=in.(open,acknowledged)&select=title,priority&limit=20'),
+          sbGet('rfq_quotes?select=unit_fob_price,factory_id,moq,production_lead_time_days,score_overall_v2,status,rfqs!inner(item_description,category,tenant_id)&rfqs.tenant_id=eq.' + etid + '&order=created_at.desc&limit=60'),
         ]);
-        dataCtx = { skus, purchase_orders: pos, action_items: items }; sources = ['skus', 'purchase_orders', 'tenant_action_items'];
+        const quoteData = quotes.map(q => ({ product: q.rfqs && q.rfqs.item_description, category: q.rfqs && q.rfqs.category, unit_fob_price: q.unit_fob_price, factory_id: q.factory_id, moq: q.moq, lead_time_days: q.production_lead_time_days, quality_score: q.score_overall_v2, status: q.status }));
+        dataCtx = { skus, purchase_orders: pos, rfq_quotes: quoteData, action_items: items };
+        sources = ['skus', 'purchase_orders', 'rfq_quotes', 'tenant_action_items'];
       }
     } catch (e) { dataCtx = {}; }
 
