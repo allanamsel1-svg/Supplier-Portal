@@ -7,18 +7,31 @@
 <link rel="stylesheet" href="/tenant-portal.css">
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
 <style>
-  .nr-btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:auto;}
+  .nr-btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
   .nr-btn:hover{background:#1d4ed8;}
-  .nr-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;}
-  .nr-modal-bg.open{display:flex;}
-  .nr-modal{background:var(--card-bg,#0f172a);border:1px solid var(--border,#334155);border-radius:14px;padding:1.5rem;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
-  .nr-modal h2{font-size:16px;font-weight:700;margin-bottom:1rem;}
-  .nr-field{margin:10px 0;}
+  .nr-btn.top{margin-left:auto;}
+  .nr-btn.alt{background:none;border:1px solid var(--border,#334155);color:var(--text,#e2e8f0);}
+  /* Full-screen RFQ drawer (slides in from the right) */
+  .rfq-drawer-bg{position:fixed;inset:0;background:rgba(0,0,0,0.5);display:none;z-index:500;}
+  .rfq-drawer-bg.open{display:block;}
+  .rfq-drawer{position:fixed;top:0;right:0;height:100vh;width:85vw;max-width:980px;background:var(--bg,#0a0e1a);border-left:1px solid var(--border,#334155);box-shadow:-8px 0 40px rgba(0,0,0,0.45);display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.25s ease;}
+  .rfq-drawer-bg.open .rfq-drawer{transform:translateX(0);}
+  .rfq-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border,#334155);flex-shrink:0;background:var(--bg2,#0d1424);}
+  .rfq-drawer-head h2{font-size:17px;font-weight:700;}
+  .rfq-x{background:none;border:1px solid var(--border,#334155);border-radius:7px;color:var(--text,#e2e8f0);font-size:15px;cursor:pointer;padding:5px 11px;font-family:inherit;}
+  .rfq-drawer-body{flex:1;overflow-y:auto;padding:20px 24px;}
+  .rfq-drawer-foot{display:flex;align-items:center;gap:10px;padding:14px 24px;border-top:1px solid var(--border,#334155);flex-shrink:0;background:var(--bg2,#0d1424);}
+  .rfq-sec{border:1px solid var(--border,#334155);border-radius:12px;padding:16px 18px;margin-bottom:16px;background:var(--card-bg,#0f172a);}
+  .rfq-sec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2,#94a3b8);margin-bottom:12px;}
+  .nr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:640px){.nr-grid{grid-template-columns:1fr;}.rfq-drawer{width:100vw;}}
+  .nr-field{margin:8px 0;}
   .nr-field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--text2,#94a3b8);}
   .nr-field input,.nr-field select,.nr-field textarea{width:100%;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--bg2,#0d1424);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;}
-  .nr-field textarea{min-height:70px;resize:vertical;}
-  .nr-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;}
-  .nr-actions .alt{background:none;border:1px solid var(--border,#334155);color:var(--text,#e2e8f0);}
+  .nr-field textarea{min-height:64px;resize:vertical;}
+  .nr-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0;}
+  .nr-radio{display:inline-flex;gap:16px;}
+  .fmatch-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border,#334155);}
 </style>
 </head>
 <body>
@@ -40,7 +53,7 @@
     <div class="toolbar">
       <input class="search-input" id="rfqSearch" placeholder="Search RFQs by project #, description, category…">
       <select class="filter-select" id="rfqStatus"><option value="all">All statuses</option></select>
-      <button class="nr-btn" onclick="openNewRfqModal()">+ New RFQ</button>
+      <button class="nr-btn top" onclick="openNewRfqModal()">+ New RFQ</button>
     </div>
     <div id="box-rfq"><div class="loading">Loading RFQs…</div></div>
   </div>
@@ -68,16 +81,88 @@
   </div>
 </div>
 
-<div class="nr-modal-bg" id="nrModal">
-  <div class="nr-modal">
-    <h2>New RFQ</h2>
-    <div class="nr-field"><label>Product name / description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
-    <div class="nr-field"><label>Category</label><select id="nr-category"><option value="">Select category…</option></select></div>
-    <div class="nr-field"><label>Quantity</label><input id="nr-qty" type="number" min="0" placeholder="e.g. 5000"></div>
-    <div class="nr-field"><label>Target FOB cost (optional)</label><input id="nr-fob" type="number" min="0" step="0.01" placeholder="e.g. 2.50"></div>
-    <div class="nr-field"><label>Specifications / notes</label><textarea id="nr-spec" placeholder="Describe materials, packaging, certifications required…"></textarea></div>
-    <div class="nr-field"><div id="nr-err" style="color:#f87171;font-size:12px;display:none;"></div></div>
-    <div class="nr-actions"><button class="nr-btn alt" onclick="closeNewRfqModal()">Cancel</button><button class="nr-btn" id="nr-save" onclick="saveNewRfq()">Create RFQ</button></div>
+<div class="rfq-drawer-bg" id="rfqDrawerBg">
+  <div class="rfq-drawer" id="rfqDrawer">
+    <div class="rfq-drawer-head">
+      <div style="display:flex;align-items:center;gap:10px;"><button class="rfq-x" onclick="closeNewRfqModal()" title="Back">←</button><h2>New RFQ</h2></div>
+      <button class="rfq-x" onclick="closeNewRfqModal()" title="Close">✕</button>
+    </div>
+    <div class="rfq-drawer-body">
+      <div class="rfq-sec"><h3>1 · Product Information</h3>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
+          <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
+        </div>
+        <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
+        <div class="nr-field"><label>Basic specifications</label><textarea id="nr-spec" placeholder="Materials, formula, packaging, claims…"></textarea></div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Quantity</label><input id="nr-qty" type="number" min="0" placeholder="e.g. 5000"></div>
+          <div class="nr-field"><label>Target FOB cost (optional)</label><input id="nr-fob" type="number" min="0" step="0.01" placeholder="e.g. 2.50"></div>
+        </div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Product size</label><input id="nr-size" placeholder="e.g. 30"></div>
+          <div class="nr-field"><label>Size unit</label><select id="nr-sizeunit"><option value="">—</option><option>ml</option><option>g</option><option>oz</option><option>cm</option><option>in</option><option>units</option></select></div>
+        </div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Color</label><input id="nr-color" placeholder="e.g. Clear / White"></div>
+          <div class="nr-field"></div>
+        </div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Inner case pack</label><input id="nr-inner" type="number" min="0"></div>
+          <div class="nr-field"><label>Master case pack</label><input id="nr-master" type="number" min="0"></div>
+        </div>
+      </div>
+
+      <div class="rfq-sec"><h3>2 · Product Type</h3>
+        <div class="nr-radio">
+          <label class="nr-check"><input type="radio" name="nr-ptype" value="single" checked> Single product</label>
+          <label class="nr-check"><input type="radio" name="nr-ptype" value="kit"> Kit</label>
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:6px;">Kit components can be specified with your sourcing manager after the RFQ is created.</div>
+      </div>
+
+      <div class="rfq-sec"><h3>3 · Packaging</h3>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Primary container</label><input id="nr-pkg-primary" list="nr-pkg-suggestions" placeholder="e.g. Glass dropper bottle"></div>
+          <div class="nr-field"><label>Closure / applicator</label><input id="nr-pkg-closure" placeholder="e.g. Dropper cap"></div>
+        </div>
+        <datalist id="nr-pkg-suggestions"><option value="Glass bottle"><option value="PET bottle"><option value="Airless pump"><option value="Jar"><option value="Tube"><option value="Folding carton"><option value="Pouch"></datalist>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Secondary / display</label><input id="nr-pkg-secondary" placeholder="e.g. Printed folding carton"></div>
+          <div class="nr-field"><label>Finish</label><input id="nr-pkg-finish" placeholder="e.g. Matte / Gloss / Soft-touch"></div>
+        </div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Color</label><input id="nr-pkg-color" placeholder="e.g. Frosted"></div>
+          <div class="nr-field"></div>
+        </div>
+        <div class="nr-field"><label>Packaging notes</label><textarea id="nr-pkg-notes" placeholder="Decoration, print method, special requirements…"></textarea></div>
+      </div>
+
+      <div class="rfq-sec"><h3>4 · Compliance</h3>
+        <label class="nr-check"><input type="checkbox" id="nr-cosmetic"> Cosmetic product</label>
+        <div class="nr-field"><label>CA Prop 65 strategy</label><select id="nr-prop65">
+          <option value="">Not specified</option>
+          <option>Not applicable</option>
+          <option>No listed chemicals present</option>
+          <option>Warning label required</option>
+          <option>Reformulate to avoid listed chemicals</option>
+          <option>Testing required to confirm</option>
+        </select></div>
+        <div class="nr-field"><label>Product documents required/preferred</label><input id="nr-docs" placeholder="e.g. SDS, COA, Prop 65 statement, allergen disclosure"></div>
+      </div>
+
+      <div class="rfq-sec"><h3>5 · Factory Matching</h3>
+        <button class="nr-btn alt" onclick="findMatchingFactories()">✦ Find Matching Factories</button>
+        <div id="nr-factory-status" style="font-size:12px;color:var(--text2);margin-top:8px;">Select a category, then find suppliers that match it.</div>
+        <div id="nr-factory-list" style="margin-top:8px;"></div>
+      </div>
+    </div>
+
+    <div class="rfq-drawer-foot">
+      <div id="nr-err" style="color:#f87171;font-size:12px;flex:1;"></div>
+      <button class="nr-btn alt" id="nr-draft" onclick="saveNewRfq('draft')">Save as Draft</button>
+      <button class="nr-btn" id="nr-submit" onclick="saveNewRfq('pending_review')">Submit for Review</button>
+    </div>
   </div>
 </div>
 
@@ -97,20 +182,36 @@ let TID = null, ME_EMAIL = '';
 let rfqs = [], pds = [], skus = [], rfqCategories = [];
 const loaded = {};
 
-// ── New RFQ creation ──
+// ── New RFQ creation (full-screen drawer) ──
+let rfqCatMeta = [];   // [{category, is_cosmetic}]
+let nrSelectedFactories = [];
+function nrg(id) { return document.getElementById(id); }
 async function loadRfqCategories() {
-  const rows = await supa('categories?select=category&order=category');
-  rfqCategories = Array.from(new Set(rows.map(r => r.category).filter(Boolean)));
-  const sel = document.getElementById('nr-category');
-  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCategories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const rows = await supa('categories?select=category,is_cosmetic&order=category');
+  const seen = {}; rfqCatMeta = [];
+  rows.forEach(r => { if (r.category && !seen[r.category]) { seen[r.category] = 1; rfqCatMeta.push({ category: r.category, is_cosmetic: !!r.is_cosmetic }); } });
+  rfqCategories = rfqCatMeta.map(c => c.category);
+  const sel = nrg('nr-category');
+  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCatMeta.map(c => `<option value="${esc(c.category)}" data-cosmetic="${c.is_cosmetic ? '1' : '0'}">${esc(c.category)}</option>`).join('');
+}
+function nrCategoryChange() {
+  const sel = nrg('nr-category'); if (!sel) return;
+  const opt = sel.options[sel.selectedIndex];
+  const cos = nrg('nr-cosmetic');
+  if (opt && cos && !cos.dataset.userOverride) cos.checked = opt.getAttribute('data-cosmetic') === '1';
+  nrg('nr-factory-list').innerHTML = '';
+  nrg('nr-factory-status').textContent = sel.value ? 'Click "Find Matching Factories" to see suppliers for ' + sel.value + '.' : 'Select a category, then find suppliers that match it.';
+  nrSelectedFactories = [];
 }
 function openNewRfqModal(prefill) {
-  document.getElementById('nr-err').style.display = 'none';
-  document.getElementById('nr-desc').value = (prefill && prefill.product) || '';
-  document.getElementById('nr-qty').value = (prefill && prefill.quantity != null) ? prefill.quantity : '';
-  document.getElementById('nr-fob').value = (prefill && prefill.target_cost != null) ? prefill.target_cost : '';
-  document.getElementById('nr-spec').value = '';
-  const catSel = document.getElementById('nr-category');
+  nrg('nr-err').textContent = '';
+  ['nr-desc', 'nr-spec', 'nr-qty', 'nr-fob', 'nr-size', 'nr-color', 'nr-inner', 'nr-master',
+   'nr-pkg-primary', 'nr-pkg-closure', 'nr-pkg-secondary', 'nr-pkg-finish', 'nr-pkg-color', 'nr-pkg-notes', 'nr-docs'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
+  const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
+  document.querySelectorAll('input[name="nr-ptype"]').forEach(r => { r.checked = r.value === 'single'; });
+  nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
+  const catSel = nrg('nr-category');
   if (catSel) {
     catSel.value = '';
     if (prefill && prefill.category) {
@@ -119,25 +220,58 @@ function openNewRfqModal(prefill) {
       if (match) catSel.value = match;
     }
   }
-  document.getElementById('nrModal').classList.add('open');
-  setTimeout(() => { try { document.getElementById('nr-desc').focus(); } catch (e) {} }, 50);
+  if (prefill) {
+    if (prefill.product) nrg('nr-desc').value = prefill.product;
+    if (prefill.quantity != null) nrg('nr-qty').value = prefill.quantity;
+    if (prefill.target_cost != null) nrg('nr-fob').value = prefill.target_cost;
+  }
+  nrCategoryChange();
+  nrg('rfqDrawerBg').classList.add('open');
+  setTimeout(() => { try { nrg('nr-desc').focus(); } catch (e) {} }, 80);
 }
-function closeNewRfqModal() { document.getElementById('nrModal').classList.remove('open'); }
-async function saveNewRfq() {
-  const desc = (document.getElementById('nr-desc').value || '').trim();
-  const err = document.getElementById('nr-err');
-  if (!desc) { err.textContent = 'Product name / description is required.'; err.style.display = 'block'; return; }
-  const cat = document.getElementById('nr-category').value || null;
-  const qtyRaw = document.getElementById('nr-qty').value, fobRaw = document.getElementById('nr-fob').value;
-  let spec = (document.getElementById('nr-spec').value || '').trim();
-  if (ME_EMAIL) spec = (spec ? spec + '\n\n' : '') + 'Submitted by: ' + ME_EMAIL;   // rfqs has no created_by column
+function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); }
+async function findMatchingFactories() {
+  const cat = nrg('nr-category').value;
+  const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
+  if (!cat) { status.textContent = 'Please select a category first.'; return; }
+  status.textContent = 'Searching…'; listEl.innerHTML = '';
+  const facs = await supa(`factories?tenant_id=eq.${TID}&product_categories=cs.${encodeURIComponent('{"' + cat.replace(/"/g, '') + '"}')}&select=id,factory_name_english,country,city&order=factory_name_english.asc`);
+  if (!facs.length) { status.textContent = 'No factories in your network match "' + cat + '". You can still submit — your sourcing manager will source suppliers.'; return; }
+  status.textContent = facs.length + ' matching factor' + (facs.length === 1 ? 'y' : 'ies') + ' — select who to send to:';
+  listEl.innerHTML = facs.map(f => `<label class="fmatch-row"><input type="checkbox" class="nr-fac" value="${esc(f.id)}" onchange="nrToggleFactory()"> ${esc(f.factory_name_english || 'Factory')}${f.city || f.country ? ' <span style="color:var(--text2);font-size:11px;">· ' + esc([f.city, f.country].filter(Boolean).join(', ')) + '</span>' : ''}</label>`).join('');
+}
+function nrToggleFactory() {
+  nrSelectedFactories = Array.prototype.slice.call(document.querySelectorAll('.nr-fac:checked')).map(c => c.value);
+}
+async function saveNewRfq(status) {
+  const desc = (nrg('nr-desc').value || '').trim();
+  const err = nrg('nr-err');
+  if (!desc) { err.textContent = 'Item description is required.'; return; }
+  const num = id => { const v = nrg(id).value; return v === '' ? null : Number(v); };
+  const txt = id => { const v = (nrg(id).value || '').trim(); return v || null; };
+  let spec = (nrg('nr-spec').value || '').trim();
+  const ptype = (document.querySelector('input[name="nr-ptype"]:checked') || {}).value || 'single';
+  const extras = [];
+  if (txt('nr-size') || nrg('nr-sizeunit').value) extras.push('Size: ' + [txt('nr-size'), nrg('nr-sizeunit').value].filter(Boolean).join(' '));
+  if (txt('nr-color')) extras.push('Color: ' + txt('nr-color'));
+  if (ptype === 'kit') extras.push('Product type: Kit');
+  if (ME_EMAIL) extras.push('Submitted by: ' + ME_EMAIL);   // rfqs has no created_by column
+  if (extras.length) spec = (spec ? spec + '\n\n' : '') + extras.join('\n');
   const body = {
-    tenant_id: TID, item_description: desc, category: cat, status: 'draft',
-    quote_quantity: qtyRaw === '' ? null : Number(qtyRaw),
-    max_fob_price: fobRaw === '' ? null : Number(fobRaw),
+    tenant_id: TID, item_description: desc, category: nrg('nr-category').value || null, status: status,
     detailed_specifications: spec || null,
+    quote_quantity: num('nr-qty'), max_fob_price: num('nr-fob'),
+    product_size: txt('nr-size'), unit_type: (nrg('nr-unit').value || 'Each').toLowerCase(),
+    inner_case_pack: num('nr-inner'), master_case_pack: num('nr-master'),
+    packaging_primary: txt('nr-pkg-primary'), packaging_closures: txt('nr-pkg-closure'),
+    packaging_secondary: txt('nr-pkg-secondary'), packaging_finish: txt('nr-pkg-finish'),
+    packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
+    is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
+    product_docs_required: txt('nr-docs'),
+    factories_to_send: nrSelectedFactories.length ? nrSelectedFactories : null,
   };
-  const btn = document.getElementById('nr-save'); btn.disabled = true; btn.textContent = 'Creating…';
+  const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
+  dBtn.disabled = true; sBtn.disabled = true;
   let ok = false;
   try {
     const r = await fetch(SUPA_URL + '/rest/v1/rfqs', {
@@ -146,13 +280,16 @@ async function saveNewRfq() {
       body: JSON.stringify(body),
     });
     ok = r.ok;
+    if (!ok) console.error('saveNewRfq failed', r.status, await r.text().catch(() => ''));
   } catch (e) { ok = false; }
-  btn.disabled = false; btn.textContent = 'Create RFQ';
-  if (!ok) { err.textContent = 'Could not create the RFQ. Please try again.'; err.style.display = 'block'; return; }
+  dBtn.disabled = false; sBtn.disabled = false;
+  if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
   closeNewRfqModal();
   await loadRFQs();
   showTab('rfq');
 }
+// Cosmetic checkbox manual override flag.
+document.addEventListener('change', e => { if (e.target && e.target.id === 'nr-cosmetic') e.target.dataset.userOverride = 'true'; });
 
 function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'rfq';
@@ -389,7 +526,7 @@ async function openSKU(id) {
   renderSidebar(user);
   document.getElementById('pageSub').textContent = user.tenant.name + ' · RFQs and product development';
   loadRfqCategories();
-  document.getElementById('nrModal').addEventListener('click', e => { if (e.target.id === 'nrModal') closeNewRfqModal(); });
+  document.getElementById('rfqDrawerBg').addEventListener('click', e => { if (e.target.id === 'rfqDrawerBg') closeNewRfqModal(); });
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
   document.getElementById('rfqSearch').addEventListener('input', renderRFQs);
@@ -423,7 +560,7 @@ function handleAiRfqAction() {
     var banner = document.createElement('div');
     banner.id = 'nr-ai-banner';
     banner.style.cssText = 'background:rgba(59,130,246,0.12);border:1px solid #3b82f6;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text);';
-    banner.textContent = '🆕 Opening New RFQ form…' + (p.product ? ' (' + p.product + ')' : '');
+    banner.textContent = '🆕 Opening full RFQ form' + (p.product ? ' for ' + p.product + '…' : '…');
     pane.insertBefore(banner, pane.firstChild);
   }
   // Give categories a moment to load so pre-select can match, then open the pre-filled form.
