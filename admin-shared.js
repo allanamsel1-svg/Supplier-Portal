@@ -21,6 +21,12 @@
   var IS_ADMIN_HOME = CURRENT === 'admin.html';
   var STORE_KEY = 'admin_sidebar_sections';
 
+  // Master-detail pages whose OWN full-height left list (.layout > .lpanel) sat flush
+  // against the new nav and read as a second sidebar. On these we inset the .layout as a
+  // card so it reads as content. (compliance-rules/scanner already center their content
+  // with rounded cards, so they're intentionally excluded — wrapping them would double-border.)
+  var INSET_PAGES = { 'artwork-admin.html': 1, 'inspections.html': 1 };
+
   // ── Nav definition (exact sections/items/order from the spec) ──
   var NAV = [
     { section: 'Overview', items: [
@@ -116,6 +122,9 @@
     'body.admin-dark #admin-sidebar .sb-item:hover{background:#0f1e35;color:#e2e8f0;}',
     'body.admin-dark #admin-sidebar .sb-item.on,body.admin-dark #admin-sidebar .sb-item.active{background:#14223c;color:#9bc2ff;}',
     'body.admin-dark #admin-sidebar .sb-count{background:#1e2d47;color:#94a3b8;}',
+    // Inset master-detail pages' own .layout as a card so it doesn't read as a 2nd sidebar.
+    'body.admin-md-inset .layout{margin:0 16px;border:1px solid #e0e0d8;border-radius:12px;overflow:hidden;}',
+    'body.admin-dark.admin-md-inset .layout{border-color:#1e2d47;}',
   ].join('\n');
 
   function injectCss() {
@@ -173,6 +182,7 @@
       '<div class="sb-logo"><div class="sb-wordmark">TBG Sourcing</div><div class="sb-sub">Admin</div></div>' +
       '<nav class="sb-nav">' + NAV.map(sectionHtml).join('') + '</nav>';
     if (!IS_ADMIN_HOME) document.body.classList.add('admin-sidebar-offset');
+    if (INSET_PAGES[CURRENT]) document.body.classList.add('admin-md-inset');
   }
 
   // ── Loaders ──
