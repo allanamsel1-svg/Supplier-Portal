@@ -11,11 +11,32 @@
 //   POST /api/tenant-auth?action=logout   (Bearer token)      → { success }
 export const config = { runtime: 'nodejs' };
 
-import { createHash } from 'crypto';
+import { createHash, createHmac, timingSafeEqual } from 'crypto';
 
 const SB_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
+
+// Byline Brands — the tenant an authenticated admin is shown when browsing the tenant
+// portal pages (admins hold an admin_session, not a tenant_token / tenant_users row).
+const ADMIN_TENANT_ID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+
+// Verify an admin session token exactly the way api/admin-auth.js does:
+// token = base64url(payload) + '.' + base64url(HMAC-SHA256(payload, KEY)),
+// KEY = ADMIN_SESSION_SECRET || ADMIN_PASSWORD. Returns false if unconfigured.
+function verifyAdminToken(token) {
+  const key = String(process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || '').trim();
+  if (!key || !token || typeof token !== 'string' || token.indexOf('.') === -1) return false;
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return false;
+  const expected = createHmac('sha256', key).update(payload).digest('base64url');
+  if (sig.length !== expected.length) return false;
+  try {
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+    const obj = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    return !obj.exp || Date.now() < obj.exp;
+  } catch { return false; }
+}
 
 function hashPassword(password) {
   // SHA256 of password + salt, concatenated with no separator.
@@ -91,6 +112,24 @@ export default async function handler(req, res) {
     try {
       const token = bearer(req);
       if (!token) return res.status(401).json({ error: 'No token' });
+
+      // Cross-portal access: a valid admin session token loads the tenant portal as the
+      // Byline Brands tenant (admins have no separate tenant login). Checked before the
+      // tenant-session lookup; a tenant token fails verifyAdminToken and falls through.
+      if (verifyAdminToken(token)) {
+        try {
+          const tr = await fetch(SB_URL + '/rest/v1/tenants?id=eq.' + ADMIN_TENANT_ID +
+            '&select=id,name,slug,plan,features,api_cost_cap_usd,api_markup_rate&limit=1', { headers: H });
+          if (!tr.ok) console.error('tenant-auth validate(admin): tenant query failed', tr.status, await tr.text().catch(() => ''));
+          const tarr = tr.ok ? await tr.json() : [];
+          const tenant = Array.isArray(tarr) ? tarr[0] : null;
+          if (tenant) {
+            const adminUser = { id: 'admin', email: 'admin@tbgsourcing.net', full_name: 'Admin', role: 'admin', tenants: tenant };
+            return res.status(200).json({ valid: true, user: userPayload(adminUser, tenant.id) });
+          }
+          // tenant row missing → fall through to the normal tenant-session check below.
+        } catch (e) { console.error('tenant-auth validate(admin): fetch threw', e); }
+      }
 
       let session = null;
       try {

@@ -32,7 +32,11 @@ async function supa(path) {
 
 // ── Auth ── (validate token from localStorage; redirect to login if invalid)
 async function tenantAuth() {
-  const token = localStorage.getItem('tenant_token');
+  // Tenant users authenticate with tenant_token. Admins (admin_session, no tenant_token)
+  // are allowed through: the validate endpoint accepts a valid admin session token and
+  // returns the Byline Brands tenant, so admins can browse tenant pages without a tenant login.
+  let token = localStorage.getItem('tenant_token');
+  if (!token) token = localStorage.getItem('admin_session');
   if (!token) return window.location.href = 'tenant-login.html';
   let res;
   try {
