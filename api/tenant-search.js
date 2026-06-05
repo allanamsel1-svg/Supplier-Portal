@@ -116,6 +116,37 @@ function navUrl(dest) {
   return 'tenant-dashboard.html';
 }
 
+const PRICING_GUIDE = "When answering pricing questions: use RFQ Quote History if available (these are factory-submitted quotes). If only Purchase Order Price History is available, use those prices — they represent actual contracted FOB prices. If all POs are from the same factory, note that cross-factory comparison isn't possible and show the price range across product variants instead. Always state the source of the data (quoted price vs contracted PO price).";
+
+// Pull BOTH rfq_quotes and purchase_orders (tenant-scoped), filter by product/category when given,
+// and return a context string preferring quotes, falling back to PO prices.
+async function buildPricingContext(etid, params) {
+  const cat = (params.category || '').trim().toLowerCase();
+  const prod = (params.product || '').trim().toLowerCase();
+  let quotes = await sbGet('rfq_quotes?select=unit_fob_price,moq,production_lead_time_days,score_overall_v2,status,factories(factory_name_english),rfqs!inner(item_description,category,tenant_id)&rfqs.tenant_id=eq.' + etid + '&order=created_at.desc&limit=80');
+  if (cat || prod) {
+    const m = quotes.filter(q => { const it = ((q.rfqs && q.rfqs.item_description) || '').toLowerCase(), c = ((q.rfqs && q.rfqs.category) || '').toLowerCase(); return (prod && it.includes(prod)) || (cat && c.includes(cat)); });
+    if (m.length) quotes = m;
+  }
+  let pos = await sbGet('purchase_orders?tenant_id=eq.' + etid + '&select=po_number,description_snapshot,factory_name_snapshot,unit_fob_price,quantity,status&order=created_at.desc&limit=80');
+  if (cat || prod) {
+    const m = pos.filter(p => { const d = ((p.description_snapshot) || '').toLowerCase(); return (prod && d.includes(prod)) || (cat && d.includes(cat)); });
+    if (m.length) pos = m;
+  }
+  const sources = [];
+  let text;
+  if (quotes.length) {
+    sources.push('rfq_quotes');
+    text = 'RFQ Quote History: ' + JSON.stringify(quotes.map(q => ({ factory: (q.factories && q.factories.factory_name_english) || '—', product: q.rfqs && q.rfqs.item_description, unit_fob_price: q.unit_fob_price, moq: q.moq, lead_time: q.production_lead_time_days, score: q.score_overall_v2 })));
+  } else if (pos.length) {
+    sources.push('purchase_orders');
+    text = 'Purchase Order Price History (no factory quotes on file — using issued PO prices): ' + JSON.stringify(pos.map(p => ({ po_number: p.po_number, description_snapshot: p.description_snapshot, factory_name_snapshot: p.factory_name_snapshot, unit_fob_price: p.unit_fob_price, quantity: p.quantity, status: p.status })));
+  } else {
+    text = 'No pricing data available for this tenant.';
+  }
+  return { text, sources, hasData: quotes.length > 0 || pos.length > 0 };
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -168,26 +199,12 @@ export default async function handler(req, res) {
       let answer = '', sources = [];
       try {
         if (intent === 'quote_comparison') {
-          const cat = (params.category || '').trim(), prod = (params.product || '').trim();
-          let rfqFilter = 'rfqs?tenant_id=eq.' + etid + '&select=id,project_number,item_description,category&order=created_at.desc&limit=40';
-          let rfqs = await sbGet(rfqFilter);
-          if (cat || prod) {
-            const m = rfqs.filter(r => (cat && (r.category || '').toLowerCase().includes(cat.toLowerCase())) || (prod && (r.item_description || '').toLowerCase().includes(prod.toLowerCase())));
-            if (m.length) rfqs = m;
-          }
-          const ids = rfqs.slice(0, 15).map(r => r.id).filter(Boolean);
-          let quotes = [];
-          if (ids.length) quotes = await sbGet('rfq_quotes?rfq_id=in.(' + ids.join(',') + ')&select=*,factories(factory_name_english)&limit=60');
-          sources = ['rfqs', 'rfq_quotes', 'factories'];
-          const data = quotes.map(q => ({
-            factory: (q.factories && q.factories.factory_name_english) || q.factory_name || '—',
-            unit_fob_price: q.unit_fob_price, moq: q.moq, lead_time_days: q.production_lead_time_days,
-            quality_score: q.score_overall_v2, compliance: q.compliance_status, certs_confirmed: q.certifications_confirmed,
-          }));
-          const sys = 'You are a sourcing analyst. Given competing factory quotes (JSON), produce a MARKDOWN TABLE ranked by best overall value (weigh unit price, quality score, and lead time together), then 2-3 plain-English sentences recommending the best option. If there is no quote data, say so briefly.\n\nQUOTES:\n' + JSON.stringify(data);
+          const pc = await buildPricingContext(etid, params);
+          sources = pc.sources.length ? pc.sources : ['rfq_quotes', 'purchase_orders'];
+          const sys = PRICING_GUIDE + '\n\nYou are a sourcing analyst. Using the pricing data below, produce a MARKDOWN TABLE ranked best-first (weigh unit price, quality score, and lead time where available), then 2-3 plain-English sentences with a recommendation. State whether the prices are quoted prices or contracted PO prices. If no pricing data exists, say so briefly.\n\n' + pc.text;
           const out = await claude(ANSWER_MODEL, 800, sys, query);
           logCost(tid, 'tenant_search_quote_comparison', ANSWER_MODEL, out.usage);
-          answer = out.text || 'No quote data available to compare.';
+          answer = out.text || 'No pricing data available to compare.';
         } else {
           const factories = await sbGet('factories?tenant_id=eq.' + etid + '&select=id,factory_name_english,product_categories,status,certifications,reliability_score,credit_score&order=created_at.desc&limit=30');
           const fids = factories.map(f => f.id).filter(Boolean);
@@ -254,7 +271,7 @@ export default async function handler(req, res) {
 
     let answer = '';
     try {
-      const sys = 'You are a sourcing intelligence assistant. Answer the question concisely and specifically using ONLY the portal data below (scoped to this tenant). Use markdown (bold, bullets, small tables) where helpful. If the data does not contain the answer, say so plainly.\n\nPORTAL DATA (JSON):\n' + JSON.stringify(dataCtx);
+      const sys = 'You are a sourcing intelligence assistant. Answer the question concisely and specifically using ONLY the portal data below (scoped to this tenant). Use markdown (bold, bullets, small tables) where helpful. If the data does not contain the answer, say so plainly.\n\n' + PRICING_GUIDE + '\n\nPORTAL DATA (JSON):\n' + JSON.stringify(dataCtx);
       const out = await claude(ANSWER_MODEL, 600, sys, query);
       logCost(tid, 'tenant_search_' + intent, ANSWER_MODEL, out.usage);
       answer = out.text || 'No answer returned.';
