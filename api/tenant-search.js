@@ -224,6 +224,15 @@ async function fetchSources(srcSet, etid, params) {
     const cr = await sbGet(path);
     add('compliance_reqs', 'COMPLIANCE REQUIREMENTS', cr, x => `${x.category || '—'} | required certs: ${arr(x.required_factory_certs) || '—'} | required docs: ${arr(x.required_product_docs) || '—'}`);
   }
+
+  // Pitch & positioning — global TBG data (not tenant-scoped). Always included so the AI can
+  // speak to TBG's value proposition, competitive positioning, and demo queries regardless of
+  // which tenant data sources the query selected.
+  {
+    const pitch = await sbGet('pitch_items?select=id,category,headline,detail,demo_query,demo_result,competitive_context&limit=50');
+    add('pitch_items', 'Pitch & Positioning Data', pitch, x => `[${x.category || '—'}] ${x.headline || '—'} | ${x.detail || '—'}${x.demo_query ? ' | demo Q: ' + x.demo_query : ''}${x.demo_result ? ' | demo result: ' + x.demo_result : ''}${x.competitive_context ? ' | vs competitors: ' + x.competitive_context : ''}`);
+  }
+
   return { text: sections.join('\n\n'), sources: used };
 }
 
