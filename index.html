@@ -616,50 +616,50 @@
   <!-- Product Compliance pane (Stage 3) -->
   <div class="ppane" id="ppane-skus">
     <div class="card">
-      <div class="card-title">Product Compliance Documents</div>
-      <p style="font-size:13px;color:#999;margin-bottom:1rem;">For each SKU you produce for us, upload the required compliance documents (test reports, certifications, etc). If a document isn't ready yet, mark it "Not Complete" with an expected date so we can plan around it.</p>
+      <div class="card-title" data-i18n="skus.title">Product Compliance Documents</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-i18n="skus.intro">For each SKU you produce for us, upload the required compliance documents (test reports, certifications, etc). If a document isn't ready yet, mark it "Not Complete" with an expected date so we can plan around it.</p>
 
-      <div id="sku-compliance-list"><div style="font-size:13px;color:#bbb;padding:8px 0;">Loading...</div></div>
+      <div id="sku-compliance-list"><div style="font-size:13px;color:#bbb;padding:8px 0;" data-i18n="common.loading">Loading...</div></div>
     </div>
 
     <!-- Modal: shared upload / mark-incomplete form -->
     <div id="sku-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center;padding:20px;">
       <div style="background:#fff;border-radius:12px;max-width:580px;width:100%;max-height:90vh;overflow-y:auto;padding:1.5rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <div style="font-size:16px;font-weight:600;color:#1a1a2e;" id="sku-modal-title">Upload Document</div>
+          <div style="font-size:16px;font-weight:600;color:#1a1a2e;" id="sku-modal-title" data-i18n="common.uploadDocument">Upload Document</div>
           <button onclick="closeSkuModal()" style="background:none;border:none;font-size:22px;color:#888;cursor:pointer;line-height:1;">×</button>
         </div>
         <div id="sku-modal-context" style="font-size:11px;color:#888;margin-bottom:14px;"></div>
 
         <!-- Mode toggle -->
         <div style="display:flex;gap:8px;margin-bottom:14px;background:#f8f8f4;padding:4px;border-radius:8px;">
-          <button id="sku-mode-upload" class="cf-doc-btn" style="flex:1;padding:8px;background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="setSkuMode('upload')">📄 Upload Document</button>
-          <button id="sku-mode-incomplete" class="cf-doc-btn" style="flex:1;padding:8px;" onclick="setSkuMode('incomplete')">⏳ Not Complete Yet</button>
+          <button id="sku-mode-upload" class="cf-doc-btn" style="flex:1;padding:8px;background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="setSkuMode('upload')" data-i18n="skus.modeUpload">📄 Upload Document</button>
+          <button id="sku-mode-incomplete" class="cf-doc-btn" style="flex:1;padding:8px;" onclick="setSkuMode('incomplete')" data-i18n="skus.modeIncomplete">⏳ Not Complete Yet</button>
         </div>
 
         <!-- Common fields: category + type -->
         <div class="cf-form-grid">
           <div class="field">
-            <label>Category *</label>
+            <label data-i18n="skus.category">Category *</label>
             <select id="sku-category" onchange="onSkuCategoryChange()">
-              <option value="">— Select —</option>
-              <option>Safety Testing</option>
-              <option>Regulatory</option>
-              <option>Substantiation / Claims Testing</option>
-              <option>Children's Products</option>
-              <option>Ingredient &amp; Composition</option>
-              <option>Other</option>
+              <option value="" data-i18n="common.select">— Select —</option>
+              <option value="Safety Testing" data-i18n="skus.catSafety">Safety Testing</option>
+              <option value="Regulatory" data-i18n="skus.catRegulatory">Regulatory</option>
+              <option value="Substantiation / Claims Testing" data-i18n="skus.catSubstantiation">Substantiation / Claims Testing</option>
+              <option value="Children's Products" data-i18n="skus.catChildrens">Children's Products</option>
+              <option value="Ingredient &amp; Composition" data-i18n="skus.catIngredient">Ingredient &amp; Composition</option>
+              <option value="Other" data-i18n="skus.catOther">Other</option>
             </select>
           </div>
           <div class="field">
-            <label>Document Type *</label>
+            <label data-i18n="skus.docType">Document Type *</label>
             <select id="sku-type" disabled>
-              <option value="">— Select category first —</option>
+              <option value="" data-i18n="skus.selectCatFirst">— Select category first —</option>
             </select>
           </div>
           <div class="field cf-form-full" id="sku-other-wrap" style="display:none;">
-            <label>Specify document type *</label>
-            <input type="text" id="sku-type-other" placeholder="e.g. Walmart Item Setup Sheet" />
+            <label data-i18n="skus.specifyDocType">Specify document type *</label>
+            <input type="text" id="sku-type-other" placeholder="e.g. Walmart Item Setup Sheet" data-i18n-ph="skus.specifyDocTypePh" />
           </div>
         </div>
 
@@ -667,31 +667,31 @@
         <div id="sku-upload-fields">
           <div class="cf-form-grid">
             <div class="field">
-              <label>Certificate / Report Number</label>
-              <input type="text" id="sku-cert-no" placeholder="optional" />
+              <label data-i18n="skus.certReportNo">Certificate / Report Number</label>
+              <input type="text" id="sku-cert-no" placeholder="optional" data-i18n-ph="common.optional" />
             </div>
             <div class="field">
-              <label>Test Lab</label>
-              <input type="text" id="sku-test-lab" placeholder="e.g. Eurofins, SGS" />
+              <label data-i18n="skus.testLab">Test Lab</label>
+              <input type="text" id="sku-test-lab" placeholder="e.g. Eurofins, SGS" data-i18n-ph="skus.testLabPh" />
             </div>
             <div class="field">
-              <label>Issue Date</label>
+              <label data-i18n="common.issueDate">Issue Date</label>
               <input type="date" id="sku-issue-date" />
             </div>
             <div class="field">
-              <label>Expiry Date *</label>
+              <label data-i18n="common.expiryDate">Expiry Date *</label>
               <input type="date" id="sku-expiry-date" />
             </div>
             <div class="field cf-form-full">
-              <label>Notes</label>
-              <textarea id="sku-notes" rows="2" placeholder="Optional notes — exclusions, scope, etc."></textarea>
+              <label data-i18n="common.notes">Notes</label>
+              <textarea id="sku-notes" rows="2" placeholder="Optional notes — exclusions, scope, etc." data-i18n-ph="skus.notesScopePh"></textarea>
             </div>
           </div>
 
           <div class="upload-zone" onclick="document.getElementById('sku-file-input').click()">
             <div class="icon">📄</div>
-            <strong>Choose PDF</strong>
-            <small>PDF only, up to 25 MB</small>
+            <strong data-i18n="common.choosePdf">Choose PDF</strong>
+            <small data-i18n="common.pdfOnlyMax">PDF only, up to 25 MB</small>
             <div class="file-chosen" id="sku-chosen"></div>
           </div>
           <input type="file" id="sku-file-input" accept="application/pdf,.pdf" style="display:none" onchange="chooseFile(this,'sku-chosen','cf')" />
@@ -699,26 +699,26 @@
 
         <!-- Incomplete-mode fields -->
         <div id="sku-incomplete-fields" style="display:none;">
-          <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#664400;line-height:1.5;">
+          <div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#664400;line-height:1.5;" data-i18n="skus.incompleteBox">
             Mark this certification as "in progress" — let us know when you expect to have it. Once you have the actual certificate, you can upload it here and replace this placeholder.
           </div>
           <div class="cf-form-grid">
             <div class="field cf-form-full">
-              <label>Expected Completion Date *</label>
+              <label data-i18n="skus.expectedDate">Expected Completion Date *</label>
               <input type="date" id="sku-expected-date" />
             </div>
             <div class="field cf-form-full">
-              <label>Notes (optional)</label>
-              <textarea id="sku-incomplete-notes" rows="2" placeholder="Any context — testing in progress, lab name, etc."></textarea>
+              <label data-i18n="common.notesOptional">Notes (optional)</label>
+              <textarea id="sku-incomplete-notes" rows="2" placeholder="Any context — testing in progress, lab name, etc." data-i18n-ph="skus.incompleteNotesPh"></textarea>
             </div>
           </div>
         </div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
-          <button class="cf-doc-btn" onclick="closeSkuModal()">Cancel</button>
-          <button class="cf-doc-btn" id="sku-modal-save" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="saveSkuModal()">Save</button>
+          <button class="cf-doc-btn" onclick="closeSkuModal()" data-i18n="common.cancel">Cancel</button>
+          <button class="cf-doc-btn" id="sku-modal-save" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;padding:8px 16px;" onclick="saveSkuModal()" data-i18n="common.save">Save</button>
         </div>
-        <div class="prog" id="sku-modal-prog">Saving...</div>
+        <div class="prog" id="sku-modal-prog" data-i18n="common.saving">Saving...</div>
         <div class="pmsg err" id="sku-modal-err"></div>
       </div>
     </div>
@@ -1371,17 +1371,17 @@ async function loadFactorySkus(){
   var listEl = g('sku-compliance-list');
   if(!listEl) return;
   if(!FACTORY_ID){
-    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">Save your factory details first.</div>';
+    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">'+t('skus.saveFirst')+'</div>';
     return;
   }
-  listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">Loading your SKUs...</div>';
+  listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:8px 0;">'+t('skus.loadingSkus')+'</div>';
   try{
     // Pull SKU sources for this factory, with sku details
     var r = await fetch(SB+'/rest/v1/sku_factory_sources?factory_id=eq.'+FACTORY_ID+'&select=*,skus(id,model_number,description,is_cosmetic,brands(brand_name))',{
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
     if(!r.ok){
-      listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">Could not load SKUs.</div>';
+      listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">'+t('skus.couldNotLoad')+'</div>';
       return;
     }
     var sources = await r.json();
@@ -1395,7 +1395,7 @@ async function loadFactorySkus(){
       FACTORY_SKUS.push(s.skus);
     });
     if(!FACTORY_SKUS.length){
-      listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:12px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;">You are not yet a source for any SKUs in our system. Once we approve a quote and add your factory as a source, those SKUs will appear here.</div>';
+      listEl.innerHTML = '<div style="font-size:13px;color:#bbb;padding:12px;background:#f8f8f4;border:1px dashed #d8d8d0;border-radius:8px;text-align:center;">'+t('skus.noSources')+'</div>';
       return;
     }
     // For each SKU, load linked docs
@@ -1418,10 +1418,11 @@ async function loadFactorySkus(){
       });
     });
     await Promise.all(docPromises);
+    window.SKUS_LOADED=true;
     renderFactorySkuList();
     updateSkuComplianceBadge();
   }catch(e){
-    listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">Error: '+esc(e.message)+'</div>';
+    listEl.innerHTML = '<div style="font-size:13px;color:#b00;padding:8px 0;">'+t('common.error',{msg:esc(e.message)})+'</div>';
   }
 }
 
@@ -1429,7 +1430,7 @@ function renderFactorySkuList(){
   var listEl = g('sku-compliance-list');
   if(!listEl) return;
   if(!FACTORY_SKUS.length){
-    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;">No SKUs yet.</div>';
+    listEl.innerHTML = '<div style="font-size:13px;color:#bbb;">'+t('skus.noSkusYet')+'</div>';
     return;
   }
   listEl.innerHTML = FACTORY_SKUS.map(function(sku){
@@ -1437,7 +1438,7 @@ function renderFactorySkuList(){
     var brandName = sku.brands ? sku.brands.brand_name : '';
     var docsHtml;
     if(!docs.length){
-      docsHtml = '<div style="font-size:12px;color:#bbb;padding:8px 0;">No compliance documents yet for this SKU. Click <strong>+ Add Document</strong> below.</div>';
+      docsHtml = '<div style="font-size:12px;color:#bbb;padding:8px 0;">'+t('skus.noDocsForSku')+'</div>';
     }else{
       docsHtml = docs.map(function(d){return renderSkuDocRow(sku.id, d);}).join('');
     }
@@ -1446,13 +1447,20 @@ function renderFactorySkuList(){
         '<div>'+
           '<div style="font-size:14px;font-weight:600;color:#1a1a2e;font-family:monospace;">'+esc(sku.model_number)+'</div>'+
           '<div style="font-size:12px;color:#666;margin-top:2px;">'+esc(sku.description||'')+'</div>'+
-          (brandName?'<div style="font-size:11px;color:#888;margin-top:2px;">Brand: '+esc(brandName)+'</div>':'')+
+          (brandName?'<div style="font-size:11px;color:#888;margin-top:2px;">'+t('skus.brandLabel',{x:esc(brandName)})+'</div>':'')+
         '</div>'+
-        '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+sku.id+'\',null)">+ Add Document</button>'+
+        '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+sku.id+'\',null)">'+t('skus.addDocument')+'</button>'+
       '</div>'+
       docsHtml+
     '</div>';
   }).join('');
+}
+
+// Display-only translation of the fixed SKU category enum; specific document
+// type names are JS-populated per category and have no keys, so they stay English.
+function skuCatLabel(name){
+  var map={'Safety Testing':'skus.catSafety','Regulatory':'skus.catRegulatory','Substantiation / Claims Testing':'skus.catSubstantiation',"Children's Products":'skus.catChildrens','Ingredient & Composition':'skus.catIngredient','Other':'skus.catOther'};
+  return map[name]?t(map[name]):name;
 }
 
 function renderSkuDocRow(skuId, doc){
@@ -1462,15 +1470,15 @@ function renderSkuDocRow(skuId, doc){
   var statusEl, meta, actions;
 
   if(doc.status === 'in_progress'){
-    var expectedStr = doc.expected_completion_date ? new Date(doc.expected_completion_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : 'TBD';
+    var expectedStr = doc.expected_completion_date ? new Date(doc.expected_completion_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : t('skus.tbd');
     var expectedDays = daysUntil(doc.expected_completion_date);
-    var overdueLbl = (expectedDays !== null && expectedDays < 0) ? ' <strong style="color:#b00;">— overdue</strong>' : '';
+    var overdueLbl = (expectedDays !== null && expectedDays < 0) ? t('skus.overdue') : '';
     rowCls += ' expiring60';
-    statusEl = '<span class="cf-cert-status expiring">⏳ In Progress</span>';
-    meta = 'Expected by '+expectedStr+overdueLbl+(doc.notes?' · '+esc(doc.notes):'');
-    actions = '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'edit-incomplete\')">Edit</button>'+
-              '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'upload-replace\')">+ Upload Now</button>'+
-              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\','+null+')">Delete</button>';
+    statusEl = '<span class="cf-cert-status expiring">'+t('skus.inProgress')+'</span>';
+    meta = t('skus.expectedBy',{date:expectedStr})+overdueLbl+(doc.notes?' · '+esc(doc.notes):'');
+    actions = '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'edit-incomplete\')">'+t('common.edit')+'</button>'+
+              '<button class="cf-doc-btn" style="background:#1a1a2e;color:#fff;border-color:#1a1a2e;" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'upload-replace\')">'+t('skus.uploadNow')+'</button>'+
+              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\','+null+')">'+t('common.del')+'</button>';
   }else{
     var status = complianceStatus(doc.expiry_date);
     if(status.cls === 'warning' || status.cls === 'expired') rowCls += ' warning30';
@@ -1479,15 +1487,15 @@ function renderSkuDocRow(skuId, doc){
     statusEl = '<span class="cf-cert-status '+status.cls+'">'+esc(status.label)+'</span>';
     var expiryStr = doc.expiry_date ? new Date(doc.expiry_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
     var parts = [];
-    if(doc.document_category) parts.push(esc(doc.document_category));
-    if(doc.certificate_number) parts.push('Cert #'+esc(doc.certificate_number));
-    if(doc.test_lab) parts.push('Lab: '+esc(doc.test_lab));
-    if(expiryStr) parts.push('Expires '+expiryStr);
+    if(doc.document_category) parts.push(esc(skuCatLabel(doc.document_category)));
+    if(doc.certificate_number) parts.push(t('common.certNo',{n:esc(doc.certificate_number)}));
+    if(doc.test_lab) parts.push(t('skus.labMeta',{x:esc(doc.test_lab)}));
+    if(expiryStr) parts.push(t('common.expiresMeta',{date:expiryStr}));
     meta = parts.join(' · ');
     var safePath = (doc.file_path||'').replace(/'/g,"\\'");
-    actions = '<button class="cf-doc-btn" onclick="viewSkuDoc(\''+safePath+'\')">View</button>'+
-              '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'replace\')">Replace</button>'+
-              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\',\''+safePath+'\')">Delete</button>';
+    actions = '<button class="cf-doc-btn" onclick="viewSkuDoc(\''+safePath+'\')">'+t('common.view')+'</button>'+
+              '<button class="cf-doc-btn" onclick="openSkuModal(\''+skuId+'\',\''+doc.id+'\',\'replace\')">'+t('common.replace')+'</button>'+
+              '<button class="cf-doc-btn danger" onclick="deleteSkuDoc(\''+doc.id+'\',\''+safePath+'\')">'+t('common.del')+'</button>';
   }
 
   return '<div class="'+rowCls+'" style="margin-top:6px;">'+
@@ -1529,7 +1537,7 @@ function openSkuModal(skuId, docId, action){
 
   // Reset form
   g('sku-category').value = '';
-  g('sku-type').innerHTML = '<option value="">— Select category first —</option>';
+  g('sku-type').innerHTML = '<option value="">'+t('skus.selectCatFirst')+'</option>';
   g('sku-type').disabled = true;
   g('sku-type-other').value = '';
   g('sku-other-wrap').style.display = 'none';
@@ -1547,12 +1555,12 @@ function openSkuModal(skuId, docId, action){
   g('sku-modal-err').style.display = 'none';
 
   var sku = FACTORY_SKUS.find(function(s){return s.id===skuId;});
-  g('sku-modal-context').textContent = sku ? ('SKU: '+sku.model_number+' — '+(sku.description||'')) : '';
+  g('sku-modal-context').textContent = sku ? t('skus.modalContext',{model:sku.model_number,desc:(sku.description||'')}) : '';
 
   // Set title and mode based on action
   if(action === 'edit-incomplete'){
     setSkuMode('incomplete');
-    g('sku-modal-title').textContent = 'Edit "Not Complete" entry';
+    g('sku-modal-title').textContent = t('skus.modalEditIncomplete');
     var d = (SKU_DOCS_BY_SKU[skuId]||[]).find(function(x){return x.id===docId;});
     if(d){
       g('sku-category').value = d.document_category||'';
@@ -1564,7 +1572,7 @@ function openSkuModal(skuId, docId, action){
     }
   }else if(action === 'upload-replace' || action === 'replace'){
     setSkuMode('upload');
-    g('sku-modal-title').textContent = action === 'upload-replace' ? 'Upload Document (replaces "Not Complete" placeholder)' : 'Replace Document';
+    g('sku-modal-title').textContent = action === 'upload-replace' ? t('skus.modalUploadReplace') : t('skus.modalReplace');
     var existing = (SKU_DOCS_BY_SKU[skuId]||[]).find(function(x){return x.id===docId;});
     if(existing){
       g('sku-category').value = existing.document_category||'';
@@ -1579,7 +1587,7 @@ function openSkuModal(skuId, docId, action){
     }
   }else{
     setSkuMode('upload');
-    g('sku-modal-title').textContent = 'Add Compliance Document';
+    g('sku-modal-title').textContent = t('skus.modalAdd');
   }
 
   g('sku-modal').style.display = 'flex';
@@ -1624,13 +1632,13 @@ function onSkuCategoryChange(){
   var otherWrap = g('sku-other-wrap');
   if(!cat){
     typeSel.disabled = true;
-    typeSel.innerHTML = '<option value="">— Select category first —</option>';
+    typeSel.innerHTML = '<option value="">'+window.t('skus.selectCatFirst')+'</option>';
     otherWrap.style.display = 'none';
     return;
   }
   if(cat === 'Other'){
     typeSel.disabled = true;
-    typeSel.innerHTML = '<option value="Other">(specify below)</option>';
+    typeSel.innerHTML = '<option value="Other">'+window.t('skus.specifyBelow')+'</option>';
     typeSel.value = 'Other';
     otherWrap.style.display = 'block';
     return;
@@ -1638,19 +1646,19 @@ function onSkuCategoryChange(){
   otherWrap.style.display = 'none';
   typeSel.disabled = false;
   var types = SKU_DOC_TYPES[cat] || [];
-  typeSel.innerHTML = '<option value="">— Select —</option>'+types.map(function(t){return '<option>'+t+'</option>';}).join('');
+  typeSel.innerHTML = '<option value="">'+window.t('common.select')+'</option>'+types.map(function(t){return '<option>'+t+'</option>';}).join('');
 }
 
 async function saveSkuModal(){
   if(!skuModalSkuId){return;}
   var category = g('sku-category').value;
-  if(!category){showSkuErr('Select a category.');return;}
+  if(!category){showSkuErr(t('skus.selectCategory'));return;}
   var docType = g('sku-type').value;
   var docTypeOther = g('sku-type-other').value.trim();
   if(category === 'Other'){
-    if(!docTypeOther){showSkuErr('Specify a document type.');return;}
+    if(!docTypeOther){showSkuErr(t('skus.specifyADocType'));return;}
     docType = 'Other';
-  }else if(!docType){showSkuErr('Select a document type.');return;}
+  }else if(!docType){showSkuErr(t('skus.selectADocType'));return;}
 
   var btn = g('sku-modal-save');
   btn.disabled = true;
@@ -1660,7 +1668,7 @@ async function saveSkuModal(){
   try{
     if(skuModalMode === 'incomplete'){
       var expectedDate = g('sku-expected-date').value;
-      if(!expectedDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expected completion date is required.');return;}
+      if(!expectedDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.expectedRequired'));return;}
 
       var payload = {
         document_type: docType,
@@ -1682,14 +1690,14 @@ async function saveSkuModal(){
           headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify(payload)
         });
-        if(!pr.ok){var perr=await pr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Update failed: '+(perr.message||pr.status));return;}
+        if(!pr.ok){var perr=await pr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.updateFailed',{x:(perr.message||pr.status)}));return;}
       }else{
         var dr = await fetch(SB+'/rest/v1/sku_documents',{
           method:'POST',
           headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
           body:JSON.stringify(payload)
         });
-        if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Save failed: '+(derr.message||derr.details||dr.status));return;}
+        if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.saveFailed',{x:(derr.message||derr.details||dr.status)}));return;}
         var inserted = await dr.json().catch(function(){return null;});
         var newId = Array.isArray(inserted) ? (inserted[0]&&inserted[0].id) : (inserted&&inserted.id);
         if(newId){
@@ -1703,14 +1711,14 @@ async function saveSkuModal(){
     }else{
       // upload mode
       var expiryDate = g('sku-expiry-date').value;
-      if(!expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expiry date is required.');return;}
+      if(!expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.expiryRequired'));return;}
       var issueDate = g('sku-issue-date').value;
-      if(issueDate && issueDate >= expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Expiry must be after issue date.');return;}
+      if(issueDate && issueDate >= expiryDate){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.expiryAfterIssue'));return;}
       var file = selFiles.cf;
-      if(!file){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Choose a PDF.');return;}
+      if(!file){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.choosePdf'));return;}
       var isPdf = (file.type==='application/pdf')||/\.pdf$/i.test(file.name);
-      if(!isPdf){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('PDF only.');return;}
-      if(file.size > 25*1024*1024){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('File over 25 MB.');return;}
+      if(!isPdf){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.pdfOnly'));return;}
+      if(file.size > 25*1024*1024){btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.fileOver25'));return;}
 
       var ts = Date.now();
       var safeName = file.name.replace(/[^a-zA-Z0-9._\-]/g,'_').slice(0,80);
@@ -1721,7 +1729,7 @@ async function saveSkuModal(){
         headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/pdf','x-upsert':'true'},
         body: file
       });
-      if(!sr.ok){var serr=await sr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Upload failed: '+(serr.message||serr.error||sr.status));return;}
+      if(!sr.ok){var serr=await sr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.uploadFailed',{x:(serr.message||serr.error||sr.status)}));return;}
 
       // If replacing/converting an existing doc, archive it
       var existingVersion = 0;
@@ -1761,7 +1769,7 @@ async function saveSkuModal(){
         headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
         body: JSON.stringify(payload)
       });
-      if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr('Save failed: '+(derr.message||derr.details||dr.status));return;}
+      if(!dr.ok){var derr=await dr.json().catch(function(){return{};});btn.disabled=false;g('sku-modal-prog').style.display='none';showSkuErr(t('skus.saveFailed',{x:(derr.message||derr.details||dr.status)}));return;}
       var inserted = await dr.json().catch(function(){return null;});
       var newId = Array.isArray(inserted) ? (inserted[0]&&inserted[0].id) : (inserted&&inserted.id);
       if(newId){
@@ -1780,7 +1788,7 @@ async function saveSkuModal(){
   }catch(e){
     btn.disabled = false;
     g('sku-modal-prog').style.display = 'none';
-    showSkuErr('Error: '+e.message);
+    showSkuErr(t('common.error',{msg:e.message}));
   }
 }
 
@@ -1790,21 +1798,21 @@ function showSkuErr(msg){
 }
 
 async function viewSkuDoc(filePath){
-  if(!filePath){alert('No file path.');return;}
+  if(!filePath){alert(t('skus.noFilePath'));return;}
   try{
     var r = await fetch(SB+'/storage/v1/object/sign/sku-documents/'+filePath,{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json'},
       body: JSON.stringify({expiresIn:300})
     });
-    if(!r.ok){alert('Could not generate download link: '+r.status);return;}
+    if(!r.ok){alert(t('compliance.dlLinkFailed',{status:r.status}));return;}
     var d = await r.json();
     window.open(SB+'/storage/v1'+d.signedURL, '_blank');
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){alert(t('common.error',{msg:e.message}));}
 }
 
 async function deleteSkuDoc(docId, filePath){
-  if(!confirm('Delete this document?'))return;
+  if(!confirm(t('skus.deleteConfirm')))return;
   try{
     if(filePath && filePath !== 'null'){
       await fetch(SB+'/storage/v1/object/sku-documents/'+filePath,{
@@ -1816,9 +1824,9 @@ async function deleteSkuDoc(docId, filePath){
       method:'DELETE',
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
     });
-    if(!r.ok){var err=await r.json().catch(function(){return{};});alert('Delete failed: '+(err.message||r.status));return;}
+    if(!r.ok){var err=await r.json().catch(function(){return{};});alert(t('skus.deleteFailed',{x:(err.message||r.status)}));return;}
     await loadFactorySkus();
-  }catch(e){alert('Error: '+e.message);}
+  }catch(e){alert(t('common.error',{msg:e.message}));}
 }
 
 async function loadDetails(){
@@ -1895,6 +1903,10 @@ window.onLangChange=function(){
   // (pure, no network — the banner re-localizes on its next status check).
   if(window.COMPLIANCE_LOADED&&typeof renderComplianceUI==='function'){
     renderComplianceUI();
+  }
+  // Product Compliance tab: re-render the JS-built SKU/doc rows from cached data.
+  if(window.SKUS_LOADED&&typeof renderFactorySkuList==='function'){
+    renderFactorySkuList();
   }
 };
 
