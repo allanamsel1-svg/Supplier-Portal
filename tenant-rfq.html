@@ -6,6 +6,20 @@
 <title>RFQs — TBG Sourcing</title>
 <link rel="stylesheet" href="/tenant-portal.css">
 <script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .nr-btn{background:#2563eb;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-left:auto;}
+  .nr-btn:hover{background:#1d4ed8;}
+  .nr-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.55);display:none;align-items:center;justify-content:center;z-index:200;padding:1rem;}
+  .nr-modal-bg.open{display:flex;}
+  .nr-modal{background:var(--card-bg,#0f172a);border:1px solid var(--border,#334155);border-radius:14px;padding:1.5rem;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
+  .nr-modal h2{font-size:16px;font-weight:700;margin-bottom:1rem;}
+  .nr-field{margin:10px 0;}
+  .nr-field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px;color:var(--text2,#94a3b8);}
+  .nr-field input,.nr-field select,.nr-field textarea{width:100%;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--bg2,#0d1424);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;}
+  .nr-field textarea{min-height:70px;resize:vertical;}
+  .nr-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:1rem;}
+  .nr-actions .alt{background:none;border:1px solid var(--border,#334155);color:var(--text,#e2e8f0);}
+</style>
 </head>
 <body>
 <div id="sidebar"></div>
@@ -26,6 +40,7 @@
     <div class="toolbar">
       <input class="search-input" id="rfqSearch" placeholder="Search RFQs by project #, description, category…">
       <select class="filter-select" id="rfqStatus"><option value="all">All statuses</option></select>
+      <button class="nr-btn" onclick="openNewRfqModal()">+ New RFQ</button>
     </div>
     <div id="box-rfq"><div class="loading">Loading RFQs…</div></div>
   </div>
@@ -53,6 +68,19 @@
   </div>
 </div>
 
+<div class="nr-modal-bg" id="nrModal">
+  <div class="nr-modal">
+    <h2>New RFQ</h2>
+    <div class="nr-field"><label>Product name / description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
+    <div class="nr-field"><label>Category</label><select id="nr-category"><option value="">Select category…</option></select></div>
+    <div class="nr-field"><label>Quantity</label><input id="nr-qty" type="number" min="0" placeholder="e.g. 5000"></div>
+    <div class="nr-field"><label>Target FOB cost (optional)</label><input id="nr-fob" type="number" min="0" step="0.01" placeholder="e.g. 2.50"></div>
+    <div class="nr-field"><label>Specifications / notes</label><textarea id="nr-spec" placeholder="Describe materials, packaging, certifications required…"></textarea></div>
+    <div class="nr-field"><div id="nr-err" style="color:#f87171;font-size:12px;display:none;"></div></div>
+    <div class="nr-actions"><button class="nr-btn alt" onclick="closeNewRfqModal()">Cancel</button><button class="nr-btn" id="nr-save" onclick="saveNewRfq()">Create RFQ</button></div>
+  </div>
+</div>
+
 <div class="panel-overlay" id="panelOverlay"></div>
 <div class="detail-panel" id="detailPanel">
   <div class="panel-head">
@@ -65,9 +93,66 @@
 <script src="/tenant-shared.js"></script>
 <script>
 const TABS = ['rfq', 'pd', 'skus'];
-let TID = null;
-let rfqs = [], pds = [], skus = [];
+let TID = null, ME_EMAIL = '';
+let rfqs = [], pds = [], skus = [], rfqCategories = [];
 const loaded = {};
+
+// ── New RFQ creation ──
+async function loadRfqCategories() {
+  const rows = await supa('categories?select=category&order=category');
+  rfqCategories = Array.from(new Set(rows.map(r => r.category).filter(Boolean)));
+  const sel = document.getElementById('nr-category');
+  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCategories.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
+function openNewRfqModal(prefill) {
+  document.getElementById('nr-err').style.display = 'none';
+  document.getElementById('nr-desc').value = (prefill && prefill.product) || '';
+  document.getElementById('nr-qty').value = (prefill && prefill.quantity != null) ? prefill.quantity : '';
+  document.getElementById('nr-fob').value = (prefill && prefill.target_cost != null) ? prefill.target_cost : '';
+  document.getElementById('nr-spec').value = '';
+  const catSel = document.getElementById('nr-category');
+  if (catSel) {
+    catSel.value = '';
+    if (prefill && prefill.category) {
+      const want = String(prefill.category).toLowerCase();
+      const match = rfqCategories.find(c => c.toLowerCase() === want) || rfqCategories.find(c => c.toLowerCase().includes(want));
+      if (match) catSel.value = match;
+    }
+  }
+  document.getElementById('nrModal').classList.add('open');
+  setTimeout(() => { try { document.getElementById('nr-desc').focus(); } catch (e) {} }, 50);
+}
+function closeNewRfqModal() { document.getElementById('nrModal').classList.remove('open'); }
+async function saveNewRfq() {
+  const desc = (document.getElementById('nr-desc').value || '').trim();
+  const err = document.getElementById('nr-err');
+  if (!desc) { err.textContent = 'Product name / description is required.'; err.style.display = 'block'; return; }
+  const cat = document.getElementById('nr-category').value || null;
+  const qtyRaw = document.getElementById('nr-qty').value, fobRaw = document.getElementById('nr-fob').value;
+  let spec = (document.getElementById('nr-spec').value || '').trim();
+  if (ME_EMAIL) spec = (spec ? spec + '\n\n' : '') + 'Submitted by: ' + ME_EMAIL;   // rfqs has no created_by column
+  const body = {
+    tenant_id: TID, item_description: desc, category: cat, status: 'draft',
+    quote_quantity: qtyRaw === '' ? null : Number(qtyRaw),
+    max_fob_price: fobRaw === '' ? null : Number(fobRaw),
+    detailed_specifications: spec || null,
+  };
+  const btn = document.getElementById('nr-save'); btn.disabled = true; btn.textContent = 'Creating…';
+  let ok = false;
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/rfqs', {
+      method: 'POST',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    });
+    ok = r.ok;
+  } catch (e) { ok = false; }
+  btn.disabled = false; btn.textContent = 'Create RFQ';
+  if (!ok) { err.textContent = 'Could not create the RFQ. Please try again.'; err.style.display = 'block'; return; }
+  closeNewRfqModal();
+  await loadRFQs();
+  showTab('rfq');
+}
 
 function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'rfq';
@@ -300,8 +385,11 @@ async function openSKU(id) {
   const user = await tenantAuth();
   if (!user || !user.tenant) return;
   TID = user.tenant.id;
+  ME_EMAIL = user.email || '';
   renderSidebar(user);
   document.getElementById('pageSub').textContent = user.tenant.name + ' · RFQs and product development';
+  loadRfqCategories();
+  document.getElementById('nrModal').addEventListener('click', e => { if (e.target.id === 'nrModal') closeNewRfqModal(); });
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
   document.getElementById('rfqSearch').addEventListener('input', renderRFQs);
@@ -320,8 +408,8 @@ async function openSKU(id) {
 })();
 
 // AI toolbar pre-population for create_rfq (set by tenant-dashboard runSearch).
-// This list view has no inline create form, so we surface the intent: pre-fill the
-// search with the product and show a banner. The key is always cleared after reading.
+// Auto-opens the New RFQ form pre-populated from the extracted params.
+// The key is always cleared after reading (prevents stale pre-pop on refresh).
 function handleAiRfqAction() {
   var raw; try { raw = sessionStorage.getItem('ai_action_params'); } catch (e) { return; }
   if (!raw) return;
@@ -330,17 +418,16 @@ function handleAiRfqAction() {
   if (!d || d.action !== 'create_rfq' || (Date.now() - (d.ts || 0)) > 30000) return;
   var p = d.params || {};
   showTab('rfq');
-  var s = document.getElementById('rfqSearch');
-  if (s && p.product) { s.value = p.product; if (typeof renderRFQs === 'function') renderRFQs(); }
   var pane = document.getElementById('pane-rfq');
   if (pane) {
     var banner = document.createElement('div');
+    banner.id = 'nr-ai-banner';
     banner.style.cssText = 'background:rgba(59,130,246,0.12);border:1px solid #3b82f6;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text);';
-    banner.textContent = '🆕 Starting a new RFQ' + (p.product ? ' for "' + p.product + '"' : '') +
-      (p.quantity ? ' · qty ' + p.quantity : '') + (p.target_cost ? ' · target $' + p.target_cost : '') +
-      '. Use your sourcing manager or the admin RFQ tool to create it.';
+    banner.textContent = '🆕 Opening New RFQ form…' + (p.product ? ' (' + p.product + ')' : '');
     pane.insertBefore(banner, pane.firstChild);
   }
+  // Give categories a moment to load so pre-select can match, then open the pre-filled form.
+  setTimeout(function () { openNewRfqModal(p); }, 400);
 }
 </script>
 </body>

@@ -248,6 +248,7 @@ async function loadPriceTremors() {
 async function loadProduction() {
   // Active production = all open PO statuses (everything except closed / cancelled).
   const pos = await supa(`purchase_orders?tenant_id=eq.${TID}&status=in.(draft,pending_admin_signature,sent_to_factory,accepted_by_factory,in_production,shipped,received)&select=id,po_number,status,description_snapshot,factory_name_snapshot,expected_ship_date&order=created_at.desc`);
+  console.log('[loadProduction] TID=', TID, '— active POs returned:', pos.length, pos);
   document.getElementById('pp-count').textContent = pos.length;
   const list = document.getElementById('pp-list');
   if (!pos.length) { list.innerHTML = '<div class="w-empty">No active production</div>'; return; }
