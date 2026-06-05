@@ -21,6 +21,7 @@
   }
   .ai-send:hover { background: #1d4ed8; }
   .ai-send:disabled { background: #1e3a6e; cursor: not-allowed; }
+  .ai-mic { border: none; background: none; cursor: pointer; font-size: 16px; padding: 0 8px; color: var(--text2); }
   .ai-result { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; display: none; }
   .ai-result.open { display: block; }
   .ai-answer { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; }
@@ -81,6 +82,7 @@
   <div class="ai-search">
     <div class="ai-row">
       <input class="ai-input" id="aiInput" type="search" placeholder="Ask anything about your sourcing, factories, products, intel..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="AI search">
+      <button class="ai-mic" id="aiMic" type="button" title="Voice input" aria-label="Voice input">🎤</button>
       <button class="ai-send" id="aiSend" title="Ask">➤</button>
     </div>
     <div class="ai-result" id="aiResult">
@@ -141,6 +143,32 @@ let TID = null, TOKEN = null, user = null;
 function daysSince(iso) { if (!iso) return null; const d = new Date(iso); if (isNaN(d)) return null; return Math.max(0, Math.floor((Date.now() - d.getTime()) / 864e5)); }
 
 // ── AI Search ──
+// Wire a 🎤 button to the Web Speech API. Hides itself if the browser lacks SpeechRecognition.
+function setupVoiceMic(micId, inputId, onResult) {
+  var mic = document.getElementById(micId), input = document.getElementById(inputId);
+  if (!mic || !input) return;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { mic.style.display = 'none'; return; }   // unsupported → hide silently
+  var rec = null, listening = false;
+  var origColor = mic.style.color;
+  var origPlaceholder = input.getAttribute('placeholder') || '';
+  function reset() { listening = false; mic.style.color = origColor; input.setAttribute('placeholder', origPlaceholder); }
+  mic.addEventListener('click', function () {
+    if (listening && rec) { try { rec.stop(); } catch (e) {} return; }
+    try {
+      rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
+      rec.onresult = function (e) {
+        var t = ''; try { t = e.results[0][0].transcript || ''; } catch (err) {}
+        reset();
+        if (t) { input.value = t; onResult(); }
+      };
+      rec.onerror = reset; rec.onend = reset;
+      listening = true; mic.style.color = 'red'; input.setAttribute('placeholder', 'Listening...');
+      rec.start();
+    } catch (e) { reset(); }
+  });
+}
+
 async function runSearch() {
   const input = document.getElementById('aiInput');
   const q = input.value.trim();
@@ -466,6 +494,7 @@ async function confirmCapIncrease() {
 
   document.getElementById('aiSend').addEventListener('click', runSearch);
   document.getElementById('aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+  setupVoiceMic('aiMic', 'aiInput', runSearch);
   document.querySelectorAll('.widget').forEach(w => w.addEventListener('click', () => { location.href = w.dataset.href; }));
 
   loadPriceTremors();

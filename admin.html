@@ -603,6 +603,7 @@
         </div>
         <div style="display:flex;gap:8px;">
           <input id="ai-bar-input" type="text" placeholder="e.g. Which factories have BSCI certification?" onkeydown="if(event.key==='Enter'){aiBarSubmit()}" style="flex:1;padding:11px 14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;color:#fff;font-size:13px;outline:none;font-family:inherit;" />
+          <button id="ai-bar-mic" type="button" title="Voice input" aria-label="Voice input" style="border:none;background:none;cursor:pointer;font-size:16px;padding:0 8px;color:#fff;">🎤</button>
           <button onclick="aiBarSubmit()" style="padding:11px 20px;background:#fff;color:#1a1a2e;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Ask AI</button>
         </div>
         <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
@@ -12132,6 +12133,28 @@ function aiBarSuggest(el){
   g('ai-bar-input').value=el.textContent;
   aiBarSubmit();
 }
+// Wire the 🎤 button to the Web Speech API. Hides itself if the browser lacks SpeechRecognition.
+function setupVoiceMic(micId, inputId, onResult){
+  var mic=document.getElementById(micId), input=document.getElementById(inputId);
+  if(!mic||!input)return;
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){mic.style.display='none';return;}
+  var rec=null, listening=false;
+  var origColor=mic.style.color;
+  var origPlaceholder=input.getAttribute('placeholder')||'';
+  function reset(){listening=false;mic.style.color=origColor;input.setAttribute('placeholder',origPlaceholder);}
+  mic.addEventListener('click',function(){
+    if(listening&&rec){try{rec.stop();}catch(e){}return;}
+    try{
+      rec=new SR();rec.lang='en-US';rec.interimResults=false;rec.maxAlternatives=1;
+      rec.onresult=function(e){var t='';try{t=e.results[0][0].transcript||'';}catch(err){}reset();if(t){input.value=t;onResult();}};
+      rec.onerror=reset;rec.onend=reset;
+      listening=true;mic.style.color='red';input.setAttribute('placeholder','Listening...');
+      rec.start();
+    }catch(e){reset();}
+  });
+}
+(function(){ function go(){ setupVoiceMic('ai-bar-mic','ai-bar-input',aiBarSubmit); } if(document.readyState!=='loading')go(); else document.addEventListener('DOMContentLoaded',go); })();
 
 // Open Orders — demo placeholder. Data is rendered statically in the HTML
 // for the investor pitch. When the milestone schema is built, this will
