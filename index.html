@@ -391,12 +391,12 @@
 
   <!-- RFQ pane -->
   <div class="ppane" id="ppane-rfqs">
-    <div id="rfq-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading RFQs...</div>
+    <div id="rfq-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;" data-i18n="rfq.loading">Loading RFQs...</div>
     <div id="rfq-list"></div>
     <div class="rfq-empty" id="rfq-empty" style="display:none;">
       <div class="rfq-empty-icon">📋</div>
-      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No RFQs yet</div>
-      <div style="font-size:13px;">When our sourcing team sends you a Request for Quotation, it will appear here.</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;" data-i18n="rfq.empty">No RFQs yet</div>
+      <div style="font-size:13px;" data-i18n="rfq.emptyBody">When our sourcing team sends you a Request for Quotation, it will appear here.</div>
     </div>
   </div>
 
@@ -1867,10 +1867,16 @@ async function loadDetails(){
   }catch(e){console.log('loadDetails error:',e);}
 }
 
-// Re-assert JS-managed Factory Details labels after a language toggle
-// (applyTranslations resets the static save button to its "Save" key).
+// Re-apply JS-managed labels after a language toggle. applyTranslations only
+// touches static [data-i18n] nodes, so anything built in JS is re-rendered here.
 window.onLangChange=function(){
+  // Factory Details: static save button resets to its "Save" key — restore "Update".
   if(window.IS_UPDATE_MODE){var b=document.getElementById('save-btn');if(b)b.textContent=t('details.updateBtn');}
+  // RFQ tab: re-render the JS-built cards so their labels follow the language.
+  // (Collapses any expanded card — acceptable on an explicit language switch.)
+  if(Array.isArray(allRFQs)&&allRFQs.length&&typeof renderRFQList==='function'){
+    renderRFQList(allRFQs,window.RFQ_EXISTING_QUOTES||[]);
+  }
 };
 
 async function saveDetails(){
@@ -3234,12 +3240,13 @@ async function loadRFQs(){
       if(cr.ok){allCategories=await cr.json()||[];}
     } catch(e){allCategories=[];}
     allRFQs=assignments;
+    window.RFQ_EXISTING_QUOTES=existingQuotes;
     renderRFQList(assignments,existingQuotes);
     // Clear badge
     var badge=g('rfq-badge');badge.style.display='none';
   }catch(e){
     g('rfq-loading').style.display='none';
-    g('rfq-list').innerHTML='<div style="color:#b00;font-size:13px;padding:1rem;">Error loading RFQs: '+e.message+'</div>';
+    g('rfq-list').innerHTML='<div style="color:#b00;font-size:13px;padding:1rem;">'+t('rfq.errLoad',{msg:e.message})+'</div>';
   }
 }
 
@@ -3248,7 +3255,7 @@ function renderRFQList(assignments,existingQuotes){
   el.innerHTML=assignments.map(function(a){
     var rfq=a.rfqs||{};
     var quotes=existingQuotes.filter(function(q){return q.rfq_id===rfq.id;}).sort(function(x,y){return (parseInt(x.quote_option)||0)-(parseInt(y.quote_option)||0);});
-    var badgeClass='badge-new',badgeText='New RFQ';
+    var badgeClass='badge-new',badgeText=t('rfq.badgeNew');
     if(quotes.length){
       // Priority: accepted > more_info > rejected > submitted > draft
       var hasAccepted=quotes.some(function(q){return q.status==='accepted';});
@@ -3256,14 +3263,14 @@ function renderRFQList(assignments,existingQuotes){
       var hasRejected=quotes.some(function(q){return q.status==='rejected';});
       var hasSubmitted=quotes.some(function(q){return q.status==='submitted'||q.status==='quoted';});
       var hasDraft=quotes.some(function(q){return q.status==='draft';});
-      if(hasAccepted){badgeClass='badge-quoted';badgeText='✓ Approved';}
-      else if(hasInfo){badgeClass='badge-info-needed';badgeText='⚠ More Info Requested';}
-      else if(hasSubmitted){badgeClass='badge-quoted';badgeText=quotes.length>1?'✓ '+quotes.length+' Quotes Submitted':'Quote Submitted';}
-      else if(hasDraft){badgeClass='badge-draft';badgeText='Draft Saved';}
-      else if(hasRejected){badgeClass='badge-rejected';badgeText='Not Approved';}
+      if(hasAccepted){badgeClass='badge-quoted';badgeText=t('rfq.badgeApproved');}
+      else if(hasInfo){badgeClass='badge-info-needed';badgeText=t('rfq.badgeMoreInfo');}
+      else if(hasSubmitted){badgeClass='badge-quoted';badgeText=quotes.length>1?t('rfq.badgeQuotesSubmitted',{n:quotes.length}):t('rfq.badgeQuoteSubmitted');}
+      else if(hasDraft){badgeClass='badge-draft';badgeText=t('rfq.badgeDraft');}
+      else if(hasRejected){badgeClass='badge-rejected';badgeText=t('rfq.badgeNotApproved');}
     }
     var date=rfq.created_at?new Date(rfq.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
-    var qty=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'units'):'—';
+    var qty=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||t('rfq.unitsFallback')):'—';
     var uom=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'';
 
     // Build structured packaging display — prefers new structured fields, falls back to legacy packaging_type
@@ -3271,25 +3278,25 @@ function renderRFQList(assignments,existingQuotes){
     if(rfq.packaging_primary){
       var pLine=rfq.packaging_primary;
       if(rfq.packaging_primary_material) pLine+=' <span style="color:#888;font-size:11px;">('+rfq.packaging_primary_material+')</span>';
-      pkgLines.push('<div><strong>Primary:</strong> '+pLine+'</div>');
+      pkgLines.push('<div><strong>'+t('rfq.pkgPrimary')+'</strong> '+pLine+'</div>');
     }
     if(Array.isArray(rfq.packaging_closures) && rfq.packaging_closures.length){
-      pkgLines.push('<div><strong>Closure:</strong> '+rfq.packaging_closures.join(' + ')+'</div>');
+      pkgLines.push('<div><strong>'+t('rfq.pkgClosure')+'</strong> '+rfq.packaging_closures.join(' + ')+'</div>');
     }
     if(Array.isArray(rfq.packaging_secondary) && rfq.packaging_secondary.length){
-      pkgLines.push('<div><strong>Secondary:</strong> '+rfq.packaging_secondary.join(' + ')+'</div>');
+      pkgLines.push('<div><strong>'+t('rfq.pkgSecondary')+'</strong> '+rfq.packaging_secondary.join(' + ')+'</div>');
     }
     if(Array.isArray(rfq.packaging_decoration) && rfq.packaging_decoration.length){
-      pkgLines.push('<div><strong>Decoration:</strong> '+rfq.packaging_decoration.join(', ')+'</div>');
+      pkgLines.push('<div><strong>'+t('rfq.pkgDecoration')+'</strong> '+rfq.packaging_decoration.join(', ')+'</div>');
     }
     if(rfq.packaging_finish || rfq.packaging_color){
       var fcParts=[];
-      if(rfq.packaging_finish) fcParts.push('Finish: '+rfq.packaging_finish);
-      if(rfq.packaging_color)  fcParts.push('Color: '+rfq.packaging_color);
-      pkgLines.push('<div><strong>Finish/Color:</strong> '+fcParts.join(' · ')+'</div>');
+      if(rfq.packaging_finish) fcParts.push(t('rfq.pkgFinish')+' '+rfq.packaging_finish);
+      if(rfq.packaging_color)  fcParts.push(t('rfq.pkgColor')+' '+rfq.packaging_color);
+      pkgLines.push('<div><strong>'+t('rfq.pkgFinishColor')+'</strong> '+fcParts.join(' · ')+'</div>');
     }
     if(Array.isArray(rfq.packaging_sustainability) && rfq.packaging_sustainability.length){
-      pkgLines.push('<div style="color:#1a7a1a;"><strong>♻ Sustainability required:</strong> '+rfq.packaging_sustainability.join(', ')+'</div>');
+      pkgLines.push('<div style="color:#1a7a1a;"><strong>'+t('rfq.pkgSustainability')+'</strong> '+rfq.packaging_sustainability.join(', ')+'</div>');
     }
     var pkgTypes;
     if(pkgLines.length){
@@ -3297,11 +3304,11 @@ function renderRFQList(assignments,existingQuotes){
     }else{
       pkgTypes=rfq.packaging_type?rfq.packaging_type.split(',').join(', '):'—';
     }
-    var certs=(rfq.certifications_required||[]).join(', ')||'None required';
+    var certs=(rfq.certifications_required||[]).join(', ')||t('rfq.noneRequired');
     return '<div class="rfq-card" id="rfqcard-'+rfq.id+'">' +
       '<div class="rfq-card-header" onclick="toggleRFQ(\''+rfq.id+'\')">' +
         '<div>' +
-          '<div class="rfq-card-title">'+(rfq.item_description||'RFQ')+'</div>' +
+          '<div class="rfq-card-title">'+(rfq.item_description||t('rfq.fallbackTitle'))+'</div>' +
           '<div class="rfq-card-meta">'+(rfq.project_number||'')+(date?' · '+date:'')+(rfq.category?' · '+rfq.category:'')+'</div>' +
         '</div>' +
         '<span class="rfq-card-badge '+badgeClass+'">'+badgeText+'</span>' +
@@ -3309,22 +3316,22 @@ function renderRFQList(assignments,existingQuotes){
       '<div class="rfq-card-body" id="rfqbody-'+rfq.id+'">' +
         (rfq.product_image_url?'<img src="'+rfq.product_image_url+'" style="max-height:150px;border-radius:8px;border:1px solid #e0e0d8;margin-bottom:12px;display:block;" />':'')+
         quotes.filter(function(q){return q.status==='more_info_requested'&&q.admin_notes;}).map(function(q){return '<div style="background:#fff8e0;border:1px solid #f0d860;border-radius:8px;padding:14px;margin-bottom:12px;">'+
-          '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">⚠ Buyer requested additional information — Option '+q.quote_option+'</div>'+
+          '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">'+t('rfq.bannerMoreInfo',{opt:q.quote_option})+'</div>'+
           '<div style="font-size:12px;color:#664400;line-height:1.6;white-space:pre-wrap;">'+esc(q.admin_notes)+'</div>'+
-          '<div style="font-size:11px;color:#886600;margin-top:8px;font-style:italic;">Please update your quote below to address this request.</div>'+
+          '<div style="font-size:11px;color:#886600;margin-top:8px;font-style:italic;">'+t('rfq.bannerMoreInfoBody')+'</div>'+
         '</div>';}).join('')+
         quotes.filter(function(q){return q.status==='rejected'&&q.admin_notes;}).map(function(q){return '<div style="background:#fff0f0;border:1px solid #fdd;border-radius:8px;padding:14px;margin-bottom:12px;">'+
-          '<div style="font-size:13px;font-weight:600;color:#b00;margin-bottom:6px;">Not Approved — Option '+q.quote_option+'</div>'+
+          '<div style="font-size:13px;font-weight:600;color:#b00;margin-bottom:6px;">'+t('rfq.bannerNotApproved',{opt:q.quote_option})+'</div>'+
           '<div style="font-size:12px;color:#b00;line-height:1.6;white-space:pre-wrap;">'+esc(q.admin_notes)+'</div>'+
         '</div>';}).join('')+
         '<div class="rfq-detail-grid">' +
-          '<div class="rfq-detail-item"><div class="rfq-detail-label">Quantity</div><div class="rfq-detail-val">'+qty+(uom?' ('+uom+')':'')+'</div></div>' +
-          '<div class="rfq-detail-item"><div class="rfq-detail-label">Packaging</div><div class="rfq-detail-val">'+pkgTypes+'</div></div>' +
-          '<div class="rfq-detail-item"><div class="rfq-detail-label">Certifications Required</div><div class="rfq-detail-val">'+certs+'</div></div>' +
-          (rfq.likely_country_of_manufacture?'<div class="rfq-detail-item"><div class="rfq-detail-label">Country of Manufacture</div><div class="rfq-detail-val">'+rfq.likely_country_of_manufacture+'</div></div>':'')+
+          '<div class="rfq-detail-item"><div class="rfq-detail-label">'+t('rfq.detQuantity')+'</div><div class="rfq-detail-val">'+qty+(uom?' ('+uom+')':'')+'</div></div>' +
+          '<div class="rfq-detail-item"><div class="rfq-detail-label">'+t('rfq.detPackaging')+'</div><div class="rfq-detail-val">'+pkgTypes+'</div></div>' +
+          '<div class="rfq-detail-item"><div class="rfq-detail-label">'+t('rfq.detCertsRequired')+'</div><div class="rfq-detail-val">'+certs+'</div></div>' +
+          (rfq.likely_country_of_manufacture?'<div class="rfq-detail-item"><div class="rfq-detail-label">'+t('rfq.detCountry')+'</div><div class="rfq-detail-val">'+rfq.likely_country_of_manufacture+'</div></div>':'')+
         '</div>' +
-        (rfq.detailed_specifications?'<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Specifications</div><div class="rfq-specs-box">'+rfq.detailed_specifications+'</div>':'')+
-        (rfq.is_cosmetic?'<div style="background:#fce8f0;border:1px solid #f0b8d0;border-radius:7px;padding:10px 12px;font-size:12px;color:#880044;margin-bottom:12px;">&#x1F9F4; <strong>Cosmetic Product:</strong> Please include your INCI ingredient list and formulation details with your quote.</div>':'')+
+        (rfq.detailed_specifications?'<div style="font-size:11px;font-weight:600;color:#bbb;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">'+t('rfq.specifications')+'</div><div class="rfq-specs-box">'+rfq.detailed_specifications+'</div>':'')+
+        (rfq.is_cosmetic?'<div style="background:#fce8f0;border:1px solid #f0b8d0;border-radius:7px;padding:10px 12px;font-size:12px;color:#880044;margin-bottom:12px;">'+t('rfq.cosmeticNote')+'</div>':'')+
         renderQuoteSection(rfq,a,quotes)+
       '</div>' +
     '</div>';
