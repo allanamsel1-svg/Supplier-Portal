@@ -49,14 +49,18 @@
       { icon: '📋', label: 'Compliance Rules', href: 'compliance-rules.html' },
     ]},
     { section: 'Communications', items: [
+      // Sourcing/Sales/Accounting/Graphics/Logistics open admin.html's in-page inbox panels
+      // (showPanel('inbox-<dept>') sets currentDept + calls loadInbox internally). On any
+      // other page they fall back to the standalone comms view (communications.html?tab=<dept>).
+      // Messages/Allan/Compliance/Zoom have no admin.html panel, so they stay plain links.
       { icon: '💬', label: 'Messages', href: 'communications.html' },
       { icon: '🎥', label: 'Zoom', href: 'zoom.html' },
       { icon: '👤', label: 'Allan', href: 'communications.html?tab=allan' },
-      { icon: '📬', label: 'Sourcing', href: 'communications.html?tab=sourcing' },
-      { icon: '💼', label: 'Sales', href: 'communications.html?tab=sales' },
-      { icon: '🎨', label: 'Graphics', href: 'communications.html?tab=graphics' },
-      { icon: '💰', label: 'Accounting', href: 'communications.html?tab=accounting' },
-      { icon: '🚚', label: 'Logistics', href: 'communications.html?tab=logistics' },
+      { icon: '📬', label: 'Sourcing', panel: 'inbox-sourcing', fallback: 'communications.html?tab=sourcing' },
+      { icon: '💼', label: 'Sales', panel: 'inbox-sales', fallback: 'communications.html?tab=sales' },
+      { icon: '🎨', label: 'Graphics', panel: 'inbox-graphics', fallback: 'communications.html?tab=graphics' },
+      { icon: '💰', label: 'Accounting', panel: 'inbox-accounting', fallback: 'communications.html?tab=accounting' },
+      { icon: '🚚', label: 'Logistics', panel: 'inbox-logistics', fallback: 'communications.html?tab=logistics' },
       { icon: '🛡', label: 'Compliance', href: 'communications.html?tab=compliance' },
     ]},
     { section: 'RFQ & Products', items: [
@@ -140,9 +144,13 @@
                 badgeHtml(it.badge) + countHtml(it.count);
     if (it.panel) {
       // Keep id="nav-<panel>" + class "sitem" so admin.html's showPanel() still works.
+      // Fallback href (used on non-admin pages) is it.fallback when set, else admin.html#panel=<id>.
+      // When a fallback exists we also mirror it into data-href so highlightNav() can match it.
       var loaders = (it.loaders || []).join(',');
+      var href = it.fallback || ('admin.html#panel=' + it.panel);
+      var dataHref = it.fallback ? (' data-href="' + esc(it.fallback) + '"') : '';
       return '<a class="sb-item sitem" id="nav-' + esc(it.panel) + '"' +
-             ' href="admin.html#panel=' + esc(it.panel) + '"' +
+             ' href="' + esc(href) + '"' + dataHref +
              ' data-panel="' + esc(it.panel) + '" data-loaders="' + esc(loaders) + '"' +
              ' onclick="return AdminSidebar.go(event,this)">' + inner + '</a>';
     }
