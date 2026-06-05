@@ -611,6 +611,7 @@
           <span onclick="aiBarSuggest(this)" style="font-size:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);padding:4px 10px;border-radius:14px;cursor:pointer;">Who manufactures LED lighting?</span>
           <span onclick="aiBarSuggest(this)" style="font-size:11px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);padding:4px 10px;border-radius:14px;cursor:pointer;">Draft an RFQ for outdoor solar lights</span>
         </div>
+        <div id="ai-bar-result" style="display:none;margin-top:12px;padding:12px 14px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);border-radius:8px;font-size:13px;line-height:1.55;color:#fff;overflow-wrap:break-word;"></div>
       </div>
 
       <div class="stats">
@@ -12107,17 +12108,25 @@ async function aiSuggestHTSPD(){
 // ════════════════════════════════════════
 
 // AI Assistant bar (top of dashboard) — routes the query to the existing chat panel
-function aiBarSubmit(){
-  var q=g('ai-bar-input').value.trim();
-  if(!q)return;
-  // Open the chat panel and pre-fill with the question, then send
-  var chatInput=g('chat-input');
-  if(chatInput){
-    chatInput.value=q;
-    showPanel('chat');
-    if(typeof sendMsg==='function'){setTimeout(sendMsg,100);}
-  }
-  g('ai-bar-input').value='';
+async function aiBarSubmit(){
+  var input=g('ai-bar-input');var q=input.value.trim();if(!q)return;
+  var out=g('ai-bar-result');
+  if(out){out.style.display='block';out.innerHTML='<span style="opacity:0.7;">Thinking…</span>';}
+  input.value='';
+  function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  try{
+    var tok=localStorage.getItem('admin_session')||'';
+    var r=await fetch('/api/tenant-search',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({query:q})});
+    var d=await r.json().catch(function(){return {};});
+    if(r.status===401){if(out)out.innerHTML='<span style="color:#fbb;">Session expired — please sign in again.</span>';return;}
+    // Action intents (create RFQ/PO, navigate) return a url + message instead of an answer.
+    if(d&&d.mode==='action'&&d.url){
+      if(out)out.innerHTML=escHtml(d.message||'Opening…')+' <a href="'+d.url.replace(/"/g,'%22')+'" style="color:#9bc2ff;text-decoration:underline;">open ›</a>';
+      return;
+    }
+    var txt=(d&&(d.answer||d.message))||'No answer returned.';
+    if(out)out.innerHTML=escHtml(txt).replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+  }catch(e){ if(out){out.innerHTML='<span style="color:#fbb;">Connection error. Please try again.</span>';} }
 }
 function aiBarSuggest(el){
   g('ai-bar-input').value=el.textContent;

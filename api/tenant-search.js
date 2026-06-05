@@ -6,12 +6,31 @@
 // Auth: Bearer tenant session token. Never throws a 500 — every path returns JSON.
 export const config = { runtime: 'nodejs' };
 
+import { createHmac, timingSafeEqual } from 'crypto';
+
 const SB_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
 const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
 const INTENT_MODEL = 'claude-haiku-4-5-20251001';
 const ANSWER_MODEL = 'claude-sonnet-4-6';
+
+// Admin cross-access: a valid admin session token (same HMAC scheme as api/admin-auth.js)
+// resolves to the Byline Brands tenant, so admins can use this AI search from admin.html.
+const ADMIN_TENANT_ID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+function verifyAdminToken(token) {
+  const key = String(process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || '').trim();
+  if (!key || !token || typeof token !== 'string' || token.indexOf('.') === -1) return false;
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return false;
+  const expected = createHmac('sha256', key).update(payload).digest('base64url');
+  if (sig.length !== expected.length) return false;
+  try {
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+    const obj = JSON.parse(Buffer.from(payload, 'base64url').toString());
+    return !obj.exp || Date.now() < obj.exp;
+  } catch { return false; }
+}
 
 async function sbGet(path) {
   try { const r = await fetch(SB_URL + '/rest/v1/' + path, { headers: H }); if (!r.ok) return []; const d = await r.json(); return Array.isArray(d) ? d : []; }
@@ -259,11 +278,18 @@ export default async function handler(req, res) {
   // Auth
   const token = (req.headers.authorization || req.headers.Authorization || '').replace('Bearer ', '').trim();
   if (!token) return res.status(401).json({ error: 'Unauthorized' });
-  let session = null;
-  try { const r = await fetch(SB_URL + '/rest/v1/tenant_sessions?select=tenant_id,expires_at&token=eq.' + encodeURIComponent(token) + '&limit=1', { headers: H }); const arr = r.ok ? await r.json() : []; session = Array.isArray(arr) ? arr[0] : null; } catch { session = null; }
-  if (!session || new Date(session.expires_at) < new Date()) return res.status(401).json({ error: 'Invalid session' });
-
-  const tid = session.tenant_id, etid = encodeURIComponent(tid);
+  // A valid admin session token resolves to the Byline Brands tenant; otherwise require a
+  // valid tenant session. (Admin tokens are HMAC payload.sig and won't match a tenant session.)
+  let tid = null;
+  if (verifyAdminToken(token)) {
+    tid = ADMIN_TENANT_ID;
+  } else {
+    let session = null;
+    try { const r = await fetch(SB_URL + '/rest/v1/tenant_sessions?select=tenant_id,expires_at&token=eq.' + encodeURIComponent(token) + '&limit=1', { headers: H }); const arr = r.ok ? await r.json() : []; session = Array.isArray(arr) ? arr[0] : null; } catch { session = null; }
+    if (!session || new Date(session.expires_at) < new Date()) return res.status(401).json({ error: 'Invalid session' });
+    tid = session.tenant_id;
+  }
+  const etid = encodeURIComponent(tid);
   const body = await readBody(req);
   const query = (body.query || '').toString().trim();
   if (!query) return res.status(400).json({ error: 'Query required' });
