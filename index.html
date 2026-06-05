@@ -3357,10 +3357,10 @@ function addCertRow(rfqId,existingName,existingUrl){
   var rowId='certrow-'+rfqId+'-'+CERT_ROW_COUNTER;
   var name=existingName||'';
   var hasExisting=!!existingUrl;
-  var existingLabel=hasExisting?'<div style="font-size:10px;color:#1a7a1a;margin-bottom:4px;word-break:break-all;">📎 '+esc(existingUrl.split("/").pop())+' <span style="color:#888;">(replace by uploading a new file)</span></div>':'';
+  var existingLabel=hasExisting?'<div style="font-size:10px;color:#1a7a1a;margin-bottom:4px;word-break:break-all;">📎 '+esc(existingUrl.split("/").pop())+' <span style="color:#888;">'+t('quote.replaceByUpload')+'</span></div>':'';
   var html='<div id="'+rowId+'" class="cert-row" data-rfqid="'+rfqId+'" style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;padding:8px;background:#fffceb;border:1px solid #f0d860;border-radius:5px;">'+
     '<div style="flex:1;min-width:0;">'+
-      '<input type="text" placeholder="Certification name (e.g. FDA Registration)" value="'+esc(name)+'" data-cert-field="name" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px;font-family:inherit;box-sizing:border-box;margin-bottom:4px;" />'+
+      '<input type="text" placeholder="'+esc(t('quote.certNamePh'))+'" value="'+esc(name)+'" data-cert-field="name" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:5px;font-family:inherit;box-sizing:border-box;margin-bottom:4px;" />'+
       existingLabel+
       '<input type="file" data-cert-field="file" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
       (hasExisting?'<input type="hidden" data-cert-field="existing-url" value="'+esc(existingUrl)+'" />':'')+
@@ -3399,11 +3399,11 @@ async function uploadCertRows(rfqId){
       var allowedExt=/\.(pdf|png|jpg|jpeg|gif|webp|heic|heif|tif|tiff|bmp)$/;
       var blockedType=/^(video|audio|application\/x-msdownload|application\/x-executable)/;
       if(!allowedExt.test(fileName)&&!fileType.startsWith('image/')&&fileType!=='application/pdf'){
-        alert('File "'+file.name+'" doesn\'t look like a certification document. Please upload a PDF or image (JPG, PNG, etc.).');
+        alert(t('quote.fileBadCert',{name:file.name}));
         continue;
       }
       if(blockedType.test(fileType)){
-        alert('File "'+file.name+'" is a '+fileType.split('/')[0]+' file — please upload the certification as a PDF or image.');
+        alert(t('quote.fileWrongType',{name:file.name,type:fileType.split('/')[0]}));
         continue;
       }
       var ts=Date.now()+i;
@@ -3472,7 +3472,7 @@ async function hydrateKitQuoteSection(rfq,assignment){
     var pkgLabel=pkgRow.packaging_type||pkgRow.factory_described_name||'Packaging';
     var pkgDetail=pkgRow.factory_described_spec||'';
     rowsHtml+='<tr data-comp="'+pkgRow.id+'" data-label="'+esc(pkgLabel)+'" data-qty="'+(pkgRow.qty_per_kit||1)+'" style="background:#fbf7ef;">'+
-      '<td style="padding:6px 8px;font-size:12px;"><div style="font-weight:600;">📦 '+esc(pkgLabel)+' <span style="font-size:10px;color:#a07a30;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">· Packaging</span></div>'+(pkgDetail?'<div style="font-size:11px;color:#888;margin-top:1px;">'+esc(pkgDetail)+'</div>':'')+'</td>'+
+      '<td style="padding:6px 8px;font-size:12px;"><div style="font-weight:600;">📦 '+esc(pkgLabel)+' <span style="font-size:10px;color:#a07a30;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">'+t('quote.kitPackagingTag')+'</span></div>'+(pkgDetail?'<div style="font-size:11px;color:#888;margin-top:1px;">'+esc(pkgDetail)+'</div>':'')+'</td>'+
       '<td style="padding:6px 8px;text-align:center;font-size:12px;color:#888;">'+(pkgRow.qty_per_kit||1)+'</td>'+
       '<td style="padding:4px 6px;"><input type="number" class="kq-cost" step="0.0001" value="'+(pex.component_unit_cost||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
       '<td style="padding:4px 6px;"><input type="number" class="kq-frt" step="0.0001" value="'+(pex.freight_to_qb||'')+'" placeholder="0.0000" style="width:90px;padding:5px 6px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></td>'+
@@ -3481,27 +3481,27 @@ async function hydrateKitQuoteSection(rfq,assignment){
 
   var html=
     '<div style="background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;padding:12px 14px;font-size:12px;color:#1a3a7a;margin-bottom:12px;line-height:1.5;">'+
-      '<div style="font-weight:600;margin-bottom:4px;">🧩 This is a multi-component set</div>'+
-      'Please quote each component separately — your per-unit cost and the freight to bring that component to the assembly location. Add your assembly cost at the bottom.'+
+      '<div style="font-weight:600;margin-bottom:4px;">'+t('quote.kitTitle')+'</div>'+
+      t('quote.kitBody')+
     '</div>'+
     '<table style="width:100%;border-collapse:collapse;margin-bottom:10px;">'+
       '<thead><tr style="background:#f5f5f0;">'+
-        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Component</th>'+
-        '<th style="padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Order Qty</th>'+
-        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Cost/unit (USD)</th>'+
-        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">Freight to assembly</th>'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">'+t('quote.kitComponent')+'</th>'+
+        '<th style="padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">'+t('quote.kitOrderQty')+'</th>'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">'+t('quote.kitCostUnit')+'</th>'+
+        '<th style="padding:6px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#888;">'+t('quote.kitFreight')+'</th>'+
       '</tr></thead>'+
-      '<tbody>'+(rowsHtml||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:#aaa;">No components defined for this kit.</td></tr>')+'</tbody>'+
+      '<tbody>'+(rowsHtml||'<tr><td colspan="4" style="padding:10px;font-size:12px;color:#aaa;">'+t('quote.kitNoComponents')+'</td></tr>')+'</tbody>'+
     '</table>'+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">'+
-      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Assembly cost / set (USD)</label>'+
-        '<input type="number" id="kq-asm-'+rfq.id+'" step="0.0001" value="'+(asmEx.assembly_cost||'')+'" placeholder="e.g. 0.5000" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
-      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">Notes (optional)</label>'+
+      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">'+t('quote.kitAssemblyCost')+'</label>'+
+        '<input type="number" id="kq-asm-'+rfq.id+'" step="0.0001" value="'+(asmEx.assembly_cost||'')+'" placeholder="'+esc(t('quote.kitAsmPh'))+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
+      '<div><label style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:0.04em;">'+t('quote.kitNotesOptional')+'</label>'+
         '<input type="text" id="kq-notes-'+rfq.id+'" value="'+esc(asmEx.factory_notes||'')+'" style="width:100%;padding:6px 8px;font-size:12px;border:1px solid #e0e0d8;border-radius:6px;" /></div>'+
     '</div>'+
-    '<button onclick="submitKitQuote(\''+rfq.id+'\')" id="kq-btn-'+rfq.id+'" class="submit-quote-btn">Submit Kit Quote</button>'+
+    '<button onclick="submitKitQuote(\''+rfq.id+'\')" id="kq-btn-'+rfq.id+'" class="submit-quote-btn">'+t('quote.kitSubmit')+'</button>'+
     '<div id="kq-err-'+rfq.id+'" style="display:none;color:#b00;font-size:12px;margin-top:8px;"></div>'+
-    '<div id="kq-ok-'+rfq.id+'" style="display:none;color:#1a7a1a;font-size:12px;margin-top:8px;">✓ Kit quote submitted.</div>';
+    '<div id="kq-ok-'+rfq.id+'" style="display:none;color:#1a7a1a;font-size:12px;margin-top:8px;">'+t('quote.kitSubmitted')+'</div>';
 
   holder.innerHTML=html;
 }
@@ -3526,7 +3526,7 @@ async function submitKitQuote(rfqId){
   });
   // Require at least one component cost.
   if(!lines.some(function(l){return l.component_unit_cost;})){
-    if(err){err.textContent='Please enter a cost for at least one component.';err.style.display='block';}
+    if(err){err.textContent=t('quote.kitNeedOne');err.style.display='block';}
     return;
   }
   // Assembly line. Must carry the SAME key set as component rows — PostgREST
@@ -3545,7 +3545,7 @@ async function submitKitQuote(rfqId){
     factory_notes:notes
   });
 
-  if(btn){btn.disabled=true;btn.textContent='Submitting...';}
+  if(btn){btn.disabled=true;btn.textContent=t('quote.submitting');}
   try{
     // Replace this factory's prior lines for this RFQ.
     await fetch(SB+'/rest/v1/kit_quote_lines?rfq_id=eq.'+rfqId+'&factory_id=eq.'+FACTORY_ID,{method:'DELETE',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}});
@@ -3554,10 +3554,10 @@ async function submitKitQuote(rfqId){
     // Mark assignment quoted.
     await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+rfqId+'&factory_id=eq.'+FACTORY_ID,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'quoted'})});
     if(ok)ok.style.display='block';
-    if(btn){btn.disabled=false;btn.textContent='Update Kit Quote';}
+    if(btn){btn.disabled=false;btn.textContent=t('quote.kitUpdate');}
   }catch(ex){
-    if(err){err.textContent='Submit failed: '+ex.message;err.style.display='block';}
-    if(btn){btn.disabled=false;btn.textContent='Submit Kit Quote';}
+    if(err){err.textContent=t('quote.submitFailed',{x:ex.message});err.style.display='block';}
+    if(btn){btn.disabled=false;btn.textContent=t('quote.kitSubmit');}
   }
 }
 
@@ -3566,38 +3566,38 @@ function renderQuoteSection(rfq,assignment,quotes){
   if(rfq.is_kit_rfq){
     // Async content — return a placeholder and hydrate after render.
     setTimeout(function(){hydrateKitQuoteSection(rfq,assignment);},0);
-    return '<div id="kitq-'+rfq.id+'"><div style="padding:16px;color:#aaa;font-size:13px;">Loading components…</div></div>';
+    return '<div id="kitq-'+rfq.id+'"><div style="padding:16px;color:#aaa;font-size:13px;">'+t('quote.kitLoading')+'</div></div>';
   }
   // Instruction banner — always shown
   var banner='<div style="background:#e8f0ff;border:1px solid #b8ccf0;border-radius:8px;padding:12px 14px;font-size:12px;color:#1a3a7a;margin-bottom:12px;line-height:1.5;">'+
-    '<div style="font-weight:600;margin-bottom:4px;">💡 Submit one quote per FOB origin</div>'+
-    'If you can ship from multiple ports with different pricing (e.g. Yantian vs Shanghai), please submit a <strong>separate quote for each port</strong>. Click "+ Add Another Quote" after submitting your first.'+
+    '<div style="font-weight:600;margin-bottom:4px;">'+t('quote.multiFobTitle')+'</div>'+
+    t('quote.multiFobBody')+
     '</div>';
   // Submitted quote summary cards
   var summaries=quotes.map(function(q){
     var fobN=parseFloat(q.unit_fob_price||0);
     var pkgN=parseFloat(q.packaging_price_per_unit||0);
     var ports=Array.isArray(q.fob_ports)?q.fob_ports.join(', '):(q.fob_ports||'');
-    var statusLabel='Submitted';var statusColor='#1a7a1a';
-    if(q.status==='draft'){statusLabel='Draft';statusColor='#aa6600';}
-    else if(q.status==='accepted'){statusLabel='✓ Approved';statusColor='#1a7a1a';}
-    else if(q.status==='rejected'){statusLabel='Not Approved';statusColor='#b00';}
-    else if(q.status==='more_info_requested'){statusLabel='Info Requested';statusColor='#aa6600';}
+    var statusLabel=t('quote.statusSubmitted');var statusColor='#1a7a1a';
+    if(q.status==='draft'){statusLabel=t('quote.statusDraft');statusColor='#aa6600';}
+    else if(q.status==='accepted'){statusLabel=t('quote.statusApproved');statusColor='#1a7a1a';}
+    else if(q.status==='rejected'){statusLabel=t('quote.statusNotApproved');statusColor='#b00';}
+    else if(q.status==='more_info_requested'){statusLabel=t('quote.statusInfoRequested');statusColor='#aa6600';}
     return '<div class="existing-quote" style="margin-bottom:8px;">'+
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">'+
         '<div style="flex:1;min-width:200px;">'+
-          '<strong>Option '+(q.quote_option||'?')+'</strong>'+
-          (ports?' · <span style="color:#5522aa;font-weight:600;">'+esc(ports)+'</span>':' · <span style="color:#aa6600;">⚠ no FOB port</span>')+
+          '<strong>'+t('quote.optionLabel',{n:(q.quote_option||'?')})+'</strong>'+
+          (ports?' · <span style="color:#5522aa;font-weight:600;">'+esc(ports)+'</span>':' · <span style="color:#aa6600;">'+t('quote.noFobPort')+'</span>')+
           '<span style="margin-left:8px;font-size:11px;color:'+statusColor+';font-weight:600;">'+statusLabel+'</span>'+
-          '<div style="margin-top:4px;font-size:12px;color:#555;">FOB: $'+fobN.toFixed(4)+' + Pkg: $'+pkgN.toFixed(4)+' = <strong>$'+(fobN+pkgN).toFixed(4)+'</strong> · MOQ: '+(q.moq||'—')+'</div>'+
+          '<div style="margin-top:4px;font-size:12px;color:#555;">'+t('quote.summaryLine',{fob:fobN.toFixed(4),pkg:pkgN.toFixed(4),total:(fobN+pkgN).toFixed(4),moq:(q.moq||'—')})+'</div>'+
         '</div>'+
-        '<button onclick="editQuote(\''+rfq.id+'\',\''+q.id+'\')" style="font-size:12px;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;flex-shrink:0;">✏ Edit</button>'+
+        '<button onclick="editQuote(\''+rfq.id+'\',\''+q.id+'\')" style="font-size:12px;padding:6px 12px;background:#fff;border:1px solid #ddd;border-radius:6px;cursor:pointer;flex-shrink:0;">'+t('quote.editBtn')+'</button>'+
       '</div>'+
     '</div>';
   }).join('');
   // Form: shown by default if no quotes; hidden if quotes exist (revealed via "Add Another" button)
   var formHidden=quotes.length>0;
-  var addBtn=quotes.length>0?'<button id="qaddbtn-'+rfq.id+'" onclick="addAnotherQuote(\''+rfq.id+'\')" style="margin-bottom:10px;width:100%;padding:10px;background:#1a1a2e;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">＋ Add Another Quote (different FOB origin)</button>':'';
+  var addBtn=quotes.length>0?'<button id="qaddbtn-'+rfq.id+'" onclick="addAnotherQuote(\''+rfq.id+'\')" style="margin-bottom:10px;width:100%;padding:10px;background:#1a1a2e;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('quote.addAnother')+'</button>':'';
   return banner+summaries+addBtn+renderQuoteForm(rfq,assignment,null,formHidden);
 }
 
@@ -3605,7 +3605,7 @@ function renderQuoteSection(rfq,assignment,quotes){
 function editQuote(rfqId,quoteId){
   // Find quote data from cached allRFQs structure isn't reliable; refetch
   fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*',{headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}}).then(function(r){return r.json();}).then(function(rows){
-    if(!rows||!rows[0]){alert('Quote not found.');return;}
+    if(!rows||!rows[0]){alert(t('quote.notFound'));return;}
     var q=rows[0];
     populateQuoteForm(rfqId,q);
     var form=g('qform-'+rfqId);if(form)form.style.display='block';
@@ -3656,14 +3656,14 @@ function populateQuoteForm(rfqId,q){
   }
   // INCI/Formulation "current" labels
   var inciCur=g('qinci-current-'+rfqId);
-  if(inciCur)inciCur.innerHTML='Current: '+(q&&q.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(q.inci_document_url.split("/").pop())+'</strong>':'<em>None</em>');
+  if(inciCur)inciCur.innerHTML=t('quote.currentPrefix')+(q&&q.inci_document_url?'<strong style="color:#1a7a1a;">'+esc(q.inci_document_url.split("/").pop())+'</strong>':'<em>'+t('common.none')+'</em>');
   var formCur=g('qformula-current-'+rfqId);
-  if(formCur)formCur.innerHTML='Current: '+(q&&q.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(q.formulation_document_url.split("/").pop())+'</strong>':'<em>None</em>');
+  if(formCur)formCur.innerHTML=t('quote.currentPrefix')+(q&&q.formulation_document_url?'<strong style="color:#1a7a1a;">'+esc(q.formulation_document_url.split("/").pop())+'</strong>':'<em>'+t('common.none')+'</em>');
   // Update title/buttons to reflect mode
   var title=g('qformtitle-'+rfqId);
-  if(title)title.textContent=q?'Update Your Quote (Option '+(q.quote_option||'?')+')':'Submit a New Quote';
+  if(title)title.textContent=q?t('quote.formTitleUpdate',{opt:(q.quote_option||'?')}):t('quote.formTitleNew');
   var btn=g('qbtn-'+rfqId);
-  if(btn)btn.textContent=q?'Update Quote':'Submit Quote';
+  if(btn)btn.textContent=q?t('quote.updateBtn'):t('quote.submitBtn');
   // File inputs can't be programmatically populated — reset them
   var inci=g('qinci-'+rfqId);if(inci)inci.value='';
   var formula=g('qformula-'+rfqId);if(formula)formula.value='';
@@ -3745,9 +3745,9 @@ function renderRecommendedDocsPanel(rfq,existing){
   var other=certs.filter(function(c){return !c.tier||(c.tier!=='critical'&&c.tier!=='important'&&c.tier!=='nice_to_have');});
 
   function tierColor(tier){
-    if(tier==='critical')return {bg:'#fff0f0',border:'#fdd',text:'#b00',label:'CRITICAL'};
-    if(tier==='important')return {bg:'#fff8e0',border:'#e0c060',text:'#886600',label:'IMPORTANT'};
-    if(tier==='nice_to_have')return {bg:'#f0f8f0',border:'#c0d8c0',text:'#3a7a3a',label:'NICE-TO-HAVE'};
+    if(tier==='critical')return {bg:'#fff0f0',border:'#fdd',text:'#b00',label:t('quote.tierCritical')};
+    if(tier==='important')return {bg:'#fff8e0',border:'#e0c060',text:'#886600',label:t('quote.tierImportant')};
+    if(tier==='nice_to_have')return {bg:'#f0f8f0',border:'#c0d8c0',text:'#3a7a3a',label:t('quote.tierNice')};
     return {bg:'#f5f5f0',border:'#e0e0d8',text:'#666',label:''};
   }
 
@@ -3763,10 +3763,10 @@ function renderRecommendedDocsPanel(rfq,existing){
     var hint='';
     if(kind==='numeric'){
       var rangeBits=[];
-      if(item.min!==undefined)rangeBits.push('min '+item.min);
-      if(item.max!==undefined)rangeBits.push('max '+item.max);
+      if(item.min!==undefined)rangeBits.push(t('quote.specMin')+item.min);
+      if(item.max!==undefined)rangeBits.push(t('quote.specMax')+item.max);
       var unit=item.unit?' '+item.unit:'';
-      if(rangeBits.length)hint='<div style="font-size:10px;color:#888;margin-left:24px;margin-top:2px;">Target: '+rangeBits.join(', ')+unit+' — provide a test report or COA showing this</div>';
+      if(rangeBits.length)hint='<div style="font-size:10px;color:#888;margin-left:24px;margin-top:2px;">'+t('quote.specTarget',{range:rangeBits.join(', '),unit:unit})+'</div>';
     }
     return '<div style="padding:4px 0;font-size:12px;color:#1a1a2e;">'+icon+' '+label+tierBadge+weight+hint+'</div>';
   }
@@ -3778,36 +3778,36 @@ function renderRecommendedDocsPanel(rfq,existing){
   }
 
   var summaryNum=certs.length+nums.length;
-  var headerCounts=(critical.length?'<span style="color:#b00;font-weight:600;">'+critical.length+' critical</span>':'')+
-    (important.length?(critical.length?' · ':'')+'<span style="color:#886600;font-weight:600;">'+important.length+' important</span>':'')+
-    (nice.length?(critical.length||important.length?' · ':'')+'<span style="color:#3a7a3a;">'+nice.length+' nice-to-have</span>':'');
+  var headerCounts=(critical.length?'<span style="color:#b00;font-weight:600;">'+t('quote.countCritical',{n:critical.length})+'</span>':'')+
+    (important.length?(critical.length?' · ':'')+'<span style="color:#886600;font-weight:600;">'+t('quote.countImportant',{n:important.length})+'</span>':'')+
+    (nice.length?(critical.length||important.length?' · ':'')+'<span style="color:#3a7a3a;">'+t('quote.countNice',{n:nice.length})+'</span>':'');
 
   // Prop 65 strategy banner (RFQ-level setting)
   var p65Banner='';
   if(rfq.prop65_strategy==='conform'){
-    p65Banner='<div style="background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#882200;line-height:1.5;"><strong style="color:#b00;">🚨 CA Prop 65 Strategy: Must Conform.</strong> Final product must contain no detectable Prop 65-listed chemicals. Provide third-party Prop 65 chemical screening test report from an accredited lab. <strong>Reformulation required if any listed chemical is present.</strong></div>';
+    p65Banner='<div style="background:#fff0f0;border:1px solid #fdd;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#882200;line-height:1.5;">'+t('quote.prop65MustConform')+'</div>';
   } else if(rfq.prop65_strategy==='warning_label'){
-    p65Banner='<div style="background:#fff8e0;border:1px solid #e0c060;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#664400;line-height:1.5;"><strong style="color:#886600;">🚨 CA Prop 65 Strategy: Warning Label Acceptable.</strong> Standard CA Prop 65 warning must appear on packaging artwork ("WARNING: This product can expose you to chemicals known to the State of California to cause cancer..."). <strong>Submit packaging mockup with warning label visible.</strong> Reformulation NOT required.</div>';
+    p65Banner='<div style="background:#fff8e0;border:1px solid #e0c060;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#664400;line-height:1.5;">'+t('quote.prop65WarnLabel')+'</div>';
   } else if(rfq.prop65_strategy==='either'){
-    p65Banner='<div style="background:#f0f8f0;border:1px solid #c0d8c0;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#1a5a1a;line-height:1.5;"><strong style="color:#3a7a3a;">🚨 CA Prop 65: Flexible.</strong> Either conformance (no detectable listed chemicals) OR a packaging warning label is acceptable. Conformance is preferred but warning label is OK.</div>';
+    p65Banner='<div style="background:#f0f8f0;border:1px solid #c0d8c0;border-radius:7px;padding:10px 12px;margin-top:8px;font-size:11px;color:#1a5a1a;line-height:1.5;">'+t('quote.prop65Flexible')+'</div>';
   }
 
   return '<div style="background:#f3f7ff;border:1px solid #c8d8f0;border-radius:9px;padding:12px 14px;margin-bottom:14px;">'+
     '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;flex-wrap:wrap;gap:8px;" onclick="toggleRecDocs(\''+rfq.id+'\')">'+
       '<div>'+
-        '<div style="font-size:13px;font-weight:700;color:#2244cc;">📋 Recommended Documents for this Category <span id="recdocs-toggle-'+rfq.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
-        '<div style="font-size:11px;color:#666;margin-top:2px;">'+headerCounts+(headerCounts?' · ':'')+nums.length+' test specs</div>'+
+        '<div style="font-size:13px;font-weight:700;color:#2244cc;">'+t('quote.recDocsTitle')+'<span id="recdocs-toggle-'+rfq.id+'" style="color:#888;font-weight:400;">▾</span></div>'+
+        '<div style="font-size:11px;color:#666;margin-top:2px;">'+headerCounts+(headerCounts?' · ':'')+t('quote.recDocsTestSpecs',{n:nums.length})+'</div>'+
       '</div>'+
-      '<div style="font-size:10px;color:#666;background:#fff;border:1px solid #c8d8f0;padding:4px 8px;border-radius:6px;">Optional but recommended</div>'+
+      '<div style="font-size:10px;color:#666;background:#fff;border:1px solid #c8d8f0;padding:4px 8px;border-radius:6px;">'+t('quote.recDocsOptional')+'</div>'+
     '</div>'+
     p65Banner+
-    '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">These documents strengthen your quote and avoid back-and-forth review cycles. <strong>You can submit your quote without them</strong> — but providing them speeds approval.</div>'+
+    '<div style="font-size:11px;color:#445;margin-top:8px;line-height:1.5;">'+t('quote.recDocsBody')+'</div>'+
     '<div id="recdocs-body-'+rfq.id+'" style="margin-top:8px;">'+
-      section('Critical Certifications',critical,'cert')+
-      section('Important Certifications',important,'cert')+
-      section('Nice-to-Have Certifications',nice,'cert')+
-      (other.length?section('Other Certifications',other,'cert'):'')+
-      (nums.length?section('Test Reports / Numeric Specs',nums,'numeric'):'')+
+      section(t('quote.recCritical'),critical,'cert')+
+      section(t('quote.recImportant'),important,'cert')+
+      section(t('quote.recNiceToHave'),nice,'cert')+
+      (other.length?section(t('quote.recOther'),other,'cert'):'')+
+      (nums.length?section(t('quote.recTestReports'),nums,'numeric'):'')+
     '</div>'+
   '</div>';
 }
@@ -3835,127 +3835,127 @@ function renderQuoteForm(rfq,assignment,existing,hidden){
   var wgt=existing?existing.unit_weight_kg||'':'';
   var quoteId=existing?existing.id:'';
   return '<div class="quote-form" id="'+id+'" style="'+display+'">' +
-    '<div class="quote-form-title" id="qformtitle-'+rfq.id+'">Submit a New Quote</div>' +
+    '<div class="quote-form-title" id="qformtitle-'+rfq.id+'">'+t('quote.formTitleNew')+'</div>' +
     renderRecommendedDocsPanel(rfq,existing) +
     '<div class="quote-grid-3">' +
-      '<div class="qf"><label>Unit FOB Price (USD) *</label><input type="number" id="qfob-'+rfq.id+'" step="0.0001" placeholder="e.g. 2.5000" value="'+fob+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
-      '<div class="qf"><label>Packaging Cost / unit (USD) *</label><input type="number" id="qpkg-'+rfq.id+'" step="0.0001" placeholder="e.g. 0.3500" value="'+pkg+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
-      '<div class="qf"><label>Total FOB (calculated)</label><input type="text" id="qtotalfob-'+rfq.id+'" readonly style="background:#f8f8f4;font-weight:600;" /></div>' +
+      '<div class="qf"><label>'+t('quote.unitFob')+'</label><input type="number" id="qfob-'+rfq.id+'" step="0.0001" placeholder="'+esc(t('quote.unitFobPh'))+'" value="'+fob+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
+      '<div class="qf"><label>'+t('quote.pkgCost')+'</label><input type="number" id="qpkg-'+rfq.id+'" step="0.0001" placeholder="'+esc(t('quote.pkgCostPh'))+'" value="'+pkg+'" oninput="updateTotalFobDisplay(\''+rfq.id+'\')" /></div>' +
+      '<div class="qf"><label>'+t('quote.totalFob')+'</label><input type="text" id="qtotalfob-'+rfq.id+'" readonly style="background:#f8f8f4;font-weight:600;" /></div>' +
     '</div>' +
-    '<div style="font-size:10px;color:#888;margin-bottom:10px;margin-top:-2px;">Please quote unit price and packaging cost separately. Total FOB will be calculated automatically.</div>' +
+    '<div style="font-size:10px;color:#888;margin-bottom:10px;margin-top:-2px;">'+t('quote.priceSeparatelyNote')+'</div>' +
     '<div style="margin-top:6px;margin-bottom:10px;padding:12px;background:#f7f7f2;border:1px solid #e6e6dc;border-radius:8px;">' +
-      '<div style="font-size:12px;font-weight:600;color:#556;margin-bottom:3px;">Bulk / unpackaged pricing <span style="font-weight:400;color:#999;">(optional)</span></div>' +
-      '<div style="font-size:10px;color:#999;margin-bottom:8px;">If this item were supplied in bulk with no retail packaging (e.g. for inclusion in a set), what would your price be?</div>' +
+      '<div style="font-size:12px;font-weight:600;color:#556;margin-bottom:3px;">'+t('quote.bulkPricing')+'<span style="font-weight:400;color:#999;">'+t('quote.bulkOptional')+'</span></div>' +
+      '<div style="font-size:10px;color:#999;margin-bottom:8px;">'+t('quote.bulkBody')+'</div>' +
       '<div class="quote-grid">' +
-        '<div class="qf"><label>Bulk price / unit (USD)</label><input type="number" id="qbulk-'+rfq.id+'" step="0.0001" placeholder="e.g. 0.3200" /></div>' +
-        '<div class="qf"><label>Units / bulk master carton</label><input type="number" id="qbulkmaster-'+rfq.id+'" step="1" placeholder="e.g. 100" /></div>' +
+        '<div class="qf"><label>'+t('quote.bulkPrice')+'</label><input type="number" id="qbulk-'+rfq.id+'" step="0.0001" placeholder="'+esc(t('quote.bulkPricePh'))+'" /></div>' +
+        '<div class="qf"><label>'+t('quote.bulkUnits')+'</label><input type="number" id="qbulkmaster-'+rfq.id+'" step="1" placeholder="'+esc(t('quote.bulkUnitsPh'))+'" /></div>' +
       '</div>' +
     '</div>' +
     '<div class="quote-grid">' +
-      '<div class="qf"><label>MOQ (Minimum Order Quantity) *</label><input type="number" id="qmoq-'+rfq.id+'" placeholder="e.g. 1000" value="'+moq+'" /></div>' +
-      '<div class="qf"><label>FOB Port * <span style="font-size:10px;color:#888;font-weight:400;">(this quote is for shipping from)</span></label><input type="text" id="qfobport-'+rfq.id+'" placeholder="e.g. Yantian, Shekou, Shanghai" /></div>' +
+      '<div class="qf"><label>'+t('quote.moq')+'</label><input type="number" id="qmoq-'+rfq.id+'" placeholder="'+esc(t('quote.moqPh'))+'" value="'+moq+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.fobPort')+'<span style="font-size:10px;color:#888;font-weight:400;">'+t('quote.fobPortHint')+'</span></label><input type="text" id="qfobport-'+rfq.id+'" placeholder="'+esc(t('quote.fobPortPh'))+'" /></div>' +
     '</div>' +
     '<div class="quote-grid">' +
-      '<div class="qf"><label>HTS Code (if known)</label><input type="text" id="qhts-'+rfq.id+'" placeholder="e.g. 8513.10.2000" value="'+hts+'" /></div>' +
-      '<div class="qf"><label>Country of Manufacture</label><select id="qcountry-'+rfq.id+'"><option value="China">China</option><option value="Vietnam">Vietnam</option><option value="Korea">Korea</option><option value="India">India</option><option value="Bangladesh">Bangladesh</option><option value="Other">Other</option></select></div>' +
+      '<div class="qf"><label>'+t('quote.htsCode')+'</label><input type="text" id="qhts-'+rfq.id+'" placeholder="'+esc(t('quote.htsCodePh'))+'" value="'+hts+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.countryMfr')+'</label><select id="qcountry-'+rfq.id+'"><option value="China">'+t('quote.optChina')+'</option><option value="Vietnam">'+t('quote.optVietnam')+'</option><option value="Korea">'+t('quote.optKorea')+'</option><option value="India">'+t('quote.optIndia')+'</option><option value="Bangladesh">'+t('quote.optBangladesh')+'</option><option value="Other">'+t('quote.optOther')+'</option></select></div>' +
     '</div>' +
-    '<div class="qf qf-full" style="margin-bottom:10px;"><label>Existing factory model number (if applicable)</label><input type="text" id="qmodel-'+rfq.id+'" placeholder="e.g. SKU-A123 — leave blank if this is a custom build" value="'+(existing?existing.factory_existing_model_number||'':'')+'" /></div>' +
-    '<div class="qf qf-full" style="margin-bottom:10px;"><label>Product Specifications / Notes</label><textarea id="qspecs-'+rfq.id+'" rows="3" placeholder="Describe what you can produce, any variations, materials, etc.">'+specs+'</textarea></div>' +
-    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Unit Dimensions (optional)</div>' +
+    '<div class="qf qf-full" style="margin-bottom:10px;"><label>'+t('quote.factoryModel')+'</label><input type="text" id="qmodel-'+rfq.id+'" placeholder="'+esc(t('quote.factoryModelPh'))+'" value="'+(existing?existing.factory_existing_model_number||'':'')+'" /></div>' +
+    '<div class="qf qf-full" style="margin-bottom:10px;"><label>'+t('quote.prodSpecs')+'</label><textarea id="qspecs-'+rfq.id+'" rows="3" placeholder="'+esc(t('quote.prodSpecsPh'))+'">'+specs+'</textarea></div>' +
+    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">'+t('quote.unitDims')+'</div>' +
     '<div class="quote-grid-3">' +
-      '<div class="qf"><label>Length (cm)</label><input type="number" id="qlen-'+rfq.id+'" step="0.1" placeholder="cm" value="'+len+'" /></div>' +
-      '<div class="qf"><label>Width (cm)</label><input type="number" id="qwid-'+rfq.id+'" step="0.1" placeholder="cm" value="'+wid+'" /></div>' +
-      '<div class="qf"><label>Height (cm)</label><input type="number" id="qhei-'+rfq.id+'" step="0.1" placeholder="cm" value="'+hei+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.length')+'</label><input type="number" id="qlen-'+rfq.id+'" step="0.1" placeholder="'+esc(t('quote.cm'))+'" value="'+len+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.width')+'</label><input type="number" id="qwid-'+rfq.id+'" step="0.1" placeholder="'+esc(t('quote.cm'))+'" value="'+wid+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.height')+'</label><input type="number" id="qhei-'+rfq.id+'" step="0.1" placeholder="'+esc(t('quote.cm'))+'" value="'+hei+'" /></div>' +
     '</div>' +
     '<div class="quote-grid" style="margin-top:8px;">' +
-      '<div class="qf"><label>Unit Weight (kg)</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="kg" value="'+wgt+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.unitWeight')+'</label><input type="number" id="qwgt-'+rfq.id+'" step="0.001" placeholder="'+esc(t('quote.kg'))+'" value="'+wgt+'" /></div>' +
     '</div>' +
-    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:10px;">Lead Times</div>' +
+    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:10px;">'+t('quote.leadTimes')+'</div>' +
     '<div class="quote-grid">' +
-      '<div class="qf"><label>Production Lead Time (days) *</label><input type="number" id="qprodlt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 45" /></div>' +
-      '<div class="qf"><label>Sample Lead Time (days) *</label><input type="number" id="qsamplt-'+rfq.id+'" step="1" min="1" placeholder="e.g. 14" /></div>' +
+      '<div class="qf"><label>'+t('quote.prodLead')+'</label><input type="number" id="qprodlt-'+rfq.id+'" step="1" min="1" placeholder="'+esc(t('quote.prodLeadPh'))+'" /></div>' +
+      '<div class="qf"><label>'+t('quote.sampleLead')+'</label><input type="number" id="qsamplt-'+rfq.id+'" step="1" min="1" placeholder="'+esc(t('quote.sampleLeadPh'))+'" /></div>' +
     '</div>' +
     // ── Production Timeline (new) ──
     '<div style="margin-top:14px;padding:14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;">' +
-      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:6px;">📅 Production Timeline Commitment</div>' +
+      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:6px;">'+t('quote.timelineTitle')+'</div>' +
       '<div style="font-size:11px;color:#445a99;line-height:1.5;margin-bottom:12px;">' +
-        'Commit to the days you need for each stage. Sample submission is days from quote acceptance. Every other stage is days from when we approve the golden sample.' +
-        (rfq.target_sample_submission_days||rfq.target_materials_offset_days?' Buyer targets shown for reference.':'') +
+        t('quote.timelineBody') +
+        (rfq.target_sample_submission_days||rfq.target_materials_offset_days?t('quote.timelineBuyerRef'):'') +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
         '<div class="qf">' +
-          '<label>Sample submission <span style="color:#888;font-weight:400;">(days from quote acceptance)</span>' +
-            (rfq.target_sample_submission_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_sample_submission_days+'d</span>':'') +
+          '<label>'+t('quote.tlSampleSub')+'<span style="color:#888;font-weight:400;">'+t('quote.tlFromAcceptance')+'</span>' +
+            (rfq.target_sample_submission_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_sample_submission_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-sample-'+rfq.id+'" min="1" step="1" placeholder="e.g. 14" />' +
         '</div>' +
         '<div class="qf">' +
-          '<label>Materials on hand <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
-            (rfq.target_materials_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_materials_offset_days+'d</span>':'') +
+          '<label>'+t('quote.tlMaterials')+'<span style="color:#888;font-weight:400;">'+t('quote.tlAfterGolden')+'</span>' +
+            (rfq.target_materials_offset_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_materials_offset_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-materials-'+rfq.id+'" min="0" step="1" placeholder="e.g. 14" />' +
         '</div>' +
         '<div class="qf">' +
-          '<label>Mass production starts <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
-            (rfq.target_prod_start_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_prod_start_offset_days+'d</span>':'') +
+          '<label>'+t('quote.tlMpStart')+'<span style="color:#888;font-weight:400;">'+t('quote.tlAfterGolden')+'</span>' +
+            (rfq.target_prod_start_offset_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_prod_start_offset_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-prodstart-'+rfq.id+'" min="0" step="1" placeholder="e.g. 18" />' +
         '</div>' +
         '<div class="qf">' +
-          '<label>Mass production ends <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
-            (rfq.target_prod_end_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_prod_end_offset_days+'d</span>':'') +
+          '<label>'+t('quote.tlMpEnd')+'<span style="color:#888;font-weight:400;">'+t('quote.tlAfterGolden')+'</span>' +
+            (rfq.target_prod_end_offset_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_prod_end_offset_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-prodend-'+rfq.id+'" min="0" step="1" placeholder="e.g. 48" />' +
         '</div>' +
         '<div class="qf">' +
-          '<label>Pre-shipment inspection <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
-            (rfq.target_inspection_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_inspection_offset_days+'d</span>':'') +
+          '<label>'+t('quote.tlInspection')+'<span style="color:#888;font-weight:400;">'+t('quote.tlAfterGolden')+'</span>' +
+            (rfq.target_inspection_offset_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_inspection_offset_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-inspection-'+rfq.id+'" min="0" step="1" placeholder="e.g. 52" />' +
         '</div>' +
         '<div class="qf">' +
-          '<label>Cargo ready <span style="color:#888;font-weight:400;">(days after golden sample)</span>' +
-            (rfq.target_cargo_ready_offset_days?' <span style="color:#1a3a8a;font-size:10px;">target ≤'+rfq.target_cargo_ready_offset_days+'d</span>':'') +
+          '<label>'+t('quote.tlCargoReady')+'<span style="color:#888;font-weight:400;">'+t('quote.tlAfterGolden')+'</span>' +
+            (rfq.target_cargo_ready_offset_days?' <span style="color:#1a3a8a;font-size:10px;">'+t('quote.tlTarget',{n:rfq.target_cargo_ready_offset_days})+'</span>':'') +
           '</label>' +
           '<input type="number" id="qtl-cargo-'+rfq.id+'" min="0" step="1" placeholder="e.g. 58" />' +
         '</div>' +
       '</div>' +
       '<div class="qf qf-full" style="margin-top:10px;">' +
-        '<label>Timeline notes / caveats (optional)</label>' +
-        '<textarea id="qtl-notes-'+rfq.id+'" rows="2" placeholder="e.g. Materials lead time depends on supplier confirmation"></textarea>' +
+        '<label>'+t('quote.tlNotes')+'</label>' +
+        '<textarea id="qtl-notes-'+rfq.id+'" rows="2" placeholder="'+esc(t('quote.tlNotesPh'))+'"></textarea>' +
       '</div>' +
     '</div>' +
-    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:14px;">Compliance &amp; Documents</div>' +
+    '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:14px;">'+t('quote.complianceDocsSection')+'</div>' +
     '<div class="qf qf-full" style="margin:10px 0;padding:14px;background:#fff8e0;border:1px solid #f0d860;border-radius:8px;box-sizing:border-box;">'+
-      '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">📋 Compliance Documents <span style="font-size:11px;font-weight:500;">(INCI + Formulation required for cosmetics, optional for others)</span></div>'+
-      '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">For cosmetic products, both INCI list AND full formulation breakdown are required. This is industry standard — major retailers including P&amp;G, L&apos;Oréal, Unilever, and Sephora private label require formulation disclosure for compliance review. Formulation files are stored confidentially. Skip if non-cosmetic.</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#664400;margin-bottom:6px;">'+t('quote.complianceDocsTitle')+'<span style="font-size:11px;font-weight:500;">'+t('quote.complianceDocsHint')+'</span></div>'+
+      '<div style="font-size:11px;color:#886600;margin-bottom:12px;line-height:1.5;">'+t('quote.complianceDocsBody')+'</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:12px;">'+
         '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
-          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">INCI List PDF</label>'+
-          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Standardized ingredient list (regulatory order, no percentages)</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qinci-current-'+rfq.id+'">Current: <em>None</em></div>'+
+          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">'+t('quote.inciPdf')+'</label>'+
+          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">'+t('quote.inciDesc')+'</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qinci-current-'+rfq.id+'">'+t('quote.currentPrefix')+'<em>'+t('common.none')+'</em></div>'+
           '<input type="file" id="qinci-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
         '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;min-width:0;box-sizing:border-box;overflow:hidden;">'+
-          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">Formulation PDF <span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">CONFIDENTIAL</span></label>'+
-          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">Quantitative breakdown — ingredient %, role, active concentrations</div>'+
-          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qformula-current-'+rfq.id+'">Current: <em>None</em></div>'+
+          '<label style="display:block;font-weight:600;color:#664400;margin-bottom:4px;font-size:12px;">'+t('quote.formulationPdf')+'<span style="font-size:9px;background:#e8f0ff;color:#2244cc;padding:1px 5px;border-radius:8px;">'+t('quote.confidential')+'</span></label>'+
+          '<div style="font-size:10px;color:#886600;margin-bottom:6px;">'+t('quote.formulationDesc')+'</div>'+
+          '<div style="font-size:10px;color:#888;margin-bottom:6px;word-break:break-all;overflow-wrap:break-word;" id="qformula-current-'+rfq.id+'">'+t('quote.currentPrefix')+'<em>'+t('common.none')+'</em></div>'+
           '<input type="file" id="qformula-'+rfq.id+'" accept="application/pdf,.pdf" style="font-size:11px;width:100%;max-width:100%;box-sizing:border-box;" />'+
         '</div>'+
       '</div>'+
       // Certifications — always shown
       '<div style="background:#fff;border:1px solid #f0d860;border-radius:6px;padding:10px;">'+
-        '<label style="display:block;font-weight:600;color:#664400;margin-bottom:6px;font-size:12px;">Certifications &amp; Test Reports</label>'+
-        (rfq.certifications_required&&rfq.certifications_required.length?'<div style="font-size:10px;color:#886600;margin-bottom:8px;">Buyer requested: <strong>'+rfq.certifications_required.join(', ')+'</strong></div>':'<div style="font-size:10px;color:#886600;margin-bottom:8px;">Add any SKU-specific certifications (FDA, ISO, FCC, CE, RoHS, USDA Organic, etc.)</div>')+
+        '<label style="display:block;font-weight:600;color:#664400;margin-bottom:6px;font-size:12px;">'+t('quote.certsTestReports')+'</label>'+
+        (rfq.certifications_required&&rfq.certifications_required.length?'<div style="font-size:10px;color:#886600;margin-bottom:8px;">'+t('quote.buyerRequested',{x:'<strong>'+rfq.certifications_required.join(', ')+'</strong>'})+'</div>':'<div style="font-size:10px;color:#886600;margin-bottom:8px;">'+t('quote.addCertsHint')+'</div>')+
         '<div id="qcerts-rows-'+rfq.id+'"></div>'+
-        '<button type="button" onclick="addCertRow(\''+rfq.id+'\')" style="margin-top:6px;padding:7px 12px;background:#fff;border:1px dashed #c0a830;color:#664400;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;">＋ Add a Certification</button>'+
+        '<button type="button" onclick="addCertRow(\''+rfq.id+'\')" style="margin-top:6px;padding:7px 12px;background:#fff;border:1px dashed #c0a830;color:#664400;border-radius:6px;font-size:12px;cursor:pointer;font-family:inherit;">'+t('quote.addCertBtn')+'</button>'+
       '</div>'+
     '</div>'+
     '<input type="hidden" id="qquoteid-'+rfq.id+'" value="'+quoteId+'" />' +
     '<input type="hidden" id="qassignid-'+rfq.id+'" value="'+assignment.id+'" />' +
     '<div style="display:flex;gap:8px;margin-top:8px;">'+
-      '<button class="submit-quote-btn" id="qdraft-'+rfq.id+'" style="flex:1;background:#fff;color:#1a1a2e;border:1px solid #d8d8d0;" onclick="saveQuoteDraft(\''+rfq.id+'\')">💾 Save Draft</button>' +
-      '<button class="submit-quote-btn" id="qbtn-'+rfq.id+'" style="flex:2;" onclick="submitQuote(\''+rfq.id+'\')">Submit Quote</button>' +
+      '<button class="submit-quote-btn" id="qdraft-'+rfq.id+'" style="flex:1;background:#fff;color:#1a1a2e;border:1px solid #d8d8d0;" onclick="saveQuoteDraft(\''+rfq.id+'\')">'+t('quote.saveDraft')+'</button>' +
+      '<button class="submit-quote-btn" id="qbtn-'+rfq.id+'" style="flex:2;" onclick="submitQuote(\''+rfq.id+'\')">'+t('quote.submitBtn')+'</button>' +
     '</div>' +
     '<div class="pmsg ok" id="qok-'+rfq.id+'"></div>' +
     '<div class="pmsg err" id="qerr-'+rfq.id+'"></div>' +
@@ -3977,10 +3977,10 @@ function isValidHts(v){
 }
 
 async function saveQuoteDraft(rfqId){
-  if(!FACTORY_ID){alert('Factory not loaded.');return;}
-  var btn=g('qdraft-'+rfqId);btn.disabled=true;btn.textContent='Saving...';
+  if(!FACTORY_ID){alert(t('quote.factoryNotLoaded'));return;}
+  var btn=g('qdraft-'+rfqId);btn.disabled=true;btn.textContent=t('common.saving');
   var qHtsD=g('qhts-'+rfqId)?g('qhts-'+rfqId).value.trim():'';
-  if(qHtsD&&!isValidHts(qHtsD)){var ed=g('qerr-'+rfqId);if(ed){ed.textContent='HTS code format looks invalid — expected e.g. 8513.10.2000 or 3304.10. Please correct or clear it.';ed.style.display='block';}btn.disabled=false;btn.textContent='💾 Save Draft';return;}
+  if(qHtsD&&!isValidHts(qHtsD)){var ed=g('qerr-'+rfqId);if(ed){ed.textContent=t('quote.htsInvalid');ed.style.display='block';}btn.disabled=false;btn.textContent=t('quote.saveDraft');return;}
   var existingId=g('qquoteid-'+rfqId).value;
   var assignId=g('qassignid-'+rfqId).value;
 
@@ -4061,16 +4061,16 @@ async function saveQuoteDraft(rfqId){
       var d=await r.json();
       var newId=existingId||(Array.isArray(d)?d[0].id:d.id);
       if(newId)g('qquoteid-'+rfqId).value=newId;
-      btn.disabled=false;btn.textContent='💾 Save Draft';
-      var ok=g('qok-'+rfqId);if(ok){ok.textContent='✓ Draft saved — you can return to finish later.';ok.style.display='block';setTimeout(function(){ok.style.display='none';},4000);}
+      btn.disabled=false;btn.textContent=t('quote.saveDraft');
+      var ok=g('qok-'+rfqId);if(ok){ok.textContent=t('quote.draftSaved');ok.style.display='block';setTimeout(function(){ok.style.display='none';},4000);}
     }else{
       var e=await r.json().catch(function(){return{};});
-      btn.disabled=false;btn.textContent='💾 Save Draft';
-      var er=g('qerr-'+rfqId);if(er){er.textContent='Save failed: '+(e.message||r.status);er.style.display='block';}
+      btn.disabled=false;btn.textContent=t('quote.saveDraft');
+      var er=g('qerr-'+rfqId);if(er){er.textContent=t('quote.saveFailed',{x:(e.message||r.status)});er.style.display='block';}
     }
   }catch(e){
-    btn.disabled=false;btn.textContent='💾 Save Draft';
-    alert('Error: '+e.message);
+    btn.disabled=false;btn.textContent=t('quote.saveDraft');
+    alert(t('common.error',{msg:e.message}));
   }
 }
 
@@ -4083,12 +4083,12 @@ async function submitQuote(rfqId){
   var pkg=parseFloat(g('qpkg-'+rfqId).value)||0;
   var moq=parseInt(g('qmoq-'+rfqId).value)||0;
   var fobPortRaw=g('qfobport-'+rfqId)?g('qfobport-'+rfqId).value.trim():'';
-  if(!fob||!moq){alert('Please enter at least Unit FOB price and MOQ.');return;}
-  if(!fobPortRaw){alert('Please enter the FOB Port for this quote. If you can ship from multiple ports, submit a separate quote for each.');return;}
+  if(!fob||!moq){alert(t('quote.needPriceMoq'));return;}
+  if(!fobPortRaw){alert(t('quote.needFobPort'));return;}
   var qHtsS=g('qhts-'+rfqId)?g('qhts-'+rfqId).value.trim():'';
-  if(qHtsS&&!isValidHts(qHtsS)){showQuoteErr(rfqId,'HTS code format looks invalid — expected e.g. 8513.10.2000 or 3304.10. Please correct or clear it.');return;}
+  if(qHtsS&&!isValidHts(qHtsS)){showQuoteErr(rfqId,t('quote.htsInvalid'));return;}
   var btn=g('qbtn-'+rfqId);
-  btn.disabled=true;btn.textContent='Submitting...';
+  btn.disabled=true;btn.textContent=t('quote.submitting');
   var existingId=g('qquoteid-'+rfqId).value;
   var assignId=g('qassignid-'+rfqId).value;
   var len=parseFloat(g('qlen-'+rfqId).value)||null;
@@ -4113,14 +4113,14 @@ async function submitQuote(rfqId){
       });
       if(!ur.ok){
         var uerr=await ur.json().catch(function(){return{};});
-        btn.disabled=false;btn.textContent='Submit Quote';
-        showQuoteErr(rfqId,'INCI upload failed: '+(uerr.message||uerr.error||ur.status));
+        btn.disabled=false;btn.textContent=t('quote.submitBtn');
+        showQuoteErr(rfqId,t('quote.inciUploadFailed',{x:(uerr.message||uerr.error||ur.status)}));
         return;
       }
       inciUrl=inciPath;
     }catch(e){
-      btn.disabled=false;btn.textContent='Submit Quote';
-      showQuoteErr(rfqId,'INCI upload error: '+e.message);
+      btn.disabled=false;btn.textContent=t('quote.submitBtn');
+      showQuoteErr(rfqId,t('quote.inciUploadError',{x:e.message}));
       return;
     }
   }
@@ -4141,14 +4141,14 @@ async function submitQuote(rfqId){
       });
       if(!ur2.ok){
         var uerr2=await ur2.json().catch(function(){return{};});
-        btn.disabled=false;btn.textContent='Submit Quote';
-        showQuoteErr(rfqId,'Formulation upload failed: '+(uerr2.message||uerr2.error||ur2.status));
+        btn.disabled=false;btn.textContent=t('quote.submitBtn');
+        showQuoteErr(rfqId,t('quote.formUploadFailed',{x:(uerr2.message||uerr2.error||ur2.status)}));
         return;
       }
       formulaUrl=formulaPath;
     }catch(e){
-      btn.disabled=false;btn.textContent='Submit Quote';
-      showQuoteErr(rfqId,'Formulation upload error: '+e.message);
+      btn.disabled=false;btn.textContent=t('quote.submitBtn');
+      showQuoteErr(rfqId,t('quote.formUploadError',{x:e.message}));
       return;
     }
   }
@@ -4251,21 +4251,21 @@ async function submitQuote(rfqId){
         body:JSON.stringify({status:'quotes_received'})
       });
       var okEl=g('qok-'+rfqId);
-      okEl.textContent=existingId?'✓ Quote updated successfully!':'✓ Quote submitted successfully! Our team will review it shortly.';
+      okEl.textContent=existingId?t('quote.updatedOk'):t('quote.submittedOk');
       okEl.style.display='block';
-      btn.textContent=existingId?'Update Quote':'Submit Quote';
+      btn.textContent=existingId?t('quote.updateBtn'):t('quote.submitBtn');
       btn.disabled=false;
       setTimeout(function(){loadRFQs();},1500);
     }else{
       var e=await r.json().catch(function(){return{};});
-      g('qerr-'+rfqId).textContent='Submit failed: '+(e.message||e.details||r.status);
+      g('qerr-'+rfqId).textContent=t('quote.submitFailed',{x:(e.message||e.details||r.status)});
       g('qerr-'+rfqId).style.display='block';
-      btn.disabled=false;btn.textContent=existingId?'Update Quote':'Submit Quote';
+      btn.disabled=false;btn.textContent=existingId?t('quote.updateBtn'):t('quote.submitBtn');
     }
   }catch(e){
-    g('qerr-'+rfqId).textContent='Error: '+e.message;
+    g('qerr-'+rfqId).textContent=t('common.error',{msg:e.message});
     g('qerr-'+rfqId).style.display='block';
-    btn.disabled=false;btn.textContent=existingId?'Update Quote':'Submit Quote';
+    btn.disabled=false;btn.textContent=existingId?t('quote.updateBtn'):t('quote.submitBtn');
   }
 }
 
