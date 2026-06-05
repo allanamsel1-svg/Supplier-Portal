@@ -79,7 +79,7 @@ function renderHeader(user) {
   if (document.getElementById('tenantHeader')) return;
   const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
   // "← Dashboard" link, hidden when we're already on the dashboard page.
-  const onDashboard = /(^|\/)tenant-dashboard\.html$/.test(window.location.pathname);
+  const onDashboard = window.location.pathname.includes('tenant-dashboard.html');
   const dashLink =
     '<a class="th-dashlink" href="tenant-dashboard.html" style="' +
       'margin-left:24px;color:var(--text2);font-size:13px;text-decoration:none;white-space:nowrap;' +
