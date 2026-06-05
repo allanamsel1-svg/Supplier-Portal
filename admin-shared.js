@@ -3,12 +3,13 @@
 // with chevrons, icons, active highlight, smooth max-height animation, BETA/NEW/count
 // badges, and dark-mode support.
 //
-// Layout:
-//   • admin.html  → renders in-flow inside the existing flex `.body` (the page already
-//     had a sidebar slot there); preserves every showPanel()/cnt-* hook by reusing the
-//     same id="nav-<panel>" / class="sitem" / id="cnt-*" element contract.
-//   • all other admin pages → renders a fixed left rail and shifts page content right via
-//     `body.admin-sidebar-offset { padding-left:190px }` (no per-page HTML edits needed).
+// Layout (sidebar is ALWAYS in-flow — never position:fixed):
+//   • admin.html  → the page already has a flex `.body` with a sidebar slot; we just fill
+//     the mount in place and preserve every showPanel()/cnt-* hook by reusing the same
+//     id="nav-<panel>" / class="sitem" / id="cnt-*" element contract.
+//   • every other admin page → we build a flex row: the topbar stays full-width on top,
+//     then <div class="admin-page-wrap"> holds the sidebar + <div class="admin-content">
+//     (everything that was after the topbar) side by side, each scrolling independently.
 //
 // Item types:
 //   • panel → SPA panel on admin.html (calls showPanel + optional loaders). From any other
@@ -20,12 +21,6 @@
   var CURRENT = (location.pathname.split('/').pop() || 'admin.html').toLowerCase();
   var IS_ADMIN_HOME = CURRENT === 'admin.html';
   var STORE_KEY = 'admin_sidebar_sections';
-
-  // Master-detail pages whose OWN full-height left list (.layout > .lpanel) sat flush
-  // against the new nav and read as a second sidebar. On these we inset the .layout as a
-  // card so it reads as content. (compliance-rules/scanner already center their content
-  // with rounded cards, so they're intentionally excluded — wrapping them would double-border.)
-  var INSET_PAGES = { 'artwork-admin.html': 1, 'inspections.html': 1 };
 
   // ── Nav definition (exact sections/items/order from the spec) ──
   var NAV = [
@@ -93,10 +88,10 @@
 
   // ── CSS (namespaced under #admin-sidebar so it can't collide with any page's styles) ──
   var CSS = [
-    '#admin-sidebar{width:190px;box-sizing:border-box;background:#fff;border-right:1px solid #e0e0d8;overflow-y:auto;padding:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
-    '#admin-sidebar.sb-inflow{flex-shrink:0;}',
-    '#admin-sidebar.sb-fixed{position:fixed;top:0;left:0;bottom:0;z-index:50;}',
-    'body.admin-sidebar-offset{padding-left:190px;}',
+    // Flex-row layout (matches the tenant sidebar + content pattern). No position:fixed.
+    '.admin-page-wrap{display:flex;flex-direction:row;height:calc(100vh - 52px);overflow:hidden;}',
+    '.admin-content{flex:1;overflow-y:auto;height:100%;}',
+    '#admin-sidebar{width:190px;flex-shrink:0;height:100%;box-sizing:border-box;background:#fff;border-right:1px solid #e0e0d8;overflow-y:auto;padding:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
     '#admin-sidebar .sb-logo{padding:14px 16px 12px;}',
     '#admin-sidebar .sb-wordmark{font-size:14px;font-weight:700;color:#1a1a2e;letter-spacing:0.03em;}',
     '#admin-sidebar .sb-sub{font-size:11px;color:#999;margin-top:2px;}',
@@ -122,9 +117,6 @@
     'body.admin-dark #admin-sidebar .sb-item:hover{background:#0f1e35;color:#e2e8f0;}',
     'body.admin-dark #admin-sidebar .sb-item.on,body.admin-dark #admin-sidebar .sb-item.active{background:#14223c;color:#9bc2ff;}',
     'body.admin-dark #admin-sidebar .sb-count{background:#1e2d47;color:#94a3b8;}',
-    // Inset master-detail pages' own .layout as a card so it doesn't read as a 2nd sidebar.
-    'body.admin-md-inset .layout{margin:0 16px;border:1px solid #e0e0d8;border-radius:12px;overflow:hidden;}',
-    'body.admin-dark.admin-md-inset .layout{border-color:#1e2d47;}',
   ].join('\n');
 
   function injectCss() {
@@ -177,12 +169,37 @@
       mount.id = 'admin-sidebar';
       document.body.insertBefore(mount, document.body.firstChild);
     }
-    mount.className = IS_ADMIN_HOME ? 'sb-inflow' : 'sb-fixed';
     mount.innerHTML =
       '<div class="sb-logo"><div class="sb-wordmark">TBG Sourcing</div><div class="sb-sub">Admin</div></div>' +
       '<nav class="sb-nav">' + NAV.map(sectionHtml).join('') + '</nav>';
-    if (!IS_ADMIN_HOME) document.body.classList.add('admin-sidebar-offset');
-    if (INSET_PAGES[CURRENT]) document.body.classList.add('admin-md-inset');
+    // admin.html already has its own flex `.body` with the mount slotted in — leave it.
+    // Every other page gets the tenant-style flex row built around its topbar.
+    if (!IS_ADMIN_HOME) wrapLayout(mount);
+  }
+
+  // Build a flex row [sidebar | .admin-content] right after the page's topbar, so the
+  // topbar stays full-width and the sidebar sits in-flow beside the scrollable content.
+  function wrapLayout(sidebar) {
+    if (document.querySelector('.admin-page-wrap')) return;          // already wrapped
+    var topbar = document.querySelector('.topbar') ||
+                 document.querySelector('.ri-top') ||
+                 document.querySelector('.top');
+    if (!topbar) return;                                            // no anchor — leave as-is
+    var parent = topbar.parentNode;
+    var wrap = document.createElement('div');
+    wrap.className = 'admin-page-wrap';
+    var content = document.createElement('div');
+    content.className = 'admin-content';
+    // Move everything after the topbar (the page content) into .admin-content.
+    var node = topbar.nextSibling;
+    while (node) {
+      var next = node.nextSibling;
+      if (node !== sidebar) content.appendChild(node);
+      node = next;
+    }
+    wrap.appendChild(sidebar);   // left rail (in-flow, 190px)
+    wrap.appendChild(content);   // content fills the rest
+    parent.appendChild(wrap);    // sits immediately after the topbar
   }
 
   // ── Loaders ──
