@@ -88,9 +88,15 @@
 
   // ── CSS (namespaced under #admin-sidebar so it can't collide with any page's styles) ──
   var CSS = [
-    // Flex-row layout (matches the tenant sidebar + content pattern). No position:fixed.
-    '.admin-page-wrap{display:flex;flex-direction:row;height:calc(100vh - 52px);overflow:hidden;}',
-    '.admin-content{flex:1;overflow-y:auto;height:100%;}',
+    // Full-height flex layout (matches tenant). No position:fixed, no fixed 52px assumption:
+    // a 100% height chain (html/body/host) + flex makes the content fill the remaining space
+    // below the topbar and scroll internally, so it can't clip the top of the content.
+    'html.admin-fh,body.admin-fh{height:100%;}',
+    '.admin-host-parent{height:100%;min-height:0;}',
+    '.admin-layout-host{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden;}',
+    '.admin-topbar{flex-shrink:0;}',
+    '.admin-page-wrap{flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden;}',
+    '.admin-content{flex:1;min-height:0;overflow-y:auto;}',
     '#admin-sidebar{width:190px;flex-shrink:0;height:100%;box-sizing:border-box;background:#fff;border-right:1px solid #e0e0d8;overflow-y:auto;padding:0 0 16px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}',
     '#admin-sidebar .sb-logo{padding:14px 16px 12px;}',
     '#admin-sidebar .sb-wordmark{font-size:14px;font-weight:700;color:#1a1a2e;letter-spacing:0.03em;}',
@@ -177,29 +183,62 @@
     if (!IS_ADMIN_HOME) wrapLayout(mount);
   }
 
-  // Build a flex row [sidebar | .admin-content] right after the page's topbar, so the
-  // topbar stays full-width and the sidebar sits in-flow beside the scrollable content.
+  // Locate the page's topbar: by known class, else the first child of #main/body that is
+  // position:sticky (covers pages whose header uses a custom sticky class).
+  function findTopbar() {
+    var t = document.querySelector('.topbar') ||
+            document.querySelector('.ri-top') ||
+            document.querySelector('.top');
+    if (t) return t;
+    var hosts = [document.getElementById('main'), document.body];
+    for (var i = 0; i < hosts.length; i++) {
+      var h = hosts[i];
+      if (!h) continue;
+      var fc = h.firstElementChild;
+      while (fc && fc.id === 'admin-sidebar') fc = fc.nextElementSibling;  // skip the mount
+      if (fc && getComputedStyle(fc).position === 'sticky') return fc;
+    }
+    return null;
+  }
+
+  // Build a full-height flex column: the topbar (full width, natural height) stays on top
+  // and OUTSIDE the wrap; below it a flex row [sidebar | .admin-content] fills the remaining
+  // height. We introduce our own .admin-layout-host wrapper because each page sets #main's
+  // `display` inline via its login code, so #main itself can't be made a flex column. Height
+  // comes from a 100% chain (html/body/host) + flex — never a fixed 52px calc — so the inner
+  // content can't be clipped regardless of the topbar's real height.
   function wrapLayout(sidebar) {
     if (document.querySelector('.admin-page-wrap')) return;          // already wrapped
-    var topbar = document.querySelector('.topbar') ||
-                 document.querySelector('.ri-top') ||
-                 document.querySelector('.top');
+    var topbar = findTopbar();
     if (!topbar) return;                                            // no anchor — leave as-is
     var parent = topbar.parentNode;
+
+    var host = document.createElement('div');
+    host.className = 'admin-layout-host';
     var wrap = document.createElement('div');
     wrap.className = 'admin-page-wrap';
     var content = document.createElement('div');
     content.className = 'admin-content';
-    // Move everything after the topbar (the page content) into .admin-content.
+
+    parent.insertBefore(host, topbar);          // host takes the topbar's slot in the parent
+    // Move the page content (everything after the topbar) into .admin-content.
     var node = topbar.nextSibling;
     while (node) {
       var next = node.nextSibling;
       if (node !== sidebar) content.appendChild(node);
       node = next;
     }
-    wrap.appendChild(sidebar);   // left rail (in-flow, 190px)
-    wrap.appendChild(content);   // content fills the rest
-    parent.appendChild(wrap);    // sits immediately after the topbar
+    wrap.appendChild(sidebar);                   // left rail (in-flow, 190px)
+    wrap.appendChild(content);                   // content fills the rest, scrolls internally
+
+    host.appendChild(topbar);                    // topbar: full width, OUTSIDE the wrap
+    topbar.classList.add('admin-topbar');
+    host.appendChild(wrap);                      // flex row sits below the topbar
+
+    // Height chain so the host can resolve height:100% (no fixed-px assumption).
+    document.documentElement.classList.add('admin-fh');
+    document.body.classList.add('admin-fh');
+    parent.classList.add('admin-host-parent');
   }
 
   // ── Loaders ──
