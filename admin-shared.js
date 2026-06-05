@@ -17,7 +17,7 @@
     { section: 'Operations', items: [
       { icon: '📋', label: 'Open Orders',    href: 'tenant-operations.html#orders' },
       { icon: '🔍', label: 'Inspections',    href: 'tenant-operations.html#inspections' },
-      { icon: '🗂', label: 'Factory Audits', href: 'tenant-operations.html#artwork' },
+      { icon: '🗂', label: 'Factory Audits', href: 'tenant-operations.html#certifications' },
       { icon: '🎨', label: 'Artwork',        href: 'tenant-operations.html#artwork' },
       { icon: '📦', label: 'Warehouse',      href: 'tenant-operations.html#warehouse',  badge: 'BETA' },
       { icon: '💰', label: 'Accounting',     href: 'tenant-operations.html#accounting', badge: 'BETA' },
