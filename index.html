@@ -425,18 +425,18 @@
   <!-- Catalog pane -->
   <div class="ppane" id="ppane-catalogs">
     <div class="card">
-      <div class="card-title">Product Catalog</div>
-      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your product catalog. Accepted: PDF, PowerPoint (.pptx)</p>
+      <div class="card-title" data-i18n="upload.catalogTitle">Product Catalog</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-i18n="upload.catalogBody">Upload your product catalog. Accepted: PDF, PowerPoint (.pptx)</p>
       <div class="upload-zone" onclick="document.getElementById('cat-input').click()">
         <div class="icon">📄</div>
-        <strong>Upload Catalog</strong>
-        <small>PDF or PowerPoint files</small>
+        <strong data-i18n="upload.catalogBtn">Upload Catalog</strong>
+        <small data-i18n="upload.pdfOrPpt">PDF or PowerPoint files</small>
         <div class="file-chosen" id="cat-chosen"></div>
       </div>
       <input type="file" id="cat-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'cat-chosen','cat')" />
-      <button class="up-btn" onclick="uploadFile('cat','catalogs','Catalog')">Upload</button>
-      <div class="prog" id="cat-prog">Uploading...</div>
-      <div class="pmsg ok" id="cat-ok">Catalog uploaded successfully!</div>
+      <button class="up-btn" onclick="uploadFile('cat','catalogs','Catalog')" data-i18n="common.upload">Upload</button>
+      <div class="prog" id="cat-prog" data-i18n="common.uploading">Uploading...</div>
+      <div class="pmsg ok" id="cat-ok" data-i18n="upload.catalogOk">Catalog uploaded successfully!</div>
       <div class="pmsg err" id="cat-err"></div>
     </div>
     <div class="file-list" id="cat-list"></div>
@@ -445,18 +445,18 @@
   <!-- Overview pane -->
   <div class="ppane" id="ppane-overview">
     <div class="card">
-      <div class="card-title">Company Presentation</div>
-      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload your company overview or presentation. Accepted: PDF, PowerPoint (.pptx)</p>
+      <div class="card-title" data-i18n="upload.deckTitle">Company Presentation</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-i18n="upload.deckBody">Upload your company overview or presentation. Accepted: PDF, PowerPoint (.pptx)</p>
       <div class="upload-zone" onclick="document.getElementById('ov-input').click()">
         <div class="icon">📊</div>
-        <strong>Upload Company Deck</strong>
-        <small>PDF or PowerPoint files</small>
+        <strong data-i18n="upload.deckBtn">Upload Company Deck</strong>
+        <small data-i18n="upload.pdfOrPpt">PDF or PowerPoint files</small>
         <div class="file-chosen" id="ov-chosen"></div>
       </div>
       <input type="file" id="ov-input" accept=".pdf,.pptx,.ppt" style="display:none" onchange="chooseFile(this,'ov-chosen','ov')" />
-      <button class="up-btn" onclick="uploadFile('ov','overview','Company Presentation')">Upload</button>
-      <div class="prog" id="ov-prog">Uploading...</div>
-      <div class="pmsg ok" id="ov-ok">Presentation uploaded successfully!</div>
+      <button class="up-btn" onclick="uploadFile('ov','overview','Company Presentation')" data-i18n="common.upload">Upload</button>
+      <div class="prog" id="ov-prog" data-i18n="common.uploading">Uploading...</div>
+      <div class="pmsg ok" id="ov-ok" data-i18n="upload.deckOk">Presentation uploaded successfully!</div>
       <div class="pmsg err" id="ov-err"></div>
     </div>
     <div class="file-list" id="ov-list"></div>
@@ -465,18 +465,18 @@
   <!-- Quote Sheets pane -->
   <div class="ppane" id="ppane-quotes">
     <div class="card">
-      <div class="card-title">Product Pricing Sheets</div>
-      <p style="font-size:13px;color:#999;margin-bottom:1rem;">Upload any existing product pricing sheets or price lists for your factory. These help us understand your product range and pricing structure. Accepted: Excel (.xlsx, .xls)</p>
+      <div class="card-title" data-i18n="upload.quotesTitle">Product Pricing Sheets</div>
+      <p style="font-size:13px;color:#999;margin-bottom:1rem;" data-i18n="upload.quotesBody">Upload any existing product pricing sheets or price lists for your factory. These help us understand your product range and pricing structure. Accepted: Excel (.xlsx, .xls)</p>
       <div class="upload-zone" onclick="document.getElementById('qt-input').click()">
         <div class="icon">📈</div>
-        <strong>Upload Quote Sheet</strong>
-        <small>Excel files only (.xlsx, .xls)</small>
+        <strong data-i18n="upload.quotesBtn">Upload Quote Sheet</strong>
+        <small data-i18n="upload.excelOnly">Excel files only (.xlsx, .xls)</small>
         <div class="file-chosen" id="qt-chosen"></div>
       </div>
       <input type="file" id="qt-input" accept=".xlsx,.xls" style="display:none" onchange="chooseFile(this,'qt-chosen','qt')" />
-      <button class="up-btn" onclick="uploadFile('qt','quotes','Quote Sheet')">Upload</button>
-      <div class="prog" id="qt-prog">Uploading...</div>
-      <div class="pmsg ok" id="qt-ok">Quote sheet uploaded successfully!</div>
+      <button class="up-btn" onclick="uploadFile('qt','quotes','Quote Sheet')" data-i18n="common.upload">Upload</button>
+      <div class="prog" id="qt-prog" data-i18n="common.uploading">Uploading...</div>
+      <div class="pmsg ok" id="qt-ok" data-i18n="upload.quotesOk">Quote sheet uploaded successfully!</div>
       <div class="pmsg err" id="qt-err"></div>
     </div>
     <div class="file-list" id="qt-list"></div>
@@ -1876,6 +1876,11 @@ window.onLangChange=function(){
   // (Collapses any expanded card — acceptable on an explicit language switch.)
   if(Array.isArray(allRFQs)&&allRFQs.length&&typeof renderRFQList==='function'){
     renderRFQList(allRFQs,window.RFQ_EXISTING_QUOTES||[]);
+  }
+  // Catalog/Deck/Quote-Sheets file lists are JS-built; re-render only if one is
+  // already populated (avoids a refetch for users who never opened those tabs).
+  if(typeof loadAllFileLists==='function'&&USER&&document.querySelector('#cat-list .file-row, #ov-list .file-row, #qt-list .file-row')){
+    loadAllFileLists();
   }
 };
 
@@ -4283,7 +4288,7 @@ function chooseFile(input,displayId,key){
 
 async function uploadFile(key,folder,fileType){
   var file=selFiles[key];
-  if(!file){alert('Please select a file first.');return;}
+  if(!file){alert(t('upload.selectFileFirst'));return;}
   var progId=key+'-prog',okId=key+'-ok',errId=key+'-err';
   g(progId).style.display='block';g(okId).style.display='none';g(errId).style.display='none';
   var factoryName=FACTORY_NAME||g('p-name_en').value.trim()||'Factory';
@@ -4308,9 +4313,9 @@ async function uploadFile(key,folder,fileType){
       setTimeout(function(){g(okId).style.display='none';},4000);
     }else{
       var e=await r.json().catch(function(){return{};});
-      g(errId).textContent='Upload failed: '+(e.message||r.status);g(errId).style.display='block';
+      g(errId).textContent=t('upload.uploadFailed',{x:(e.message||r.status)});g(errId).style.display='block';
     }
-  }catch(e){g(progId).style.display='none';g(errId).textContent='Error: '+e.message;g(errId).style.display='block';}
+  }catch(e){g(progId).style.display='none';g(errId).textContent=t('common.error',{msg:e.message});g(errId).style.display='block';}
 }
 
 async function loadAllFileLists(){
@@ -4322,11 +4327,11 @@ async function loadAllFileLists(){
       var items=await r.json();
       var listEl=g(key+'-list');
       if(Array.isArray(items)&&items.filter(function(f){return f.name;}).length){
-        var html='<div class="file-list-title">Uploaded Files</div>';
+        var html='<div class="file-list-title">'+t('upload.uploadedFiles')+'</div>';
         items.filter(function(f){return f.name;}).forEach(function(f){
           var url=SB+'/storage/v1/object/public/factory-files/'+USER.id+'/'+folder+'/'+f.name;
           var icon=f.name.toLowerCase().endsWith('.pdf')?'PDF':f.name.match(/\.pptx?$/i)?'PPT':'XLS';
-          html+='<div class="file-row"><span class="file-row-name">['+icon+'] '+f.name+'</span><a class="file-row-link" href="'+url+'" target="_blank">View / Download</a></div>';
+          html+='<div class="file-row"><span class="file-row-name">['+icon+'] '+f.name+'</span><a class="file-row-link" href="'+url+'" target="_blank">'+t('upload.viewDownload')+'</a></div>';
         });
         listEl.innerHTML=html;
       }else{listEl.innerHTML='';}
