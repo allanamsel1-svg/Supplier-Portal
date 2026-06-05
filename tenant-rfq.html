@@ -316,7 +316,32 @@ async function openSKU(id) {
 
   await loadRFQs();
   showTab((location.hash || '#rfq').slice(1));
+  handleAiRfqAction();
 })();
+
+// AI toolbar pre-population for create_rfq (set by tenant-dashboard runSearch).
+// This list view has no inline create form, so we surface the intent: pre-fill the
+// search with the product and show a banner. The key is always cleared after reading.
+function handleAiRfqAction() {
+  var raw; try { raw = sessionStorage.getItem('ai_action_params'); } catch (e) { return; }
+  if (!raw) return;
+  var d; try { d = JSON.parse(raw); } catch (e) { try { sessionStorage.removeItem('ai_action_params'); } catch (x) {} return; }
+  try { sessionStorage.removeItem('ai_action_params'); } catch (e) {}   // clear to prevent stale pre-pop on refresh
+  if (!d || d.action !== 'create_rfq' || (Date.now() - (d.ts || 0)) > 30000) return;
+  var p = d.params || {};
+  showTab('rfq');
+  var s = document.getElementById('rfqSearch');
+  if (s && p.product) { s.value = p.product; if (typeof renderRFQs === 'function') renderRFQs(); }
+  var pane = document.getElementById('pane-rfq');
+  if (pane) {
+    var banner = document.createElement('div');
+    banner.style.cssText = 'background:rgba(59,130,246,0.12);border:1px solid #3b82f6;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--text);';
+    banner.textContent = '🆕 Starting a new RFQ' + (p.product ? ' for "' + p.product + '"' : '') +
+      (p.quantity ? ' · qty ' + p.quantity : '') + (p.target_cost ? ' · target $' + p.target_cost : '') +
+      '. Use your sourcing manager or the admin RFQ tool to create it.';
+    pane.insertBefore(banner, pane.firstChild);
+  }
+}
 </script>
 </body>
 </html>

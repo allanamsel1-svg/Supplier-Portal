@@ -642,7 +642,28 @@ async function awSaveProject(){
 
   await loadOrders();
   showTab((location.hash || '#orders').slice(1));
+  handleAiAction();
 })();
+
+// AI toolbar pre-population (set by tenant-dashboard runSearch before navigating here).
+function handleAiAction() {
+  var raw; try { raw = sessionStorage.getItem('ai_action_params'); } catch (e) { return; }
+  if (!raw) return;
+  var d; try { d = JSON.parse(raw); } catch (e) { try { sessionStorage.removeItem('ai_action_params'); } catch (x) {} return; }
+  try { sessionStorage.removeItem('ai_action_params'); } catch (e) {}   // always clear (prevents stale pre-pop on refresh)
+  if (!d || (Date.now() - (d.ts || 0)) > 30000) return;
+  var p = d.params || {};
+  if (d.action === 'new_artwork') {
+    if (!loaded.artwork) { loaded.artwork = true; awInit(); }
+    setTimeout(function () {
+      try {
+        awOpenNew();
+        if (p.product && document.getElementById('np-name')) document.getElementById('np-name').value = p.product;
+      } catch (e) {}
+    }, 350);
+  }
+  // create_po: tenant has no PO-creation form — the Open Orders tab is the correct landing.
+}
 </script>
 </body>
 </html>

@@ -160,15 +160,73 @@ async function runSearch() {
       body: JSON.stringify({ query: q, tenant_id: TID }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) { answerEl.textContent = data.error || 'Search failed.'; }
-    else {
-      answerEl.textContent = data.answer || 'No answer returned.';
+    if (!res.ok && !data.mode) { answerEl.textContent = data.error || 'Search failed.'; btn.disabled = false; return; }
+
+    if (data.mode === 'action') {
+      // Stash the extracted params so the destination page can pre-populate its form.
+      try { sessionStorage.setItem('ai_action_params', JSON.stringify({ action: data.action, params: data.params || {}, ts: Date.now() })); } catch (e) {}
+      answerEl.textContent = data.message || 'Opening…';
+      sourcesEl.textContent = '';
+      setTimeout(() => { location.href = data.url || 'tenant-dashboard.html'; }, 1200);
+    } else if (data.mode === 'comparison') {
+      answerEl.innerHTML = '<div style="border-left:3px solid #3b82f6;padding-left:12px;">' + renderMarkdown(data.answer || '') + '</div>';
+      sourcesEl.textContent = (data.sources && data.sources.length) ? 'Sources: ' + data.sources.join(', ') : '';
+    } else {
+      // query mode (and any default)
+      answerEl.innerHTML = renderMarkdown(data.answer || 'No answer returned.');
       sourcesEl.textContent = (data.sources && data.sources.length) ? 'Sources: ' + data.sources.join(', ') : '';
     }
   } catch (e) {
     answerEl.textContent = 'Connection error. Please try again.';
   }
   btn.disabled = false;
+}
+
+// Minimal markdown renderer: bold, ## headers, | tables |, - bullets, paragraphs.
+function mdInline(s) {
+  return esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(148,163,184,0.15);padding:1px 4px;border-radius:4px;">$1</code>');
+}
+function renderMarkdown(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  let html = '', i = 0;
+  const flushPara = (buf) => { if (buf.length) { html += '<p style="margin:6px 0;line-height:1.55;">' + buf.join('<br>') + '</p>'; } return []; };
+  let para = [];
+  while (i < lines.length) {
+    let line = lines[i];
+    // Table block: a line with | and the next line a separator row of ---
+    if (/^\s*\|.*\|/.test(line) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
+      para = flushPara(para);
+      const headerCells = line.split('|').map(c => c.trim()).filter((c, idx, arr) => !(idx === 0 && c === '') && !(idx === arr.length - 1 && c === ''));
+      i += 2; // skip header + separator
+      let rows = '';
+      while (i < lines.length && /^\s*\|.*\|/.test(lines[i])) {
+        const cells = lines[i].split('|').map(c => c.trim()).filter((c, idx, arr) => !(idx === 0 && c === '') && !(idx === arr.length - 1 && c === ''));
+        rows += '<tr>' + cells.map(c => `<td style="border:1px solid var(--border);padding:6px 9px;">${mdInline(c)}</td>`).join('') + '</tr>';
+        i++;
+      }
+      html += `<table style="border-collapse:collapse;width:100%;margin:8px 0;font-size:12px;"><thead><tr>${headerCells.map(c => `<th style="border:1px solid var(--border);padding:6px 9px;text-align:left;background:rgba(148,163,184,0.12);">${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+      continue;
+    }
+    // Headers
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { para = flushPara(para); html += `<h3 style="font-size:14px;font-weight:700;margin:10px 0 4px;">${mdInline(h[2])}</h3>`; i++; continue; }
+    // Bullets
+    if (/^\s*[-*]\s+/.test(line)) {
+      para = flushPara(para);
+      let items = '';
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items += `<li style="margin:2px 0;">${mdInline(lines[i].replace(/^\s*[-*]\s+/, ''))}</li>`; i++; }
+      html += `<ul style="margin:6px 0 6px 18px;line-height:1.5;">${items}</ul>`;
+      continue;
+    }
+    // Blank line → paragraph break
+    if (line.trim() === '') { para = flushPara(para); i++; continue; }
+    para.push(mdInline(line));
+    i++;
+  }
+  flushPara(para);
+  return html || esc(text || '');
 }
 
 // ── Widget 1: Price Tremors ──
