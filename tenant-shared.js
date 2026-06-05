@@ -78,9 +78,20 @@ try { if (document.body) applySavedTheme(); } catch (e) {}
 function renderHeader(user) {
   if (document.getElementById('tenantHeader')) return;
   const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
+  // "← Dashboard" link, hidden when we're already on the dashboard page.
+  const onDashboard = /(^|\/)tenant-dashboard\.html$/.test(window.location.pathname);
+  const dashLink =
+    '<a class="th-dashlink" href="tenant-dashboard.html" style="' +
+      'margin-left:24px;color:var(--text2);font-size:13px;text-decoration:none;white-space:nowrap;' +
+      (onDashboard ? 'display:none;' : '') +
+      '" onmouseover="this.style.textDecoration=\'underline\'" ' +
+      'onmouseout="this.style.textDecoration=\'none\'">← Dashboard</a>';
   const html =
     '<div class="tenant-header" id="tenantHeader">' +
-      '<div class="th-logo">TBG Sourcing</div>' +
+      '<div class="th-left" style="display:flex;align-items:center;">' +
+        '<div class="th-logo">TBG Sourcing</div>' +
+        dashLink +
+      '</div>' +
       '<div class="th-right">' +
         '<button class="th-btn" id="themeToggleBtn" title="Toggle light/dark">☀️</button>' +
         '<span class="th-tenant">' + esc(tenantName) + '</span>' +
