@@ -517,29 +517,33 @@ async function loadInvStates(skuId) {
   }
 }
 
+// Admin state writes go through the gated, service-role /api/sku-state endpoint
+// (RLS allows anon SELECT only). Sends the admin session token, same as admin.html.
+async function postSkuState(payload) {
+  var resp = await fetch('/api/sku-state', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('admin_session')||'')},
+    body: JSON.stringify(payload)
+  });
+  var d = await resp.json().catch(function(){return {};});
+  if (resp.status===401) { alert('Session expired — please sign in to the admin portal again.'); throw new Error('Unauthorized'); }
+  if (!resp.ok) { alert('Action failed: ' + (d.error || ('HTTP '+resp.status))); throw new Error(d.error || 'failed'); }
+  return d;
+}
+function reloadInvStates(){ var el=document.querySelector('[id^="inv-states-"]'); if(el) loadInvStates(el.id.replace('inv-states-','')); }
+
 async function approveStateTransition(stateId, newState) {
   var note = prompt('Approval note (optional):') || '';
-  var now = new Date().toISOString();
-  await h(SB + '/rest/v1/sku_state_transitions', {
-    method:'POST', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
-    body: JSON.stringify({ sku_inventory_state_id:stateId, to_state:newState, triggered_by:'manual', approved_by:localStorage.getItem('admin_user')||'admin', approved_at:now, notes:note })
-  });
-  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
-    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
-    body: JSON.stringify({ current_state:newState, proposed_state:null, proposed_at:null, proposed_reason:null, approved_by:localStorage.getItem('admin_user')||'admin', approved_at:now })
-  });
-  var el = document.querySelector('[id^="inv-states-"]');
-  if (el) loadInvStates(el.id.replace('inv-states-',''));
+  try { await postSkuState({ action:'approve', state_id:stateId, new_state:newState, note:note, approved_by:localStorage.getItem('admin_user')||'admin' }); }
+  catch(e){ return; }
+  reloadInvStates();
 }
 
 async function rejectStateTransition(stateId) {
   var note = prompt('Reason for rejection:') || 'Rejected';
-  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
-    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
-    body: JSON.stringify({ proposed_state:null, proposed_at:null, proposed_reason:null, notes:note })
-  });
-  var el = document.querySelector('[id^="inv-states-"]');
-  if (el) loadInvStates(el.id.replace('inv-states-',''));
+  try { await postSkuState({ action:'reject', state_id:stateId, note:note }); }
+  catch(e){ return; }
+  reloadInvStates();
 }
 
 async function manualStateChange(stateId, currentState) {
@@ -547,12 +551,9 @@ async function manualStateChange(stateId, currentState) {
   var newState = prompt('Change state to (type exactly):\n\n' + states.filter(function(s){return s!==currentState;}).join('\n'));
   if (!newState || !states.includes(newState)) { alert('Invalid state.'); return; }
   var note = prompt('Note (optional):') || '';
-  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
-    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
-    body: JSON.stringify({ proposed_state:newState, proposed_at:new Date().toISOString(), proposed_reason:'Manual change request: '+note })
-  });
-  var el = document.querySelector('[id^="inv-states-"]');
-  if (el) loadInvStates(el.id.replace('inv-states-',''));
+  try { await postSkuState({ action:'manual_change', state_id:stateId, new_state:newState, note:note }); }
+  catch(e){ return; }
+  reloadInvStates();
 }
 
 function docIcon(t){
