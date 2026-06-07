@@ -229,10 +229,13 @@ async function submitArtwork(){
   // version number
   var existing=await supa('artwork_versions?artwork_project_id=eq.'+PROJ.id+'&select=version_number&order=version_number.desc&limit=1');
   var vnum=(existing[0]&&existing[0].version_number?Number(existing[0].version_number):0)+1;
-  var path=PROJ.id+'/v'+vnum+'/'+Date.now()+'_'+PICKED.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  var up=await fetch(SUPA_URL+'/storage/v1/object/artwork-files/'+encodeURIComponent(path),{method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':PICKED.type||'application/octet-stream'},body:PICKED});
-  if(!up.ok){st.style.color='#f87171';st.textContent='Upload failed ('+up.status+').';btn.disabled=false;return;}
-  var fileUrl=SUPA_URL+'/storage/v1/object/public/artwork-files/'+path;
+  var safeName=Date.now()+'_'+PICKED.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  var folder='artwork/'+PROJ.id+'/v'+vnum;
+  var ctype=PICKED.type||'application/octet-stream';
+  var up=await fetch('/api/r2-upload?folder='+encodeURIComponent(folder)+'&filename='+encodeURIComponent(safeName)+'&contentType='+encodeURIComponent(ctype),{method:'POST',headers:{'Authorization':'Bearer '+tok(),'Content-Type':ctype},body:PICKED});
+  var upj=await up.json().catch(function(){return{error:true};});
+  if(!up.ok||!upj||upj.error||!upj.url){st.style.color='#f87171';st.textContent='Upload failed: '+((upj&&upj.message)||up.status);btn.disabled=false;return;}
+  var fileUrl=upj.url;
   var pantone=(g('sp-pantone').value||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
   var created=await awPost('artwork_versions',{artwork_project_id:PROJ.id,version_number:vnum,file_name:PICKED.name,file_url:fileUrl,file_size_bytes:PICKED.size,file_type:(PICKED.name.split('.').pop()||'').toLowerCase(),dimensions_mm:g('sp-dim').value||null,bleed_mm:parseFloat(g('sp-bleed').value)||null,safe_zone_mm:parseFloat(g('sp-safe').value)||null,color_profile:g('sp-color').value,pantone_colors:pantone,finish:g('sp-finish').value,material:g('sp-material').value||null,resolution_dpi:parseInt(g('sp-dpi').value,10)||null,upc_on_artwork:upc,submitted_by:ME.id,submitted_at:new Date().toISOString(),designer_notes:g('sp-notes').value||null,status:'pending_review'},true);
   var versionId=(created&&created[0]&&created[0].id)||null;
