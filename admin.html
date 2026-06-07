@@ -7522,10 +7522,12 @@ async function saveRFQ(action){
           if(customCat){
             var brandSelV=g('rfq-brand-id')?g('rfq-brand-id').value:null;
             var brandObjV=brandSelV?(allBrands||[]).find(function(b){return b.id===brandSelV;}):null;
+            // No tenant variable exists in admin.html — use the selected brand's tenant, else Buyline Brands.
+            var pcTid=(brandObjV&&brandObjV.tenant_id)||'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
             try{
-              var pcRes=await fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:(brandObjV&&brandObjV.tenant_id)||null,rfq_id:savedRFQ.id,status:'pending'})});
-              if(!pcRes.ok){ var pcErr=await pcRes.text().catch(function(){return '';}); console.error('pending_categories insert failed', pcRes.status, pcErr); }
-            }catch(e){ console.error('pending_categories insert error', e); }
+              var pcRes=await fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:pcTid,rfq_id:savedRFQ.id,status:'pending'})});
+              if(!pcRes.ok){ var pcErr=await pcRes.text().catch(function(){return '';}); console.error('pending_categories insert failed', pcRes.status, pcErr); alert('Category suggestion failed ('+pcRes.status+'): '+pcErr); }
+            }catch(e){ console.error('pending_categories insert error', e); alert('Category suggestion error: '+(e&&e.message?e.message:e)); }
           }
         }
 

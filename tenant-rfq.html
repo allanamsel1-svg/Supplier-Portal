@@ -848,18 +848,21 @@ async function saveNewRfq(status) {
   if (nrg('nr-category').value === 'Other') {
     const customCat = ((nrg('nr-custom-cat') || {}).value || '').trim();
     if (customCat) {
+      const tid = TID || (JSON.parse(localStorage.getItem('tenant_user') || '{}').tenant_id) || null;
       try {
         const pcRes = await fetch(SUPA_URL + '/rest/v1/pending_categories', {
           method: 'POST',
           headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ suggested_name: customCat, tenant_id: TID, rfq_id: newId || null, status: 'pending' }),
+          body: JSON.stringify({ suggested_name: customCat, tenant_id: tid, rfq_id: newId || null, status: 'pending' }),
         });
         if (!pcRes.ok) {
           const pcErr = await pcRes.text().catch(() => '');
           console.error('pending_categories insert failed', pcRes.status, pcErr);
+          alert('Category suggestion failed (' + pcRes.status + '): ' + pcErr);
         }
       } catch (e) {
         console.error('pending_categories insert error', e);
+        alert('Category suggestion error: ' + (e && e.message ? e.message : e));
       }
     }
   }
