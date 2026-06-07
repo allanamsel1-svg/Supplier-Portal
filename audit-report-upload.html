@@ -23,12 +23,17 @@
   .btn:hover{background:#15803d;}.btn:disabled{opacity:0.5;cursor:not-allowed;}
   .msg{text-align:center;padding:2rem 0;}.msg .ic{font-size:42px;margin-bottom:12px;}.msg h2{font-size:18px;margin-bottom:6px;}.msg p{font-size:13px;color:#94a3b8;}
   .loading,.err{text-align:center;color:#94a3b8;font-size:14px;padding:2rem 0;}
+  .lang-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:none;border:none;color:#94a3b8;font-size:12px;font-family:inherit;cursor:pointer;padding:0;}
+  .lang-toggle .sep{color:#475569;}
+  .lang-toggle [data-lang]{color:inherit;}
+  .lang-toggle:hover{color:#e2e8f0;}
 </style>
+<script src="translations.js"></script>
 </head>
 <body>
 <div class="card">
-  <div class="brand"><div class="mk">🗂</div><div class="nm">TBG Sourcing<span>Audit Report Upload</span></div></div>
-  <div id="content"><div class="loading">Loading…</div></div>
+  <div class="brand"><div class="mk">🗂</div><div class="nm">TBG Sourcing<span data-i18n="audit.brandSub">Audit Report Upload</span></div><button class="lang-toggle" onclick="Lang.set(Lang.get()==='en'?'zh':'en')" aria-label="Toggle language"><span data-lang="en">EN</span><span class="sep">|</span><span data-lang="zh">中文</span></button></div>
+  <div id="content"><div class="loading" data-i18n="audit.loading">Loading…</div></div>
 </div>
 <script>
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
@@ -41,30 +46,37 @@ var TOKEN=qp('token'), AUDIT=null;
 async function sbGet(p){try{var r=await fetch(SB+'/rest/v1/'+p,{headers:H});if(!r.ok)return [];var d=await r.json();return Array.isArray(d)?d:[];}catch(e){return [];}}
 async function sbPatch(p,b){try{return (await fetch(SB+'/rest/v1/'+p,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(b)})).ok;}catch(e){return false;}}
 
+// Re-render dispatcher: each view sets CUR to a closure; onLangChange replays it.
+var CUR=null;
+window.onLangChange=function(){ if(typeof CUR==='function') CUR(); };
+function showErr(key){ CUR=function(){g('content').innerHTML='<div class="err">'+t(key)+'</div>';}; CUR(); }
+function showMsg(titleKey,bodyKey){ CUR=function(){g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>'+t(titleKey)+'</h2><p>'+t(bodyKey)+'</p></div>';}; CUR(); }
+
 async function load(){
-  if(!TOKEN){g('content').innerHTML='<div class="err">Invalid or expired upload link.</div>';return;}
+  if(!TOKEN){showErr('audit.invalidLink');return;}
   var rows=await sbGet('factory_audits?report_upload_token=eq.'+encodeURIComponent(TOKEN)+'&select=id,status,report_url,scheduled_date,factories(factory_name_english),factory_audit_types(name)&limit=1');
-  if(!rows.length){g('content').innerHTML='<div class="err">Invalid or expired upload link.</div>';return;}
+  if(!rows.length){showErr('audit.invalidLink');return;}
   AUDIT=rows[0];
-  if(AUDIT.report_url){done('Report already received. Thank you.');return;}
+  if(AUDIT.report_url){showMsg('audit.thankYou','audit.alreadyReceived');return;}
   render();
 }
 function render(){
+  CUR=render;
   var fac=AUDIT.factories&&AUDIT.factories.factory_name_english||'—';
-  var at=AUDIT.factory_audit_types&&AUDIT.factory_audit_types.name||'Audit';
+  var at=AUDIT.factory_audit_types&&AUDIT.factory_audit_types.name||t('audit.auditLabel');
   g('content').innerHTML=
-    '<h1>Upload Audit Report</h1><p class="lead">Please upload the completed factory audit report.</p>'+
+    '<h1>'+t('audit.title')+'</h1><p class="lead">'+t('audit.lead')+'</p>'+
     '<div class="det">'+
-      '<div class="det-row"><span class="k">Factory</span><span class="v">'+esc(fac)+'</span></div>'+
-      '<div class="det-row"><span class="k">Audit</span><span class="v">'+esc(at)+'</span></div>'+
-      '<div class="det-row"><span class="k">Scheduled</span><span class="v">'+esc(AUDIT.scheduled_date||'—')+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('audit.factory')+'</span><span class="v">'+esc(fac)+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('audit.auditLabel')+'</span><span class="v">'+esc(at)+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('audit.scheduled')+'</span><span class="v">'+esc(AUDIT.scheduled_date||'—')+'</span></div>'+
     '</div>'+
-    '<div class="field"><label>Conducted date *</label><input id="f-date" type="date" required></div>'+
-    '<div class="field"><label>Report file (PDF or image) *</label><input id="f-file" type="file" accept="application/pdf,image/*" required></div>'+
-    '<div class="field"><label>Overall score % (optional)</label><input id="f-pct" type="number" min="0" max="100" step="0.1"></div>'+
-    '<div class="field"><label>Color rating (optional)</label><select id="f-color"><option value="">—</option><option value="green">Green</option><option value="yellow">Yellow</option><option value="orange">Orange</option><option value="red">Red</option></select></div>'+
-    '<div class="field"><label>Notes (optional)</label><textarea id="f-notes"></textarea></div>'+
-    '<button class="btn" id="f-submit" onclick="submitUpload()">Upload Report</button>'+
+    '<div class="field"><label>'+t('audit.conductedDate')+'</label><input id="f-date" type="date" required></div>'+
+    '<div class="field"><label>'+t('audit.reportFile')+'</label><input id="f-file" type="file" accept="application/pdf,image/*" required></div>'+
+    '<div class="field"><label>'+t('audit.overallScore')+'</label><input id="f-pct" type="number" min="0" max="100" step="0.1"></div>'+
+    '<div class="field"><label>'+t('audit.colorRating')+'</label><select id="f-color"><option value="">—</option><option value="green">'+t('audit.colorGreen')+'</option><option value="yellow">'+t('audit.colorYellow')+'</option><option value="orange">'+t('audit.colorOrange')+'</option><option value="red">'+t('audit.colorRed')+'</option></select></div>'+
+    '<div class="field"><label>'+t('audit.notesOptional')+'</label><textarea id="f-notes"></textarea></div>'+
+    '<button class="btn" id="f-submit" onclick="submitUpload()">'+t('audit.uploadBtn')+'</button>'+
     '<div class="err" id="f-err" style="display:none;padding:8px 0;color:#f87171;"></div>';
   setTimeout(function() {
     var uploadArea = document.querySelector('.upload-zone') || document.getElementById('content') || document.querySelector('form') || document.body;
@@ -74,31 +86,30 @@ function render(){
         if (input) {
           try { var dt = new DataTransfer(); dt.items.add(file); input.files = dt.files; } catch(e) {}
           var hint = uploadArea.querySelector('.paste-hint');
-          if (hint) hint.textContent = 'Image pasted — click Upload to submit';
+          if (hint) hint.textContent = t('audit.pastedHint');
         }
       });
     }
   }, 100);
 }
-function done(msg){g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>Thank you</h2><p>'+esc(msg)+'</p></div>';}
 async function submitUpload(){
   var date=g('f-date').value, file=g('f-file').files[0], err=g('f-err');
   err.style.display='none';
-  if(!date){err.textContent='Conducted date is required.';err.style.display='block';return;}
-  if(!file){err.textContent='Please select a report file.';err.style.display='block';return;}
-  var btn=g('f-submit'); btn.disabled=true; btn.textContent='Uploading…';
+  if(!date){err.textContent=t('audit.dateRequired');err.style.display='block';return;}
+  if(!file){err.textContent=t('audit.fileRequired');err.style.display='block';return;}
+  var btn=g('f-submit'); btn.disabled=true; btn.textContent=t('audit.uploading');
   try{
     var path=AUDIT.id+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     var up=await fetch(SB+'/storage/v1/object/audit-documents/'+encodeURIComponent(path),{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':file.type||'application/octet-stream'},body:file});
-    if(!up.ok){err.textContent='Upload failed ('+up.status+').';err.style.display='block';btn.disabled=false;btn.textContent='Upload Report';return;}
+    if(!up.ok){err.textContent=t('audit.uploadFailedStatus',{status:up.status});err.style.display='block';btn.disabled=false;btn.textContent=t('audit.uploadBtn');return;}
     var fileUrl=SB+'/storage/v1/object/public/audit-documents/'+path;
     var patch={report_url:fileUrl,report_filename:file.name,report_uploaded_at:new Date().toISOString(),conducted_date:date,status:'report_pending'};
     var pctv=parseFloat(g('f-pct').value); if(!isNaN(pctv))patch.overall_pct=pctv;
     var color=g('f-color').value; if(color)patch.color_rating=color;
     await sbPatch('factory_audits?id=eq.'+AUDIT.id,patch);
     try{await fetch('/api/audit-report-received',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audit_id:AUDIT.id})});}catch(e){}
-    g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>Report Uploaded</h2><p>Report uploaded successfully. The TBG sourcing team has been notified and will review shortly.</p></div>';
-  }catch(e){err.textContent='Error: '+e.message;err.style.display='block';btn.disabled=false;btn.textContent='Upload Report';}
+    showMsg('audit.uploadedTitle','audit.uploadedBody');
+  }catch(e){err.textContent=t('audit.errorMsg',{msg:e.message});err.style.display='block';btn.disabled=false;btn.textContent=t('audit.uploadBtn');}
 }
 load();
 </script>
