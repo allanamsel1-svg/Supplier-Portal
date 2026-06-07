@@ -7659,11 +7659,22 @@ async function saveRFQ(action){
         g('rfq-id').value=savedRFQ.id;
         g('rfq-project-number').textContent=savedRFQ.project_number;
 
-        // Attach any additional product images (paste/URL/extra-image tool) to a newly created RFQ.
-        if(!rfqId && savedRFQ.id && typeof adminExtraImages!=='undefined' && adminExtraImages.length){
-          Promise.all(adminExtraImages.filter(function(im){return im.base64;}).map(function(im,i){
-            return fetch(SB+'/rest/v1/rfq_images',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({rfq_id:savedRFQ.id,image_data:im.base64,image_url:'',sort_order:i})}).catch(function(){});
-          })).catch(function(){});
+        // Attach product images (primary thumbnail + extras) to a newly created RFQ.
+        // rfq_images.tenant_id is NOT NULL — derive from the brand's tenant, else Buyline Brands.
+        if(!rfqId && savedRFQ.id){
+          var imgTid=(function(){var b=g('rfq-brand-id')?g('rfq-brand-id').value:null;var bo=b?(allBrands||[]).find(function(x){return x.id===b;}):null;return (bo&&bo.tenant_id)||'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';})();
+          var imgInserts=[];
+          var thumb=g('ax-img-thumb'); var psrc=thumb?(thumb.src||''):'';
+          if(psrc.indexOf('data:')===0){ var b64=psrc.split(',')[1]||''; if(b64)imgInserts.push({rfq_id:savedRFQ.id,tenant_id:imgTid,image_data:b64,image_url:'',sort_order:0}); }
+          else if(psrc && /^https?:\/\//i.test(psrc)){ imgInserts.push({rfq_id:savedRFQ.id,tenant_id:imgTid,image_data:'',image_url:psrc,sort_order:0}); }
+          (adminExtraImages||[]).forEach(function(im,i){ var data=(im&&(im.base64||im.data))||(typeof im==='string'?im:''); if(data)imgInserts.push({rfq_id:savedRFQ.id,tenant_id:imgTid,image_data:data,image_url:'',sort_order:i+1}); });
+          for(var ii=0; ii<imgInserts.length; ii++){
+            try{
+              var ir=await fetch(SB+'/rest/v1/rfq_images',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(imgInserts[ii])});
+              if(!ir.ok){ var et=await ir.text().catch(function(){return '';}); console.error('rfq_images insert failed', ir.status, et, 'sort_order='+imgInserts[ii].sort_order); alert('Image save failed ('+ir.status+'): '+et); }
+              else { console.log('rfq_images insert ok, sort_order='+imgInserts[ii].sort_order); }
+            }catch(e){ console.error('rfq_images insert error', e); alert('Image save error: '+(e&&e.message?e.message:e)); }
+          }
           adminExtraImages=[];
         }
 

@@ -1075,15 +1075,42 @@ async function saveNewRfq(status) {
   } catch (e) { ok = false; }
   dBtn.disabled = false; sBtn.disabled = false;
   if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
-  // Fire-and-forget: attach newly added product images to the freshly created RFQ.
-  if (newId && nrExtraImages.length) {
-    Promise.all(nrExtraImages.filter(im => im.base64).map((im, i) =>
-      fetch(SUPA_URL + '/rest/v1/rfq_images', {
-        method: 'POST',
-        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ rfq_id: newId, tenant_id: TID, image_data: im.base64, image_url: '', sort_order: i }),
-      }).catch(() => {})
-    )).catch(() => {});
+  // Attach product images (primary thumbnail + any extras) to the freshly created RFQ.
+  if (newId) {
+    const imgInserts = [];
+    // Primary image from the top-of-modal thumbnail (paste / upload / URL fetch)
+    const thumb = document.getElementById('nr-img-thumb');
+    const psrc = thumb ? (thumb.src || '') : '';
+    if (psrc.indexOf('data:') === 0) {
+      const b64 = psrc.split(',')[1] || '';
+      if (b64) imgInserts.push({ rfq_id: newId, tenant_id: TID, image_data: b64, image_url: '', sort_order: 0 });
+    } else if (psrc && /^https?:\/\//i.test(psrc)) {
+      imgInserts.push({ rfq_id: newId, tenant_id: TID, image_data: '', image_url: psrc, sort_order: 0 });
+    }
+    // Extra images — stored as { id, dataUrl, base64 }; tolerate { data } / raw string too.
+    nrExtraImages.forEach((im, i) => {
+      const data = (im && (im.base64 || im.data)) || (typeof im === 'string' ? im : '');
+      if (data) imgInserts.push({ rfq_id: newId, tenant_id: TID, image_data: data, image_url: '', sort_order: i + 1 });
+    });
+    for (const body of imgInserts) {
+      try {
+        const ir = await fetch(SUPA_URL + '/rest/v1/rfq_images', {
+          method: 'POST',
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(body),
+        });
+        if (!ir.ok) {
+          const t = await ir.text().catch(() => '');
+          console.error('rfq_images insert failed', ir.status, t, 'sort_order=' + body.sort_order);
+          alert('Image save failed (' + ir.status + '): ' + t);
+        } else {
+          console.log('rfq_images insert ok, sort_order=' + body.sort_order);
+        }
+      } catch (e) {
+        console.error('rfq_images insert error', e);
+        alert('Image save error: ' + (e && e.message ? e.message : e));
+      }
+    }
   }
   closeNewRfqModal();
   await loadRFQs();
