@@ -32,6 +32,17 @@
   .nr-check{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0;}
   .nr-radio{display:inline-flex;gap:16px;}
   .fmatch-row{display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border,#334155);}
+  /* New RFQ image auto-fill zone */
+  .nr-img-zone{border:1.5px dashed #c8c8c0;background:var(--bg2);border-radius:10px;min-height:80px;display:flex;align-items:center;justify-content:center;gap:12px;text-align:center;padding:10px 14px;cursor:pointer;margin-bottom:14px;transition:all 0.15s;}
+  .nr-img-zone.drag-over{border-color:#3b82f6;background:rgba(59,130,246,0.06);}
+  .nr-img-prompt{font-size:12.5px;color:var(--text2);}
+  .nr-img-loaded{display:flex;align-items:center;gap:12px;}
+  .nr-img-thumb-wrap{position:relative;width:60px;height:60px;flex-shrink:0;}
+  .nr-img-thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#334155);}
+  .nr-img-x{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e23636;color:#fff;border:none;font-size:12px;line-height:16px;cursor:pointer;padding:0;}
+  .nr-img-status{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:7px;}
+  .nr-img-spinner{width:14px;height:14px;border:2px solid rgba(120,120,120,0.3);border-top-color:var(--text);border-radius:50%;animation:nrimgspin 0.7s linear infinite;display:inline-block;}
+  @keyframes nrimgspin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
@@ -88,6 +99,14 @@
       <button class="rfq-x" onclick="closeNewRfqModal()" title="Close">✕</button>
     </div>
     <div class="rfq-drawer-body">
+      <div class="nr-img-zone" id="nr-img-zone">
+        <input type="file" id="nr-img-input" accept="image/*" style="display:none">
+        <span class="nr-img-prompt" id="nr-img-prompt">📸 Paste or drop a product image to auto-fill fields below (optional)</span>
+        <div class="nr-img-loaded" id="nr-img-loaded" style="display:none;">
+          <div class="nr-img-thumb-wrap"><img id="nr-img-thumb" class="nr-img-thumb" alt=""><button type="button" class="nr-img-x" id="nr-img-x" title="Remove">×</button></div>
+          <span class="nr-img-status" id="nr-img-status"></span>
+        </div>
+      </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
           <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
@@ -203,6 +222,75 @@ function nrCategoryChange() {
   nrg('nr-factory-status').textContent = sel.value ? 'Click "Find Matching Factories" to see suppliers for ' + sel.value + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
 }
+// ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
+let _nrImgWired = false;
+function nrImgToken() { return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
+function nrImgWire() {
+  if (_nrImgWired) return;
+  const zone = nrg('nr-img-zone'), input = nrg('nr-img-input'), x = nrg('nr-img-x');
+  if (!zone || !input) return;
+  zone.addEventListener('click', e => { if (e.target.closest('.nr-img-x')) return; input.click(); });
+  input.addEventListener('change', () => { if (input.files && input.files[0]) nrImgHandle(input.files[0]); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag-over'); }));
+  zone.addEventListener('dragleave', e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove('drag-over'); });
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); if (e.dataTransfer.files && e.dataTransfer.files[0]) nrImgHandle(e.dataTransfer.files[0]); });
+  if (x) x.addEventListener('click', e => { e.stopPropagation(); nrImgReset(); });
+  _nrImgWired = true;
+}
+function nrImgReset() {
+  const p = nrg('nr-img-prompt'), l = nrg('nr-img-loaded'), s = nrg('nr-img-status'), t = nrg('nr-img-thumb');
+  if (p) p.style.display = '';
+  if (l) l.style.display = 'none';
+  if (s) s.innerHTML = '';
+  if (t) t.src = '';
+}
+// Document-level paste handler — added only while the modal is open. Images only.
+function nrImgPaste(e) {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type && items[i].type.indexOf('image') !== -1) {
+      const f = items[i].getAsFile();
+      if (f) { e.preventDefault(); nrImgHandle(f); return; }
+    }
+  }
+}
+function nrImgHandle(file) {
+  if (!file || (file.type || '').indexOf('image') === -1) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result || '';
+    const t = nrg('nr-img-thumb'); if (t) t.src = dataUrl;
+    nrg('nr-img-prompt').style.display = 'none';
+    nrg('nr-img-loaded').style.display = 'flex';
+    const s = nrg('nr-img-status'); if (s) s.innerHTML = '<span class="nr-img-spinner"></span> Extracting product details...';
+    nrImgExtract(String(dataUrl).split(',')[1] || '', file.type || 'image/jpeg');
+  };
+  reader.readAsDataURL(file);
+}
+async function nrImgExtract(base64, mediaType) {
+  const s = nrg('nr-img-status');
+  try {
+    const r = await fetch('/api/rfq-extract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + nrImgToken() }, body: JSON.stringify({ image: base64, mediaType }) });
+    const d = await r.json().catch(() => ({ error: true }));
+    if (!r.ok || !d || d.error) { if (s) s.textContent = 'Could not extract — please fill in manually'; return; }
+    nrImgApply(d);
+    if (s) s.textContent = '✓ Fields auto-filled — review & edit below';
+  } catch (e) { if (s) s.textContent = 'Could not extract — please fill in manually'; }
+}
+function nrImgApply(d) {
+  if (d.product_name) { const el = nrg('nr-desc'); if (el) el.value = d.product_name; }
+  if (d.short_description) { const el = nrg('nr-spec'); if (el) el.value = d.short_description; }
+  if (d.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = d.packaging_type; }
+  if (d.category) {
+    const sel = nrg('nr-category');
+    if (sel) {
+      const want = String(d.category).toLowerCase();
+      const match = rfqCategories.find(c => c.toLowerCase() === want) || rfqCategories.find(c => c.toLowerCase().indexOf(want) !== -1 || want.indexOf(c.toLowerCase()) !== -1);
+      if (match) { sel.value = match; nrCategoryChange(); }
+    }
+  }
+}
+
 function openNewRfqModal(prefill) {
   nrg('nr-err').textContent = '';
   ['nr-desc', 'nr-spec', 'nr-qty', 'nr-fob', 'nr-size', 'nr-color', 'nr-inner', 'nr-master',
@@ -226,10 +314,14 @@ function openNewRfqModal(prefill) {
     if (prefill.target_cost != null) nrg('nr-fob').value = prefill.target_cost;
   }
   nrCategoryChange();
+  nrImgWire();
+  nrImgReset();
+  document.removeEventListener('paste', nrImgPaste);   // avoid double-binding if reopened
+  document.addEventListener('paste', nrImgPaste);
   nrg('rfqDrawerBg').classList.add('open');
   setTimeout(() => { try { nrg('nr-desc').focus(); } catch (e) {} }, 80);
 }
-function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); }
+function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); }
 async function findMatchingFactories() {
   const cat = nrg('nr-category').value;
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');

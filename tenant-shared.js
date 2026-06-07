@@ -157,7 +157,6 @@ const TENANT_NAV = [
     { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html#rfq', feature: 'rfq' },
     { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd', feature: 'product_development' },
     { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus', feature: 'sku_library' },
-    { icon: '📦', label: 'RFQ Intake', href: 'scanner.html#rfq', feature: 'rfq' },
   ]},
 ];
 
