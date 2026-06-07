@@ -998,6 +998,7 @@ function nrToggleFactory() {
   nrSelectedFactories = Array.prototype.slice.call(document.querySelectorAll('.nr-fac:checked')).map(c => c.value);
 }
 async function saveNewRfq(status) {
+ try {
   const desc = (nrg('nr-desc').value || '').trim();
   const err = nrg('nr-err');
   if (!desc) { err.textContent = 'Item description is required.'; return; }
@@ -1054,7 +1055,7 @@ async function saveNewRfq(status) {
   };
   const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
   dBtn.disabled = true; sBtn.disabled = true;
-  let ok = false, newId = null;
+  let ok = false, newId = null, failDetail = '';
   try {
     if (nrEditId) {
       const r = await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + encodeURIComponent(nrEditId), {
@@ -1063,7 +1064,7 @@ async function saveNewRfq(status) {
         body: JSON.stringify(body),
       });
       ok = r.ok;
-      if (!ok) console.error('saveNewRfq PATCH failed', r.status, await r.text().catch(() => ''));
+      if (!ok) { failDetail = r.status + ' ' + await r.text().catch(() => ''); console.error('saveNewRfq PATCH failed', failDetail); }
     } else {
       const r = await fetch(SUPA_URL + '/rest/v1/rfqs', {
         method: 'POST',
@@ -1072,11 +1073,11 @@ async function saveNewRfq(status) {
       });
       ok = r.ok;
       if (ok) { const rows = await r.json().catch(() => []); const row = Array.isArray(rows) ? rows[0] : rows; newId = row && row.id; }
-      else console.error('saveNewRfq failed', r.status, await r.text().catch(() => ''));
+      else { failDetail = r.status + ' ' + await r.text().catch(() => ''); console.error('saveNewRfq failed', failDetail); }
     }
-  } catch (e) { ok = false; }
+  } catch (e) { ok = false; failDetail = (e && e.message) ? e.message : String(e); }
   dBtn.disabled = false; sBtn.disabled = false;
-  if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
+  if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; alert('Failed at rfqs insert: ' + failDetail); return; }
   // Attach product images (primary thumbnail + any extras) to the freshly created RFQ.
   if (newId) {
     const imgInserts = [];
@@ -1117,6 +1118,7 @@ async function saveNewRfq(status) {
   closeNewRfqModal();
   await loadRFQs();
   showTab('rfq');
+ } catch (e) { alert('Save error: ' + (e && e.message ? e.message : e)); return; }
 }
 // Cosmetic checkbox manual override flag.
 document.addEventListener('change', e => { if (e.target && e.target.id === 'nr-cosmetic') e.target.dataset.userOverride = 'true'; });

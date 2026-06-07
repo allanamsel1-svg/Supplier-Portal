@@ -7584,6 +7584,7 @@ async function axHtsLookup(){
 }
 
 async function saveRFQ(action){
+ try {
   var desc=g('rfq-description').value.trim();
   if(!desc){alert('Item description is required.');return;}
   var rfqHts=(g('rfq-est-hts')&&g('rfq-est-hts').value.trim())||'';
@@ -7782,8 +7783,8 @@ async function saveRFQ(action){
       if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
       await loadRFQs();
     }else{
-      var e=await r.json().catch(function(){return{};});
-      var errMsg='Save failed: '+(e.message||e.details||r.status);
+      var et=await r.text().catch(function(){return '';});
+      var errMsg='Failed at rfqs insert: '+r.status+' '+et;
       showFormMsg('rfq-save-err',errMsg);
       alert(errMsg);
       if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
@@ -7793,6 +7794,7 @@ async function saveRFQ(action){
     alert('Error: '+e.message);
     if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
   }
+ } catch (e) { alert('Save error: ' + (e && e.message ? e.message : e)); return; }
 }
 
 async function sendRFQEmails(rfq){
