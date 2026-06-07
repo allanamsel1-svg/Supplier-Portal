@@ -4114,11 +4114,22 @@ function rfqTypeBadge(r){
 async function deleteRfq(event, id){
   event.stopPropagation();
   if(!confirm('Delete this draft RFQ? This cannot be undone.'))return;
-  await fetch(SB+'/rest/v1/rfqs?id=eq.'+id,{
-    method:'DELETE',
-    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
-  });
-  loadRFQs();
+  // admin.html authenticates Supabase REST with the anon KEY (admin_session is an API HMAC, not a Supabase JWT).
+  var headers = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
+
+  // Null out non-cascading foreign key references first
+  await fetch(SB + '/rest/v1/email_threads?rfq_id=eq.' + id, { method: 'PATCH', headers: headers, body: JSON.stringify({ rfq_id: null }) }).catch(function(){});
+  await fetch(SB + '/rest/v1/reference_component_costs?rfq_id=eq.' + id, { method: 'PATCH', headers: headers, body: JSON.stringify({ rfq_id: null }) }).catch(function(){});
+  await fetch(SB + '/rest/v1/sku_factory_sources?rfq_id=eq.' + id, { method: 'PATCH', headers: headers, body: JSON.stringify({ rfq_id: null }) }).catch(function(){});
+  await fetch(SB + '/rest/v1/product_development?rfq_id=eq.' + id, { method: 'PATCH', headers: headers, body: JSON.stringify({ rfq_id: null }) }).catch(function(){});
+
+  // Now delete the RFQ (cascading children delete automatically)
+  var res = await fetch(SB + '/rest/v1/rfqs?id=eq.' + id, { method: 'DELETE', headers: headers });
+  if (res.ok) {
+    loadRFQs();
+  } else {
+    alert('Could not delete — please try again.');
+  }
 }
 
 function renderRFQList(){
