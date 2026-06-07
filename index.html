@@ -242,50 +242,51 @@
 <!-- Auth Screen -->
 <div id="auth-screen">
   <div class="auth-box">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:6px;"><button class="lang-toggle" onclick="Lang.set(Lang.get() === 'en' ? 'zh' : 'en')" aria-label="Toggle language"><span data-lang="en">EN</span><span class="sep">|</span><span data-lang="zh">中文</span></button></div>
     <div class="auth-logo">
       <div class="auth-logo-mark">S</div>
-      <div class="auth-logo-name">Supplier Portal</div>
+      <div class="auth-logo-name" data-i18n="auth.portalName">Supplier Portal</div>
     </div>
     <div class="tabs">
-      <button class="tab on" onclick="authTab('login')">Sign In</button>
-      <button class="tab" onclick="authTab('signup')">Register</button>
-      <button class="tab" onclick="authTab('forgot')">Reset Password</button>
+      <button class="tab on" onclick="authTab('login')" data-i18n="auth.tabSignIn">Sign In</button>
+      <button class="tab" onclick="authTab('signup')" data-i18n="auth.tabRegister">Register</button>
+      <button class="tab" onclick="authTab('forgot')" data-i18n="auth.tabReset">Reset Password</button>
     </div>
     <!-- Login -->
     <div class="pane on" id="pane-login">
-      <label>Email Address</label>
-      <input type="email" id="l-email" placeholder="your@email.com" onkeydown="if(event.key==='Enter')login()" />
-      <label>Password</label>
+      <label data-i18n="auth.emailLabel">Email Address</label>
+      <input type="email" id="l-email" placeholder="your@email.com" data-i18n-ph="auth.emailPh" onkeydown="if(event.key==='Enter')login()" />
+      <label data-i18n="auth.passwordLabel">Password</label>
       <div class="pw-wrap">
         <input type="password" id="l-pass" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()" />
-        <button type="button" class="pw-toggle" id="l-pass-toggle" onclick="togglePw('l-pass')" aria-label="Show password">👁</button>
+        <button type="button" class="pw-toggle" id="l-pass-toggle" onclick="togglePw('l-pass')" aria-label="Show password" data-i18n-aria="auth.showPassword">👁</button>
       </div>
-      <button class="auth-btn" id="l-btn" onclick="login()">Sign In</button>
+      <button class="auth-btn" id="l-btn" onclick="login()" data-i18n="auth.signInBtn">Sign In</button>
       <div class="aerr" id="l-err"></div>
     </div>
     <!-- Signup -->
     <div class="pane" id="pane-signup">
-      <label>Email Address</label>
-      <input type="email" id="s-email" placeholder="your@email.com" />
-      <label>Password (min 6 characters)</label>
+      <label data-i18n="auth.emailLabel">Email Address</label>
+      <input type="email" id="s-email" placeholder="your@email.com" data-i18n-ph="auth.emailPh" />
+      <label data-i18n="auth.passwordMinLabel">Password (min 6 characters)</label>
       <div class="pw-wrap">
         <input type="password" id="s-pass" placeholder="••••••••" />
-        <button type="button" class="pw-toggle" id="s-pass-toggle" onclick="togglePw('s-pass')" aria-label="Show password">👁</button>
+        <button type="button" class="pw-toggle" id="s-pass-toggle" onclick="togglePw('s-pass')" aria-label="Show password" data-i18n-aria="auth.showPassword">👁</button>
       </div>
-      <label>Confirm Password</label>
+      <label data-i18n="auth.confirmPassword">Confirm Password</label>
       <div class="pw-wrap">
         <input type="password" id="s-pass2" placeholder="••••••••" />
-        <button type="button" class="pw-toggle" id="s-pass2-toggle" onclick="togglePw('s-pass2')" aria-label="Show password">👁</button>
+        <button type="button" class="pw-toggle" id="s-pass2-toggle" onclick="togglePw('s-pass2')" aria-label="Show password" data-i18n-aria="auth.showPassword">👁</button>
       </div>
-      <button class="auth-btn" id="s-btn" onclick="signup()">Create Account</button>
+      <button class="auth-btn" id="s-btn" onclick="signup()" data-i18n="auth.createAccountBtn">Create Account</button>
       <div class="aerr" id="s-err"></div>
     </div>
     <!-- Forgot -->
     <div class="pane" id="pane-forgot">
-      <label>Email Address</label>
-      <input type="email" id="f-email" placeholder="your@email.com" />
-      <button class="auth-btn" onclick="forgot()">Send Reset Link</button>
-      <div class="aok" id="f-ok">Reset link sent! Check your email.</div>
+      <label data-i18n="auth.emailLabel">Email Address</label>
+      <input type="email" id="f-email" placeholder="your@email.com" data-i18n-ph="auth.emailPh" />
+      <button class="auth-btn" onclick="forgot()" data-i18n="auth.sendResetBtn">Send Reset Link</button>
+      <div class="aok" id="f-ok" data-i18n="auth.resetSent">Reset link sent! Check your email.</div>
     </div>
   </div>
 </div>
@@ -295,12 +296,12 @@
   <div class="topbar">
     <div class="topbar-l">
       <div class="tm">S</div>
-      <div class="topbar-title">Supplier Portal</div>
+      <div class="topbar-title" data-i18n="nav.portalTitle">Supplier Portal</div>
     </div>
     <div class="topbar-r">
       <button class="lang-toggle" onclick="Lang.set(Lang.get() === 'en' ? 'zh' : 'en')" aria-label="Toggle language"><span data-lang="en">EN</span><span class="sep">|</span><span data-lang="zh">中文</span></button>
       <span class="u-email" id="u-email"></span>
-      <button class="signout-btn" onclick="signout()">Sign out</button>
+      <button class="signout-btn" onclick="signout()" data-i18n="nav.signOut">Sign out</button>
     </div>
   </div>
   <div class="portal-tabs">
@@ -402,23 +403,23 @@
 
   <!-- Samples pane (Product Development) -->
   <div class="ppane" id="ppane-samples">
-    <div id="samples-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading samples...</div>
+    <div id="samples-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;" data-i18n="samples.loading">Loading samples...</div>
     <div id="samples-list"></div>
     <div class="rfq-empty" id="samples-empty" style="display:none;">
       <div class="rfq-empty-icon">🧪</div>
-      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No products in development</div>
-      <div style="font-size:13px;">After a quote you submit is accepted, the project will appear here. You'll confirm carton dimensions, upload product images, ship samples, and track approval — all from this tab.</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;" data-i18n="samples.empty">No products in development</div>
+      <div style="font-size:13px;" data-i18n="samples.emptyBody">After a quote you submit is accepted, the project will appear here. You'll confirm carton dimensions, upload product images, ship samples, and track approval — all from this tab.</div>
     </div>
   </div>
 
   <!-- Orders pane (active POs) -->
   <div class="ppane" id="ppane-orders">
-    <div id="orders-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;">Loading orders...</div>
+    <div id="orders-loading" style="text-align:center;padding:2rem;color:#bbb;font-size:13px;" data-i18n="orders.loading">Loading orders...</div>
     <div id="orders-list"></div>
     <div class="rfq-empty" id="orders-empty" style="display:none;">
       <div class="rfq-empty-icon">📦</div>
-      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;">No active orders</div>
-      <div style="font-size:13px;">When your golden sample is approved and we issue a Purchase Order, your production milestone schedule will appear here.</div>
+      <div style="font-size:15px;font-weight:600;color:#1a1a2e;margin-bottom:6px;" data-i18n="orders.empty">No active orders</div>
+      <div style="font-size:13px;" data-i18n="orders.emptyBody">When your golden sample is approved and we issue a Purchase Order, your production milestone schedule will appear here.</div>
     </div>
   </div>
 
@@ -746,39 +747,39 @@ function togglePw(inputId){
   var inp=g(inputId);
   var btn=g(inputId+'-toggle');
   if(!inp||!btn)return;
-  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';btn.setAttribute('aria-label','Hide password');}
-  else{inp.type='password';btn.textContent='👁';btn.setAttribute('aria-label','Show password');}
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';btn.setAttribute('aria-label',t('auth.hidePassword'));}
+  else{inp.type='password';btn.textContent='👁';btn.setAttribute('aria-label',t('auth.showPassword'));}
 }
 
 async function signup(){
   var email=g('s-email').value.trim(),pass=g('s-pass').value,pass2=g('s-pass2').value;
   g('s-err').style.display='none';
-  if(!email||!pass)return showAerr('s-err','Please fill in all fields.');
-  if(pass.length<6)return showAerr('s-err','Password must be at least 6 characters.');
-  if(pass!==pass2)return showAerr('s-err','Passwords do not match.');
-  var btn=g('s-btn');btn.disabled=true;btn.textContent='Creating...';
+  if(!email||!pass)return showAerr('s-err',t('auth.fillAll'));
+  if(pass.length<6)return showAerr('s-err',t('auth.passwordMin'));
+  if(pass!==pass2)return showAerr('s-err',t('auth.passwordMismatch'));
+  var btn=g('s-btn');btn.disabled=true;btn.textContent=t('auth.creating');
   try{
     var r=await fetch(SB+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email,password:pass})});
     var d=await r.json();
     if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
     else if(d.user&&d.session){TOKEN=d.session.access_token;USER=d.user;enterPortal();}
-    else showAerr('s-err',d.error_description||d.msg||'Signup failed. Please try again.');
-  }catch(e){showAerr('s-err','Connection error: '+e.message);}
-  btn.disabled=false;btn.textContent='Create Account';
+    else showAerr('s-err',d.error_description||d.msg||t('auth.signupFailed'));
+  }catch(e){showAerr('s-err',t('auth.connError',{msg:e.message}));}
+  btn.disabled=false;btn.textContent=t('auth.createAccountBtn');
 }
 
 async function login(){
   var email=g('l-email').value.trim(),pass=g('l-pass').value;
   g('l-err').style.display='none';
-  if(!email||!pass)return showAerr('l-err','Please enter your email and password.');
-  var btn=g('l-btn');btn.disabled=true;btn.textContent='Signing in...';
+  if(!email||!pass)return showAerr('l-err',t('auth.enterEmailPass'));
+  var btn=g('l-btn');btn.disabled=true;btn.textContent=t('auth.signingIn');
   try{
     var r=await fetch(SB+'/auth/v1/token?grant_type=password',{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({email:email,password:pass})});
     var d=await r.json();
     if(d.access_token){TOKEN=d.access_token;USER=d.user;enterPortal();}
-    else showAerr('l-err','Incorrect email or password.');
-  }catch(e){showAerr('l-err','Connection error: '+e.message);}
-  btn.disabled=false;btn.textContent='Sign In';
+    else showAerr('l-err',t('auth.incorrect'));
+  }catch(e){showAerr('l-err',t('auth.connError',{msg:e.message}));}
+  btn.disabled=false;btn.textContent=t('auth.signInBtn');
 }
 
 async function forgot(){
@@ -1865,13 +1866,14 @@ async function loadDetails(){
       FACTORY_CHECKED_CERTS=Array.isArray(f.certifications)?f.certifications.slice():[];
       var banner=g('status-banner');
       banner.style.display='block';
+      window.FACTORY_STATUS=f.status;
       var welcomeBanner=g('welcome-banner');
       if(f.status==='approved'){
-        banner.textContent='Your factory is approved and active in our supplier network.';
+        banner.textContent=t('details.statusApproved');
         banner.className='banner approved';
         if(welcomeBanner)welcomeBanner.classList.remove('show');
       }else{
-        banner.textContent='Your registration is under review. Our team will be in touch shortly.';
+        banner.textContent=t('details.statusReview');
         banner.className='banner pending';
         if(welcomeBanner)welcomeBanner.classList.add('show');
       }
@@ -1889,6 +1891,8 @@ async function loadDetails(){
 window.onLangChange=function(){
   // Factory Details: static save button resets to its "Save" key — restore "Update".
   if(window.IS_UPDATE_MODE){var b=document.getElementById('save-btn');if(b)b.textContent=t('details.updateBtn');}
+  // Factory Details: re-assert the JS-set status banner so it follows the language.
+  if(window.FACTORY_STATUS){var sb=document.getElementById('status-banner');if(sb&&sb.style.display!=='none')sb.textContent=t(window.FACTORY_STATUS==='approved'?'details.statusApproved':'details.statusReview');}
   // RFQ tab: re-render the JS-built cards so their labels follow the language.
   // (Collapses any expanded card — acceptable on an explicit language switch.)
   if(Array.isArray(allRFQs)&&allRFQs.length&&typeof renderRFQList==='function'){
@@ -1908,12 +1912,20 @@ window.onLangChange=function(){
   if(window.SKUS_LOADED&&typeof renderFactorySkuList==='function'){
     renderFactorySkuList();
   }
+  // Samples / Orders tabs are JS-built; re-load only if a card is already shown
+  // (re-fetches, like the file lists — avoids work for unopened tabs).
+  if(FACTORY_ID&&typeof loadSamples==='function'&&document.querySelector('#samples-list .rfq-card')){
+    loadSamples();
+  }
+  if(FACTORY_ID&&typeof loadOrders==='function'&&document.querySelector('#orders-list .rfq-card')){
+    loadOrders();
+  }
 };
 
 async function saveDetails(){
-  var reqFields=[['p-name_en','Factory name'],['p-telephone','Telephone'],['p-address','Address'],['p-city','City'],['p-country','Country'],['p-contact_name','Contact name'],['p-contact_mobile','Mobile'],['p-contact_email','Email'],];
+  var reqFields=[['p-name_en',t('details.fName')],['p-telephone',t('details.fTelephone')],['p-address',t('details.fAddress')],['p-city',t('details.fCity')],['p-country',t('details.fCountry')],['p-contact_name',t('details.fContactName')],['p-contact_mobile',t('details.fMobile')],['p-contact_email',t('details.fEmail')],];
   for(var i=0;i<reqFields.length;i++){
-    if(!g(reqFields[i][0]).value.trim()){alert('Please fill in: '+reqFields[i][1]);g(reqFields[i][0]).focus();return;}
+    if(!g(reqFields[i][0]).value.trim()){alert(t('details.fillIn',{fields:reqFields[i][1]}));g(reqFields[i][0]).focus();return;}
   }
   var btn=g('save-btn');btn.disabled=true;
   g('save-prog').style.display='block';
@@ -1963,7 +1975,7 @@ async function saveDetails(){
       setTimeout(function(){g('save-ok').style.display='none';},4000);
     }else{
       var errData=await r.json().catch(function(){return{};});
-      g('save-err').textContent='Save failed: '+(errData.message||errData.details||r.status);
+      g('save-err').textContent=t('common.saveFailed',{x:(errData.message||errData.details||r.status)});
       g('save-err').style.display='block';
     }
   }catch(e){
@@ -2066,12 +2078,12 @@ async function loadSamples(){
     var attentionCount=pdItems.filter(function(p){return p.status==='awaiting_initial_sample'||p.status==='in_revision';}).length;
     var badge=g('samples-badge');
     if(badge){
-      if(attentionCount>0){badge.style.display='inline-block';badge.textContent=attentionCount+' need action';}
+      if(attentionCount>0){badge.style.display='inline-block';badge.textContent=t('nav.badgeNeedAction',{n:attentionCount});}
       else{badge.style.display='none';}
     }
   }catch(e){
     g('samples-loading').style.display='none';
-    g('samples-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">Could not load samples: '+esc(e.message||String(e))+'</div>';
+    g('samples-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">'+t('samples.errLoad',{msg:esc(e.message||String(e))})+'</div>';
   }
 }
 
@@ -2080,9 +2092,9 @@ function renderPDCard(pd,subs,destinations){
   var quote=pd.rfq_quotes||{};
   // Status styling
   var stConfig={
-    awaiting_initial_sample:{bg:'#fff8e0',border:'#f0d860',color:'#664400',label:'Awaiting first sample',action:true},
-    awaiting_approval:      {bg:'#f0f6ff',border:'#c0d8f0',color:'#1a3a8a',label:'Awaiting approval',action:false},
-    in_revision:            {bg:'#fff0f0',border:'#fdd',color:'#b00',label:'Revision requested',action:true}
+    awaiting_initial_sample:{bg:'#fff8e0',border:'#f0d860',color:'#664400',label:t('samples.statusAwaitingFirst'),action:true},
+    awaiting_approval:      {bg:'#f0f6ff',border:'#c0d8f0',color:'#1a3a8a',label:t('samples.statusAwaitingApproval'),action:false},
+    in_revision:            {bg:'#fff0f0',border:'#fdd',color:'#b00',label:t('samples.statusRevision'),action:true}
   };
   var s=stConfig[pd.status]||stConfig.awaiting_initial_sample;
   // Latest sample + its evaluation (if any)
@@ -2095,19 +2107,19 @@ function renderPDCard(pd,subs,destinations){
   var historyHtml='';
   if(subs.length){
     historyHtml='<div style="margin-top:12px;padding:10px 12px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:8px;">'+
-      '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Version History</div>'+
+      '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">'+t('samples.versionHistory')+'</div>'+
       subs.map(function(sub){
         var ev=Array.isArray(sub.sample_evaluations)&&sub.sample_evaluations.length?sub.sample_evaluations[sub.sample_evaluations.length-1]:null;
         var evBadge='';
         if(ev){
           var evColor=ev.decision==='approve'?'#1a7a1a':ev.decision==='reject'?'#b00':'#886600';
           var evBg=ev.decision==='approve'?'#edfaed':ev.decision==='reject'?'#fff0f0':'#fff8e0';
-          var evLabel=ev.decision==='approve'?'✓ Approved':ev.decision==='reject'?'✗ Rejected':'↻ Revision requested';
+          var evLabel=ev.decision==='approve'?t('samples.verApproved'):ev.decision==='reject'?t('samples.verRejected'):t('samples.verRevision');
           evBadge='<span style="font-size:10px;background:'+evBg+';color:'+evColor+';padding:2px 7px;border-radius:10px;font-weight:600;margin-left:6px;">'+evLabel+'</span>';
         }
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0e8;">'+
-          '<div style="font-size:12px;color:#1a1a2e;"><strong>Version '+sub.version_number+'</strong>'+evBadge+
-            (sub.ship_date?'<span style="color:#888;margin-left:8px;">Shipped '+esc(sub.ship_date)+'</span>':'')+
+          '<div style="font-size:12px;color:#1a1a2e;"><strong>'+t('samples.versionLabel',{n:sub.version_number})+'</strong>'+evBadge+
+            (sub.ship_date?'<span style="color:#888;margin-left:8px;">'+t('samples.shipped',{date:esc(sub.ship_date)})+'</span>':'')+
           '</div>'+
           (sub.tracking_number?'<div style="font-size:11px;color:#666;">'+esc((sub.carrier||'').replace('_',' ').toUpperCase())+': '+esc(sub.tracking_number)+'</div>':'')+
         '</div>';
@@ -2118,7 +2130,7 @@ function renderPDCard(pd,subs,destinations){
   var feedbackHtml='';
   if(pd.status==='in_revision'&&latestEval&&latestEval.feedback_text){
     feedbackHtml='<div style="margin-top:12px;padding:12px 14px;background:#fff5f5;border:1px solid #fdd;border-left:3px solid #b00;border-radius:8px;">'+
-      '<div style="font-size:12px;font-weight:600;color:#b00;margin-bottom:6px;">Feedback from buyer on Version '+(latest?latest.version_number:'?')+':</div>'+
+      '<div style="font-size:12px;font-weight:600;color:#b00;margin-bottom:6px;">'+t('samples.feedbackOn',{n:(latest?latest.version_number:'?')})+'</div>'+
       '<div style="font-size:12px;color:#7a0000;line-height:1.6;white-space:pre-wrap;">'+esc(latestEval.feedback_text)+'</div>'+
     '</div>';
   }
@@ -2128,28 +2140,28 @@ function renderPDCard(pd,subs,destinations){
   if(s.action){
     var destOptions=destinations.filter(function(d){return d.active!==false;}).map(function(d){
       return '<option value="'+esc(d.id)+'">'+esc(d.label)+'</option>';
-    }).join('')+'<option value="testing_lab">Testing Lab (specify address)</option><option value="other">Other (specify address)</option>';
+    }).join('')+'<option value="testing_lab">'+t('samples.destTestingLab')+'</option><option value="other">'+t('samples.destOther')+'</option>';
     shipFormHtml='<div style="margin-top:14px;padding:14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:10px;">'+
-      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:10px;">Ship '+(pd.status==='in_revision'?'Revised':'Initial')+' Sample (Version '+nextVersion+')</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#1a3a8a;margin-bottom:10px;">'+(pd.status==='in_revision'?t('samples.shipRevised',{n:nextVersion}):t('samples.shipInitial',{n:nextVersion}))+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">'+
-        '<div class="qf"><label>Ship date *</label><input type="date" id="ss-date-'+pd.id+'" /></div>'+
-        '<div class="qf"><label>Destination *</label><select id="ss-dest-'+pd.id+'" onchange="toggleShipDestAddress(\''+pd.id+'\')">'+destOptions+'</select></div>'+
-        '<div class="qf qf-full" id="ss-addr-wrap-'+pd.id+'" style="display:none;"><label>Address *</label><input type="text" id="ss-addr-'+pd.id+'" placeholder="Full destination address" /></div>'+
-        '<div class="qf"><label>Carrier *</label><select id="ss-carrier-'+pd.id+'"><option value="sf_express">SF Express</option><option value="ups">UPS</option><option value="fedex">FedEx</option><option value="dhl">DHL</option><option value="other">Other</option></select></div>'+
-        '<div class="qf"><label>Tracking number *</label><input type="text" id="ss-track-'+pd.id+'" placeholder="e.g. SF1234567890" /></div>'+
-        '<div class="qf qf-full"><label>Notes (optional)</label><textarea id="ss-notes-'+pd.id+'" rows="2" placeholder="Anything to call out about this version"></textarea></div>'+
-        '<div class="qf qf-full"><label>Sample photo (required)</label><input type="file" id="ss-photo-'+pd.id+'" accept="image/*" /></div>'+
+        '<div class="qf"><label>'+t('samples.shipDate')+'</label><input type="date" id="ss-date-'+pd.id+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.destination')+'</label><select id="ss-dest-'+pd.id+'" onchange="toggleShipDestAddress(\''+pd.id+'\')">'+destOptions+'</select></div>'+
+        '<div class="qf qf-full" id="ss-addr-wrap-'+pd.id+'" style="display:none;"><label>'+t('samples.addressLabel')+'</label><input type="text" id="ss-addr-'+pd.id+'" placeholder="'+esc(t('samples.addressPh'))+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.carrier')+'</label><select id="ss-carrier-'+pd.id+'"><option value="sf_express">SF Express</option><option value="ups">UPS</option><option value="fedex">FedEx</option><option value="dhl">DHL</option><option value="other">'+t('samples.destOtherShort')+'</option></select></div>'+
+        '<div class="qf"><label>'+t('samples.trackingNo')+'</label><input type="text" id="ss-track-'+pd.id+'" placeholder="'+esc(t('samples.trackingPh'))+'" /></div>'+
+        '<div class="qf qf-full"><label>'+t('common.notesOptional')+'</label><textarea id="ss-notes-'+pd.id+'" rows="2" placeholder="'+esc(t('samples.notesPh'))+'"></textarea></div>'+
+        '<div class="qf qf-full"><label>'+t('samples.photoRequired')+'</label><input type="file" id="ss-photo-'+pd.id+'" accept="image/*" /></div>'+
       '</div>'+
-      '<button class="submit-quote-btn" id="ss-btn-'+pd.id+'" style="margin-top:10px;" onclick="submitSampleShipment(\''+pd.id+'\','+nextVersion+')">Mark Sample as Shipped</button>'+
+      '<button class="submit-quote-btn" id="ss-btn-'+pd.id+'" style="margin-top:10px;" onclick="submitSampleShipment(\''+pd.id+'\','+nextVersion+')">'+t('samples.markShipped')+'</button>'+
       '<div class="pmsg ok" id="ss-ok-'+pd.id+'"></div>'+
       '<div class="pmsg err" id="ss-err-'+pd.id+'"></div>'+
     '</div>';
   } else if(pd.status==='awaiting_approval'){
-    shipFormHtml='<div style="margin-top:14px;padding:12px 14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;font-size:12px;color:#1a3a8a;">Sample Version '+(latest?latest.version_number:'?')+' is with the buyer for evaluation. You\'ll be notified once a decision is made.</div>';
+    shipFormHtml='<div style="margin-top:14px;padding:12px 14px;background:#f0f6ff;border:1px solid #c0d8f0;border-radius:8px;font-size:12px;color:#1a3a8a;">'+t('samples.withBuyer',{n:(latest?latest.version_number:'?')})+'</div>';
   }
 
   // ── Outstanding Actions placeholder (filled async by loadPdOutstandingActions) ──
-  var actionsHtml='<div id="pd-actions-'+pd.id+'" style="margin-top:14px;"><div style="font-size:11px;color:#bbb;padding:10px;">Checking outstanding items...</div></div>';
+  var actionsHtml='<div id="pd-actions-'+pd.id+'" style="margin-top:14px;"><div style="font-size:11px;color:#bbb;padding:10px;">'+t('samples.checkingItems')+'</div></div>';
 
   // ── Carton Dimensions form ──
   function valOrEmpty(v) { return (v == null || v === '') ? '' : v; }
@@ -2158,38 +2170,38 @@ function renderPDCard(pd,subs,destinations){
   var cartonBorder = cartonsConfirmed ? '#c0e0c0' : '#f0d860';
   var cartonTitleColor = cartonsConfirmed ? '#1a7a1a' : '#664400';
   var cartonTitle = cartonsConfirmed
-    ? '✓ Carton Dimensions Confirmed'
-    : '📦 Carton Dimensions — Action Required';
+    ? t('samples.cartonConfirmed')
+    : t('samples.cartonAction');
   var cartonSubtitle = cartonsConfirmed
-    ? 'Confirmed on ' + esc((pd.cartons_confirmed_at || '').slice(0, 10)) + '. Click any field to update if needed.'
-    : 'Confirm your actual packaging dimensions. Master case dimensions are required before a PO can be issued.';
+    ? t('samples.cartonConfirmedOn',{date:esc((pd.cartons_confirmed_at || '').slice(0, 10))})
+    : t('samples.cartonBody');
 
   var cartonsHtml =
     '<div style="margin-top:14px;padding:14px;background:'+cartonBg+';border:1px solid '+cartonBorder+';border-radius:10px;">'+
       '<div style="font-size:13px;font-weight:600;color:'+cartonTitleColor+';margin-bottom:4px;">'+cartonTitle+'</div>'+
-      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">'+esc(cartonSubtitle)+'</div>'+
+      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">'+cartonSubtitle+'</div>'+
 
-      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">Inner Case Pack <span style="color:#888;font-weight:400;text-transform:none;">(recommended)</span></div>'+
+      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">'+t('samples.innerPack')+' <span style="color:#888;font-weight:400;text-transform:none;">'+t('samples.innerPackHint')+'</span></div>'+
       '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;">'+
-        '<div class="qf"><label>Units per inner</label><input type="number" id="pdcart-inner-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.inner_case_pack_units)+'" /></div>'+
-        '<div class="qf"><label>Length (cm)</label><input type="number" id="pdcart-inner-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_length_cm)+'" /></div>'+
-        '<div class="qf"><label>Width (cm)</label><input type="number" id="pdcart-inner-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_width_cm)+'" /></div>'+
-        '<div class="qf"><label>Height (cm)</label><input type="number" id="pdcart-inner-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_height_cm)+'" /></div>'+
-        '<div class="qf"><label>Weight (kg)</label><input type="number" id="pdcart-inner-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.inner_weight_kg)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.unitsPerInner')+'</label><input type="number" id="pdcart-inner-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.inner_case_pack_units)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.lengthCm')+'</label><input type="number" id="pdcart-inner-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_length_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.widthCm')+'</label><input type="number" id="pdcart-inner-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_width_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.heightCm')+'</label><input type="number" id="pdcart-inner-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.inner_height_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.weightKg')+'</label><input type="number" id="pdcart-inner-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.inner_weight_kg)+'" /></div>'+
       '</div>'+
 
-      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">Master Case Pack <span style="color:#b00;font-weight:400;text-transform:none;">(required for PO)</span></div>'+
+      '<div style="font-size:11px;font-weight:600;color:#556;text-transform:uppercase;letter-spacing:0.06em;margin:6px 0 4px;">'+t('samples.masterPack')+' <span style="color:#b00;font-weight:400;text-transform:none;">'+t('samples.masterPackHint')+'</span></div>'+
       '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;">'+
-        '<div class="qf"><label>Units per master</label><input type="number" id="pdcart-master-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.master_case_pack_units)+'" /></div>'+
-        '<div class="qf"><label>Length (cm)</label><input type="number" id="pdcart-master-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_length_cm)+'" /></div>'+
-        '<div class="qf"><label>Width (cm)</label><input type="number" id="pdcart-master-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_width_cm)+'" /></div>'+
-        '<div class="qf"><label>Height (cm)</label><input type="number" id="pdcart-master-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_height_cm)+'" /></div>'+
-        '<div class="qf"><label>Weight (kg)</label><input type="number" id="pdcart-master-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.master_weight_kg)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.unitsPerMaster')+'</label><input type="number" id="pdcart-master-units-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.master_case_pack_units)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.lengthCm')+'</label><input type="number" id="pdcart-master-l-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_length_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.widthCm')+'</label><input type="number" id="pdcart-master-w-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_width_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.heightCm')+'</label><input type="number" id="pdcart-master-h-'+pd.id+'" step="0.1" value="'+valOrEmpty(pd.master_height_cm)+'" /></div>'+
+        '<div class="qf"><label>'+t('samples.weightKg')+'</label><input type="number" id="pdcart-master-wgt-'+pd.id+'" step="0.001" value="'+valOrEmpty(pd.master_weight_kg)+'" /></div>'+
       '</div>'+
 
       '<div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;">'+
-        '<div class="qf"><label>Master cases per pallet <span style="color:#888;font-weight:400;">(optional)</span></label><input type="number" id="pdcart-pallet-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.pallet_masters_per_pallet)+'" /></div>'+
-        '<button onclick="savePdCartons(\''+pd.id+'\')" id="pdcart-save-'+pd.id+'" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">Save Dimensions</button>'+
+        '<div class="qf"><label>'+t('samples.casesPerPallet')+' <span style="color:#888;font-weight:400;">'+t('samples.casesPerPalletHint')+'</span></label><input type="number" id="pdcart-pallet-'+pd.id+'" min="1" step="1" value="'+valOrEmpty(pd.pallet_masters_per_pallet)+'" /></div>'+
+        '<button onclick="savePdCartons(\''+pd.id+'\')" id="pdcart-save-'+pd.id+'" style="padding:8px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('samples.saveDimensions')+'</button>'+
       '</div>'+
       '<div id="pdcart-msg-'+pd.id+'" style="font-size:11px;margin-top:8px;"></div>'+
     '</div>';
@@ -2197,53 +2209,53 @@ function renderPDCard(pd,subs,destinations){
   // ── Product Assets section ──
   var assetsHtml =
     '<div style="margin-top:14px;padding:14px;background:#fff;border:1px solid #e0e0d8;border-radius:10px;">'+
-      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">📸 Product Assets</div>'+
-      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">Upload production-ready assets for this product. The buyer needs these for catalog, retailer setup, and tooling reference.</div>'+
+      '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:4px;">'+t('samples.assetsTitle')+'</div>'+
+      '<div style="font-size:11px;color:#666;margin-bottom:12px;line-height:1.4;">'+t('samples.assetsBody')+'</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">'+
         // Row 1: images + technical drawing
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📸 Product Images <span style="color:#888;font-weight:400;font-size:10px;">(multiple)</span></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.assetImages')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.assetImagesHint')+'</span></div>'+
           '<input type="file" id="pd-img-input-'+pd.id+'" accept="image/*" multiple style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Product Image\', \'pd-img-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Product Image\', \'pd-img-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📐 Technical Drawing <span style="color:#888;font-weight:400;font-size:10px;">(PDF or image)</span></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.assetTechDrawing')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.assetTechDrawingHint')+'</span></div>'+
           '<input type="file" id="pd-drw-input-'+pd.id+'" accept="application/pdf,image/*" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Technical Drawing\', \'pd-drw-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Technical Drawing\', \'pd-drw-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
         // Row 2: die lines + 3D step file
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📦 Packaging Die Lines <span style="color:#888;font-weight:400;font-size:10px;">(PDF or AI)</span></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.assetDieLines')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.assetDieLinesHint')+'</span></div>'+
           '<input type="file" id="pd-die-input-'+pd.id+'" accept="application/pdf,image/*,.ai,.eps" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Die Lines\', \'pd-die-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'Die Lines\', \'pd-die-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">⚙ 3D STEP File <span style="color:#888;font-weight:400;font-size:10px;">(.step, .stp)</span></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.asset3dStep')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.asset3dStepHint')+'</span></div>'+
           '<input type="file" id="pd-step-input-'+pd.id+'" accept=".step,.stp,application/octet-stream" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'3D STEP File\', \'pd-step-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'3D STEP File\', \'pd-step-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
         // Row 3: user manual + other
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📖 User Manual <span style="color:#888;font-weight:400;font-size:10px;">(where applicable)</span></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.assetManual')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.assetManualHint')+'</span></div>'+
           '<input type="file" id="pd-man-input-'+pd.id+'" accept="application/pdf" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'User Manual\', \'pd-man-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssets(\''+pd.id+'\', \'User Manual\', \'pd-man-input-'+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
         '<div style="border:1px dashed #d8d8d0;border-radius:8px;padding:12px;background:#fafaf6;min-width:0;">'+
-          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">📄 Other Document <span style="color:#888;font-weight:400;font-size:10px;">(specify type)</span></div>'+
-          '<input type="text" id="pd-oth-type-'+pd.id+'" placeholder="e.g. Tech spec, Material spec" style="font-size:11px;width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #d8d8d0;border-radius:4px;margin-bottom:4px;" />'+
+          '<div style="font-size:12px;font-weight:600;color:#444;margin-bottom:6px;">'+t('samples.assetOther')+' <span style="color:#888;font-weight:400;font-size:10px;">'+t('samples.assetOtherHint')+'</span></div>'+
+          '<input type="text" id="pd-oth-type-'+pd.id+'" placeholder="'+esc(t('samples.assetOtherPh'))+'" style="font-size:11px;width:100%;box-sizing:border-box;padding:4px 6px;border:1px solid #d8d8d0;border-radius:4px;margin-bottom:4px;" />'+
           '<input type="file" id="pd-oth-input-'+pd.id+'" style="font-size:11px;width:100%;box-sizing:border-box;" />'+
-          '<button onclick="uploadPdAssetOther(\''+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Upload</button>'+
+          '<button onclick="uploadPdAssetOther(\''+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
       '</div>'+
-      '<div id="pd-assets-list-'+pd.id+'" style="margin-top:8px;font-size:12px;color:#888;">Loading uploaded assets...</div>'+
+      '<div id="pd-assets-list-'+pd.id+'" style="margin-top:8px;font-size:12px;color:#888;">'+t('samples.loadingAssets')+'</div>'+
       '<div id="pd-asset-msg-'+pd.id+'" style="font-size:11px;margin-top:6px;"></div>'+
     '</div>';
 
   return '<div class="rfq-card" id="pd-card-'+pd.id+'">'+
     '<div class="rfq-card-header" style="background:'+s.bg+';border-left:3px solid '+s.border+';">'+
       '<div style="flex:1;">'+
-        '<div class="rfq-card-title">'+esc(rfq.item_description||'(no description)')+'</div>'+
-        '<div class="rfq-card-meta">'+esc(rfq.project_number||'')+(rfq.category?' · '+esc(rfq.category):'')+(quote.unit_fob_price?' · Accepted at $'+parseFloat(quote.unit_fob_price).toFixed(4)+' FOB':'')+'</div>'+
+        '<div class="rfq-card-title">'+esc(rfq.item_description||t('samples.noDescription'))+'</div>'+
+        '<div class="rfq-card-meta">'+esc(rfq.project_number||'')+(rfq.category?' · '+esc(rfq.category):'')+(quote.unit_fob_price?' · '+t('samples.acceptedAt',{price:parseFloat(quote.unit_fob_price).toFixed(4)}):'')+'</div>'+
       '</div>'+
       '<span class="rfq-card-badge" style="background:'+s.bg+';color:'+s.color+';border:1px solid '+s.border+';">'+esc(s.label)+'</span>'+
     '</div>'+
@@ -2262,7 +2274,7 @@ function renderPDCard(pd,subs,destinations){
 async function savePdCartons(pdId) {
   var btn = g('pdcart-save-'+pdId);
   var msg = g('pdcart-msg-'+pdId);
-  if(btn){btn.disabled=true;btn.textContent='Saving...';}
+  if(btn){btn.disabled=true;btn.textContent=t('common.saving');}
   if(msg){msg.style.color='#666';msg.textContent='';}
 
   function numOrNull(id) {
@@ -2315,18 +2327,18 @@ async function savePdCartons(pdId) {
       var err = await r.json().catch(function(){return{};});
       throw new Error(err.message || err.details || ('HTTP '+r.status));
     }
-    if(btn){btn.disabled=false;btn.textContent='Save Dimensions';}
+    if(btn){btn.disabled=false;btn.textContent=t('samples.saveDimensions');}
     if(msg){
       msg.style.color = masterComplete ? '#1a7a1a' : '#886600';
       msg.textContent = masterComplete
-        ? '✓ Dimensions saved. Master case info is complete — PO can proceed once other requirements are met.'
-        : '✓ Saved. Master case info is incomplete — fill in all 5 master fields to satisfy the PO requirement.';
+        ? t('samples.dimsSavedComplete')
+        : t('samples.dimsSavedIncomplete');
     }
     // Refresh actions list for this card
     loadPdOutstandingActions(pdId);
   } catch(e) {
-    if(btn){btn.disabled=false;btn.textContent='Save Dimensions';}
-    if(msg){msg.style.color='#b00';msg.textContent='Save failed: '+(e.message||e);}
+    if(btn){btn.disabled=false;btn.textContent=t('samples.saveDimensions');}
+    if(msg){msg.style.color='#b00';msg.textContent=t('samples.saveFailed',{x:(e.message||e)});}
   }
 }
 
@@ -2335,10 +2347,10 @@ async function uploadPdAssets(pdId, docType, inputId) {
   var input = g(inputId);
   var msg = g('pd-asset-msg-'+pdId);
   if(!input || !input.files || !input.files.length){
-    if(msg){msg.style.color='#b00';msg.textContent='Please choose a file first.';}
+    if(msg){msg.style.color='#b00';msg.textContent=t('samples.chooseFileFirst');}
     return;
   }
-  if(msg){msg.style.color='#666';msg.textContent='Uploading...';}
+  if(msg){msg.style.color='#666';msg.textContent=t('common.uploading');}
 
   // Look up accepted_quote_id so assets are dual-tagged (visible from both RFQ and PD views)
   var acceptedQuoteId = null;
@@ -2403,13 +2415,13 @@ async function uploadPdAssets(pdId, docType, inputId) {
   if(msg){
     if(successCount > 0 && failCount === 0){
       msg.style.color='#1a7a1a';
-      msg.textContent = '✓ Uploaded '+successCount+' file'+(successCount>1?'s':'')+'.';
+      msg.textContent = t('samples.uploadedN',{n:successCount});
     } else if(successCount > 0){
       msg.style.color='#886600';
-      msg.textContent = '⚠ Uploaded '+successCount+', '+failCount+' failed.';
+      msg.textContent = t('samples.uploadedPartial',{ok:successCount,fail:failCount});
     } else {
       msg.style.color='#b00';
-      msg.textContent = 'All uploads failed. Files must be <25 MB.';
+      msg.textContent = t('samples.allFailed');
     }
   }
   // Refresh asset list + outstanding actions
@@ -2423,7 +2435,7 @@ async function uploadPdAssetOther(pdId) {
   var msg = g('pd-asset-msg-'+pdId);
   var t = (typeEl && typeEl.value || '').trim();
   if (!t) {
-    if(msg){msg.style.color='#b00';msg.textContent='Please specify a document type first.';}
+    if(msg){msg.style.color='#b00';msg.textContent=t('samples.specifyTypeFirst');}
     return;
   }
   // Delegate to the standard upload helper with the typed value
@@ -2457,7 +2469,7 @@ async function loadPdAssetsList(pdId) {
     });
     var docs = await r.json();
     if(!Array.isArray(docs) || !docs.length){
-      listEl.innerHTML = '<div style="font-size:11px;color:#bbb;font-style:italic;">No assets uploaded yet.</div>';
+      listEl.innerHTML = '<div style="font-size:11px;color:#bbb;font-style:italic;">'+t('samples.noAssets')+'</div>';
       return;
     }
     // Deduplicate by id (in case same row matches both filters)
@@ -2477,14 +2489,14 @@ async function loadPdAssetsList(pdId) {
           // Tag with source: which id this doc came in via
           var source = d.product_development_id ? 'PD' : (d.rfq_quote_id ? 'Quote' : '');
           return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:5px;margin-bottom:4px;font-size:11px;">'+
-            '<span style="color:#1a1a2e;">📎 '+esc(d.file_name||'(no name)')+(source?' <span style="color:#aaa;font-size:10px;">· from '+source+'</span>':'')+'</span>'+
+            '<span style="color:#1a1a2e;">📎 '+esc(d.file_name||window.t('samples.noName'))+(source?' <span style="color:#aaa;font-size:10px;">'+window.t('samples.fromTag',{src:source})+'</span>':'')+'</span>'+
             '<span style="color:#888;">'+esc((d.uploaded_at||'').slice(0,10))+'</span>'+
           '</div>';
         }).join('')+
       '</div>';
     }).join('');
   } catch(e) {
-    listEl.innerHTML = '<div style="font-size:11px;color:#b00;">Could not load assets: '+esc(e.message||e)+'</div>';
+    listEl.innerHTML = '<div style="font-size:11px;color:#b00;">'+t('samples.errLoadAssets',{x:esc(e.message||e)})+'</div>';
   }
 }
 
@@ -2514,7 +2526,7 @@ async function loadPdOutstandingActions(pdId) {
       })
     });
     if(!r.ok) {
-      el.innerHTML = '<div style="font-size:11px;color:#886600;padding:8px;">Compliance check unavailable (HTTP '+r.status+')</div>';
+      el.innerHTML = '<div style="font-size:11px;color:#886600;padding:8px;">'+t('samples.complianceUnavailable',{status:r.status})+'</div>';
       return;
     }
     var data = await r.json();
@@ -2536,7 +2548,7 @@ async function loadPdOutstandingActions(pdId) {
     pushFrom(layers.layer_3_product, 'Product');
 
     if(!allRed.length && !allWarn.length){
-      el.innerHTML = '<div style="padding:10px 12px;background:#edfaed;border:1px solid #c0e0c0;color:#1a7a1a;border-radius:8px;font-size:12px;font-weight:500;">✓ Ready for PO. No outstanding compliance items.</div>';
+      el.innerHTML = '<div style="padding:10px 12px;background:#edfaed;border:1px solid #c0e0c0;color:#1a7a1a;border-radius:8px;font-size:12px;font-weight:500;">'+t('samples.readyForPo')+'</div>';
       return;
     }
 
@@ -2544,8 +2556,8 @@ async function loadPdOutstandingActions(pdId) {
     var border = allRed.length ? '#fdd' : '#f0d860';
     var titleColor = allRed.length ? '#b00' : '#886600';
     var title = allRed.length
-      ? '⛔ '+allRed.length+' item'+(allRed.length===1?'':'s')+' must be addressed before PO can issue'
-      : '⚠ '+allWarn.length+' recommended item'+(allWarn.length===1?'':'s');
+      ? t('samples.poBlocked',{n:allRed.length})
+      : t('samples.poRecommended',{n:allWarn.length});
 
     function renderItem(group, color) {
       var flag = group.flag;
@@ -2555,7 +2567,7 @@ async function loadPdOutstandingActions(pdId) {
       if (docKey) {
         btnHtml = '<button data-layer="'+esc(group.label)+'" data-key="'+esc(docKey)+'" '+
           'onclick="uploadInlineFromAction(\''+pdId+'\', this)" '+
-          'style="padding:5px 12px;background:'+color+';color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">📎 Upload</button>';
+          'style="padding:5px 12px;background:'+color+';color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;">'+t('samples.uploadShort')+'</button>';
       }
       return '<div style="padding:8px 10px;border-left:3px solid '+color+';background:'+color+'10;border-radius:4px;margin:5px 0;display:flex;gap:10px;align-items:flex-start;">'+
         '<div style="flex:1;min-width:0;">'+
@@ -2573,7 +2585,7 @@ async function loadPdOutstandingActions(pdId) {
         allWarn.map(function(g){return renderItem(g,'#886600');}).join('')+
       '</div>';
   } catch(e) {
-    el.innerHTML = '<div style="font-size:11px;color:#b00;padding:8px;">Action check error: '+esc(e.message||e)+'</div>';
+    el.innerHTML = '<div style="font-size:11px;color:#b00;padding:8px;">'+t('samples.actionCheckErr',{x:esc(e.message||e)})+'</div>';
   }
 }
 
@@ -2601,7 +2613,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
     if (!input.files || !input.files.length) return;
     var file = input.files[0];
     if (file.size > 25 * 1024 * 1024) {
-      alert('File too large. Must be under 25 MB.');
+      alert(t('samples.fileTooLarge'));
       return;
     }
 
@@ -2620,7 +2632,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
 
     var orig = btnEl.textContent;
     btnEl.disabled = true;
-    btnEl.textContent = 'Uploading...';
+    btnEl.textContent = t('common.uploading');
 
     try {
       var ts = Date.now();
@@ -2631,15 +2643,11 @@ async function uploadInlineFromAction(pdId, btnEl) {
         // ── Factory-level cert ──
         // factory_documents requires expiry_date NOT NULL — prompt for it (or default far-future for non-expiring docs).
         btnEl.disabled = false; btnEl.textContent = orig;  // un-disable while prompting
-        var expiry = prompt(
-          docName + ' — Enter expiry date (YYYY-MM-DD).\n\n' +
-          'If this document does not expire (e.g. business license, self-declaration), leave blank to set far-future placeholder.\n\n' +
-          'Example: 2027-06-20'
-        );
+        var expiry = prompt(docName + ' — ' + t('samples.enterExpiryPrompt'));
         if (expiry === null) {  // user cancelled
           return;
         }
-        btnEl.disabled = true; btnEl.textContent = 'Uploading...';
+        btnEl.disabled = true; btnEl.textContent = t('common.uploading');
 
         // Validate or default
         var expiryDate;
@@ -2648,12 +2656,10 @@ async function uploadInlineFromAction(pdId, btnEl) {
         } else if (/^\d{4}-\d{2}-\d{2}$/.test(expiry.trim())) {
           expiryDate = expiry.trim();
         } else {
-          throw new Error('Expiry date must be in YYYY-MM-DD format.');
+          throw new Error(t('samples.expiryFormat'));
         }
 
-        var issuedBy = prompt(
-          docName + ' — Optionally enter the issuing body (e.g. SGS, Bureau Veritas, Health Canada).\n\nLeave blank to skip.'
-        );
+        var issuedBy = prompt(docName + ' — ' + t('samples.enterIssuerPrompt'));
         if (issuedBy === null) return;  // cancelled
 
         var storagePath = FACTORY_ID + '/compliance/' + ts + '_' + safeName;
@@ -2662,7 +2668,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
           headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':contentType,'x-upsert':'true'},
           body: file
         });
-        if (!sr.ok) throw new Error('Storage upload failed (HTTP '+sr.status+')');
+        if (!sr.ok) throw new Error(t('samples.storageFailedHttp',{status:sr.status}));
 
         var isStandard = STANDARD_TYPES.indexOf(docName) >= 0;
         var payload = {
@@ -2716,7 +2722,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
           headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':contentType,'x-upsert':'true'},
           body: file
         });
-        if (!sr.ok) throw new Error('Storage upload failed (HTTP '+sr.status+')');
+        if (!sr.ok) throw new Error(t('samples.storageFailedHttp',{status:sr.status}));
 
         var prodPayload = {
           product_development_id: pdId,
@@ -2748,7 +2754,7 @@ async function uploadInlineFromAction(pdId, btnEl) {
       loadPdOutstandingActions(pdId);
       loadPdAssetsList(pdId);
     } catch(e) {
-      alert('Upload failed: '+(e.message||e));
+      alert(t('samples.uploadFailed',{x:(e.message||e)}));
       btnEl.disabled = false;
       btnEl.textContent = orig;
     }
@@ -2778,12 +2784,12 @@ async function submitSampleShipment(pdId,versionNumber){
   var errEl=g('ss-err-'+pdId),okEl=g('ss-ok-'+pdId);
   errEl.style.display='none';okEl.style.display='none';
   function fail(msg){errEl.textContent=msg;errEl.style.display='block';}
-  if(!shipDate)return fail('Ship date is required.');
-  if((destType==='testing_lab'||destType==='other')&&!destAddr)return fail('Address is required for testing lab or other destinations.');
-  if(!track)return fail('Tracking number is required.');
-  if(!photoFile)return fail('A sample photo is required.');
+  if(!shipDate)return fail(t('samples.shipDateReq'));
+  if((destType==='testing_lab'||destType==='other')&&!destAddr)return fail(t('samples.addressReq'));
+  if(!track)return fail(t('samples.trackingReq'));
+  if(!photoFile)return fail(t('samples.photoReq'));
 
-  var btn=g('ss-btn-'+pdId);btn.disabled=true;btn.textContent='Uploading...';
+  var btn=g('ss-btn-'+pdId);btn.disabled=true;btn.textContent=t('common.uploading');
 
   try{
     // Upload photo to factory-files bucket
@@ -2794,7 +2800,7 @@ async function submitSampleShipment(pdId,versionNumber){
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':photoFile.type||'image/jpeg'},
       body:photoFile
     });
-    if(!up.ok){var t=await up.text();throw new Error('Photo upload failed: '+t.slice(0,200));}
+    if(!up.ok){var pt=await up.text();throw new Error(window.t('samples.photoUploadFailed',{x:pt.slice(0,200)}));}
 
     // Create sample_submissions row
     var payload={
@@ -2809,13 +2815,13 @@ async function submitSampleShipment(pdId,versionNumber){
       sample_photo_urls:[photoPath],
       status:'shipped'
     };
-    btn.textContent='Saving...';
+    btn.textContent=t('common.saving');
     var r=await fetch(SB+'/rest/v1/sample_submissions',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify(payload)
     });
-    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error('Save failed: '+(e.message||e.details||r.status));}
+    if(!r.ok){var e=await r.json().catch(function(){return{};});throw new Error(t('samples.saveFailed',{x:(e.message||e.details||r.status)}));}
 
     // Transition PD item to awaiting_approval + bump current_version
     await fetch(SB+'/rest/v1/product_development_items?id=eq.'+pdId,{
@@ -2831,11 +2837,11 @@ async function submitSampleShipment(pdId,versionNumber){
       body:JSON.stringify({factory_id:FACTORY_ID,event_type:'sample_shipped',event_data:{product_development_id:pdId,version_number:versionNumber,carrier:carrier,tracking_number:track},actor_type:'factory'})
     }).catch(function(){});
 
-    okEl.textContent='✓ Sample Version '+versionNumber+' marked as shipped. The buyer has been notified.';okEl.style.display='block';
+    okEl.textContent=t('samples.markedShipped',{n:versionNumber});okEl.style.display='block';
     setTimeout(loadSamples,1500);
   }catch(e){
     fail(e.message||String(e));
-    btn.disabled=false;btn.textContent='Mark Sample as Shipped';
+    btn.disabled=false;btn.textContent=t('samples.markShipped');
   }
 }
 
@@ -2881,12 +2887,12 @@ async function loadOrders(){
     });
     var badge=g('orders-badge');
     if(badge){
-      if(attention>0){badge.style.display='inline-block';badge.textContent=attention+' to action';}
+      if(attention>0){badge.style.display='inline-block';badge.textContent=t('orders.badgeToAction',{n:attention});}
       else{badge.style.display='none';}
     }
   }catch(e){
     g('orders-loading').style.display='none';
-    g('orders-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">Could not load orders: '+esc(e.message||String(e))+'</div>';
+    g('orders-list').innerHTML='<div style="background:#fff0f0;border:1px solid #fdd;color:#b00;padding:12px;border-radius:8px;font-size:13px;">'+t('orders.errLoad',{x:esc(e.message||String(e))})+'</div>';
   }
 }
 
@@ -2907,38 +2913,38 @@ function renderOrderCard(po){
   // ── In-production: milestone tracking (existing behavior) ──
   var milestones=(po.po_milestones||[]).slice().sort(function(a,b){return a.display_order-b.display_order;});
   var msLabels={
-    sample_submission:'Sample Submission',
-    materials_on_hand:'Materials On Hand',
-    mass_production_start:'Mass Production Start',
-    mass_production_end:'Mass Production End',
-    inspection:'Pre-Shipment Inspection',
-    cargo_ready:'Cargo Ready'
+    sample_submission:t('orders.msSampleSub'),
+    materials_on_hand:t('orders.msMaterials'),
+    mass_production_start:t('orders.msMpStart'),
+    mass_production_end:t('orders.msMpEnd'),
+    inspection:t('orders.msInspection'),
+    cargo_ready:t('orders.msCargoReady')
   };
   var today=new Date().toISOString().slice(0,10);
   var msHtml=milestones.map(function(m){
     var dateStr=m.revised_date||m.agreed_date;
     var overdue=dateStr<today && m.status==='pending';
     var stColor,stBg,stLabel;
-    if(m.status==='completed'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ Completed';}
-    else if(m.status==='confirmed_on_track'){stColor='#1a7a1a';stBg='#edfaed';stLabel='✓ On track';}
-    else if(m.status==='delayed'){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Delayed';}
-    else if(m.status==='at_risk'){stColor='#886600';stBg='#fff8e0';stLabel='⚠ At risk';}
-    else if(overdue){stColor='#b00';stBg='#fff0f0';stLabel='⚠ Overdue';}
-    else{stColor='#666';stBg='#f5f5f0';stLabel='Pending';}
+    if(m.status==='completed'){stColor='#1a7a1a';stBg='#edfaed';stLabel=t('orders.msCompleted');}
+    else if(m.status==='confirmed_on_track'){stColor='#1a7a1a';stBg='#edfaed';stLabel=t('orders.msOnTrack');}
+    else if(m.status==='delayed'){stColor='#b00';stBg='#fff0f0';stLabel=t('orders.msDelayed');}
+    else if(m.status==='at_risk'){stColor='#886600';stBg='#fff8e0';stLabel=t('orders.msAtRisk');}
+    else if(overdue){stColor='#b00';stBg='#fff0f0';stLabel=t('orders.msOverdue');}
+    else{stColor='#666';stBg='#f5f5f0';stLabel=t('orders.msPending');}
 
     var actionBtns='';
     if(m.status==='pending'||m.status==='at_risk'){
       actionBtns='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">'+
-        '<button onclick="confirmMilestone(\''+m.id+'\')" style="padding:5px 10px;background:#1a7a1a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Confirm on schedule</button>'+
-        '<button onclick="flagMilestoneDelay(\''+m.id+'\')" style="padding:5px 10px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">⚠ Flag delay</button>'+
-        '<button onclick="requestTimelineChange(\''+m.id+'\',\''+po.id+'\',\''+m.milestone_type+'\',\''+dateStr+'\')" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Request date change</button>'+
+        '<button onclick="confirmMilestone(\''+m.id+'\')" style="padding:5px 10px;background:#1a7a1a;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('orders.confirmOnSchedule')+'</button>'+
+        '<button onclick="flagMilestoneDelay(\''+m.id+'\')" style="padding:5px 10px;background:#fff5f5;color:#b00;border:1px solid #fdd;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('orders.flagDelay')+'</button>'+
+        '<button onclick="requestTimelineChange(\''+m.id+'\',\''+po.id+'\',\''+m.milestone_type+'\',\''+dateStr+'\')" style="padding:5px 10px;background:#fff;color:#666;border:1px solid #ddd;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">'+t('orders.requestDateChange')+'</button>'+
       '</div>';
     }
     return '<div style="padding:10px 12px;border-bottom:1px solid #f0f0e8;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">'+
       '<div style="flex:1;min-width:200px;">'+
         '<div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(msLabels[m.milestone_type]||m.milestone_type)+'</div>'+
-        '<div style="font-size:12px;color:#666;margin-top:2px;">Due: <strong>'+esc(dateStr)+'</strong>'+
-          (m.revised_date&&m.revised_date!==m.agreed_date?' <span style="color:#888;font-size:11px;">(orig '+esc(m.agreed_date)+')</span>':'')+
+        '<div style="font-size:12px;color:#666;margin-top:2px;">'+t('orders.due',{date:'<strong>'+esc(dateStr)+'</strong>'})+
+          (m.revised_date&&m.revised_date!==m.agreed_date?' <span style="color:#888;font-size:11px;">'+t('orders.orig',{date:esc(m.agreed_date)})+'</span>':'')+
         '</div>'+
         actionBtns+
       '</div>'+
@@ -2948,15 +2954,15 @@ function renderOrderCard(po){
   return '<div class="rfq-card">'+
     '<div class="rfq-card-header" style="background:#edfaed;border-left:3px solid #1a7a1a;">'+
       '<div style="flex:1;">'+
-        '<div class="rfq-card-title">'+esc(po.po_number||'(no PO number)')+' · '+esc(rfq.item_description||'')+'</div>'+
+        '<div class="rfq-card-title">'+esc(po.po_number||t('orders.noPoNumber'))+' · '+esc(rfq.item_description||'')+'</div>'+
         '<div class="rfq-card-meta">'+
           (rfq.project_number?esc(rfq.project_number)+' · ':'')+
-          'Issued '+(po.issued_at?esc(po.issued_at.slice(0,10)):'')+
-          (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+          t('orders.issued',{date:(po.issued_at?esc(po.issued_at.slice(0,10)):'')})+
+          (po.total_units?' · '+t('orders.units',{n:po.total_units.toLocaleString()}):'')+
           (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString():'')+
         '</div>'+
       '</div>'+
-      '<span class="rfq-card-badge badge-quoted">In production</span>'+
+      '<span class="rfq-card-badge badge-quoted">'+t('orders.inProduction')+'</span>'+
     '</div>'+
     '<div class="rfq-card-body open" style="display:block;padding:0;">'+
       msHtml+
@@ -2972,14 +2978,14 @@ function renderPreProductionPoCard(po, rfq){
 
   var bannerBg, bannerColor, bannerText, badgeBg, badgeColor, badgeText;
   if(awaitingAccept){
-    bannerBg='#fff8e0'; bannerColor='#886600'; bannerText='Action required: review and accept the contract';
-    badgeBg='#fff8e0'; badgeColor='#886600'; badgeText='Awaiting acceptance';
+    bannerBg='#fff8e0'; bannerColor='#886600'; bannerText=t('orders.bannerReviewContract');
+    badgeBg='#fff8e0'; badgeColor='#886600'; badgeText=t('orders.awaitingAcceptance');
   } else if(awaitingSignedPdf){
-    bannerBg='#e8f0ff'; bannerColor='#2244cc'; bannerText='Action required: print, sign, chop, and upload the executed contract';
-    badgeBg='#e8f0ff'; badgeColor='#2244cc'; badgeText='Awaiting signed PDF';
+    bannerBg='#e8f0ff'; bannerColor='#2244cc'; bannerText=t('orders.bannerUploadSigned');
+    badgeBg='#e8f0ff'; badgeColor='#2244cc'; badgeText=t('orders.awaitingSigned');
   } else {
-    bannerBg='#edfaed'; bannerColor='#1a7a1a'; bannerText='Contract fully executed. Production milestones will be loaded shortly.';
-    badgeBg='#edfaed'; badgeColor='#1a7a1a'; badgeText='Fully executed';
+    bannerBg='#edfaed'; bannerColor='#1a7a1a'; bannerText=t('orders.bannerExecuted');
+    badgeBg='#edfaed'; badgeColor='#1a7a1a'; badgeText=t('orders.fullyExecuted');
   }
 
   // PDF preview (inline iframe if available)
@@ -2987,10 +2993,10 @@ function renderPreProductionPoCard(po, rfq){
   if(po.pdf_url){
     pdfBlock =
       '<div style="padding:12px;border-bottom:1px solid #f0f0e8;">'+
-        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Contract PDF (v'+(po.po_version||1)+')</div>'+
+        '<div style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">'+t('orders.contractPdfV',{n:(po.po_version||1)})+'</div>'+
         '<iframe src="'+esc(po.pdf_url)+'#view=FitH" style="width:100%;height:480px;border:1px solid #e0e0d8;border-radius:6px;background:#fff;"></iframe>'+
         '<div style="margin-top:6px;">'+
-          '<a href="'+esc(po.pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">↓ Download PDF</a>'+
+          '<a href="'+esc(po.pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">'+t('orders.downloadPdf')+'</a>'+
         '</div>'+
       '</div>';
   }
@@ -3001,11 +3007,10 @@ function renderPreProductionPoCard(po, rfq){
     actionBlock =
       '<div style="padding:14px;background:#fafaf6;">'+
         '<div style="font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;">'+
-          'Please review the contract above. Clicking <strong>Accept</strong> below confirms you have read and agree to the terms. '+
-          'After accepting, you will be prompted to print the contract, apply your signature and company chop, and upload the executed PDF to complete the process.'+
+          t('orders.reviewBody')+
         '</div>'+
-        '<button onclick="acceptPO(\''+po.id+'\',\''+esc(po.po_number||'')+'\')" style="padding:10px 18px;background:#1a7a1a;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✓ Accept Contract</button>'+
-        '<span style="margin-left:12px;font-size:11px;color:#888;">Your acceptance will be recorded with timestamp and audit trail.</span>'+
+        '<button onclick="acceptPO(\''+po.id+'\',\''+esc(po.po_number||'')+'\')" style="padding:10px 18px;background:#1a7a1a;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('orders.acceptContract')+'</button>'+
+        '<span style="margin-left:12px;font-size:11px;color:#888;">'+t('orders.acceptAudit')+'</span>'+
       '</div>';
   } else if(awaitingSignedPdf){
     var acceptedAt = po.factory_accepted_at ? po.factory_accepted_at.slice(0,10) : '';
@@ -3013,15 +3018,15 @@ function renderPreProductionPoCard(po, rfq){
     actionBlock =
       '<div style="padding:14px;background:#fafaf6;">'+
         '<div style="background:#edfaed;color:#1a7a1a;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:14px;">'+
-          '✓ Contract accepted '+(acceptedAt?'on '+esc(acceptedAt):'')+(acceptedBy?' by '+esc(acceptedBy):'')+
+          t('orders.acceptedBy',{date:esc(acceptedAt),name:esc(acceptedBy)})+
         '</div>'+
         '<div style="font-size:13px;color:#333;margin-bottom:10px;line-height:1.5;">'+
-          '<strong>Final step:</strong> Print the contract above, apply your authorized signature and company chop on the signature page, scan the executed document, and upload the PDF below. The contract will be considered fully executed once uploaded.'+
+          t('orders.finalStep')+
         '</div>'+
         '<div style="margin-top:10px;">'+
           '<input type="file" id="signed-pdf-input-'+po.id+'" accept="application/pdf" style="display:none;" onchange="uploadSignedPO(\''+po.id+'\',\''+esc(po.po_number||'')+'\',this)" />'+
-          '<button onclick="document.getElementById(\'signed-pdf-input-'+po.id+'\').click()" style="padding:10px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📎 Upload signed & chopped PDF</button>'+
-          '<span style="margin-left:12px;font-size:11px;color:#888;">PDF only. Once uploaded, the file is locked.</span>'+
+          '<button onclick="document.getElementById(\'signed-pdf-input-'+po.id+'\').click()" style="padding:10px 18px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('orders.uploadSignedPdf')+'</button>'+
+          '<span style="margin-left:12px;font-size:11px;color:#888;">'+t('orders.pdfLocked')+'</span>'+
         '</div>'+
         '<div id="signed-pdf-status-'+po.id+'" style="margin-top:10px;font-size:12px;"></div>'+
       '</div>';
@@ -3030,20 +3035,20 @@ function renderPreProductionPoCard(po, rfq){
     actionBlock =
       '<div style="padding:14px;background:#fafaf6;">'+
         '<div style="background:#edfaed;color:#1a7a1a;padding:10px 12px;border-radius:6px;font-size:12px;margin-bottom:6px;">'+
-          '✓ Contract fully executed'+(signedAt?' on '+esc(signedAt):'')+'. Production milestones will appear once timeline is locked in.'+
+          t('orders.executedOn',{date:(signedAt?esc(signedAt):'')})+
         '</div>'+
-        (po.signed_pdf_url?'<div style="margin-top:8px;"><a href="'+esc(po.signed_pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">↓ View your executed copy</a></div>':'')+
+        (po.signed_pdf_url?'<div style="margin-top:8px;"><a href="'+esc(po.signed_pdf_url)+'" target="_blank" style="font-size:12px;color:#2266cc;text-decoration:none;">'+t('orders.viewExecuted')+'</a></div>':'')+
       '</div>';
   }
 
   return '<div class="rfq-card">'+
     '<div class="rfq-card-header" style="background:'+bannerBg+';border-left:3px solid '+bannerColor+';">'+
       '<div style="flex:1;">'+
-        '<div class="rfq-card-title">'+esc(po.po_number||'(no PO number)')+' · '+esc(rfq.item_description||'')+'</div>'+
+        '<div class="rfq-card-title">'+esc(po.po_number||t('orders.noPoNumber'))+' · '+esc(rfq.item_description||'')+'</div>'+
         '<div class="rfq-card-meta">'+
           (rfq.project_number?esc(rfq.project_number)+' · ':'')+
-          'Issued '+(po.issued_at?esc(po.issued_at.slice(0,10)):'')+
-          (po.total_units?' · '+po.total_units.toLocaleString()+' units':'')+
+          t('orders.issued',{date:(po.issued_at?esc(po.issued_at.slice(0,10)):'')})+
+          (po.total_units?' · '+t('orders.units',{n:po.total_units.toLocaleString()}):'')+
           (po.total_value_usd?' · $'+parseFloat(po.total_value_usd).toLocaleString():'')+
         '</div>'+
         '<div style="font-size:12px;color:'+bannerColor+';margin-top:4px;font-weight:500;">'+esc(bannerText)+'</div>'+
@@ -3059,13 +3064,7 @@ function renderPreProductionPoCard(po, rfq){
 // ── Accept PO contract (digital acknowledgment) ──
 async function acceptPO(poId, poNumber){
   var contactName = (window.FACTORY_NAME || '');  // best-effort default
-  var name = prompt(
-    'Type your full name to digitally accept Purchase Order '+poNumber+'.\n\n' +
-    'By accepting, you confirm you are authorized to commit your company to the terms of this contract. ' +
-    'Your name, timestamp, and IP address will be recorded as part of the audit trail.\n\n' +
-    'After acceptance, you will be prompted to upload the physically signed and chopped contract.',
-    contactName
-  );
+  var name = prompt(t('orders.acceptPrompt',{po:poNumber}), contactName);
   if(!name || !name.trim()){
     return;
   }
@@ -3079,10 +3078,10 @@ async function acceptPO(poId, poNumber){
     if(!r.ok || !data.success){
       throw new Error(data.error || ('HTTP '+r.status));
     }
-    alert('✓ Contract accepted. Please print, sign, and apply your company chop, then upload the executed PDF.');
+    alert(t('orders.acceptedAlert'));
     loadOrders();
   }catch(e){
-    alert('Could not accept contract: '+(e.message||e));
+    alert(t('orders.couldNotAccept',{x:(e.message||e)}));
   }
 }
 
@@ -3091,7 +3090,7 @@ async function uploadSignedPO(poId, poNumber, inputEl){
   var file = inputEl.files && inputEl.files[0];
   if(!file)return;
   if(file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')){
-    alert('Please upload a PDF file only.');
+    alert(t('orders.uploadPdfOnly'));
     inputEl.value = '';
     return;
   }
@@ -3099,7 +3098,7 @@ async function uploadSignedPO(poId, poNumber, inputEl){
   if(statusEl){
     statusEl.style.background='#fff8e0';statusEl.style.color='#886600';
     statusEl.style.padding='8px 10px';statusEl.style.borderRadius='6px';
-    statusEl.textContent='Uploading... please wait.';
+    statusEl.textContent=t('orders.uploadingWait');
   }
   try{
     // 1. Upload directly to Supabase storage
@@ -3116,16 +3115,13 @@ async function uploadSignedPO(poId, poNumber, inputEl){
     });
     if(!uploadResp.ok){
       var errTxt = await uploadResp.text();
-      throw new Error('Storage upload failed: '+errTxt);
+      throw new Error(t('compliance.storageFailed',{x:errTxt}));
     }
     var signedPdfUrl = SB+'/storage/v1/object/public/po-contracts/'+path;
 
     // 2. Tell backend the upload is done
     var contactName = (window.FACTORY_NAME || '');
-    var nameForRecord = prompt(
-      'Confirm your name for the record (who uploaded the signed contract):',
-      contactName
-    ) || null;
+    var nameForRecord = prompt(t('orders.confirmUploaderName'), contactName) || null;
 
     var finResp = await fetch('/api/finalize-po-signature', {
       method:'POST',
@@ -3142,20 +3138,20 @@ async function uploadSignedPO(poId, poNumber, inputEl){
     }
     if(statusEl){
       statusEl.style.background='#edfaed';statusEl.style.color='#1a7a1a';
-      statusEl.textContent='✓ Signed PDF uploaded successfully. Contract is now fully executed.';
+      statusEl.textContent=t('orders.signedUploaded');
     }
     setTimeout(loadOrders, 1200);
   }catch(e){
     if(statusEl){
       statusEl.style.background='#fff0f0';statusEl.style.color='#b00';
-      statusEl.textContent='Upload failed: '+(e.message||e);
+      statusEl.textContent=t('orders.uploadFailed',{x:(e.message||e)});
     }
     inputEl.value = '';
   }
 }
 
 async function confirmMilestone(milestoneId){
-  if(!confirm('Confirm this milestone is on track for the agreed date?'))return;
+  if(!confirm(t('orders.confirmMilestone')))return;
   try{
     await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
       method:'PATCH',
@@ -3174,11 +3170,11 @@ async function confirmMilestone(milestoneId){
       body:JSON.stringify({factory_id:FACTORY_ID,event_type:'milestone_confirmed',event_data:{po_milestone_id:milestoneId},actor_type:'factory'})
     }).catch(function(){});
     loadOrders();
-  }catch(e){alert('Could not confirm: '+e.message);}
+  }catch(e){alert(t('orders.couldNotConfirm',{x:e.message}));}
 }
 
 async function flagMilestoneDelay(milestoneId){
-  var reason=prompt('Briefly describe the delay (the buyer will be notified):');
+  var reason=prompt(t('orders.describeDelay'));
   if(!reason||!reason.trim())return;
   try{
     await fetch(SB+'/rest/v1/po_milestones?id=eq.'+milestoneId,{
@@ -3197,13 +3193,13 @@ async function flagMilestoneDelay(milestoneId){
       body:JSON.stringify({factory_id:FACTORY_ID,event_type:'milestone_delayed',event_data:{po_milestone_id:milestoneId,reason:reason.trim()},actor_type:'factory'})
     }).catch(function(){});
     loadOrders();
-  }catch(e){alert('Could not flag: '+e.message);}
+  }catch(e){alert(t('orders.couldNotFlag',{x:e.message}));}
 }
 
 async function requestTimelineChange(milestoneId,poId,milestoneType,currentDate){
-  var newDate=prompt('Propose a new date for '+milestoneType.replace(/_/g,' ')+' (current: '+currentDate+').\n\nFormat: YYYY-MM-DD');
+  var newDate=prompt(t('orders.proposeNewDate',{ms:milestoneType.replace(/_/g,' '),date:currentDate}));
   if(!newDate||!/^\d{4}-\d{2}-\d{2}$/.test(newDate.trim()))return;
-  var reason=prompt('Reason for the change request (the buyer must approve):');
+  var reason=prompt(t('orders.reasonForChange'));
   if(!reason||!reason.trim())return;
   try{
     await fetch(SB+'/rest/v1/timeline_change_requests',{
@@ -3224,8 +3220,8 @@ async function requestTimelineChange(milestoneId,poId,milestoneType,currentDate)
       headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({factory_id:FACTORY_ID,event_type:'timeline_change_requested',event_data:{po_milestone_id:milestoneId,previous_date:currentDate,proposed_date:newDate.trim()},actor_type:'factory'})
     }).catch(function(){});
-    alert('Request submitted. The buyer will review and respond.');
-  }catch(e){alert('Could not submit: '+e.message);}
+    alert(t('orders.requestSubmitted'));
+  }catch(e){alert(t('orders.couldNotSubmit',{x:e.message}));}
 }
 
 async function loadRFQs(){
@@ -4392,7 +4388,7 @@ async function loadCategoryData(){
     await loadMarketData();
     await loadFactoryMarkets();
   }catch(e){
-    g('cat-loading').textContent = 'Error loading categories. Please refresh.';
+    g('cat-loading').textContent = t('details.errLoadCategories');
     console.log('loadCategoryData error:',e);
   }
 }
@@ -4427,11 +4423,11 @@ function renderCategoryStage1(){
         '<div class="cat-pct-wrap">' +
           '<input type="number" class="cat-pct-input" id="catpct-'+encCat+'" value="'+pct+'" min="0" max="100" placeholder="0" '+pctHidden+' oninput="updateCatTotal()" />' +
           '<span class="cat-pct-label" '+pctHidden+'>%</span>' +
-          '<button class="cat-specify-btn" id="catbtn-'+encCat+'" onclick="handleSpecifyClick(this)" '+btnHidden+'>Specify Products &#9660;</button>' +
+          '<button class="cat-specify-btn" id="catbtn-'+encCat+'" onclick="handleSpecifyClick(this)" '+btnHidden+'>'+t('details.specifyProducts')+' &#9660;</button>' +
         '</div>' +
       '</div>' +
       '<div class="cat-detail-panel" id="catdetail-'+encCat+'">' +
-        '<div style="font-size:12px;color:#888;margin-bottom:10px;padding:6px 0;">All products in this category have been pre-selected. Simply uncheck any products your factory does not manufacture.</div>' +
+        '<div style="font-size:12px;color:#888;margin-bottom:10px;padding:6px 0;">'+t('details.preselected')+'</div>' +
         renderSubCategories(cat) +
       '</div>' +
     '</div>';
@@ -4466,7 +4462,7 @@ function handleSpecifyClick(btn){
   var panel = g('catdetail-'+encCat);
   if(!panel) return;
   var isOpen = panel.classList.toggle('open');
-  btn.innerHTML = isOpen ? 'Specify Products &#9650;' : 'Specify Products &#9660;';
+  btn.innerHTML = isOpen ? t('details.specifyProducts')+' &#9650;' : t('details.specifyProducts')+' &#9660;';
 }
 
 function renderSubCategories(cat){
@@ -4481,9 +4477,9 @@ function renderSubCategories(cat){
       '<div class="cat-sub-header">' +
         '<input type="checkbox" class="cat-sub-check" id="subscheck-'+subId+'" '+(isSubChecked?'checked':'')+' onchange="updateCatTotal()" />' +
         '<span class="cat-sub-name">'+sub+'</span>' +
-        '<button class="cat-sub-toggle" data-subid="'+subId+'" data-all="true" onclick="selectAllSubSub(this.dataset.subid,true)">All</button>' +
+        '<button class="cat-sub-toggle" data-subid="'+subId+'" data-all="true" onclick="selectAllSubSub(this.dataset.subid,true)">'+t('details.allToggle')+'</button>' +
         '<span style="color:#ccc;font-size:11px;">|</span>' +
-        '<button class="cat-sub-toggle" data-subid="'+subId+'" onclick="selectAllSubSub(this.dataset.subid,false)">None</button>' +
+        '<button class="cat-sub-toggle" data-subid="'+subId+'" onclick="selectAllSubSub(this.dataset.subid,false)">'+t('details.noneToggle')+'</button>' +
       '</div>' +
       '<div class="cat-subsub-grid" id="subsubgrid-'+subId+'">' +
         subSubs.map(function(item){
@@ -4496,8 +4492,8 @@ function renderSubCategories(cat){
         }).join('') +
       '</div>' +
       '<div class="cat-add-custom">' +
-        '<input type="text" class="cat-add-input" placeholder="Not listed? Add it here..." id="custominput-'+subId+'" data-cat="'+cat+'" data-sub="'+sub+'" data-subid="'+subId+'" />' +
-        '<button class="cat-add-btn" data-subid="'+subId+'" onclick="handleAddCustom(this)">+ Add</button>' +
+        '<input type="text" class="cat-add-input" placeholder="'+esc(t('details.addCustomPh'))+'" id="custominput-'+subId+'" data-cat="'+cat+'" data-sub="'+sub+'" data-subid="'+subId+'" />' +
+        '<button class="cat-add-btn" data-subid="'+subId+'" onclick="handleAddCustom(this)">'+t('common.add')+'</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -4599,7 +4595,7 @@ async function addCustomProduct(cat, sub, subId, name){
     label.className = 'cat-subsub-item';
     label.style.background = '#fff8e0';
     label.style.borderColor = '#f0d060';
-    label.innerHTML = '<input type="checkbox" checked value="'+name+'" data-cat="'+cat+'" data-sub="'+sub+'" data-custom="true" /> '+name+' <span style="font-size:10px;color:#886600;margin-left:4px;">pending</span>';
+    label.innerHTML = '<input type="checkbox" checked value="'+name+'" data-cat="'+cat+'" data-sub="'+sub+'" data-custom="true" /> '+name+' <span style="font-size:10px;color:#886600;margin-left:4px;">'+t('details.pending')+'</span>';
     grid.appendChild(label);
   }
   if(FACTORY_ID){
@@ -4740,7 +4736,7 @@ async function loadCertifications(){
     g('certs-loading').style.display='none';
   }catch(e){
     console.log('loadCertifications error:',e);
-    g('certs-loading').textContent='Error loading certifications.';
+    g('certs-loading').textContent=t('details.errLoadCerts');
   }
 }
 
@@ -4772,14 +4768,14 @@ function renderCertifications(savedCerts){
 async function submitCustomCert(){
   var input = g('p-cert-custom');
   var name = input ? input.value.trim() : '';
-  if(!name){alert('Please enter a certification name.');return;}
+  if(!name){alert(t('details.enterCertName'));return;}
   // Show as pending tag in UI
   var pendingEl = g('custom-certs-pending');
   var tagId = 'certtag-'+Date.now();
   var tag = document.createElement('div');
   tag.className = 'cert-pending-tag';
   tag.id = tagId;
-  tag.innerHTML = name+' <span style="font-size:9px;background:#fff0c0;padding:1px 4px;border-radius:3px;margin-left:2px;">pending</span> <span class="cert-pending-remove" onclick="this.parentElement.remove()">✕</span>';
+  tag.innerHTML = name+' <span style="font-size:9px;background:#fff0c0;padding:1px 4px;border-radius:3px;margin-left:2px;">'+t('details.pending')+'</span> <span class="cert-pending-remove" onclick="this.parentElement.remove()">✕</span>';
   tag.dataset.certname = name;
   if(pendingEl) pendingEl.appendChild(tag);
   input.value = '';
