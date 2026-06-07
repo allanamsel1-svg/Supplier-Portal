@@ -222,7 +222,7 @@
 <script>
 var DATA=[],sFiltered=[],sPage=1,sSort={col:-1,dir:1};
 var activeTab='shipments';
-var S_PAGE=50,STORAGE_KEY='ig_v2';
+var S_PAGE=50;
 
 var COL_MAP={
   product:['PRODUCT DESCRIPTION','DESCRIPTION','COMMODITY'],
@@ -233,7 +233,16 @@ var COL_MAP={
   qty:['QUANTITY','QTY'],
   unit:['QUANTITY UNIT','UNIT'],
   weight_kg:['GROSS WEIGHT (KG)','WEIGHT KG','WEIGHT (KG)'],
+  weight_lb:['GROSS WEIGHT (LB)','WEIGHT LB','WEIGHT (LB)'],
   foreign_port:['FOREIGN PORT','PORT OF LOADING','LOADING PORT'],
+  us_port:['US PORT','PORT OF DISCHARGE'],
+  vessel:['VESSEL NAME','VESSEL'],
+  bol:['BILL OF LADING','B/L NUMBER'],
+  containers:['NO. OF CONTAINERS','CONTAINERS'],
+  container_type:['CONTAINER TYPE'],
+  marks:['MARKS & NUMBERS','MARKS'],
+  notify:['NOTIFY PARTY','NOTIFY'],
+  receipt:['PLACE OF RECEIPT'],
 };
 var CI={};
 
@@ -250,28 +259,63 @@ function detectCols(headers){
 function g(row,key){var i=CI[key];if(i==null||i<0)return '';var v=row[i];return v==null?'':String(v).trim();}
 function gn(row,key){var v=parseFloat(g(row,key));return isNaN(v)?0:v;}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function tagCls(o){o=o.toLowerCase();return o.includes('china')?'cn':o.includes('korea')?'kr':o.includes('hong kong')?'hk':o.includes('thailand')?'th':'';}
+function tagCls(o){o=(o||'').toLowerCase();return o.includes('china')?'cn':o.includes('korea')?'kr':o.includes('hong kong')?'hk':o.includes('thailand')?'th':'';}
 
-function getSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');}catch(e){return[];}}
-function saveDS(name,rows,headers){
-  var saved=getSaved();
-  var idx=saved.findIndex(function(d){return d.name===name;});
-  var e={name:name,savedAt:new Date().toISOString(),rowCount:rows.length,headers:headers,rows:rows};
-  if(idx>=0)saved[idx]=e;else{if(saved.length>=5)saved.shift();saved.push(e);}
-  localStorage.setItem(STORAGE_KEY,JSON.stringify(saved));
-  renderSaved();
-}
-function delDS(i){var s=getSaved();s.splice(i,1);localStorage.setItem(STORAGE_KEY,JSON.stringify(s));renderSaved();}
-function renderSaved(){
-  var saved=getSaved();
+// ── Saved datasets (Supabase via API) ──────────────────────────────────────
+async function loadSavedFromDB(){
   var wrap=document.getElementById('ig-saved-wrap');
   var list=document.getElementById('ig-saved-list');
-  if(!saved.length){wrap.style.display='none';return;}
-  wrap.style.display='';
-  list.innerHTML=saved.map(function(d,i){return '<div class="ig-saved-row"><div class="ig-saved-name">'+esc(d.name)+'</div><div class="ig-saved-meta">'+d.rowCount.toLocaleString()+' rows &middot; '+new Date(d.savedAt).toLocaleDateString()+'</div><button class="ig-saved-load" onclick="loadDS('+i+')">Load</button><button class="ig-saved-del" onclick="delDS('+i+')">&#x2715;</button></div>';}).join('');
+  try{
+    var resp=await fetch('/api/ig-data?action=datasets');
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    var datasets=await resp.json();
+    if(!datasets||!datasets.length){wrap.style.display='none';return;}
+    wrap.style.display='';
+    list.innerHTML=datasets.map(function(d){
+      return '<div class="ig-saved-row">'+
+        '<div class="ig-saved-name">'+esc(d.dataset_name)+'</div>'+
+        '<div class="ig-saved-meta">'+(d.row_count||'?').toLocaleString()+' rows'+(d.competitor_name?' &middot; '+esc(d.competitor_name):'')+' &middot; '+new Date(d.uploaded_at).toLocaleDateString()+'</div>'+
+        '<button class="ig-saved-load" onclick="loadDatasetFromDB(\''+d.id+'\',\''+esc(d.dataset_name.replace(/'/g,"\\'"))+'\')">Load</button>'+
+        '<button class="ig-saved-del" onclick="deleteDatasetFromDB(\''+d.id+'\')">&#x2715;</button>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    console.error('Could not load datasets from DB:',e);
+    wrap.style.display='none';
+  }
 }
-function loadDS(i){var d=getSaved()[i];if(!d)return;initData(d.rows,d.headers,d.name);}
 
+async function loadDatasetFromDB(datasetId,name){
+  setStatus('','Loading '+name+'…');
+  try{
+    var resp=await fetch('/api/ig-data?action=shipments&dataset_id='+datasetId);
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    var rows=await resp.json();
+    if(!rows||!rows.length){setStatus('err','No shipments found.');return;}
+    // Map DB rows to array format
+    var dbHeaders=['PRODUCT DESCRIPTION','IMPORTER ENTITY','IMPORTER','SHIPPER','ARRIVAL DATE','GROSS WEIGHT (KG)','GROSS WEIGHT (LB)','COUNTRY OF ORIGIN','FOREIGN PORT','US PORT','VESSEL NAME','BILL OF LADING','QUANTITY','QUANTITY UNIT','NO. OF CONTAINERS','CONTAINER TYPE','MARKS & NUMBERS','NOTIFY PARTY','PLACE OF RECEIPT'];
+    DATA=rows.map(function(r){return[
+      r.product_description,r.importer_entity,r.importer,r.shipper,
+      r.arrival_date,r.weight_kg,r.weight_lb,r.origin_country,
+      r.foreign_port,r.us_port,r.vessel_name,r.bill_of_lading,
+      r.quantity,r.quantity_unit,r.container_count,r.container_type,
+      r.marks_numbers,r.notify_party,r.place_of_receipt
+    ];});
+    detectCols(dbHeaders);
+    setStatus('ok','Loaded "'+name+'" — '+DATA.length.toLocaleString()+' shipments');
+    document.getElementById('ig-empty').style.display='none';
+    document.getElementById('ig-dashboard').style.display='';
+    buildOriginFilter();renderStats();renderShipments();renderImporters();renderSuppliers();renderTrends();
+  }catch(e){setStatus('err','Failed to load: '+e.message);}
+}
+
+async function deleteDatasetFromDB(datasetId){
+  if(!confirm('Delete this dataset and all its shipments?'))return;
+  await fetch('/api/ig-data?action=dataset&dataset_id='+datasetId,{method:'DELETE'});
+  loadSavedFromDB();
+}
+
+// ── File handling ──────────────────────────────────────────────────────────
 document.getElementById('ig-file-input').addEventListener('change',function(e){if(e.target.files[0])processFile(e.target.files[0]);});
 var drop=document.getElementById('ig-drop');
 drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('drag');});
@@ -290,27 +334,69 @@ function processFile(file){
       if(raw.length<2){setStatus('err','No data rows found.');return;}
       var headers=raw[0].map(function(h){return String(h).trim();});
       var rows=raw.slice(1).map(function(r){return headers.map(function(_,i){return r[i]!=null?r[i]:'';});});
-      saveDS(file.name,rows,headers);
-      initData(rows,headers,file.name);
+      detectCols(headers);
+      DATA=rows;
+      setStatus('ok','Loaded '+DATA.length.toLocaleString()+' rows — saving to database…');
+      document.getElementById('ig-empty').style.display='none';
+      document.getElementById('ig-dashboard').style.display='';
+      buildOriginFilter();renderStats();renderShipments();renderImporters();renderSuppliers();renderTrends();
+      // Save to Supabase
+      saveToSupabase(file.name,rows,headers);
     }catch(err){setStatus('err','Could not parse: '+err.message);}
   };
   if(isCSV)reader.readAsText(file);else reader.readAsBinaryString(file);
 }
 
-function initData(rows,headers,name){
-  detectCols(headers);
-  DATA=rows;
-  setStatus('ok','Loaded "'+name+'" — '+DATA.length.toLocaleString()+' shipments');
-  document.getElementById('ig-empty').style.display='none';
-  document.getElementById('ig-dashboard').style.display='';
-  buildOriginFilter();
-  renderStats();
-  renderShipments();
-  renderImporters();
-  renderSuppliers();
-  renderTrends();
+async function saveToSupabase(fileName,rows,headers){
+  try{
+    detectCols(headers);
+    var dates=rows.map(function(r){return g(r,'date');}).filter(Boolean).sort();
+    var shipments=rows.map(function(r){
+      var qty=parseFloat(g(r,'qty'));var kg=parseFloat(g(r,'weight_kg'));var lb=parseFloat(g(r,'weight_lb'));var ct=parseFloat(g(r,'containers'));
+      return{
+        arrival_date:g(r,'date')||null,
+        importer:g(r,'importer')||null,
+        importer_entity:g(r,'importer')||null,
+        shipper:g(r,'shipper')||null,
+        origin_country:g(r,'origin')||null,
+        product_description:(g(r,'product')||'').slice(0,2000),
+        quantity:isNaN(qty)?null:qty,
+        quantity_unit:g(r,'unit')||null,
+        weight_kg:isNaN(kg)?null:kg,
+        weight_lb:isNaN(lb)?null:lb,
+        foreign_port:g(r,'foreign_port')||null,
+        us_port:g(r,'us_port')||null,
+        vessel_name:g(r,'vessel')||null,
+        bill_of_lading:g(r,'bol')||null,
+        container_count:isNaN(ct)?null:Math.round(ct),
+        container_type:g(r,'container_type')||null,
+        marks_numbers:(g(r,'marks')||'').slice(0,500),
+        notify_party:g(r,'notify')||null,
+        place_of_receipt:g(r,'receipt')||null,
+      };
+    });
+    var payload={
+      dataset_name:fileName,
+      category:'general',
+      pull_type:'manual_upload',
+      row_count:rows.length,
+      date_from:dates[0]||null,
+      date_to:dates[dates.length-1]||null,
+      uploaded_by:'admin',
+      shipments:shipments
+    };
+    var resp=await fetch('/api/ig-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var result=await resp.json();
+    if(!resp.ok)throw new Error(result.error||'Save failed');
+    setStatus('ok','Saved "'+fileName+'" — '+result.row_count.toLocaleString()+' shipments stored. Will persist across all browsers.');
+    loadSavedFromDB();
+  }catch(e){
+    setStatus('err','Data loaded in browser but could not save to database: '+e.message);
+    console.error(e);
+  }
 }
 
+// ── Stats ──────────────────────────────────────────────────────────────────
 function buildOriginFilter(){
   var origins=[...new Set(DATA.map(function(r){return g(r,'origin');}).filter(Boolean))].sort();
   var sel=document.getElementById('f-origin');
@@ -330,6 +416,7 @@ function renderStats(){
   document.getElementById('st-weight').textContent=kg>0?(kg/1000).toFixed(0)+'t':'—';
 }
 
+// ── Shipments tab ──────────────────────────────────────────────────────────
 function getFilters(){return{product:document.getElementById('f-product').value.toLowerCase(),importer:document.getElementById('f-importer').value.toLowerCase(),shipper:document.getElementById('f-shipper').value.toLowerCase(),origin:document.getElementById('f-origin').value.toLowerCase(),df:document.getElementById('f-date-from').value,dt:document.getElementById('f-date-to').value};}
 
 function renderShipments(){
@@ -344,8 +431,7 @@ function renderShipments(){
     return true;
   });
   if(sSort.col>=0)sortSD();
-  sPage=1;
-  renderST();
+  sPage=1;renderST();
 }
 
 var S_KEYS=['date','importer','shipper','origin','product','qty','unit','weight_kg','foreign_port'];
@@ -353,8 +439,7 @@ function sortShipments(col){
   sSort.col===col?sSort.dir=-sSort.dir:(sSort.col=col,sSort.dir=1);
   document.querySelectorAll('#tab-shipments .ig-table th').forEach(function(th,i){
     th.classList.toggle('sorted',i===col);
-    var si=th.querySelector('.si');
-    if(si)si.textContent=i===col?(sSort.dir===1?'↑':'↓'):'↕';
+    var si=th.querySelector('.si');if(si)si.textContent=i===col?(sSort.dir===1?'↑':'↓'):'↕';
   });
   sortSD();sPage=1;renderST();
 }
@@ -391,6 +476,7 @@ function exportShipments(){
   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='shipments.csv';a.click();
 }
 
+// ── Importers tab ──────────────────────────────────────────────────────────
 function aggBy(key){
   var map={};
   DATA.forEach(function(row){
@@ -443,6 +529,7 @@ function renderImpDrill(name,el){
   +'<div class="ig-card"><div class="ig-card-title">Recent Shipments (last 50)</div><div class="ig-table-wrap" style="margin-top:.5rem"><table class="ig-table"><thead><tr><th>Date</th><th>Shipper</th><th>Origin</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">KG</th></tr></thead><tbody>'+rows.sort(function(a,b){return g(b,'date').localeCompare(g(a,'date'));}).slice(0,50).map(function(r){var desc=g(r,'product').replace(/\n/g,' ');return '<tr><td style="white-space:nowrap">'+esc(g(r,'date'))+'</td><td>'+esc(g(r,'shipper'))+'</td><td><span class="ig-tag '+tagCls(g(r,'origin'))+'">'+esc(g(r,'origin'))+'</span></td><td class="trunc" title="'+esc(desc)+'">'+esc(desc)+'</td><td class="num">'+gn(r,'qty').toLocaleString()+'</td><td>'+esc(g(r,'unit'))+'</td><td class="num">'+gn(r,'weight_kg').toLocaleString()+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
+// ── Suppliers tab ──────────────────────────────────────────────────────────
 function renderSuppliers(drill){
   var el=document.getElementById('suppliers-list');
   if(drill){renderSupDrill(drill,el);return;}
@@ -480,6 +567,7 @@ function renderSupDrill(name,el){
   +'<div class="ig-card"><div class="ig-card-title">Shipment History (last 50)</div><div class="ig-table-wrap" style="margin-top:.5rem"><table class="ig-table"><thead><tr><th>Date</th><th>Importer</th><th>Origin</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">KG</th></tr></thead><tbody>'+rows.sort(function(a,b){return g(b,'date').localeCompare(g(a,'date'));}).slice(0,50).map(function(r){var desc=g(r,'product').replace(/\n/g,' ');return '<tr><td style="white-space:nowrap">'+esc(g(r,'date'))+'</td><td>'+esc(g(r,'importer'))+'</td><td><span class="ig-tag '+tagCls(g(r,'origin'))+'">'+esc(g(r,'origin'))+'</span></td><td class="trunc" title="'+esc(desc)+'">'+esc(desc)+'</td><td class="num">'+gn(r,'qty').toLocaleString()+'</td><td>'+esc(g(r,'unit'))+'</td><td class="num">'+gn(r,'weight_kg').toLocaleString()+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
+// ── Trends tab ─────────────────────────────────────────────────────────────
 function renderTrends(){
   var el=document.getElementById('trends-content');
   var moMap={},moKg={};
@@ -499,6 +587,7 @@ function renderTrends(){
   +'<div class="ig-card"><div class="ig-card-title">Monthly Weight (tonnes)</div><div class="ig-month-chart" style="height:100px;">'+months.map(function(mo){return '<div class="ig-month-col"><div class="ig-month-val" style="font-size:9px;">'+(moKg[mo]/1000).toFixed(0)+'t</div><div class="ig-month-bar" style="height:'+Math.round(moKg[mo]/maxK*80)+'px;background:#885500;"></div><div class="ig-month-label">'+mo.slice(5)+'<br>'+mo.slice(2,4)+'</div></div>';}).join('')+'</div></div>';
 }
 
+// ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(tab){
   activeTab=tab;
   var tabs=['shipments','importers','suppliers','trends'];
@@ -508,7 +597,8 @@ function switchTab(tab){
 
 function setStatus(type,msg){var el=document.getElementById('ig-status');el.className='ig-status'+(type?' '+type:'');el.textContent=msg;el.style.display=msg?'':'none';}
 
-renderSaved();
+// Init
+loadSavedFromDB();
 </script>
 <script src="admin-shared.js"></script>
 </body>
