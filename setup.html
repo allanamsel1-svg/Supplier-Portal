@@ -325,7 +325,8 @@
             <div class="sc-chips" id="sc-markets" data-key="target_markets"></div>
           </div>
 
-          <button class="btn-save-form" onclick="saveCat()">Save Category</button>
+          <button class="btn-save-form" id="cf-save-btn" onclick="saveCat()">Save Category</button>
+          <button class="btn-cancel-form" id="cf-cancel-edit" onclick="newCatForm()" style="margin-top:6px;display:none;">Cancel Edit</button>
           <button class="btn-cancel-form" onclick="newCatForm()" style="margin-top:6px;">Clear Form</button>
           <div class="msg ok" id="cat-ok"></div>
           <div class="msg err" id="cat-err"></div>
@@ -1717,6 +1718,8 @@ function newCatForm(){
   updateCosmeticStatusDisplay(false);
   g('cf-gross').value='';g('cf-net').value='';g('cf-notes').value='';
   g('cat-form-title').textContent='New Category';
+  var sb=g('cf-save-btn');if(sb)sb.textContent='Save Category';
+  var ce=g('cf-cancel-edit');if(ce)ce.style.display='none';
   g('cat-ok').style.display='none';g('cat-err').style.display='none';
   var warnEl=g('cf-prefix-warn');if(warnEl)warnEl.style.display='none';
   populateCriteriaForm({});
@@ -1736,6 +1739,8 @@ function editCat(id){
   var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
   var levelLabel=c.sub_sub_category?'(leaf)':c.sub_category?'(sub-category parent)':'(top-level parent)';
   g('cat-form-title').textContent='Edit: '+path+' '+levelLabel;
+  var sb=g('cf-save-btn');if(sb)sb.textContent='Update Category';
+  var ce=g('cf-cancel-edit');if(ce)ce.style.display='';
   g('cat-ok').style.display='none';g('cat-err').style.display='none';
   showPrefixWarning();
   populateCriteriaForm(c.scoring_criteria||{});
@@ -1775,9 +1780,9 @@ async function saveCat(){
   try{
     var r=await fetch(url,{method:method,headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
     if(r.ok){
-      showMsg('cat','ok',id?'Category updated!':'Category saved!');
       await loadCats();
-      if(!id)newCatForm();
+      newCatForm();
+      showMsg('cat','ok',id?'Category updated!':'Category saved!');
     }else{
       var e=await r.json().catch(function(){return{};});
       var msg=e.code==='23505'?'Prefix "'+prefix+'" already exists.':(e.message||e.details||r.status);
