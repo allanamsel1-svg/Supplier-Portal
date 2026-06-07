@@ -4210,7 +4210,10 @@ async function openRFQDetail(rfqId){
       if(vr.ok){var vrows=await vr.json();if(vrows.length)quoteVersions[updatedQuotes[i].id]=vrows;}
     }
 
-    renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines);
+    var imgr=await fetch(SB+'/rest/v1/rfq_images?rfq_id=eq.'+rfqId+'&order=sort_order.asc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var images=imgr.ok?await imgr.json():[];
+
+    renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines,images);
   }catch(e){
     g('rfq-detail-pane').innerHTML='<div style="color:#b00;font-size:13px;">Error loading: '+e.message+'</div>';
   }
@@ -4555,8 +4558,24 @@ function renderKitQuotes(rfq,assignments,kitLines){
   return html;
 }
 
-function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines){
+// Full-size image lightbox overlay (shared by RFQ detail thumbnails).
+function axLightbox(src){
+  var ov=g('ax-lightbox');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='ax-lightbox';
+    ov.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    ov.onclick=function(){ov.style.display='none';};
+    ov.innerHTML='<img style="max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);">';
+    document.body.appendChild(ov);
+  }
+  ov.querySelector('img').src=src;
+  ov.style.display='flex';
+}
+function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines,images){
   var el=g('rfq-detail-pane');
+  var axImgSrc=function(im){ var d=(im.image_data||'').trim(); if(d) return d.indexOf('data:')===0?d:('data:image/jpeg;base64,'+d); return (im.image_url||'').trim(); };
+  var imagesHtml=(images&&images.length)?('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">'+images.map(function(im){var s=axImgSrc(im);return s?'<img src="'+esc(s)+'" onclick="axLightbox(this.src)" style="width:120px;height:120px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid #e0e0d8;">':'';}).join('')+'</div>'):'';
   var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
   var qtyStr=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'each')+' — '+uomStr:'—';
 
@@ -4564,6 +4583,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines){
   var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected'};
 
   var html=''+
+    imagesHtml+
     // Header
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">'+
       '<div>'+

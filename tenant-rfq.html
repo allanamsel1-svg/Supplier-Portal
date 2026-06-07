@@ -1245,10 +1245,15 @@ async function openRFQ(id) {
 
   openPanel(rfqTitle(r), [r.category, r.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
 
-  const [assignments, quotes] = await Promise.all([
+  const [assignments, quotes, images] = await Promise.all([
     supa(`rfq_factory_assignments?rfq_id=eq.${id}&select=*,factories(factory_name_english)&order=sent_at.desc`),
     supa(`rfq_quotes?rfq_id=eq.${id}&select=id,quote_option,status,total_fob_price,unit_fob_price,score_overall_v2,score_tier,compliance_status,factory_model_number&order=score_overall_v2.desc.nullslast`),
+    supa(`rfq_images?rfq_id=eq.${id}&order=sort_order.asc`),
   ]);
+  const nrImgDetailSrc = im => { const d = (im.image_data || '').trim(); if (d) return d.indexOf('data:') === 0 ? d : ('data:image/jpeg;base64,' + d); return (im.image_url || '').trim(); };
+  const imagesHtml = (images && images.length)
+    ? `<div class="panel-section"><h3>Images</h3><div style="display:flex;flex-wrap:wrap;gap:8px;">${images.map(im => { const s = nrImgDetailSrc(im); return s ? `<img src="${esc(s)}" onclick="nrLightbox(this.src)" style="width:120px;height:120px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--border,#334155);">` : ''; }).join('')}</div></div>`
+    : '';
 
   const details = kv([
     ['Project #', r.project_number],
@@ -1285,11 +1290,27 @@ async function openRFQ(id) {
     </div>`).join('') : '<div class="empty" style="padding:12px;">No quotes received.</div>';
 
   document.getElementById('panelBody').innerHTML = `
+    ${imagesHtml}
     <div class="panel-section"><h3>RFQ Details</h3>${details}</div>
     <div class="panel-section"><h3>Specifications</h3><div class="sub-list">${spec}</div></div>
     <div class="panel-section"><h3>Factory Assignments (${assignments.length})</h3><div class="sub-list">${asgItems}</div></div>
     <div class="panel-section"><h3>Quotes Received (${quotes.length})</h3><div class="sub-list">${quoteItems}</div></div>
   `;
+}
+
+// Full-size image lightbox overlay (shared by RFQ detail thumbnails).
+function nrLightbox(src) {
+  let ov = document.getElementById('nr-lightbox');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'nr-lightbox';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;cursor:zoom-out;';
+    ov.onclick = function () { ov.style.display = 'none'; };
+    ov.innerHTML = '<img style="max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,0.5);">';
+    document.body.appendChild(ov);
+  }
+  ov.querySelector('img').src = src;
+  ov.style.display = 'flex';
 }
 
 // ── Product Development ──
