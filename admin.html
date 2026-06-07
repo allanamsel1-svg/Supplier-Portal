@@ -1160,14 +1160,10 @@
               </div>
               <div class="mf">
                 <label>Unit Type</label>
-                <select id="rfq-unit-type">
-                  <option value="each">Each</option>
-                  <option value="pair">Pair</option>
-                  <option value="set">Set</option>
-                  <option value="pack">Pack</option>
-                  <option value="dozen">Dozen</option>
-                  <option value="box">Box</option>
+                <select id="rfq-unit-type" onchange="axOtherToggle(this)">
+                  <option value="each">Each</option><option value="pack">Pack</option><option value="set">Set</option><option value="pair">Pair</option><option value="box">Box</option><option value="case">Case</option><option value="bag">Bag</option><option value="bottle">Bottle</option><option value="jar">Jar</option><option value="tube">Tube</option><option value="pouch">Pouch</option><option value="roll">Roll</option><option value="sheet">Sheet</option><option value="strip">Strip</option><option value="dozen">Dozen</option><option value="gross">Gross</option><option value="Other">Other</option>
                 </select>
+                <input id="rfq-unit-type-other" placeholder="Specify unit type" style="display:none;margin-top:6px;width:100%;padding:8px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
               </div>
             </div>
             <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" oninput="rfqDescChanged()" /></div>
@@ -1176,7 +1172,7 @@
               <div class="mf"><label>Quote Quantity</label><input type="number" id="rfq-quantity" placeholder="e.g. 10000" min="1" /></div>
               <div class="mf"><label>Product Size</label><input type="text" id="rfq-product-size" placeholder="N/A" /></div>
               <div class="mf"><label>Size Unit</label>
-                <select id="rfq-uom">
+                <select id="rfq-uom" onchange="axOtherToggle(this)">
                   <option value="N/A" selected>N/A</option>
                   <option value="ct">ct (count)</option>
                   <option value="ml">ml</option><option value="L">L</option>
@@ -1185,7 +1181,9 @@
                   <option value="lb">lb</option><option value="mm">mm</option>
                   <option value="cm">cm</option><option value="m">m</option>
                   <option value="in">in</option>
+                  <option value="Other">Other</option>
                 </select>
+                <input id="rfq-uom-other" placeholder="Specify unit" style="display:none;margin-top:6px;width:100%;padding:8px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
               </div>
             </div>
             <div class="mf-row">
@@ -6045,13 +6043,13 @@ async function populateRFQEditForm(rfq){
   if(cosCb){cosCb.checked=!!rfq.is_cosmetic;cosCb.dataset.userOverride='true';}
   // Load Prop 65 strategy
   var p65=g('rfq-prop65-strategy');if(p65)p65.value=rfq.prop65_strategy||'';
-  if(g('rfq-unit-type'))g('rfq-unit-type').value=rfq.unit_type||'each';
+  axSetSelOrOther('rfq-unit-type', rfq.unit_type||'each');
   if(g('rfq-description'))g('rfq-description').value=rfq.item_description||'';
   if(g('rfq-specs'))g('rfq-specs').value=rfq.detailed_specifications||'';
   if(g('rfq-color'))g('rfq-color').value=rfq.color_code||'';
   if(g('rfq-quantity'))g('rfq-quantity').value=rfq.quote_quantity||'';
   if(g('rfq-product-size'))g('rfq-product-size').value=rfq.product_size||'';
-  if(g('rfq-uom'))g('rfq-uom').value=rfq.unit_of_measure||'';
+  axSetSelOrOther('rfq-uom', rfq.unit_of_measure||'');
   if(g('rfq-inner-pack'))g('rfq-inner-pack').value=rfq.inner_case_pack||'';
   if(g('rfq-master-pack'))g('rfq-master-pack').value=rfq.master_case_pack||'';
   if(g('rfq-pkg-notes'))g('rfq-pkg-notes').value=rfq.packaging_notes||'';
@@ -6149,7 +6147,7 @@ async function openRFQForm(id){
   await populateRFQDropdowns();
   // Fill form fields
   axCatLoadFromRfq(rfq);
-  g('rfq-uom').value=rfq.unit_of_measure||'';
+  axSetSelOrOther('rfq-uom', rfq.unit_of_measure||'');
   g('rfq-description').value=rfq.item_description||'';
   g('rfq-specs').value=rfq.detailed_specifications||'';
   g('rfq-color').value=rfq.color_code||'';
@@ -6235,6 +6233,7 @@ function resetRFQForm(){
   g('rfq-id').value='';
   axCatReset();g('rfq-uom').value='N/A';
   g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
+  ['rfq-unit-type-other','rfq-uom-other'].forEach(function(id){var el=g(id);if(el){el.value='';el.style.display='none';}});
   g('rfq-description').value='';g('rfq-specs').value='';
   g('rfq-color').value='';g('rfq-quantity').value='';
   if(g('rfq-fob-port'))g('rfq-fob-port').value='';
@@ -6428,6 +6427,28 @@ function axCatSetFromId(id){
 function axCatLoadFromRfq(rfq){
   if(rfq && rfq.category) axCatSetFromPath(rfq.category, rfq.sub_category, rfq.sub_sub_category);
   else axCatSetFromId((rfq && rfq.category_id) || '');
+}
+
+// ── Section 3 simple-field dropdowns with "Other" manual entry (unit type, size unit) ──
+function axOtherToggle(sel){ var inp=g(sel.id+'-other'); if(!inp)return; var v=sel.value; inp.style.display=(v==='Other'||v==='__other__')?'':'none'; }
+function axSelOrOther(selId){
+  var sel=g(selId); if(!sel)return '';
+  var v=sel.value;
+  if(v==='Other'||v==='__other__'){ var inp=g(selId+'-other'); return inp?(inp.value||'').trim():''; }
+  return v;
+}
+function axSetSelOrOther(selId,val){
+  var sel=g(selId); if(!sel)return;
+  var inp=g(selId+'-other'); if(inp){inp.value='';inp.style.display='none';}
+  if(val==null||val===''){ sel.value=''; return; }
+  var matched=false;
+  for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===val){ sel.value=val; matched=true; break; } }
+  if(!matched){
+    var other='';
+    for(var j=0;j<sel.options.length;j++){ if(sel.options[j].value==='Other'||sel.options[j].value==='__other__'){ other=sel.options[j].value; break; } }
+    if(other&&inp){ sel.value=other; inp.value=val; inp.style.display=''; }
+    else sel.value='';
+  }
 }
 function axCatAutoSelect(catString){
   if(!catString||!allCategories)return;
@@ -7557,9 +7578,9 @@ async function saveRFQ(action){
     category:((g('ax-cat-l1')&&g('ax-cat-l1').value!=='__other__')?(g('ax-cat-l1').value||null):null),
     sub_category:axCatL2Value()||null,
     sub_sub_category:axCatL3Value()||null,
-    unit_type:g('rfq-unit-type').value||'each',
+    unit_type:axSelOrOther('rfq-unit-type')||'each',
     product_size:g('rfq-product-size').value==='N/A'?null:g('rfq-product-size').value||null,
-    unit_of_measure:g('rfq-uom').value==='N/A'?null:g('rfq-uom').value||null,
+    unit_of_measure:(function(){var u=axSelOrOther('rfq-uom');return (!u||u==='N/A')?null:u;})(),
     color_code:g('rfq-color').value||null,
     quote_quantity:parseInt(g('rfq-quantity').value)||null,
     inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,

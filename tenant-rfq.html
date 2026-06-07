@@ -144,7 +144,12 @@
             </select>
             <input id="nr-cat-l3-input" placeholder="Type sub-sub-category (optional)" style="display:none;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;">
           </div>
-          <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
+          <div class="nr-field"><label>Unit type</label>
+            <select id="nr-unit" onchange="nrPkgOther(this)">
+              <option>Each</option><option>Pack</option><option>Set</option><option>Pair</option><option>Box</option><option>Case</option><option>Bag</option><option>Bottle</option><option>Jar</option><option>Tube</option><option>Pouch</option><option>Roll</option><option>Sheet</option><option>Strip</option><option>Dozen</option><option>Gross</option><option>Other</option>
+            </select>
+            <input id="nr-unit-other" placeholder="Specify unit type" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
         </div>
         <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
         <div class="nr-field"><label>Basic specifications</label><textarea id="nr-spec" placeholder="Materials, formula, packaging, claims…"></textarea></div>
@@ -155,7 +160,12 @@
         </div>
         <div class="nr-grid">
           <div class="nr-field"><label>Product size</label><input id="nr-size" placeholder="e.g. 30"></div>
-          <div class="nr-field"><label>Size unit</label><select id="nr-sizeunit"><option value="">—</option><option>ml</option><option>g</option><option>oz</option><option>cm</option><option>in</option><option>units</option></select></div>
+          <div class="nr-field"><label>Size unit</label>
+            <select id="nr-sizeunit" onchange="nrPkgOther(this)">
+              <option value="">—</option><option>ml</option><option>L</option><option>oz</option><option>fl oz</option><option>g</option><option>kg</option><option>lb</option><option>cm</option><option>mm</option><option>in</option><option>count</option><option>Other</option>
+            </select>
+            <input id="nr-sizeunit-other" placeholder="Specify unit" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
         </div>
         <div class="nr-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
           <div class="nr-field"><label>Width</label><input id="nr-dim-w" type="number" min="0" step="0.1" placeholder="e.g. 5"></div>
@@ -164,7 +174,12 @@
           <div class="nr-field"><label>Dim unit</label><select id="nr-dim-unit"><option value="cm">cm</option><option value="in">in</option><option value="mm">mm</option></select></div>
         </div>
         <div class="nr-grid">
-          <div class="nr-field"><label>Color</label><input id="nr-color" placeholder="e.g. Clear / White"></div>
+          <div class="nr-field"><label>Color</label>
+            <select id="nr-color" onchange="nrColorOther(this)">
+              <option value="">—</option><option>Clear</option><option>White</option><option>Black</option><option>Clear/White</option><option>Clear/Black</option><option>Silver</option><option>Gold</option><option>Pink</option><option>Red</option><option>Blue</option><option>Green</option><option>Purple</option><option>Natural</option><option>Custom/Other</option>
+            </select>
+            <input id="nr-color-other" placeholder="Custom color description (optional, e.g. Frosted Clear with Gold Accent)" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
           <div class="nr-field"></div>
         </div>
         <div class="nr-grid">
@@ -183,13 +198,26 @@
 
       <div class="rfq-sec"><h3>3 · Packaging</h3>
         <div class="nr-grid">
-          <div class="nr-field"><label>Primary container</label><input id="nr-pkg-primary" list="nr-pkg-suggestions" placeholder="e.g. Glass dropper bottle"></div>
-          <div class="nr-field"><label>Closure / applicator</label><input id="nr-pkg-closure" placeholder="e.g. Dropper cap"></div>
+          <div class="nr-field"><label>Primary container</label>
+            <select id="nr-pkg-primary" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
+            <input id="nr-pkg-primary-other" placeholder="Specify primary container" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
+          <div class="nr-field"><label>Closure / applicator</label>
+            <select id="nr-pkg-closure" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
+            <input id="nr-pkg-closure-other" placeholder="Specify closure / applicator" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
         </div>
-        <datalist id="nr-pkg-suggestions"><option value="Glass bottle"><option value="PET bottle"><option value="Airless pump"><option value="Jar"><option value="Tube"><option value="Folding carton"><option value="Pouch"></datalist>
         <div class="nr-grid">
-          <div class="nr-field"><label>Secondary / display</label><input id="nr-pkg-secondary" placeholder="e.g. Printed folding carton"></div>
-          <div class="nr-field"><label>Finish</label><input id="nr-pkg-finish" placeholder="e.g. Matte / Gloss / Soft-touch"></div>
+          <div class="nr-field"><label>Secondary / display</label>
+            <select id="nr-pkg-secondary" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
+            <input id="nr-pkg-secondary-other" placeholder="Specify secondary / display" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
+          <div class="nr-field"><label>Finish</label>
+            <select id="nr-pkg-finish" onchange="nrPkgOther(this)">
+              <option value="">Select...</option><option>Matte</option><option>Gloss</option><option>Soft-Touch</option><option>Metallic</option><option>Frosted</option><option>UV Spot Gloss</option><option>Embossed</option><option>Debossed</option><option>Natural/Uncoated</option><option>Custom/Other</option>
+            </select>
+            <input id="nr-pkg-finish-other" placeholder="Specify finish" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+          </div>
         </div>
         <div class="nr-grid">
           <div class="nr-field"><label>Color</label><input id="nr-pkg-color" placeholder="e.g. Frosted"></div>
@@ -387,6 +415,64 @@ function nrCategoryChange() {
   const fl = nrg('nr-factory-list'); if (fl) fl.innerHTML = '';
   const fs = nrg('nr-factory-status'); if (fs) fs.textContent = cat ? 'Click "Find Matching Factories" to see suppliers for ' + cat + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
+}
+
+// ── Section 3 packaging dropdowns (kit_packaging_types + "Other" manual entry) ──
+window.nrPkgTypes = window.nrPkgTypes || [];
+async function nrLoadPackagingTypes() {
+  const rows = await fetch(SUPA_URL + '/rest/v1/kit_packaging_types?select=name,sort_order&active=eq.true&order=sort_order', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  }).then(r => r.json()).catch(() => []);
+  window.nrPkgTypes = Array.isArray(rows) ? rows : [];
+  ['nr-pkg-primary', 'nr-pkg-closure', 'nr-pkg-secondary'].forEach(id => {
+    const sel = nrg(id); if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Select...</option>'
+      + window.nrPkgTypes.map(t => `<option>${esc(t.name)}</option>`).join('')
+      + '<option value="__other__">Other (type below)</option>';
+    if (cur) sel.value = cur;
+  });
+}
+// Toggle the sibling "<id>-other" text input based on the select value.
+function nrPkgOther(sel) {
+  const inp = nrg(sel.id + '-other'); if (!inp) return;
+  const v = sel.value;
+  inp.style.display = (v === 'Other' || v === 'Custom/Other' || v === '__other__') ? '' : 'none';
+}
+function nrColorOther(sel) {
+  const inp = nrg(sel.id + '-other'); if (!inp) return;
+  inp.style.display = sel.value ? '' : 'none';
+}
+// Read the effective value: text input when the select is an "Other"-type option, else the select.
+function nrSelOrOther(selId) {
+  const sel = nrg(selId); if (!sel) return '';
+  const v = sel.value;
+  if (v === 'Other' || v === 'Custom/Other' || v === '__other__') {
+    const inp = nrg(selId + '-other'); return inp ? (inp.value || '').trim() : '';
+  }
+  return v;
+}
+function nrColorValue() {
+  const sel = nrg('nr-color'); const inp = nrg('nr-color-other');
+  const base = sel ? sel.value : ''; const extra = inp ? (inp.value || '').trim() : '';
+  if (base === 'Custom/Other') return extra || base;
+  if (extra) return base ? (base + ' — ' + extra) : extra;
+  return base;
+}
+// Set a select to a stored value; if not an option, fall back to the "Other" option + text input.
+function nrSetSelOrOther(selId, val) {
+  const sel = nrg(selId); if (!sel) return;
+  const inp = nrg(selId + '-other');
+  if (inp) { inp.value = ''; inp.style.display = 'none'; }
+  if (val == null || val === '') { sel.value = ''; return; }
+  let matched = false;
+  for (const o of sel.options) { if (o.value === val) { sel.value = val; matched = true; break; } }
+  if (!matched) {
+    let other = '';
+    for (const o of sel.options) { if (o.value === 'Other' || o.value === 'Custom/Other' || o.value === '__other__') { other = o.value; break; } }
+    if (other && inp) { sel.value = other; inp.value = val; inp.style.display = ''; }
+    else sel.value = '';
+  }
 }
 
 // ── 3-level cascading category selector ──
@@ -598,7 +684,7 @@ function nrImgApply(d) {
   const it = (d.items && d.items[0]) ? d.items[0] : d;
   if (it.product_name) { const el = nrg('nr-desc'); if (el) el.value = it.product_name; }
   if (it.short_description) { const el = nrg('nr-spec'); if (el) el.value = it.short_description; }
-  if (it.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = it.packaging_type; }
+  if (it.packaging_type) nrSetSelOrOther('nr-pkg-primary', it.packaging_type);
   if (it.category) nrCatAutoSelect(it.category);
   const noteWrap = nrg('nr-factory-note-wrap'), noteText = nrg('nr-factory-note-text');
   if (noteWrap && noteText) {
@@ -855,6 +941,9 @@ function openNewRfqModal(prefill) {
    'nr-dim-w', 'nr-dim-h', 'nr-dim-l', 'nr-url-input',
    'nr-pkg-primary', 'nr-pkg-closure', 'nr-pkg-secondary', 'nr-pkg-finish', 'nr-pkg-color', 'nr-pkg-notes', 'nr-docs'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
+  // Reset Section 3 packaging selects + their "Other" text inputs
+  ['nr-unit-other','nr-sizeunit-other','nr-color-other','nr-pkg-primary-other','nr-pkg-closure-other','nr-pkg-secondary-other','nr-pkg-finish-other'].forEach(id => { const el = nrg(id); if (el) { el.value = ''; el.style.display = 'none'; } });
+  ['nr-pkg-primary','nr-pkg-closure','nr-pkg-secondary','nr-pkg-finish'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   { const du = nrg('nr-dim-unit'); if (du) du.value = 'cm'; const us = nrg('nr-url-status'); if (us) { us.style.display = 'none'; us.textContent = ''; } }
   // Freight & landed cost reset
   ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-retail',
@@ -917,8 +1006,8 @@ async function saveNewRfq(status) {
   let spec = (nrg('nr-spec').value || '').trim();
   const ptype = (document.querySelector('input[name="nr-ptype"]:checked') || {}).value || 'single';
   const extras = [];
-  if (txt('nr-size') || nrg('nr-sizeunit').value) extras.push('Size: ' + [txt('nr-size'), nrg('nr-sizeunit').value].filter(Boolean).join(' '));
-  if (txt('nr-color')) extras.push('Color: ' + txt('nr-color'));
+  { const su = nrSelOrOther('nr-sizeunit'); if (txt('nr-size') || su) extras.push('Size: ' + [txt('nr-size'), su].filter(Boolean).join(' ')); }
+  { const col = nrColorValue(); if (col) extras.push('Color: ' + col); }
   if (ptype === 'kit') extras.push('Product type: Kit');
   if (ME_EMAIL) extras.push('Submitted by: ' + ME_EMAIL);   // rfqs has no created_by column
   if (extras.length) spec = (spec ? spec + '\n\n' : '') + extras.join('\n');
@@ -933,13 +1022,13 @@ async function saveNewRfq(status) {
     status: status,
     detailed_specifications: spec || null,
     quote_quantity: num('nr-qty'), max_fob_price: num('nr-fob'),
-    product_size: txt('nr-size'), unit_type: (nrg('nr-unit').value || 'Each').toLowerCase(),
+    product_size: txt('nr-size'), unit_type: (nrSelOrOther('nr-unit') || 'each').toLowerCase(),
     est_unit_width_cm: nrDimToNum('nr-dim-w', 'nr-dim-unit'),
     est_unit_height_cm: nrDimToNum('nr-dim-h', 'nr-dim-unit'),
     est_unit_length_cm: nrDimToNum('nr-dim-l', 'nr-dim-unit'),
     inner_case_pack: num('nr-inner'), master_case_pack: num('nr-master'),
-    packaging_primary: txt('nr-pkg-primary'), packaging_closures: txt('nr-pkg-closure'),
-    packaging_secondary: txt('nr-pkg-secondary'), packaging_finish: txt('nr-pkg-finish'),
+    packaging_primary: nrSelOrOther('nr-pkg-primary') || null, packaging_closures: nrSelOrOther('nr-pkg-closure') || null,
+    packaging_secondary: nrSelOrOther('nr-pkg-secondary') || null, packaging_finish: nrSelOrOther('nr-pkg-finish') || null,
     packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
     is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
     product_docs_required: txt('nr-docs'),
@@ -1075,13 +1164,13 @@ async function openRFQ(id) {
     setV('nr-qty', r.quote_quantity);
     setV('nr-fob', r.max_fob_price);
     setV('nr-size', r.product_size);
-    if (r.unit_type) { const u = nrg('nr-unit'); if (u) u.value = String(r.unit_type).charAt(0).toUpperCase() + String(r.unit_type).slice(1); }
+    if (r.unit_type) nrSetSelOrOther('nr-unit', String(r.unit_type).charAt(0).toUpperCase() + String(r.unit_type).slice(1));
     setV('nr-inner', r.inner_case_pack);
     setV('nr-master', r.master_case_pack);
-    setV('nr-pkg-primary', r.packaging_primary);
-    setV('nr-pkg-closure', r.packaging_closures);
-    setV('nr-pkg-secondary', r.packaging_secondary);
-    setV('nr-pkg-finish', r.packaging_finish);
+    nrSetSelOrOther('nr-pkg-primary', r.packaging_primary);
+    nrSetSelOrOther('nr-pkg-closure', r.packaging_closures);
+    nrSetSelOrOther('nr-pkg-secondary', r.packaging_secondary);
+    nrSetSelOrOther('nr-pkg-finish', r.packaging_finish);
     setV('nr-pkg-color', r.packaging_color);
     setV('nr-pkg-notes', r.packaging_notes);
     setV('nr-docs', r.product_docs_required);
@@ -1389,6 +1478,7 @@ async function loadInvStatusTenant(skuId) {
   document.getElementById('pageSub').textContent = user.tenant.name + ' · RFQs and product development';
   loadRfqCategories();
   nrLoadCategoryTree();
+  nrLoadPackagingTypes();
   document.getElementById('rfqDrawerBg').addEventListener('click', e => { if (e.target.id === 'rfqDrawerBg') closeNewRfqModal(); });
 
   document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
