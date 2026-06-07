@@ -1445,6 +1445,10 @@
               <div class="mf"><label>Container Cost ($)</label><input type="number" id="rfq-container-cost" step="1" placeholder="e.g. 6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Est. Freight/Unit (auto)</label><input type="text" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;font-weight:600;" /></div>
             </div>
+            <div id="rfq-freight-est" style="display:none;background:#eef7f0;border:1px solid #a9d8b8;border-radius:8px;padding:9px 12px;font-size:12px;color:#1a3a28;margin-bottom:10px;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;">
+              <div><span style="font-weight:700;color:#1a7a3a;">📦 Estimated 40&#39;HQ FCL freight:</span> <span id="rfq-freight-est-text"></span></div>
+              <button type="button" id="rfq-freight-est-apply" onclick="applyFreightEstimate()" style="padding:5px 11px;background:#1a7a3a;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">Apply to Container Cost</button>
+            </div>
 
             <!-- ROW 6: Duty & Tariff -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Origin, FOB Port &amp; Duty</div>
@@ -1468,8 +1472,11 @@
                 <button type="button" id="ax-hts-suggest-btn" onclick="axHtsSuggest()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">✨ Suggest</button>
                 <button type="button" id="ax-hts-btn" onclick="axHtsLookup()" style="padding:6px 12px;background:#eef0ff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">Look Up →</button>
               </div>
-              <div id="ax-hts-desc" style="font-size:11px;color:#888;margin-top:4px;"></div>
-              <div id="ax-hts-rulings" style="font-size:11px;margin-top:4px;"></div>
+              <div id="ax-hts-result" style="display:none;margin-top:8px;background:#f6f3ff;border:1px solid #c8b8f0;border-radius:8px;padding:10px 12px;font-size:12px;color:#2a2240;line-height:1.6;">
+                <div style="font-weight:700;color:#5522aa;margin-bottom:4px;">Suggested HTS classification — review &amp; confirm</div>
+                <div id="ax-hts-desc"></div>
+                <div id="ax-hts-rulings" style="margin-top:6px;"></div>
+              </div>
             </div>
             <div style="margin-bottom:10px;"><button onclick="suggestDutyTariff()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button></div>
 
@@ -7226,6 +7233,32 @@ function renderFactoryMatchList(factories){
 }
 
 
+// ── Freight estimate (display helper; does not change calcMargins logic) ──
+// Mirrors the Assumptions-tab freight rate. 40'HQ FCL usable volume = 56.95 CBM
+// (67 CBM × 85%), same constant calcMargins uses for units-per-FCL.
+var FCL_CBM_RATE = 92.31;     // $/CBM (Assumptions tab)
+var FCL_USABLE_CBM = 56.95;   // 40'HQ usable CBM
+function fclEstContainerCost(){ return Math.round(FCL_CBM_RATE * FCL_USABLE_CBM); } // ≈ $5,256
+
+// Show an estimated 40'HQ FCL freight cost (container + per-unit) so the user can
+// verify/override before manually entering the container cost. Display only.
+function updateFreightEstimate(unitsPerFCL){
+  var panel=g('rfq-freight-est'), txt=g('rfq-freight-est-text');
+  if(!panel||!txt)return;
+  var cont=fclEstContainerCost();
+  var perUnit=(unitsPerFCL>0)?(cont/unitsPerFCL):0;
+  txt.innerHTML='<strong>$'+cont.toLocaleString()+'</strong> / container '+
+    '<span style="color:#4a6a54;">($'+FCL_CBM_RATE.toFixed(2)+'/CBM × '+FCL_USABLE_CBM+' CBM usable)</span>'+
+    (perUnit>0?' &nbsp;·&nbsp; <strong>$'+perUnit.toFixed(4)+'</strong> / unit <span style="color:#4a6a54;">('+unitsPerFCL.toLocaleString()+' units/FCL)</span>':'');
+  panel.style.display='flex';
+}
+// Fill the manual Container Cost field with the estimate, then recompute (existing logic).
+function applyFreightEstimate(){
+  var el=g('rfq-container-cost'); if(!el)return;
+  el.value=fclEstContainerCost();
+  if(typeof calcMargins==='function')calcMargins();
+}
+
 // ── RFQ Margin Calculator ──
 function calcMargins(){
   // PRICING
@@ -7261,6 +7294,7 @@ function calcMargins(){
   var contCost=parseFloat(g('rfq-container-cost')?g('rfq-container-cost').value:0)||0;
   var freight=unitsPerFCL>0&&contCost>0?contCost/unitsPerFCL:0;
   if(g('rfq-est-freight'))g('rfq-est-freight').value=freight?'$'+freight.toFixed(4):'';
+  if(typeof updateFreightEstimate==='function')updateFreightEstimate(unitsPerFCL);
 
   // DUTY & TARIFF
   var duty=parseFloat(g('rfq-est-duty')?g('rfq-est-duty').value:0)||0;
@@ -7525,7 +7559,7 @@ async function axHtsSuggest(){
     var _cr=axCatRow(), catName=_cr?(_cr.category||''):'';
     var r=await fetch('/api/hts-suggest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({product_name:name,description:spec,category:catName})});
     var d=await r.json().catch(function(){return{error:true};});
-    if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';}
+    if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';var _hp=g('ax-hts-result');if(_hp)_hp.style.display='block';}
     else{
       if(g('rfq-est-hts'))g('rfq-est-hts').value=d.hts_code;
       if(desc)desc.textContent='✨ AI suggested: '+(d.reasoning||'')+(d.confidence?' · '+d.confidence+' confidence':'');
@@ -7533,7 +7567,7 @@ async function axHtsSuggest(){
       axHtsLookup();
       return;
     }
-  }catch(e){if(desc)desc.textContent='Could not suggest a code — enter manually';}
+  }catch(e){if(desc)desc.textContent='Could not suggest a code — enter manually';var _hp2=g('ax-hts-result');if(_hp2)_hp2.style.display='block';}
   if(btn){btn.textContent=orig;btn.disabled=false;}
 }
 
@@ -7549,18 +7583,20 @@ async function axHtsLookup(){
     var d=await r.json();
     var item=d&&(d[0]||(d.data&&d.data[0])||(d.results&&d.results[0]));
     if(item){
-      if(desc)desc.textContent=item.description||item.brief_description||'';
       var rate=item.general||item.duty_rate||'';
       if(rate){
         var pct=parseFloat(rate);
         if(!isNaN(pct)&&g('rfq-est-duty'))g('rfq-est-duty').value=pct;
         else if((''+rate).indexOf('%')>-1){var m=(''+rate).match(/([\d.]+)%/);if(m&&g('rfq-est-duty'))g('rfq-est-duty').value=parseFloat(m[1]);}
-        if(desc)desc.textContent+=' | General duty: '+rate;
       }
+      if(desc)desc.innerHTML='<div><span style="color:#7a7290;">HTS code:</span> <strong>'+esc((el.value||'').trim())+'</strong></div>'+
+        '<div><span style="color:#7a7290;">Description:</span> '+esc(item.description||item.brief_description||'—')+'</div>'+
+        (rate?'<div><span style="color:#7a7290;">General duty:</span> <strong>'+esc(''+rate)+'</strong> &nbsp;<span style="color:#7a7290;">(applied to Duty % above)</span></div>':'<div style="color:#7a7290;">No published general-duty rate — enter the duty manually.</div>');
       if(typeof calcMargins==='function')calcMargins();
-    }else if(desc){desc.textContent='HTS code not found — enter duty rate manually';}
-  }catch(e){if(desc)desc.textContent='Lookup failed — enter duty rate manually';}
-  if(rulings)rulings.innerHTML='<a href="https://rulings.cbp.dhs.gov/search?term='+encodeURIComponent(code)+'&type=ALL" target="_blank" style="color:#5522aa;">View CBP Rulings →</a>';
+    }else if(desc){desc.innerHTML='HTS code not found — enter the duty rate manually.';}
+  }catch(e){if(desc)desc.innerHTML='Lookup failed — enter the duty rate manually.';}
+  if(rulings)rulings.innerHTML='<a href="https://rulings.cbp.dhs.gov/search?term='+encodeURIComponent(code)+'&type=ALL" target="_blank" style="color:#5522aa;font-weight:600;">View CBP Rulings →</a>';
+  var _htsPanel=g('ax-hts-result'); if(_htsPanel)_htsPanel.style.display='block';
   if(btn){btn.disabled=false;btn.textContent='Look Up →';}
 }
 
