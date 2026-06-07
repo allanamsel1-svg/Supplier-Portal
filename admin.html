@@ -1143,6 +1143,10 @@
                 <select id="rfq-category-id" onchange="rfqCategoryChanged();suggestDutyTariff();">
                   <option value="">— Select Category —</option>
                 </select>
+                <div id="ax-custom-cat-wrap" style="display:none;margin-top:6px;">
+                  <input type="text" id="ax-custom-cat" placeholder="Suggest a category name" style="width:100%;border-color:#c8b8f0;" />
+                  <div style="font-size:10px;color:#888;margin-top:3px;">📋 Submitted for review before being added to the official list.</div>
+                </div>
               </div>
               <div class="mf">
                 <label>Unit Type</label>
@@ -1450,7 +1454,15 @@
               <div class="mf"><label>Tariff % (AI suggested)</label><input type="number" id="rfq-est-tariff" step="0.1" value="0" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
             </div>
             <div id="rfq-duty-note" style="display:none;background:#fff8e0;border:1px solid #e0c840;border-radius:6px;padding:8px;font-size:12px;color:#665500;margin-bottom:6px;"></div>
-            <input type="hidden" id="rfq-est-hts" />
+            <div class="mf"><label>HTS Code</label>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="rfq-est-hts" placeholder="e.g. 3304.99.5000" style="flex:1;border-color:#c8b8f0;" />
+                <button type="button" id="ax-hts-suggest-btn" onclick="axHtsSuggest()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">✨ Suggest</button>
+                <button type="button" id="ax-hts-btn" onclick="axHtsLookup()" style="padding:6px 12px;background:#eef0ff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">Look Up →</button>
+              </div>
+              <div id="ax-hts-desc" style="font-size:11px;color:#888;margin-top:4px;"></div>
+              <div id="ax-hts-rulings" style="font-size:11px;margin-top:4px;"></div>
+            </div>
             <div style="margin-bottom:10px;"><button onclick="suggestDutyTariff()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;">✦ Ask AI to suggest duty &amp; tariff rates</button></div>
 
             <!-- ROW 7: Deductions -->
@@ -6275,6 +6287,7 @@ async function populateRFQDropdowns(){
     var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
     catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'" data-category="'+rfqEsc(c.category)+'">'+path+' ['+c.model_prefix+']</option>';
   });
+  catSel.innerHTML+='<option value="__other__">Other…</option>';
   // Colors are hardcoded in HTML dropdown
 }
 
@@ -6448,6 +6461,7 @@ function rfqCategoryChanged(){
   if(cb&&cb.dataset.userOverride!=='true'){
     cb.checked=isCosmetic;
   }
+  var ccw=g('ax-custom-cat-wrap'); if(ccw)ccw.style.display=(sel.value==='__other__')?'block':'none';
   inheritComplianceForCategory();
 }
 
@@ -7313,7 +7327,64 @@ function axResetTool(){
   axImgReset();
   var us=g('ax-url-status'); if(us){ us.style.display='none'; us.textContent=''; }
   var ui=g('ax-url-input'); if(ui)ui.value='';
+  var hd=g('ax-hts-desc'); if(hd)hd.textContent='';
+  var hr=g('ax-hts-rulings'); if(hr)hr.innerHTML='';
+  var cc=g('ax-custom-cat'); if(cc)cc.value='';
+  var ccw=g('ax-custom-cat-wrap'); if(ccw)ccw.style.display='none';
   axImgWire();
+}
+
+// AI HTS suggestion + USITC lookup + CBP rulings for the admin RFQ form.
+async function axHtsSuggest(){
+  var name=((g('rfq-description')&&g('rfq-description').value)||'').trim();
+  var spec=((g('rfq-specs')&&g('rfq-specs').value)||'').trim();
+  if(!name&&!spec){alert('Enter product name and description first');return;}
+  var btn=g('ax-hts-suggest-btn'), desc=g('ax-hts-desc');
+  var orig=btn?btn.textContent:'✨ Suggest';
+  if(btn){btn.textContent='Thinking...';btn.disabled=true;}
+  try{
+    var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
+    var catSel=g('rfq-category-id'), catName='';
+    if(catSel&&catSel.selectedIndex>=0){var o=catSel.options[catSel.selectedIndex];catName=(o&&o.getAttribute('data-category'))||(o&&o.textContent)||'';}
+    var r=await fetch('/api/hts-suggest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({product_name:name,description:spec,category:catName})});
+    var d=await r.json().catch(function(){return{error:true};});
+    if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';}
+    else{
+      if(g('rfq-est-hts'))g('rfq-est-hts').value=d.hts_code;
+      if(desc)desc.textContent='✨ AI suggested: '+(d.reasoning||'')+(d.confidence?' · '+d.confidence+' confidence':'');
+      if(btn){btn.textContent=orig;btn.disabled=false;}
+      axHtsLookup();
+      return;
+    }
+  }catch(e){if(desc)desc.textContent='Could not suggest a code — enter manually';}
+  if(btn){btn.textContent=orig;btn.disabled=false;}
+}
+
+async function axHtsLookup(){
+  var el=g('rfq-est-hts'); if(!el)return;
+  var code=(el.value||'').trim().replace(/\./g,'');
+  if(!code)return;
+  var btn=g('ax-hts-btn'), desc=g('ax-hts-desc'), rulings=g('ax-hts-rulings');
+  if(btn){btn.disabled=true;btn.textContent='Looking up...';}
+  if(desc)desc.textContent='';
+  try{
+    var r=await fetch('https://hts.usitc.gov/reststop/api/details/getSection?query='+encodeURIComponent(code));
+    var d=await r.json();
+    var item=d&&(d[0]||(d.data&&d.data[0])||(d.results&&d.results[0]));
+    if(item){
+      if(desc)desc.textContent=item.description||item.brief_description||'';
+      var rate=item.general||item.duty_rate||'';
+      if(rate){
+        var pct=parseFloat(rate);
+        if(!isNaN(pct)&&g('rfq-est-duty'))g('rfq-est-duty').value=pct;
+        else if((''+rate).indexOf('%')>-1){var m=(''+rate).match(/([\d.]+)%/);if(m&&g('rfq-est-duty'))g('rfq-est-duty').value=parseFloat(m[1]);}
+        if(desc)desc.textContent+=' | General duty: '+rate;
+      }
+      if(typeof calcMargins==='function')calcMargins();
+    }else if(desc){desc.textContent='HTS code not found — enter duty rate manually';}
+  }catch(e){if(desc)desc.textContent='Lookup failed — enter duty rate manually';}
+  if(rulings)rulings.innerHTML='<a href="https://rulings.cbp.dhs.gov/search?term='+encodeURIComponent(code)+'&type=ALL" target="_blank" style="color:#5522aa;">View CBP Rulings →</a>';
+  if(btn){btn.disabled=false;btn.textContent='Look Up →';}
 }
 
 async function saveRFQ(action){
@@ -7323,6 +7394,8 @@ async function saveRFQ(action){
   if(rfqHts&&!isValidHts(rfqHts)){alert('The suggested HTS code "'+rfqHts+'" is not a valid format (expected e.g. 3304.10.0000 or 3304.10). Re-run the AI suggestion or clear it before saving.');return;}
 
   var catId=g('rfq-category-id').value;
+  var isOtherCat=(catId==='__other__');
+  if(isOtherCat)catId='';
   var catRow=catId?allCategories.find(function(c){return c.id===catId;}):null;
 
   // Collect structured packaging from picker state
@@ -7426,6 +7499,16 @@ async function saveRFQ(action){
       if(savedRFQ){
         g('rfq-id').value=savedRFQ.id;
         g('rfq-project-number').textContent=savedRFQ.project_number;
+
+        // Category suggestion: 'Other' with a custom name -> submit for admin review.
+        if(isOtherCat){
+          var customCat=((g('ax-custom-cat')&&g('ax-custom-cat').value)||'').trim();
+          if(customCat){
+            var brandSelV=g('rfq-brand-id')?g('rfq-brand-id').value:null;
+            var brandObjV=brandSelV?(allBrands||[]).find(function(b){return b.id===brandSelV;}):null;
+            fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:(brandObjV&&brandObjV.tenant_id)||null,rfq_id:savedRFQ.id,status:'pending'})}).catch(function(){});
+          }
+        }
 
         // Attach any additional product images (paste/URL/extra-image tool) to a newly created RFQ.
         if(!rfqId && savedRFQ.id && typeof adminExtraImages!=='undefined' && adminExtraImages.length){
