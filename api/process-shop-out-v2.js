@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // ════════════════════════════════════════════════════════════════════
 // /api/process-shop-out-v2.js
 //
@@ -77,7 +78,7 @@ async function claudeMessage(messages, maxTokens = 4000) {
   });
   if (!r.ok) {
     const body = await r.text();
-    throw new Error(`Anthropic ${r.status}: ${body}`);
+    throw new Error(`AI service error ${r.status}: ${body}`);
   }
   return r.json();
 }

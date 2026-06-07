@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // ════════════════════════════════════════════════════════════════════
 // /api/process-chunk.js
 //
@@ -107,8 +108,8 @@ async function claudeMessage(messages, maxTokens = 2000, retries = 2) {
     if (r.ok) return r.json();
     const errBody = await r.text();
     // Don't retry on bad input (400); do retry on rate limit (429) or server (500+)
-    if (r.status === 400) throw new Error(`Anthropic 400: ${errBody}`);
-    if (attempt === retries) throw new Error(`Anthropic ${r.status}: ${errBody}`);
+    if (r.status === 400) throw new Error(`AI service error 400: ${errBody}`);
+    if (attempt === retries) throw new Error(`AI service error ${r.status}: ${errBody}`);
     await new Promise(res => setTimeout(res, 1000 * (attempt + 1)));
   }
 }

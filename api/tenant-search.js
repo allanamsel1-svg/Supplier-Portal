@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // api/tenant-search.js
 // Tenant AI toolbar — full-portal intelligence engine.
 //  Step 1: claude-haiku classifies intent + extracts params + picks the relevant data_sources.
@@ -53,7 +54,7 @@ async function claude(model, maxTokens, system, userMsg) {
     body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: userMsg }] }),
   });
   const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error('anthropic ' + r.status);
+  if (!r.ok) throw new Error('AI service error ' + r.status);
   return { text: (d.content && d.content[0] && d.content[0].text) || '', usage: d.usage || {} };
 }
 function logCost(tid, feature, model, usage) {
