@@ -137,7 +137,6 @@ async function openSku(skuId){
     h(SB+'/rest/v1/sku_costing?sku_id=eq.'+skuId+'&order=created_at.desc&limit=1').then(function(r){return r.json();}),
     h(SB+'/rest/v1/inventory_positions?sku_id=eq.'+skuId+'&select=*,warehouses(name,type,city)').then(function(r){return r.json();}),
     h(SB+'/rest/v1/production_runs?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english)&order=created_at.desc&limit=10').then(function(r){return r.json();}),
-    h(SB+'/rest/v1/customer_order_lines?sku_id=eq.'+skuId+'&select=*,customer_orders(order_number,order_date,customers(customer_name))&order=created_at.desc&limit=10').then(function(r){return r.json();}),
     // Manufacturing variants (new arch: one row per SKU × factory)
     h(SB+'/rest/v1/sku_factory_variants?sku_id=eq.'+skuId+'&select=*,factories(factory_name_english,country)&order=is_primary.desc,created_at').then(function(r){return r.ok?r.json():[];}).catch(function(){return [];}),
     // SKU-level product documents (factory-agnostic: artwork, marketing, etc.)
@@ -151,9 +150,8 @@ async function openSku(skuId){
   var costing=results[4][0]||null;
   var inv=results[5]||[];
   var runs=results[6]||[];
-  var sales=results[7]||[];
-  var variants=results[8]||[];
-  var skuDocs=results[9]||[];
+  var variants=results[7]||[];
+  var skuDocs=results[8]||[];
 
   // ── Build the variants tree: revisions per variant + docs per revision ──
   var variantsTree=[];
@@ -430,26 +428,6 @@ async function openSku(skuId){
   '<div class="card" style="margin-bottom:1rem;">'+
     '<div class="card-title">Inventory Status</div>'+
     '<div id="inv-status-'+skuId+'"><div style="color:#bbb;font-size:12px;">Loading…</div></div>'+
-  '</div>'+
-
-  // Sales History
-  '<div class="card">'+
-    '<div class="card-title">Sales History</div>'+
-    (sales.length?
-      '<table><thead><tr><th>Order #</th><th>Customer</th><th>Date</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>'+
-      sales.map(function(l){
-        var o=l.customer_orders||{};var c=o.customers||{};
-        return '<tr>'+
-          '<td style="font-family:monospace;font-size:11px;">'+(o.order_number||'—')+'</td>'+
-          '<td>'+(c.customer_name||'—')+'</td>'+
-          '<td style="font-size:11px;">'+(o.order_date||'—')+'</td>'+
-          '<td>'+l.qty_ordered.toLocaleString()+'</td>'+
-          '<td>$'+parseFloat(l.unit_price||0).toFixed(2)+'</td>'+
-          '<td style="font-weight:500;">$'+parseFloat(l.total_price||0).toFixed(2)+'</td>'+
-        '</tr>';
-      }).join('')+
-      '</tbody></table>'
-    :'<div style="font-size:12px;color:#bbb;">No sales history yet.</div>')+
   '</div>';
 
   det.innerHTML=html;
