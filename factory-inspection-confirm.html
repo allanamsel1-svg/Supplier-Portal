@@ -30,12 +30,17 @@
   .msg h2{font-size:18px;margin-bottom:6px;}
   .msg p{font-size:13px;color:#94a3b8;}
   .loading,.err{text-align:center;color:#94a3b8;font-size:14px;padding:2rem 0;}
+  .lang-toggle{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:none;border:none;color:#94a3b8;font-size:12px;font-family:inherit;cursor:pointer;padding:0;}
+  .lang-toggle .sep{color:#475569;}
+  .lang-toggle [data-lang]{color:inherit;}
+  .lang-toggle:hover{color:#e2e8f0;}
 </style>
+<script src="translations.js"></script>
 </head>
 <body>
 <div class="card">
-  <div class="brand"><div class="mk">🔍</div><div class="nm">TBG Sourcing<span>Inspection Confirmation</span></div></div>
-  <div id="content"><div class="loading">Loading inspection…</div></div>
+  <div class="brand"><div class="mk">🔍</div><div class="nm">TBG Sourcing<span data-i18n="inspection.brandSub">Inspection Confirmation</span></div><button class="lang-toggle" onclick="Lang.set(Lang.get()==='en'?'zh':'en')" aria-label="Toggle language"><span data-lang="en">EN</span><span class="sep">|</span><span data-lang="zh">中文</span></button></div>
+  <div id="content"><div class="loading" data-i18n="inspection.loading">Loading inspection…</div></div>
 </div>
 
 <script>
@@ -53,48 +58,57 @@ async function sbPatch(path,body){try{var r=await fetch(SB+'/rest/v1/'+path,{met
 async function sbPost(path,body){try{var r=await fetch(SB+'/rest/v1/'+path,{method:'POST',headers:Object.assign({},H,{Prefer:'return=minimal'}),body:JSON.stringify(body)});return r.ok;}catch(e){return false;}}
 async function notify(subject,body){try{await fetch('/api/send-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({to:'sourcing@tbgsourcing.net',subject:subject,body:body})});}catch(e){}}
 
+// Re-render dispatcher: each view sets CUR to a closure; onLangChange replays it.
+var CUR=null;
+window.onLangChange=function(){ if(typeof CUR==='function') CUR(); };
+function showErr(key){ CUR=function(){g('content').innerHTML='<div class="err">'+t(key)+'</div>';}; CUR(); }
+
 async function load(){
-  if(!INSP_ID){g('content').innerHTML='<div class="err">Missing inspection reference. Please use the link from your email.</div>';return;}
+  if(!INSP_ID){showErr('inspection.missingRef');return;}
   var rows=await sbGet('inspections?id=eq.'+encodeURIComponent(INSP_ID)+'&select=*,purchase_orders(po_number),factories(factory_name_english)&limit=1');
-  if(!rows.length){g('content').innerHTML='<div class="err">Inspection not found.</div>';return;}
+  if(!rows.length){showErr('inspection.notFound');return;}
   INSP=rows[0];
   if(INSP.factory_confirmed_at){renderDone('confirmed');return;}
   render();
 }
 function render(){
+  CUR=render;
   var po=INSP.purchase_orders&&INSP.purchase_orders.po_number||INSP.po_id||'—';
   var fac=INSP.factories&&INSP.factories.factory_name_english||'—';
   g('content').innerHTML=
-    '<h1>Inspection Confirmation Required</h1>'+
-    '<p class="lead">Please confirm whether the goods for this order will be ready for inspection on the scheduled date.</p>'+
+    '<h1>'+t('inspection.title')+'</h1>'+
+    '<p class="lead">'+t('inspection.lead')+'</p>'+
     '<div class="det">'+
-      '<div class="det-row"><span class="k">PO Number</span><span class="v">'+esc(po)+'</span></div>'+
-      '<div class="det-row"><span class="k">Factory</span><span class="v">'+esc(fac)+'</span></div>'+
-      '<div class="det-row"><span class="k">Inspection Type</span><span class="v">'+esc(INSP.inspection_type||'—')+'</span></div>'+
-      '<div class="det-row"><span class="k">Scheduled Date</span><span class="v">'+esc(INSP.scheduled_date||'—')+'</span></div>'+
-      '<div class="det-row"><span class="k">Inspector</span><span class="v">'+esc(INSP.inspector_company||'TBD')+(INSP.inspector_contact_name?' · '+esc(INSP.inspector_contact_name):'')+'</span></div>'+
-      '<div class="det-row"><span class="k">AQL Level</span><span class="v">'+esc(INSP.aql_level!=null?INSP.aql_level:'—')+(INSP.inspection_level?' / Level '+esc(INSP.inspection_level):'')+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.poNumber')+'</span><span class="v">'+esc(po)+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.factory')+'</span><span class="v">'+esc(fac)+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.type')+'</span><span class="v">'+esc(INSP.inspection_type||'—')+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.scheduledDate')+'</span><span class="v">'+esc(INSP.scheduled_date||'—')+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.inspector')+'</span><span class="v">'+esc(INSP.inspector_company||t('inspection.tbd'))+(INSP.inspector_contact_name?' · '+esc(INSP.inspector_contact_name):'')+'</span></div>'+
+      '<div class="det-row"><span class="k">'+t('inspection.aqlLevel')+'</span><span class="v">'+esc(INSP.aql_level!=null?INSP.aql_level:'—')+(INSP.inspection_level?' / '+t('inspection.levelPrefix',{n:esc(INSP.inspection_level)}):'')+'</span></div>'+
     '</div>'+
     '<div class="actions">'+
-      '<button class="btn confirm" id="b-confirm" onclick="doConfirm()">✓ Confirm — Goods will be ready for inspection</button>'+
-      '<button class="btn flag" onclick="toggleFlag()">⚠ Flag an Issue — Goods may not be ready</button>'+
+      '<button class="btn confirm" id="b-confirm" onclick="doConfirm()">'+t('inspection.confirmBtn')+'</button>'+
+      '<button class="btn flag" onclick="toggleFlag()">'+t('inspection.flagBtn')+'</button>'+
     '</div>'+
     '<div class="flagbox" id="flagbox">'+
-      '<textarea id="flag-notes" placeholder="Describe the issue (e.g. production delay, material shortage)…"></textarea>'+
-      '<button class="btn flag" id="b-flag" onclick="doFlag()">Submit Issue Report</button>'+
+      '<textarea id="flag-notes" placeholder="'+esc(t('inspection.flagPh'))+'"></textarea>'+
+      '<button class="btn flag" id="b-flag" onclick="doFlag()">'+t('inspection.submitIssue')+'</button>'+
     '</div>';
 }
 function toggleFlag(){g('flagbox').classList.toggle('open');}
 function renderDone(kind){
-  if(kind==='confirmed')g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>Inspection Confirmed</h2><p>Thank you. We have recorded that the goods will be ready for inspection.</p></div>';
-  else g('content').innerHTML='<div class="msg"><div class="ic">⚠️</div><h2>Issue Reported</h2><p>Thank you. Our sourcing team has been notified and will follow up shortly.</p></div>';
+  CUR=function(){
+    if(kind==='confirmed')g('content').innerHTML='<div class="msg"><div class="ic">✅</div><h2>'+t('inspection.confirmedTitle')+'</h2><p>'+t('inspection.confirmedBody')+'</p></div>';
+    else g('content').innerHTML='<div class="msg"><div class="ic">⚠️</div><h2>'+t('inspection.flaggedTitle')+'</h2><p>'+t('inspection.flaggedBody')+'</p></div>';
+  };
+  CUR();
 }
 async function latestConfirmationId(){
   var rows=await sbGet('inspection_confirmations?inspection_id=eq.'+encodeURIComponent(INSP_ID)+'&factory_responded_at=is.null&select=id&order=sent_at.desc&limit=1');
   return rows.length?rows[0].id:null;
 }
 async function doConfirm(){
-  var b=g('b-confirm'); if(b){b.disabled=true;b.textContent='Submitting…';}
+  var b=g('b-confirm'); if(b){b.disabled=true;b.textContent=t('inspection.submitting');}
   var now=new Date().toISOString();
   await sbPatch('inspections?id=eq.'+encodeURIComponent(INSP_ID),{factory_confirmed_at:now,status:'factory_confirmed',updated_at:now});
   var cid=await latestConfirmationId();
@@ -106,8 +120,8 @@ async function doConfirm(){
 }
 async function doFlag(){
   var notes=(g('flag-notes').value||'').trim();
-  if(!notes){alert('Please describe the issue.');return;}
-  var b=g('b-flag'); if(b){b.disabled=true;b.textContent='Submitting…';}
+  if(!notes){alert(t('inspection.describeAlert'));return;}
+  var b=g('b-flag'); if(b){b.disabled=true;b.textContent=t('inspection.submitting');}
   var now=new Date().toISOString();
   var cid=await latestConfirmationId();
   if(cid)await sbPatch('inspection_confirmations?id=eq.'+cid,{factory_responded_at:now,confirmed:false,response_notes:notes});
