@@ -910,29 +910,172 @@ function renderPendingCatRow(p){
     +'<button class="btn-new" style="background:#fff;color:#dc2626;border:1px solid #dc2626;" onclick="rejectPendingCat(\''+esc(p.id)+'\')">✗ Reject</button>'
     +'</div>';
 }
-function approvePendingCat(id){
+// ── Analysis state per pending suggestion ──
+var _pcatState={};
+var _pcatPrefixEdited={};
+
+// Flat, de-duplicated list of every category/sub/sub-sub name with its parent path.
+function _catAllNodes(){
+  var nodes=[], seen={};
+  (allCats||[]).forEach(function(c){
+    function add(name,path){ if(!name)return; var k=(path||'')+'|'+name.toLowerCase(); if(seen[k])return; seen[k]=1; nodes.push({name:name,path:path||'',full:(path?path+' › '+name:name)}); }
+    add(c.category,'');
+    if(c.sub_category) add(c.sub_category,c.category);
+    if(c.sub_sub_category) add(c.sub_sub_category,c.category+' › '+c.sub_category);
+  });
+  return nodes;
+}
+function _catSigWords(s){ return (s||'').toLowerCase().split(/[^a-z0-9]+/).filter(function(w){return w.length>=3;}); }
+function _topLevelNames(){ var s={},out=[]; (allCats||[]).forEach(function(c){ var k=(c.category||'').toLowerCase(); if(c.category&&!s[k]){s[k]=1;out.push(c.category);} }); out.sort(function(a,b){return a.localeCompare(b);}); return out; }
+function _subNamesUnder(parent){ var s={},out=[],pl=(parent||'').toLowerCase(); (allCats||[]).forEach(function(c){ if((c.category||'').toLowerCase()===pl&&c.sub_category){var k=c.sub_category.toLowerCase(); if(!s[k]){s[k]=1;out.push(c.sub_category);}} }); out.sort(function(a,b){return a.localeCompare(b);}); return out; }
+function _genCatPrefix(name){ var L=(name||'').toUpperCase().replace(/[^A-Z]/g,''); return L.slice(0,3)||'CAT'; }
+function _existsExactCat(category,sub,subsub){
+  var cl=(category||'').toLowerCase(), sl=(sub||'').toLowerCase()||null, ssl=(subsub||'').toLowerCase()||null;
+  return (allCats||[]).some(function(c){ return (c.category||'').toLowerCase()===cl && (((c.sub_category||'').toLowerCase())||null)===sl && (((c.sub_sub_category||'').toLowerCase())||null)===ssl; });
+}
+function _pcatMsg(id,txt,color){ var m=g('pcat-msg-'+id); if(m){m.style.color=color||'#999';m.textContent=txt||'';} }
+function _aiPath(ai,leaf){
+  if(!ai)return leaf||'';
+  if(ai.recommendation==='sub_category')return (ai.suggested_parent||'(new top level)')+' › '+leaf;
+  if(ai.recommendation==='sub_sub_category')return (ai.suggested_parent||'(parent)')+' › '+(ai.suggested_sub||'(sub)')+' › '+leaf;
+  return leaf;
+}
+function _catOpts(list,selVal){ return '<option value="">— Select —</option>'+list.map(function(n){return '<option value="'+esc(n)+'"'+(n.toLowerCase()===(selVal||'').toLowerCase()?' selected':'')+'>'+esc(n)+'</option>';}).join(''); }
+
+async function approvePendingCat(id){
+  if(!allCats||!allCats.length){ await loadCats(); }
   var p=_pendingCats.find(function(x){return x.id===id;}); if(!p)return;
   var row=g('pcat-'+id); if(!row)return;
-  row.innerHTML='<div style="display:flex;align-items:center;gap:8px;width:100%;">'
-    +'<input type="text" id="pcat-off-'+esc(id)+'" value="'+esc(p.suggested_name)+'" placeholder="Official category name" style="flex:1;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;" />'
-    +'<button class="btn-new" style="background:#16a34a;color:#fff;" onclick="confirmApprovePendingCat(\''+esc(id)+'\')">Confirm</button>'
-    +'<button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button>'
-    +'<span id="pcat-msg-'+esc(id)+'" style="font-size:11px;color:#999;white-space:nowrap;"></span></div>';
-  var inp=g('pcat-off-'+id); if(inp){ inp.focus(); inp.select(); }
-}
-async function confirmApprovePendingCat(id){
-  var off=((g('pcat-off-'+id)||{}).value||'').trim();
-  var msg=g('pcat-msg-'+id);
-  if(!off){ if(msg){msg.style.color='#dc2626';msg.textContent='Enter a name.';} return; }
-  if(msg){msg.style.color='#999';msg.textContent='Saving…';}
+  var name=p.suggested_name||'';
+  var nodes=_catAllNodes();
+  var nl=name.toLowerCase();
+
+  // a. EXACT MATCH
+  var exact=null;
+  for(var i=0;i<nodes.length;i++){ if(nodes[i].name.toLowerCase()===nl){exact=nodes[i];break;} }
+  if(exact){
+    row.innerHTML='<div style="width:100%;padding:4px 0;">'
+      +'<div style="font-size:13px;color:#1a7a1a;margin-bottom:8px;">✓ Already exists as: <b>'+esc(exact.name)+'</b>'+(exact.path?' under '+esc(exact.path):' (top level)')+'</div>'
+      +'<button class="btn-new" style="background:#16a34a;color:#fff;" onclick="resolvePendingCat(\''+esc(id)+'\',this.getAttribute(\'data-nm\'))" data-nm="'+esc(exact.name)+'">Mark Resolved</button>'
+      +'<button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button>'
+      +'<span id="pcat-msg-'+esc(id)+'" style="font-size:11px;color:#999;margin-left:8px;"></span></div>';
+    return;
+  }
+
+  // b. SIMILARITY
+  var sw=_catSigWords(name), similar=[];
+  nodes.forEach(function(nd){ var ndl=nd.name.toLowerCase(); if(ndl===nl)return; var contains=(ndl.indexOf(nl)>=0||nl.indexOf(ndl)>=0); var shared=0,nw=_catSigWords(nd.name); sw.forEach(function(w){if(nw.indexOf(w)>=0)shared++;}); if(contains||shared>=2)similar.push(nd); });
+  _pcatState[id]={ suggested:name, similar:similar, ai:null };
+
+  // loading state
+  row.innerHTML='<div style="width:100%;padding:6px 0;font-size:12px;color:#999;">✨ Analyzing placement…</div>';
+
+  // c. AI PLACEMENT RECOMMENDATION
+  var ai=null;
   try{
-    var r1=await fetch(SB+'/rest/v1/pending_categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',approved_as:off})});
+    var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
+    var existing=nodes.map(function(nd){return nd.name;});
+    var r=await fetch('/api/category-suggest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({suggested_name:name,existing_categories:existing})});
+    var d=await r.json().catch(function(){return null;});
+    if(r.ok&&d&&d.recommendation&&!d.error)ai=d;
+  }catch(e){}
+  if(_pcatState[id])_pcatState[id].ai=ai;
+  renderPcatAnalysis(id);
+}
+
+function renderPcatAnalysis(id){
+  var st=_pcatState[id]; if(!st)return; var row=g('pcat-'+id); if(!row)return;
+  var html='<div style="width:100%;padding:4px 0;">';
+  html+='<div style="font-size:13px;color:#333;margin-bottom:6px;">Suggested: <b>'+esc(st.suggested)+'</b></div>';
+  if(st.similar&&st.similar.length){
+    html+='<div style="font-size:12px;color:#9a6a00;background:#fff8e0;border:1px solid #e0c840;border-radius:6px;padding:6px 9px;margin-bottom:6px;">⚠ Similar existing: '+st.similar.slice(0,6).map(function(nd){return esc(nd.full);}).join(', ')+'</div>';
+  }
+  if(st.ai){
+    html+='<div style="font-size:12px;color:#5522aa;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;padding:6px 9px;margin-bottom:8px;">✨ Suggested placement: <b>'+esc(_aiPath(st.ai,st.suggested))+'</b> · '+esc(st.ai.confidence||'')+' · '+esc(st.ai.reasoning||'')+'</div>';
+    html+='<button class="btn-new" style="background:#16a34a;color:#fff;" onclick="placeFromAI(\''+esc(id)+'\')">✓ Use AI Suggestion</button>';
+  } else {
+    html+='<div style="font-size:11px;color:#bbb;margin-bottom:8px;">AI placement unavailable — place manually.</div>';
+  }
+  html+='<button class="btn-new" style="background:#fff;color:#5522aa;border:1px solid #c8b8f0;" onclick="placeManual(\''+esc(id)+'\')">✍ Place Manually</button>';
+  html+='<button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button>';
+  html+='</div>';
+  row.innerHTML=html;
+}
+
+function placeFromAI(id){ showPlacementForm(id,true); }
+function placeManual(id){ showPlacementForm(id,false); }
+
+function showPlacementForm(id, useAI){
+  var st=_pcatState[id]; if(!st)return; var row=g('pcat-'+id); if(!row)return;
+  _pcatPrefixEdited[id]=false;
+  var ai=useAI?st.ai:null;
+  var level=(ai&&ai.recommendation)||'top_level';
+  var parent=(ai&&ai.suggested_parent)||'';
+  var sub=(ai&&ai.suggested_sub)||'';
+  var leaf=st.suggested;
+  var tops=_topLevelNames();
+  var subList=parent?_subNamesUnder(parent):[];
+  var showParent=(level!=='top_level');
+  var showSub=(level==='sub_sub_category');
+  var ie=esc(id);
+  var html='<div style="width:100%;padding:6px 0;display:flex;flex-direction:column;gap:7px;">';
+  html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+  html+='<input type="text" id="pcat-name-'+ie+'" value="'+esc(leaf)+'" placeholder="Category name" style="flex:1;min-width:160px;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;" oninput="pcatPrefixAuto(\''+ie+'\')" />';
+  html+='<input type="text" id="pcat-prefix-'+ie+'" value="'+esc(_genCatPrefix(leaf))+'" maxlength="5" placeholder="PFX" title="Model prefix" oninput="_pcatPrefixEdited[\''+ie+'\']=true" style="width:72px;text-transform:uppercase;font-family:monospace;font-weight:700;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;" />';
+  html+='</div>';
+  html+='<div style="display:flex;gap:14px;align-items:center;font-size:12px;color:#333;flex-wrap:wrap;">';
+  [['top_level','Top Level'],['sub_category','Sub-Category'],['sub_sub_category','Sub-Sub-Category']].forEach(function(o){ html+='<label style="cursor:pointer;"><input type="radio" name="pcat-level-'+ie+'" value="'+o[0]+'"'+(o[0]===level?' checked':'')+' onchange="pcatLevelChange(\''+ie+'\')"> '+o[1]+'</label>'; });
+  html+='</div>';
+  html+='<div id="pcat-parent-wrap-'+ie+'" style="display:'+(showParent?'block':'none')+';"><select id="pcat-parent-'+ie+'" onchange="pcatParentChange(\''+ie+'\')" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_catOpts(tops,parent)+'</select></div>';
+  html+='<div id="pcat-sub-wrap-'+ie+'" style="display:'+(showSub?'block':'none')+';"><select id="pcat-sub-'+ie+'" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_catOpts(subList,sub)+'</select></div>';
+  html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn-new" style="background:#16a34a;color:#fff;" onclick="confirmPlacement(\''+ie+'\')">✓ Add to Categories</button><button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button><span id="pcat-msg-'+ie+'" style="font-size:11px;color:#999;"></span></div>';
+  html+='</div>';
+  row.innerHTML=html;
+}
+function pcatPrefixAuto(id){ var pf=g('pcat-prefix-'+id), nm=g('pcat-name-'+id); if(pf&&nm&&!_pcatPrefixEdited[id])pf.value=_genCatPrefix(nm.value); }
+function pcatLevelChange(id){
+  var lvl=(document.querySelector('input[name="pcat-level-'+id+'"]:checked')||{}).value||'top_level';
+  var pw=g('pcat-parent-wrap-'+id), sw=g('pcat-sub-wrap-'+id);
+  if(pw)pw.style.display=(lvl==='top_level')?'none':'block';
+  if(sw)sw.style.display=(lvl==='sub_sub_category')?'block':'none';
+}
+function pcatParentChange(id){
+  var parent=(g('pcat-parent-'+id)||{}).value||'';
+  var sel=g('pcat-sub-'+id); if(!sel)return;
+  sel.innerHTML=_catOpts(_subNamesUnder(parent),'');
+}
+
+async function confirmPlacement(id){
+  var name=((g('pcat-name-'+id)||{}).value||'').trim();
+  var prefix=((g('pcat-prefix-'+id)||{}).value||'').trim().toUpperCase();
+  var lvl=(document.querySelector('input[name="pcat-level-'+id+'"]:checked')||{}).value||'top_level';
+  var parent=((g('pcat-parent-'+id)||{}).value||'').trim();
+  var sub=((g('pcat-sub-'+id)||{}).value||'').trim();
+  if(!name){ _pcatMsg(id,'Enter a name.','#dc2626'); return; }
+  var cat,scat,sscat;
+  if(lvl==='top_level'){ cat=name; scat=null; sscat=null; }
+  else if(lvl==='sub_category'){ if(!parent){_pcatMsg(id,'Pick a parent category.','#dc2626');return;} cat=parent; scat=name; sscat=null; }
+  else { if(!parent||!sub){_pcatMsg(id,'Pick a parent and sub-category.','#dc2626');return;} cat=parent; scat=sub; sscat=name; }
+  if(_existsExactCat(cat,scat,sscat)){ _pcatMsg(id,'That category already exists.','#dc2626'); return; }
+  _pcatMsg(id,'Saving…','#999');
+  try{
+    var r1=await fetch(SB+'/rest/v1/pending_categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',approved_as:name})});
     if(!r1.ok)throw new Error('patch failed');
-    // The categories table keys the name on the `category` column (no name/is_active columns).
-    await fetch(SB+'/rest/v1/categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({category:off})}).catch(function(){});
-    await loadPendingCats();
+    var ins={ category:cat, sub_category:scat, sub_sub_category:sscat, model_prefix:prefix||null };
+    var r2=await fetch(SB+'/rest/v1/categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(ins)});
+    if(!r2.ok){ var t=await r2.text().catch(function(){return '';}); _pcatMsg(id,'Insert failed: '+t,'#dc2626'); return; }
+    _pcatMsg(id,'✓ '+name+' added to categories','#1a7a1a');
     await loadCats();
-  }catch(e){ if(msg){msg.style.color='#dc2626';msg.textContent='Failed — try again.';} }
+    setTimeout(loadPendingCats,900);
+  }catch(e){ _pcatMsg(id,'Failed — try again.','#dc2626'); }
+}
+
+async function resolvePendingCat(id,name){
+  try{
+    var r=await fetch(SB+'/rest/v1/pending_categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',approved_as:name||null})});
+    if(!r.ok)throw new Error('patch failed');
+    await loadPendingCats();
+  }catch(e){ _pcatMsg(id,'Failed — try again.','#dc2626'); }
 }
 async function rejectPendingCat(id){
   try{
