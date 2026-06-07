@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ImportGenius — TBG Retail Intelligence</title>
+<link rel="stylesheet" href="ri_shared.css">
+<script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
+<script src="admin-theme.js"></script>
+<style>
+.fx{max-width:1100px;margin:0 auto;padding:1.5rem 2rem;}
+
+/* Hero rate card — visual language matches intel_daily.html id-digest / hub-summary */
+.fx-hero{background:linear-gradient(135deg,#1a1a2e 0%,#2244cc 100%);color:#fff;border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;}
+.fx-hero.warn{background:linear-gradient(135deg,#4a3a00 0%,#a07a00 100%);}
+.fx-hero.alert{background:linear-gradient(135deg,#5a0a0a 0%,#a22 100%);}
+.fx-h-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;}
+.fx-h-date{font-size:11px;opacity:0.65;margin-bottom:18px;}
+.fx-h-row{display:flex;align-items:baseline;gap:24px;flex-wrap:wrap;}
+.fx-h-rate{font-size:44px;font-weight:700;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;}
+.fx-h-delta{font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(255,255,255,0.14);border-radius:8px;font-variant-numeric:tabular-nums;}
+.fx-h-delta .arrow{font-size:14px;}
+.fx-h-note{font-size:11.5px;opacity:0.85;margin-top:14px;line-height:1.5;}
+.fx-h-empty{font-size:13px;opacity:0.7;font-style:italic;}
+
+/* Chart */
+.fx-chart-wrap{padding:0.25rem 0;}
+.fx-chart{width:100%;height:200px;display:block;}
+.fx-chart-meta{display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:4px;padding:0 4px;}
+.fx-chart-empty{padding:1.5rem;text-align:center;color:#888;font-size:13px;font-style:italic;}
+
+/* Table */
+.fx-table{width:100%;border-collapse:collapse;font-size:13px;}
+.fx-table th{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.06em;text-align:left;padding:8px 12px;border-bottom:1px solid #e0e0d8;}
+.fx-table th.num{text-align:right;}
+.fx-table td{padding:10px 12px;border-bottom:0.5px dashed #f0f0e8;}
+.fx-table tr:last-child td{border-bottom:none;}
+.fx-table .num{font-variant-numeric:tabular-nums;text-align:right;}
+.fx-table .delta-up{color:#a22;font-weight:600;}
+.fx-table .delta-down{color:#1a7a1a;font-weight:600;}
+.fx-table .delta-flat{color:#888;}
+
+.fx-loading{padding:1.5rem;text-align:center;color:#888;font-size:13px;}
+.fx-error{padding:1rem;color:#a22;font-size:12px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;}
+
+.fx-section-head{margin-bottom:0.85rem;}
+</style>
+</head>
+<body>
+<div id="admin-sidebar"></div>
+
+<div class="ri-top">
+  <div style="display:flex;align-items:center;"><div class="ri-top-title">🎯 Retail Intelligence</div><a class="dash-back" href="admin.html" style="margin-left:24px;color:#888;font-size:13px;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">← Dashboard</a></div>
+  <div class="ri-top-actions">
+    <button id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle dark/light mode" style="background:none;border:1px solid #e0e0d8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;margin-right:8px;">🌙</button>  </div>
+</div>
+
+<div class="ri-tabs">
+  <a href="intel_daily.html" class="ri-tab"><span class="ri-tab-icon">📋</span> Daily Intel</a>
+  <a href="intelligence_hub.html" class="ri-tab"><span class="ri-tab-icon">🎯</span> Cross Source Intel</a>
+  <a href="intel_fx.html" class="ri-tab"><span class="ri-tab-icon">💱</span> FX Watch</a>
+  <a href="shop_outs.html" class="ri-tab"><span class="ri-tab-icon">🛒</span> Shop Outs</a>
+  <a href="factory_prospects.html" class="ri-tab"><span class="ri-tab-icon">🏭</span> Factory Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="brand_watch.html" class="ri-tab"><span class="ri-tab-icon">💎</span> Brand Watch <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="online_catalog.html" class="ri-tab"><span class="ri-tab-icon">🌐</span> Online Catalog <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="retailer_intel.html" class="ri-tab"><span class="ri-tab-icon">🏬</span> Retailer Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="social_trends.html" class="ri-tab"><span class="ri-tab-icon">📈</span> Social Trends <span class="ri-tab-badge soon">SOON</span></a>
+  <a href="news_editorial.html" class="ri-tab"><span class="ri-tab-icon">📰</span> News &amp; Editorial</a>
+  <a href="trade_intelligence.html" class="ri-tab"><span class="ri-tab-icon">🛃</span> Trade Intel <span class="ri-tab-badge beta">BETA</span></a>
+  <a href="import_genius.html" class="ri-tab active"><span class="ri-tab-icon">🚢</span> ImportGenius</a>
+</div>
+
+<div style="max-width:1100px;margin:0 auto;padding:3rem 2rem;text-align:center;color:#888;">
+  <div style="font-size:36px;margin-bottom:12px;">🚢</div>
+  <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">ImportGenius</div>
+  <div style="font-size:13px;margin-bottom:24px;">Upload an ImportGenius Excel or CSV export to explore shipment data.</div>
+  <p style="font-size:12px;color:#aaa;">Full dashboard coming soon — Shipments · Importers · Suppliers · Trends</p>
+</div>
+
+<script src="admin-sidebar.js"></script>
+
+</body>
+</html>
