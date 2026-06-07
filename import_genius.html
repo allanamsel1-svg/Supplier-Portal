@@ -260,13 +260,16 @@ function g(row,key){var i=CI[key];if(i==null||i<0)return '';var v=row[i];return 
 function gn(row,key){var v=parseFloat(g(row,key));return isNaN(v)?0:v;}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function tagCls(o){o=(o||'').toLowerCase();return o.includes('china')?'cn':o.includes('korea')?'kr':o.includes('hong kong')?'hk':o.includes('thailand')?'th':'';}
+// Attach the admin session token (same mechanism as admin.html) so the gated
+// /api/ig-* endpoints accept the request. Merges with any extra headers.
+function adminHeaders(extra){var h=extra||{};h['Authorization']='Bearer '+(localStorage.getItem('admin_session')||'');return h;}
 
 // ── Saved datasets (Supabase via API) ──────────────────────────────────────
 async function loadSavedFromDB(){
   var wrap=document.getElementById('ig-saved-wrap');
   var list=document.getElementById('ig-saved-list');
   try{
-    var resp=await fetch('/api/ig-data?action=datasets');
+    var resp=await fetch('/api/ig-data?action=datasets',{headers:adminHeaders()});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     var datasets=await resp.json();
     if(!datasets||!datasets.length){wrap.style.display='none';return;}
@@ -288,7 +291,7 @@ async function loadSavedFromDB(){
 async function loadDatasetFromDB(datasetId,name){
   setStatus('','Loading '+name+'…');
   try{
-    var resp=await fetch('/api/ig-data?action=shipments&dataset_id='+datasetId);
+    var resp=await fetch('/api/ig-data?action=shipments&dataset_id='+datasetId,{headers:adminHeaders()});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     var rows=await resp.json();
     if(!rows||!rows.length){setStatus('err','No shipments found.');return;}
@@ -311,7 +314,7 @@ async function loadDatasetFromDB(datasetId,name){
 
 async function deleteDatasetFromDB(datasetId){
   if(!confirm('Delete this dataset and all its shipments?'))return;
-  await fetch('/api/ig-data?action=dataset&dataset_id='+datasetId,{method:'DELETE'});
+  await fetch('/api/ig-data?action=dataset&dataset_id='+datasetId,{method:'DELETE',headers:adminHeaders()});
   loadSavedFromDB();
 }
 
@@ -385,7 +388,7 @@ async function saveToSupabase(fileName,rows,headers){
       uploaded_by:'admin',
       shipments:shipments
     };
-    var resp=await fetch('/api/ig-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var resp=await fetch('/api/ig-import',{method:'POST',headers:adminHeaders({'Content-Type':'application/json'}),body:JSON.stringify(payload)});
     var result=await resp.json();
     if(!resp.ok)throw new Error(result.error||'Save failed');
     setStatus('ok','Saved "'+fileName+'" — '+result.row_count.toLocaleString()+' shipments stored. Will persist across all browsers.');
