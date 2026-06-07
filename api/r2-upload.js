@@ -1,25 +1,65 @@
 // api/r2-upload.js
-// Upload a file to Cloudflare R2.
+// Upload a file to Cloudflare R2 via the S3-compatible API, signed with AWS SigV4.
 //   POST  body = raw binary, with ?folder=&filename=&contentType=   (simplest)
 //     or  body = multipart/form-data with fields: file, filename, folder, contentType
 //   Auth: Bearer <tenant session | admin session>
 //   → { success:true, url } | { error:true, message }
 //
-// NOTE: R2's S3-compatible endpoint normally requires AWS SigV4 signing. This implements
-// the requested Bearer-token PUT (CF_R2_TOKEN). If R2 rejects it (401/403 SignatureDoesNotMatch),
-// switch to SigV4 with CF_R2_ACCESS_KEY_ID + CF_R2_SECRET_ACCESS_KEY.
+// Env: CF_R2_ACCESS_KEY_ID, CF_R2_SECRET_ACCESS_KEY, CF_ACCOUNT_ID, CF_R2_BUCKET
+//
+// NOTE: the returned URL is the S3 endpoint URL and is NOT publicly accessible until a public
+// dev URL / custom domain is configured on the bucket (e.g. the tbg-artwork bucket — enable
+// "Public Development URL" in the Cloudflare R2 dashboard, then swap the public base below).
+// SigV4 implemented from scratch with Node's built-in crypto only (no aws-sdk).
 export const config = { runtime: 'nodejs' };
 
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, createHash, timingSafeEqual } from 'crypto';
 
 const SB_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
 const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json' };
 
 const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
-const CF_R2_TOKEN = process.env.CF_R2_TOKEN;
 const CF_R2_BUCKET = process.env.CF_R2_BUCKET;
+const CF_R2_ACCESS_KEY_ID = process.env.CF_R2_ACCESS_KEY_ID;
+const CF_R2_SECRET_ACCESS_KEY = process.env.CF_R2_SECRET_ACCESS_KEY;
 
+// ── AWS SigV4 (crypto-only) ──
+function hmac(key, data) { return createHmac('sha256', key).update(data).digest(); }
+function sha256(data) { return createHash('sha256').update(data).digest('hex'); }
+function getSigningKey(secret, date, region, service) {
+  const kDate = hmac('AWS4' + secret, date);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  return hmac(kService, 'aws4_request');
+}
+function signRequest({ method, host, path, headers, body, accessKeyId, secretKey, region, service }) {
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, '').slice(0, 15) + 'Z';
+  const dateStamp = amzDate.slice(0, 8);
+  const payloadHash = sha256(body || '');
+  const allHeaders = Object.assign({}, headers, {
+    'x-amz-date': amzDate,
+    'x-amz-content-sha256': payloadHash,
+    'host': host,
+  });
+  const sortedKeys = Object.keys(allHeaders).sort();
+  const canonicalHeaders = sortedKeys.map(k => k.toLowerCase() + ':' + String(allHeaders[k]).trim()).join('\n') + '\n';
+  const signedHeaders = sortedKeys.map(k => k.toLowerCase()).join(';');
+  const canonicalRequest = [method, path, '', canonicalHeaders, signedHeaders, payloadHash].join('\n');
+  const credentialScope = [dateStamp, region, service, 'aws4_request'].join('/');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, credentialScope, sha256(canonicalRequest)].join('\n');
+  const signingKey = getSigningKey(secretKey, dateStamp, region, service);
+  const signature = createHmac('sha256', signingKey).update(stringToSign).digest('hex');
+  const authHeader = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+  return Object.assign({}, allHeaders, { Authorization: authHeader });
+}
+// RFC3986 encoding for a single path segment (does not encode '/').
+function uriEncodeSegment(s) {
+  return encodeURIComponent(s).replace(/[!*'()]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+}
+
+// ── Session auth (unchanged) ──
 function verifyAdminToken(token) {
   const key = String(process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || '').trim();
   if (!key || !token || typeof token !== 'string' || token.indexOf('.') === -1) return false;
@@ -48,7 +88,7 @@ async function readRaw(req) {
   await new Promise((resolve) => { req.on('data', c => chunks.push(typeof c === 'string' ? Buffer.from(c) : c)); req.on('end', resolve); req.on('error', resolve); });
   return Buffer.concat(chunks);
 }
-// Minimal multipart/form-data parser → { file:Buffer, filename, contentType, fields:{} }
+// Minimal multipart/form-data parser (unchanged) → { file:Buffer, filename, contentType, fields:{} }
 function parseMultipart(buf, boundary) {
   const delim = Buffer.from('--' + boundary);
   let start = buf.indexOf(delim);
@@ -56,8 +96,8 @@ function parseMultipart(buf, boundary) {
   start += delim.length;
   const parts = [];
   while (start < buf.length) {
-    if (buf[start] === 0x2d && buf[start + 1] === 0x2d) break;          // closing "--"
-    if (buf[start] === 0x0d && buf[start + 1] === 0x0a) start += 2;     // skip CRLF
+    if (buf[start] === 0x2d && buf[start + 1] === 0x2d) break;
+    if (buf[start] === 0x0d && buf[start + 1] === 0x0a) start += 2;
     const next = buf.indexOf(delim, start);
     if (next < 0) break;
     let part = buf.slice(start, next);
@@ -97,7 +137,9 @@ export default async function handler(req, res) {
   try {
     const token = (req.headers.authorization || req.headers.Authorization || '').replace('Bearer ', '').trim();
     if (!(await isAuthed(token))) return res.status(401).json({ error: true, message: 'Unauthorized' });
-    if (!CF_ACCOUNT_ID || !CF_R2_TOKEN || !CF_R2_BUCKET) return res.status(200).json({ error: true, message: 'R2 is not configured (missing CF_ACCOUNT_ID / CF_R2_TOKEN / CF_R2_BUCKET).' });
+    if (!CF_ACCOUNT_ID || !CF_R2_BUCKET || !CF_R2_ACCESS_KEY_ID || !CF_R2_SECRET_ACCESS_KEY) {
+      return res.status(200).json({ error: true, message: 'R2 is not configured (missing CF_ACCOUNT_ID / CF_R2_BUCKET / CF_R2_ACCESS_KEY_ID / CF_R2_SECRET_ACCESS_KEY).' });
+    }
 
     const q = query(req);
     const ct = (req.headers['content-type'] || '');
@@ -115,7 +157,7 @@ export default async function handler(req, res) {
         contentType = parsed.fields.contentType || parsed.contentType || contentType;
       }
     } else {
-      fileBuf = raw;                                  // raw binary body
+      fileBuf = raw;
       if (!contentType) contentType = ct || '';
     }
 
@@ -123,12 +165,25 @@ export default async function handler(req, res) {
     if (!filename) filename = 'upload-' + Date.now();
     if (!contentType) contentType = 'application/octet-stream';
 
-    const key = [clean(folder), clean(filename)].filter(Boolean).join('/');
-    const url = 'https://' + CF_ACCOUNT_ID + '.r2.cloudflarestorage.com/' + CF_R2_BUCKET + '/' + key;
+    const keyParts = [clean(folder), clean(filename)].filter(Boolean);
+    const key = keyParts.join('/');                                            // <folder>/<filename>
+    const host = CF_ACCOUNT_ID + '.r2.cloudflarestorage.com';
+    // Canonical (signed) path is path-style + RFC3986-encoded segments.
+    const canonicalPath = '/' + [CF_R2_BUCKET].concat(key.split('/')).map(uriEncodeSegment).join('/');
+
+    const signed = signRequest({
+      method: 'PUT', host, path: canonicalPath,
+      headers: { 'content-type': contentType },
+      body: fileBuf,
+      accessKeyId: CF_R2_ACCESS_KEY_ID, secretKey: CF_R2_SECRET_ACCESS_KEY,
+      region: 'auto', service: 's3',
+    });
+    const sendHeaders = Object.assign({}, signed);
+    delete sendHeaders.host;   // let fetch set Host from the URL (matches the signed value)
 
     let r;
     try {
-      r = await fetch(url, { method: 'PUT', headers: { Authorization: 'Bearer ' + CF_R2_TOKEN, 'Content-Type': contentType }, body: fileBuf });
+      r = await fetch('https://' + host + canonicalPath, { method: 'PUT', headers: sendHeaders, body: fileBuf });
     } catch (e) {
       return res.status(200).json({ error: true, message: 'R2 request failed: ' + (e && e.message ? e.message : e) });
     }
@@ -136,6 +191,8 @@ export default async function handler(req, res) {
       const t = await r.text().catch(() => '');
       return res.status(200).json({ error: true, message: 'R2 upload failed: ' + r.status + ' ' + t });
     }
+    // Public access requires a configured public dev URL / custom domain on the bucket.
+    const url = 'https://' + host + '/' + CF_R2_BUCKET + '/' + key;
     return res.status(200).json({ success: true, url });
   } catch (e) {
     return res.status(200).json({ error: true, message: 'Upload failed: ' + (e && e.message ? e.message : e) });
