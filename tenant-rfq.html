@@ -113,6 +113,12 @@
         <button class="nr-btn" id="nr-url-btn" onclick="nrUrlFetch()">Fetch &amp; Fill →</button>
       </div>
       <div id="nr-url-status" style="font-size:12px;color:var(--text2);margin-bottom:10px;display:none;"></div>
+      <div class="nr-field" style="margin-top:8px;">
+        <label>Additional product images</label>
+        <div id="nr-extra-imgs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;min-height:40px;"></div>
+        <button type="button" class="nr-btn alt" style="margin-top:8px;font-size:12px;padding:6px 12px;" onclick="document.getElementById('nr-extra-input').click()">+ Add Image</button>
+        <input type="file" id="nr-extra-input" accept="image/*" multiple style="display:none">
+      </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
           <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
@@ -132,7 +138,7 @@
         <div class="nr-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
           <div class="nr-field"><label>Width</label><input id="nr-dim-w" type="number" min="0" step="0.1" placeholder="e.g. 5"></div>
           <div class="nr-field"><label>Height</label><input id="nr-dim-h" type="number" min="0" step="0.1" placeholder="e.g. 10"></div>
-          <div class="nr-field"><label>Length</label><input id="nr-dim-l" type="number" min="0" step="0.1" placeholder="e.g. 3"></div>
+          <div class="nr-field"><label>Length / Depth</label><input id="nr-dim-l" type="number" min="0" step="0.1" placeholder="e.g. 3"></div>
           <div class="nr-field"><label>Dim unit</label><select id="nr-dim-unit"><option value="cm">cm</option><option value="in">in</option><option value="mm">mm</option></select></div>
         </div>
         <div class="nr-grid">
@@ -371,7 +377,35 @@ function nrDimToNum(fieldId, unitId) {
   return v;
 }
 
+// ── Additional product images + draft editing ──
+let nrExtraImages = [];   // [{ id, dataUrl, base64 }] — base64 '' for existing (display-only) images
+let nrEditId = null;      // set while editing an existing draft RFQ
+let _nrExtraSeq = 0;
+function nrExtraAddBase64(b64) { nrExtraImages.push({ id: 'x' + (++_nrExtraSeq), dataUrl: 'data:image/jpeg;base64,' + b64, base64: b64 }); nrExtraRender(); }
+function nrExtraAddExisting(dataUrl) { nrExtraImages.push({ id: 'x' + (++_nrExtraSeq), dataUrl: dataUrl, base64: '' }); nrExtraRender(); }
+function nrExtraRemove(id) { nrExtraImages = nrExtraImages.filter(im => im.id !== id); nrExtraRender(); }
+function nrExtraRender() {
+  const wrap = nrg('nr-extra-imgs'); if (!wrap) return;
+  wrap.innerHTML = nrExtraImages.map(im =>
+    '<div style="position:relative;width:60px;height:60px;">' +
+      '<img src="' + im.dataUrl + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border,#334155);">' +
+      '<button type="button" onclick="nrExtraRemove(\'' + im.id + '\')" title="Remove" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e23636;color:#fff;border:none;font-size:12px;line-height:16px;cursor:pointer;padding:0;">×</button>' +
+    '</div>').join('');
+}
+function nrExtraWire() {
+  const inp = nrg('nr-extra-input'); if (!inp || inp._wired) return;
+  inp.addEventListener('change', () => {
+    Array.prototype.slice.call(inp.files || []).forEach(f => {
+      if (!f || (f.type || '').indexOf('image') === -1) return;
+      resizeImageToBase64(f, 1200, function (b64) { nrExtraAddBase64(b64); });
+    });
+    inp.value = '';
+  });
+  inp._wired = true;
+}
+
 function openNewRfqModal(prefill) {
+  nrEditId = null;   // default to create; openRFQ() sets this after calling, for draft edits
   nrg('nr-err').textContent = '';
   ['nr-desc', 'nr-spec', 'nr-qty', 'nr-fob', 'nr-size', 'nr-color', 'nr-inner', 'nr-master',
    'nr-dim-w', 'nr-dim-h', 'nr-dim-l', 'nr-url-input',
@@ -398,12 +432,15 @@ function openNewRfqModal(prefill) {
   nrCategoryChange();
   nrImgWire();
   nrImgReset();
+  nrExtraWire();
+  nrExtraImages = []; { const exi = nrg('nr-extra-imgs'); if (exi) exi.innerHTML = ''; }
+  { const dB = nrg('nr-draft'), sB = nrg('nr-submit'); if (dB) dB.textContent = 'Save as Draft'; if (sB) sB.textContent = 'Submit for Review'; }
   document.removeEventListener('paste', nrImgPaste);   // avoid double-binding if reopened
   document.addEventListener('paste', nrImgPaste);
   nrg('rfqDrawerBg').classList.add('open');
   setTimeout(() => { try { nrg('nr-desc').focus(); } catch (e) {} }, 80);
 }
-function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); }
+function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); nrEditId = null; }
 async function findMatchingFactories() {
   const cat = nrg('nr-category').value;
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
@@ -449,18 +486,39 @@ async function saveNewRfq(status) {
   };
   const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
   dBtn.disabled = true; sBtn.disabled = true;
-  let ok = false;
+  let ok = false, newId = null;
   try {
-    const r = await fetch(SUPA_URL + '/rest/v1/rfqs', {
-      method: 'POST',
-      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify(body),
-    });
-    ok = r.ok;
-    if (!ok) console.error('saveNewRfq failed', r.status, await r.text().catch(() => ''));
+    if (nrEditId) {
+      const r = await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + encodeURIComponent(nrEditId), {
+        method: 'PATCH',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(body),
+      });
+      ok = r.ok;
+      if (!ok) console.error('saveNewRfq PATCH failed', r.status, await r.text().catch(() => ''));
+    } else {
+      const r = await fetch(SUPA_URL + '/rest/v1/rfqs', {
+        method: 'POST',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify(body),
+      });
+      ok = r.ok;
+      if (ok) { const rows = await r.json().catch(() => []); const row = Array.isArray(rows) ? rows[0] : rows; newId = row && row.id; }
+      else console.error('saveNewRfq failed', r.status, await r.text().catch(() => ''));
+    }
   } catch (e) { ok = false; }
   dBtn.disabled = false; sBtn.disabled = false;
   if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
+  // Fire-and-forget: attach newly added product images to the freshly created RFQ.
+  if (newId && nrExtraImages.length) {
+    Promise.all(nrExtraImages.filter(im => im.base64).map((im, i) =>
+      fetch(SUPA_URL + '/rest/v1/rfq_images', {
+        method: 'POST',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ rfq_id: newId, tenant_id: TID, image_data: im.base64, image_url: '', sort_order: i }),
+      }).catch(() => {})
+    )).catch(() => {});
+  }
   closeNewRfqModal();
   await loadRFQs();
   showTab('rfq');
@@ -512,6 +570,42 @@ function renderRFQs() {
 async function openRFQ(id) {
   const r = rfqs.find(x => x.id === id);
   if (!r) return;
+
+  // Draft RFQs open in the editable New RFQ form (pre-filled) instead of the read-only panel.
+  if (r.status === 'draft') {
+    openNewRfqModal();
+    nrEditId = r.id;
+    const setV = (elId, val) => { const el = nrg(elId); if (el && val != null && val !== '') el.value = val; };
+    const catSel = nrg('nr-category'); if (catSel && r.category) catSel.value = r.category;
+    setV('nr-desc', r.item_description);
+    setV('nr-spec', r.detailed_specifications);
+    setV('nr-qty', r.quote_quantity);
+    setV('nr-fob', r.max_fob_price);
+    setV('nr-size', r.product_size);
+    if (r.unit_type) { const u = nrg('nr-unit'); if (u) u.value = String(r.unit_type).charAt(0).toUpperCase() + String(r.unit_type).slice(1); }
+    setV('nr-inner', r.inner_case_pack);
+    setV('nr-master', r.master_case_pack);
+    setV('nr-pkg-primary', r.packaging_primary);
+    setV('nr-pkg-closure', r.packaging_closures);
+    setV('nr-pkg-secondary', r.packaging_secondary);
+    setV('nr-pkg-finish', r.packaging_finish);
+    setV('nr-pkg-color', r.packaging_color);
+    setV('nr-pkg-notes', r.packaging_notes);
+    setV('nr-docs', r.product_docs_required);
+    setV('nr-dim-w', r.est_unit_width_cm);
+    setV('nr-dim-h', r.est_unit_height_cm);
+    setV('nr-dim-l', r.est_unit_length_cm);
+    { const c = nrg('nr-cosmetic'); if (c) { c.checked = !!r.is_cosmetic; c.dataset.userOverride = 'true'; } }
+    { const p = nrg('nr-prop65'); if (p && r.prop65_strategy) p.value = r.prop65_strategy; }
+    nrCategoryChange();
+    { const dB = nrg('nr-draft'), sB = nrg('nr-submit'); if (dB) dB.textContent = 'Save Changes'; if (sB) sB.textContent = 'Submit for Review'; }
+    // Load existing product images for this RFQ as thumbnails.
+    supa('rfq_images?rfq_id=eq.' + encodeURIComponent(r.id) + '&order=sort_order.asc').then(imgs => {
+      (imgs || []).forEach(im => { const du = im.image_data ? ('data:image/jpeg;base64,' + im.image_data) : (im.image_url || ''); if (du) nrExtraAddExisting(du); });
+    }).catch(() => {});
+    return;
+  }
+
   openPanel(rfqTitle(r), [r.category, r.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
 
   const [assignments, quotes] = await Promise.all([

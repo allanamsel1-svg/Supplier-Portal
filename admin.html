@@ -1111,6 +1111,28 @@
 
         <input type="hidden" id="rfq-id" />
 
+        <!-- Image / URL auto-fill + additional images -->
+        <div id="ax-img-zone" style="border:1.5px dashed #c8c8c0;background:#faf9f5;border-radius:10px;min-height:80px;display:flex;align-items:center;justify-content:center;gap:12px;text-align:center;padding:10px 14px;cursor:pointer;margin-bottom:10px;">
+          <input type="file" id="ax-img-input" accept="image/*" style="display:none">
+          <span id="ax-img-prompt" style="font-size:12.5px;color:#888;">📸 Paste or drop a product image to auto-fill fields below (optional)</span>
+          <div id="ax-img-loaded" style="display:none;align-items:center;gap:12px;">
+            <div style="position:relative;width:60px;height:60px;"><img id="ax-img-thumb" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e0e0d8;" alt=""><button type="button" id="ax-img-x" title="Remove" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e23636;color:#fff;border:none;font-size:12px;line-height:16px;cursor:pointer;padding:0;">×</button></div>
+            <span id="ax-img-status" style="font-size:12.5px;color:#888;"></span>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:11px;color:#999;margin:6px 0;">— or —</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input id="ax-url-input" placeholder="Paste a product URL (Amazon, Walmart, Faire, etc.)" style="flex:1;padding:9px 11px;border:1px solid #d0d0c8;border-radius:7px;background:#fff;color:#1a1a2e;font-size:13px;font-family:inherit;">
+          <button type="button" id="ax-url-btn" onclick="axUrlFetch()" style="padding:9px 16px;background:#1a1a2e;color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Fetch &amp; Fill →</button>
+        </div>
+        <div id="ax-url-status" style="font-size:12px;color:#888;margin-bottom:10px;display:none;"></div>
+        <div style="margin-bottom:1rem;">
+          <label style="font-size:12px;font-weight:600;color:#555;">Additional product images</label>
+          <div id="ax-extra-imgs" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;min-height:40px;"></div>
+          <button type="button" onclick="document.getElementById('ax-extra-input').click()" style="margin-top:8px;font-size:12px;padding:6px 12px;background:none;border:1px solid #d0d0c8;border-radius:7px;cursor:pointer;color:#1a1a2e;font-family:inherit;">+ Add Image</button>
+          <input type="file" id="ax-extra-input" accept="image/*" multiple style="display:none">
+        </div>
+
         <!-- Step 1: Product Info -->
         <div class="mgr-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Product Information</div>
@@ -6061,6 +6083,7 @@ async function showRFQForm(){
   g('rfq-project-number').textContent='Project number will be assigned on save';
   g('rfq-id').value='';
   resetRFQForm();
+  if(typeof axResetTool==='function')axResetTool();
   await populateRFQDropdowns();
 }
 
@@ -6078,6 +6101,7 @@ async function openRFQForm(id){
   g('rfq-form-title').textContent='Edit RFQ';
   g('rfq-project-number').textContent=rfq.project_number;
   g('rfq-id').value=rfq.id;
+  if(typeof axResetTool==='function')axResetTool();
   await populateRFQDropdowns();
   // Fill form fields
   g('rfq-category-id').value=rfq.category_id||'';
@@ -7185,6 +7209,107 @@ function toggleFactorySelect(id){
   else selectedFactoryIds[id]=true;
 }
 
+// ── RFQ image / URL auto-fill + additional images (admin form) ──
+var adminExtraImages = [];   // [{ id, dataUrl, base64 }]
+var _axSeq = 0, _axWired = false;
+function axToken(){ return localStorage.getItem('admin_session') || localStorage.getItem('tenant_token') || ''; }
+function axResize(file, maxPx, cb){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      cb(c.toDataURL('image/jpeg', 0.82).split(',')[1], 'image/jpeg');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+// Fill the admin form from an extracted item (reads d.items[0] or d). Reuses existing fields;
+// skips the structured packaging selector and the existing W/D/H dimension inputs.
+function axApply(d){
+  if(!d) return;
+  var it = (d.items && d.items[0]) ? d.items[0] : d;
+  if(it.product_name && g('rfq-description')) g('rfq-description').value = it.product_name;
+  if(it.short_description && g('rfq-specs')) g('rfq-specs').value = it.short_description;
+  if(it.category && g('rfq-category-id')){
+    var sel = g('rfq-category-id'), want = String(it.category).toLowerCase();
+    for(var i=0;i<sel.options.length;i++){ if((sel.options[i].textContent||'').toLowerCase().indexOf(want) !== -1){ sel.value = sel.options[i].value; if(typeof rfqCategoryChanged==='function'){ try{ rfqCategoryChanged(); }catch(e){} } break; } }
+  }
+  if(typeof rfqDescChanged==='function'){ try{ rfqDescChanged(); }catch(e){} }
+}
+function axImgReset(){
+  var p=g('ax-img-prompt'), l=g('ax-img-loaded'), s=g('ax-img-status'), t=g('ax-img-thumb');
+  if(p)p.style.display=''; if(l)l.style.display='none'; if(s)s.textContent=''; if(t)t.src='';
+}
+function axImgHandle(file){
+  if(!file || (file.type||'').indexOf('image')===-1) return;
+  if(g('ax-img-prompt'))g('ax-img-prompt').style.display='none';
+  if(g('ax-img-loaded'))g('ax-img-loaded').style.display='flex';
+  if(g('ax-img-status'))g('ax-img-status').textContent='⏳ Extracting product details...';
+  axResize(file, 1200, function(b64, mt){ if(g('ax-img-thumb'))g('ax-img-thumb').src='data:'+mt+';base64,'+b64; axExtractImage(b64, mt); });
+}
+async function axExtractImage(b64, mt){
+  var s=g('ax-img-status');
+  try{
+    var r=await fetch('/api/rfq-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+axToken()},body:JSON.stringify({image:b64,mediaType:mt})});
+    var d=await r.json().catch(function(){return {error:true};});
+    if(!r.ok||!d||d.error){ if(s)s.textContent='Could not extract — please fill in manually'; return; }
+    axApply(d); if(s)s.textContent='✓ Fields auto-filled — review & edit below';
+  }catch(e){ if(s)s.textContent='Could not extract — please fill in manually'; }
+}
+async function axUrlFetch(){
+  var url=(g('ax-url-input').value||'').trim(), s=g('ax-url-status'), btn=g('ax-url-btn');
+  if(!url) return;
+  s.style.display='block'; s.textContent='⏳ Fetching product details...'; if(btn)btn.disabled=true;
+  try{
+    var r=await fetch('/api/rfq-extract',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+axToken()},body:JSON.stringify({url:url})});
+    var d=await r.json().catch(function(){return {error:true};});
+    if(!r.ok||!d||d.error){ s.textContent='Could not fetch — check the URL and try again'; if(btn)btn.disabled=false; return; }
+    var item=d.items?d.items[0]:d;
+    axApply(item);
+    if(item.image_url && g('ax-img-thumb')){ g('ax-img-thumb').src=item.image_url; if(g('ax-img-prompt'))g('ax-img-prompt').style.display='none'; if(g('ax-img-loaded'))g('ax-img-loaded').style.display='flex'; if(g('ax-img-status'))g('ax-img-status').textContent='✓ Product fetched from URL'; }
+    s.textContent='✓ Fields auto-filled from URL — review & edit below';
+  }catch(e){ s.textContent='Could not fetch — please fill in manually'; }
+  if(btn)btn.disabled=false;
+}
+function axExtraRender(){
+  var wrap=g('ax-extra-imgs'); if(!wrap) return;
+  wrap.innerHTML=adminExtraImages.map(function(im){ return '<div style="position:relative;width:60px;height:60px;"><img src="'+im.dataUrl+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e0e0d8;"><button type="button" onclick="axExtraRemove(\''+im.id+'\')" title="Remove" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e23636;color:#fff;border:none;font-size:12px;line-height:16px;cursor:pointer;padding:0;">×</button></div>'; }).join('');
+}
+function axExtraRemove(id){ adminExtraImages=adminExtraImages.filter(function(im){return im.id!==id;}); axExtraRender(); }
+function axImgWire(){
+  if(_axWired) return;
+  var zone=g('ax-img-zone'), input=g('ax-img-input'), x=g('ax-img-x'), extra=g('ax-extra-input');
+  if(zone&&input){
+    zone.addEventListener('click',function(e){ if(e.target.closest('#ax-img-x')) return; input.click(); });
+    input.addEventListener('change',function(){ if(input.files&&input.files[0])axImgHandle(input.files[0]); input.value=''; });
+    ['dragenter','dragover'].forEach(function(ev){ zone.addEventListener(ev,function(e){ e.preventDefault(); zone.style.borderColor='#3b82f6'; zone.style.background='rgba(59,130,246,0.05)'; }); });
+    zone.addEventListener('dragleave',function(e){ if(!zone.contains(e.relatedTarget)){ zone.style.borderColor='#c8c8c0'; zone.style.background='#faf9f5'; } });
+    zone.addEventListener('drop',function(e){ e.preventDefault(); zone.style.borderColor='#c8c8c0'; zone.style.background='#faf9f5'; if(e.dataTransfer.files&&e.dataTransfer.files[0])axImgHandle(e.dataTransfer.files[0]); });
+  }
+  if(x) x.addEventListener('click',function(e){ e.stopPropagation(); axImgReset(); });
+  if(extra) extra.addEventListener('change',function(){ Array.prototype.slice.call(extra.files||[]).forEach(function(f){ if(f&&(f.type||'').indexOf('image')===0)axResize(f,1200,function(b64){ adminExtraImages.push({id:'ax'+(++_axSeq),dataUrl:'data:image/jpeg;base64,'+b64,base64:b64}); axExtraRender(); }); }); extra.value=''; });
+  // Clipboard paste — only acts while the RFQ form is visible.
+  document.addEventListener('paste',function(e){
+    var fv=g('rfq-form-view'); if(!fv||fv.style.display==='none') return;
+    var items=(e.clipboardData&&e.clipboardData.items)||[];
+    for(var i=0;i<items.length;i++){ if(items[i].type&&items[i].type.indexOf('image')!==-1){ var f=items[i].getAsFile(); if(f){ e.preventDefault(); axImgHandle(f); return; } } }
+  });
+  _axWired=true;
+}
+// Reset the image tool for a freshly opened RFQ form (and ensure handlers are wired).
+function axResetTool(){
+  adminExtraImages=[]; var ex=g('ax-extra-imgs'); if(ex)ex.innerHTML='';
+  axImgReset();
+  var us=g('ax-url-status'); if(us){ us.style.display='none'; us.textContent=''; }
+  var ui=g('ax-url-input'); if(ui)ui.value='';
+  axImgWire();
+}
+
 async function saveRFQ(action){
   var desc=g('rfq-description').value.trim();
   if(!desc){alert('Item description is required.');return;}
@@ -7284,6 +7409,14 @@ async function saveRFQ(action){
       if(savedRFQ){
         g('rfq-id').value=savedRFQ.id;
         g('rfq-project-number').textContent=savedRFQ.project_number;
+
+        // Attach any additional product images (paste/URL/extra-image tool) to a newly created RFQ.
+        if(!rfqId && savedRFQ.id && typeof adminExtraImages!=='undefined' && adminExtraImages.length){
+          Promise.all(adminExtraImages.filter(function(im){return im.base64;}).map(function(im,i){
+            return fetch(SB+'/rest/v1/rfq_images',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({rfq_id:savedRFQ.id,image_data:im.base64,image_url:'',sort_order:i})}).catch(function(){});
+          })).catch(function(){});
+          adminExtraImages=[];
+        }
 
         // Upload reference image if selected
         if(rfqImageFile&&savedRFQ.id){
