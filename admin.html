@@ -6085,6 +6085,7 @@ async function populateRFQEditForm(rfq){
     if(g('rfq-img-preview'))g('rfq-img-preview').style.display='block';
     if(g('rfq-img-name'))g('rfq-img-name').textContent='Image on file';
   }
+  axLoadRfqImages(rfq.id);
   rfqCategoryChanged();
   calcMargins();
   // Restore kit mode + components if this is a kit RFQ. (This is the edit path used
@@ -6146,6 +6147,7 @@ async function openRFQForm(id){
   if(typeof axResetTool==='function')axResetTool();
   await populateRFQDropdowns();
   // Fill form fields
+  axLoadRfqImages(rfq.id);
   axCatLoadFromRfq(rfq);
   axSetSelOrOther('rfq-uom', rfq.unit_of_measure||'');
   g('rfq-description').value=rfq.item_description||'';
@@ -7463,6 +7465,22 @@ function axExtraRender(){
   wrap.innerHTML=adminExtraImages.map(function(im){ return '<div style="position:relative;width:60px;height:60px;"><img src="'+im.dataUrl+'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid #e0e0d8;"><button type="button" onclick="axExtraRemove(\''+im.id+'\')" title="Remove" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#e23636;color:#fff;border:none;font-size:12px;line-height:16px;cursor:pointer;padding:0;">×</button></div>'; }).join('');
 }
 function axExtraRemove(id){ adminExtraImages=adminExtraImages.filter(function(im){return im.id!==id;}); axExtraRender(); }
+function axExtraAddExisting(dataUrl){ adminExtraImages.push({id:'ax'+(++_axSeq),dataUrl:dataUrl,base64:''}); axExtraRender(); }
+// Load existing rfq_images into the edit form as thumbnails (robust src reconstruction).
+async function axLoadRfqImages(rfqId){
+  if(!rfqId)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/rfq_images?rfq_id=eq.'+encodeURIComponent(rfqId)+'&order=sort_order.asc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var imgs=r.ok?await r.json():[];
+    (imgs||[]).forEach(function(im){
+      var du='';
+      var data=(im.image_data||'').trim();
+      if(data) du=data.indexOf('data:')===0?data:('data:image/jpeg;base64,'+data);
+      else if((im.image_url||'').trim()) du=im.image_url;
+      if(du) axExtraAddExisting(du);
+    });
+  }catch(e){}
+}
 function axImgWire(){
   if(_axWired) return;
   var zone=g('ax-img-zone'), input=g('ax-img-input'), x=g('ax-img-x'), extra=g('ax-extra-input');

@@ -1221,7 +1221,13 @@ async function openRFQ(id) {
     { const dB = nrg('nr-draft'), sB = nrg('nr-submit'); if (dB) dB.textContent = 'Save Changes'; if (sB) sB.textContent = 'Submit for Review'; }
     // Load existing product images for this RFQ as thumbnails.
     supa('rfq_images?rfq_id=eq.' + encodeURIComponent(r.id) + '&order=sort_order.asc').then(imgs => {
-      (imgs || []).forEach(im => { const du = im.image_data ? ('data:image/jpeg;base64,' + im.image_data) : (im.image_url || ''); if (du) nrExtraAddExisting(du); });
+      (imgs || []).forEach(im => {
+        let du = '';
+        const data = (im.image_data || '').trim();
+        if (data) du = data.indexOf('data:') === 0 ? data : ('data:image/jpeg;base64,' + data);
+        else if ((im.image_url || '').trim()) du = im.image_url;
+        if (du) nrExtraAddExisting(du);
+      });
     }).catch(() => {});
     return;
   }
