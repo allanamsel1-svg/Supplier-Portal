@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — TBG Sourcing</title>
+<link rel="stylesheet" href="tenant-portal.css">
+<script>(function(){var t=localStorage.getItem("tenant_theme")||"dark";document.documentElement.className=t==="light"?"light-mode":"";})();</script>
+<style>
+  .btn-sm{font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:7px;border:1px solid var(--border,#334155);background:var(--card-bg,#1e293b);color:var(--text,#e2e8f0);cursor:pointer;}
+  .btn-sm:hover{opacity:0.88;}
+  .btn-primary{font-family:inherit;font-size:13px;font-weight:600;padding:8px 16px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;}
+  .btn-primary:hover{background:#1d4ed8;}
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+  /* Simple modal */
+  .st-overlay{position:fixed;inset:0;background:rgba(2,6,16,0.6);display:none;align-items:center;justify-content:center;z-index:80;}
+  .st-overlay.open{display:flex;}
+  .st-modal{background:var(--card-bg,#0f172a);border:1px solid var(--border,#334155);border-radius:12px;padding:22px;width:380px;max-width:92vw;}
+  .st-modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text,#e2e8f0);}
+  .st-field{margin:10px 0;}
+  .st-field label{display:block;font-size:12px;font-weight:600;margin-bottom:4px;color:var(--text2,#94a3b8);}
+  .st-field input,.st-field select{width:100%;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--bg2,#0d1424);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;box-sizing:border-box;}
+  .st-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  .st-msg{font-size:12px;margin-top:8px;min-height:16px;}
+</style>
+</head>
+<body>
+<div id="sidebar"></div>
+
+<div class="main">
+  <div class="page-header">
+    <div class="page-title">Settings</div>
+    <div class="page-sub" id="pageSub">Users and email accounts</div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab" data-tab="users">Users <span class="tab-count" id="cnt-users"></span></button>
+    <button class="tab" data-tab="email">Email Accounts</button>
+  </div>
+
+  <div class="tab-pane" id="pane-users">
+    <div class="toolbar">
+      <div class="page-sub">People with access to this tenant portal.</div>
+      <button class="btn-primary" onclick="openInvite()">+ Invite User</button>
+    </div>
+    <div id="box-users"><div class="loading">Loading users…</div></div>
+  </div>
+
+  <div class="tab-pane" id="pane-email">
+    <div class="toolbar">
+      <div class="page-sub">Email accounts connected to this tenant.</div>
+      <button class="btn-primary" onclick="connectEmail()">+ Connect Email</button>
+    </div>
+    <div id="box-email"></div>
+  </div>
+</div>
+
+<!-- Invite User modal -->
+<div class="st-overlay" id="inviteOverlay">
+  <div class="st-modal">
+    <h3>Invite User</h3>
+    <div class="st-field"><label>Name</label><input id="inv-name" placeholder="e.g. Jordan Lee"></div>
+    <div class="st-field"><label>Email</label><input id="inv-email" type="email" placeholder="name@company.com"></div>
+    <div class="st-field"><label>Role</label><select id="inv-role"><option value="admin">Admin</option><option value="viewer">Viewer</option></select></div>
+    <div class="st-msg" id="inv-msg"></div>
+    <div class="st-actions">
+      <button class="btn-sm" onclick="closeInvite()">Cancel</button>
+      <button class="btn-primary" id="inv-send" onclick="sendInvite()">Send Invite</button>
+    </div>
+  </div>
+</div>
+
+<script src="tenant-shared.js"></script>
+<script>
+let TID = null;
+const TABS = ['users', 'email'];
+const loaded = {};
+function stToken() { return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
+
+function showTab(tab) {
+  if (!TABS.includes(tab)) tab = 'users';
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById('pane-' + tab).classList.add('active');
+  if (tab === 'email' && !loaded.email) { loaded.email = true; loadEmail(); }
+}
+function goTab(tab) { location.hash = tab === 'users' ? '' : '#' + tab; }
+
+function roleBadge(r) {
+  const role = (r || 'viewer').toLowerCase();
+  const c = role === 'admin' ? ['#60a5fa', 'rgba(59,130,246,0.15)'] : role === 'designer' ? ['#c084fc', 'rgba(192,132,252,0.15)'] : ['#94a3b8', 'rgba(148,163,184,0.15)'];
+  return `<span class="badge" style="color:${c[0]};background:${c[1]};padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">${esc(role)}</span>`;
+}
+function statusBadge(active) {
+  return active
+    ? '<span class="badge" style="color:#22c55e;background:rgba(34,197,94,0.15);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">active</span>'
+    : '<span class="badge" style="color:#ef4444;background:rgba(239,68,68,0.15);padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">inactive</span>';
+}
+
+// ── Tab 1: Users ──
+async function loadUsers() {
+  const users = await supa(`tenant_users?tenant_id=eq.${TID}&select=id,full_name,email,role,is_active&order=created_at.asc`);
+  document.getElementById('cnt-users').textContent = users.length || '';
+  const box = document.getElementById('box-users');
+  if (!users.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">👥</span>No users yet — invite your first teammate.</div>'; return; }
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>${
+    users.map(u => `<tr>
+      <td>${esc(u.full_name || '—')}</td>
+      <td>${esc(u.email || '—')}</td>
+      <td>${roleBadge(u.role)}</td>
+      <td>${statusBadge(u.is_active)}</td></tr>`).join('')
+  }</tbody></table>`;
+}
+
+function openInvite() {
+  document.getElementById('inv-name').value = '';
+  document.getElementById('inv-email').value = '';
+  document.getElementById('inv-role').value = 'admin';
+  document.getElementById('inv-msg').textContent = '';
+  document.getElementById('inviteOverlay').classList.add('open');
+}
+function closeInvite() { document.getElementById('inviteOverlay').classList.remove('open'); }
+
+async function sendInvite() {
+  const name = (document.getElementById('inv-name').value || '').trim();
+  const email = (document.getElementById('inv-email').value || '').trim();
+  const role = document.getElementById('inv-role').value || 'viewer';
+  const msg = document.getElementById('inv-msg'), btn = document.getElementById('inv-send');
+  if (!name || !email) { msg.style.color = '#f87171'; msg.textContent = 'Name and email are required.'; return; }
+  msg.style.color = 'var(--text2,#94a3b8)'; msg.textContent = 'Sending…'; btn.disabled = true;
+  try {
+    const r = await fetch('/api/tenant-auth?action=invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + stToken() },
+      body: JSON.stringify({ name, email, role }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || (d && d.error)) { msg.style.color = '#f87171'; msg.textContent = (d && (d.error || d.message)) || 'Could not send invite.'; btn.disabled = false; return; }
+    msg.style.color = '#22c55e'; msg.textContent = '✓ Invite sent.';
+    await loadUsers();
+    setTimeout(closeInvite, 800);
+  } catch (e) { msg.style.color = '#f87171'; msg.textContent = 'Could not send invite — please try again.'; }
+  btn.disabled = false;
+}
+
+// ── Tab 2: Email Accounts ──
+async function loadEmail() {
+  const box = document.getElementById('box-email');
+  // No email-accounts data source yet — show the coming-soon placeholder.
+  box.innerHTML = '<div class="empty"><span class="empty-icon">📧</span>'
+    + '<div style="font-size:16px;color:#cbd5e1;margin-bottom:6px;">No email accounts connected</div>'
+    + 'Connect a Gmail, Outlook, or SMTP account to send and receive from this portal.<br>'
+    + '<span style="font-size:13px;color:#64748b;">Email integration coming soon.</span></div>';
+}
+function connectEmail() { alert('Email integration coming soon'); }
+
+(async function init() {
+  const user = await tenantAuth();
+  if (!user || !user.tenant) return;
+  TID = user.tenant.id;
+  renderSidebar(user);
+  document.getElementById('pageSub').textContent = user.tenant.name + ' · settings';
+
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.getElementById('inviteOverlay').addEventListener('click', e => { if (e.target === document.getElementById('inviteOverlay')) closeInvite(); });
+  window.addEventListener('hashchange', () => showTab((location.hash || '#users').slice(1)));
+
+  await loadUsers();
+  showTab((location.hash || '#users').slice(1));
+})();
+</script>
+</body>
+</html>

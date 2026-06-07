@@ -120,6 +120,7 @@ const TENANT_NAV = [
   { section: 'Overview', items: [
     { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html', feature: null },
     { icon: '💰', label: 'Financials', href: 'tenant-financials.html', feature: 'financials' },
+    { icon: '⚙', label: 'Settings', href: 'tenant-settings.html', feature: null },
   ]},
   { section: 'Operations', items: [
     { icon: '📦', label: 'Open Orders', href: 'tenant-operations.html#orders', feature: 'po_management' },
@@ -129,6 +130,7 @@ const TENANT_NAV = [
     { icon: '🔍', label: 'Inspections', href: 'tenant-operations.html#inspections', feature: 'inspections' },
     { icon: '📜', label: 'Certifications', href: 'tenant-operations.html#certifications', feature: 'factory_portal' },
     { icon: '📈', label: 'Forecasting', href: 'tenant-operations.html#forecasting', badge: 'BETA', feature: 'forecasting' },
+    { icon: '📊', label: 'Projections', href: 'projections.html', feature: 'financials' },
   ]},
   { section: 'Factories', items: [
     { icon: '🏭', label: 'All Factories', href: 'tenant-factories.html', feature: 'factory_portal' },
@@ -157,6 +159,7 @@ const TENANT_NAV = [
     { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html#rfq', feature: 'rfq' },
     { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd', feature: 'product_development' },
     { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus', feature: 'sku_library' },
+    { icon: '⚙', label: 'SKU Setup', href: 'setup.html', newtab: true, feature: 'sku_library' },
   ]},
 ];
 
@@ -182,7 +185,8 @@ function renderSidebar(user) {
   const nav = TENANT_NAV.map(sec => {
     const items = sec.items.filter(allowed).map(it => {
       const badge = it.badge ? `<span class="beta-tag">${esc(it.badge)}</span>` : '';
-      return `<a class="nav-item" data-href="${esc(it.href)}" href="${esc(it.href)}"><span class="icon">${it.icon}</span>${esc(it.label)}${badge}</a>`;
+      const tgt = it.newtab ? ' target="_blank" rel="noopener"' : '';
+      return `<a class="nav-item" data-href="${esc(it.href)}" href="${esc(it.href)}"${tgt}><span class="icon">${it.icon}</span>${esc(it.label)}${badge}</a>`;
     }).join('');
     // Hide the whole section if no items survived the feature filter.
     if (!items) return '';
