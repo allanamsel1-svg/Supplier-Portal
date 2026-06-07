@@ -12,6 +12,9 @@
       { icon: '▦',  label: 'Dashboard',        panel: 'dashboard' },
       { icon: '💰', label: 'Financials',        href: 'financials.html' },
       { icon: '🎯', label: 'Intel Daily',       href: 'intel_daily.html' },
+      { icon: '👥', label: 'Tenants',      href: 'tenant-admin.html' },
+      { icon: '📤', label: 'Upload Files', panel: 'upload' },
+      { icon: '⚙',  label: 'Settings',     panel: 'settings' },
       { icon: '🗺', label: 'System',            href: 'roadmap.html' },
     ]},
     { section: 'Operations', items: [
@@ -50,14 +53,7 @@
       { icon: '📋', label: 'RFQs',            href: 'tenant-rfq.html#rfq' },
       { icon: '🧪', label: 'Product Dev',     href: 'tenant-rfq.html#pd' },
       { icon: '📦', label: 'SKU Library',     href: 'tenant-rfq.html#skus' },
-    ]},
-    { section: 'Products', items: [
-      { icon: '⚙',  label: 'Setup',             href: 'setup.html',      newtab: true },
-    ]},
-    { section: 'System', items: [
-      { icon: '👥', label: 'Tenants',           href: 'tenant-admin.html' },
-      { icon: '📤', label: 'Upload Files',      panel: 'upload' },
-      { icon: '⚙',  label: 'Settings',          panel: 'settings' },
+      { icon: '⚙', label: 'SKU Setup', href: 'setup.html', newtab: true },
     ]},
   ];
 
