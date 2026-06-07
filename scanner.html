@@ -9,6 +9,13 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-W8YDH8LTSB');</script>
   <style>
+    /* These theme vars were referenced everywhere (background:var(--bg), color:var(--text))
+       but never defined. When this page is embedded as an iframe inside the dark tenant
+       Card Scanner tab, the undefined --bg made the body transparent (dark parent showing
+       through) while text fell back to default black = unreadable dark-on-dark. Define an
+       explicit opaque light surface so it reads cleanly in any context (light or dark). */
+    :root { --bg: #ffffff; --bg2: #f8f8f4; --text: #1a1a2e; }
+    html, body { background: var(--bg); color: var(--text); }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     /* Overflow safety net: clamp media/form controls so nothing bleeds past its container; wrap long unbroken strings. */
     img, video, table, input, select, textarea { max-width: 100%; }

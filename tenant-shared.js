@@ -175,6 +175,13 @@ function esc(s) {
 // Build + mount the sidebar. `user` is the validated user object.
 function renderSidebar(user) {
   renderHeader(user);
+  // In an embed panel (iframe with ?embed=1, e.g. tenant-factories.html's Factory Audits
+  // tab embedding factory-audits.html), don't render the sidebar — it would appear inside
+  // the iframe and overlap the host page's sidebar. We must skip here rather than rely on
+  // the page's "#sidebar{display:none}" embed CSS, because below we replace #sidebar with
+  // .sidebar (outerHTML), which that selector can't hide. Returning leaves the empty
+  // #sidebar placeholder, which the embed CSS correctly hides.
+  try { if (new URLSearchParams(location.search).get('embed') === '1' || window.self !== window.top) return; } catch (e) {}
   const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
   const who = (user && (user.full_name || user.email)) || '—';
   TENANT_FEATURES = (user && user.tenant && user.tenant.features) || {};

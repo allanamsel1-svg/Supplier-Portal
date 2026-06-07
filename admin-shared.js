@@ -243,6 +243,16 @@
     window.addEventListener('hashchange', highlight);
   }
 
-  if (document.body) init();
-  else document.addEventListener('DOMContentLoaded', init);
+  // Don't render the sidebar when this page is embedded inside the admin shell
+  // (e.g. admin.html's Factory Audits / Inspections / Artwork iframe panels use
+  // ?embed=1). Otherwise a second sidebar renders inside the iframe, overlapping
+  // the shell's sidebar. embed=1 OR being in an iframe both suppress it.
+  var IS_EMBEDDED = (function () {
+    try { return new URLSearchParams(location.search).get('embed') === '1' || window.self !== window.top; }
+    catch (e) { return false; }
+  })();
+  if (!IS_EMBEDDED) {
+    if (document.body) init();
+    else document.addEventListener('DOMContentLoaded', init);
+  }
 })();
