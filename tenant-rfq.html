@@ -43,6 +43,7 @@
   .nr-img-status{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:7px;}
   .nr-img-spinner{width:14px;height:14px;border:2px solid rgba(120,120,120,0.3);border-top-color:var(--text);border-radius:50%;animation:nrimgspin 0.7s linear infinite;display:inline-block;}
   @keyframes nrimgspin{to{transform:rotate(360deg);}}
+  .nr-img-queue{display:none;align-items:center;justify-content:space-between;gap:10px;background:rgba(59,130,246,0.08);border:1px solid #3b82f6;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12.5px;color:var(--text);}
 </style>
 </head>
 <body>
@@ -107,6 +108,10 @@
           <span class="nr-img-status" id="nr-img-status"></span>
         </div>
       </div>
+      <div class="nr-img-queue" id="nr-img-queue">
+        <span id="nr-img-queue-label"></span>
+        <button type="button" class="nr-btn alt" id="nr-img-skip" style="padding:4px 10px;font-size:12px;" onclick="nrImgSkip()">✗ Discard this item</button>
+      </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
           <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
@@ -114,6 +119,7 @@
         </div>
         <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
         <div class="nr-field"><label>Basic specifications</label><textarea id="nr-spec" placeholder="Materials, formula, packaging, claims…"></textarea></div>
+        <div class="nr-field" id="nr-factory-note-wrap" style="display:none;"><div style="font-size:12.5px;color:var(--text2);background:var(--bg2);border:1px solid var(--border,#334155);border-radius:8px;padding:8px 10px;">🏭 Recommended factory: <span id="nr-factory-note-text"></span></div></div>
         <div class="nr-grid">
           <div class="nr-field"><label>Quantity</label><input id="nr-qty" type="number" min="0" placeholder="e.g. 5000"></div>
           <div class="nr-field"><label>Target FOB cost (optional)</label><input id="nr-fob" type="number" min="0" step="0.01" placeholder="e.g. 2.50"></div>
@@ -223,7 +229,8 @@ function nrCategoryChange() {
   nrSelectedFactories = [];
 }
 // ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
-let _nrImgWired = false;
+// May detect MULTIPLE products in one image; each becomes a pre-filled modal, shown in a queue.
+let _nrImgWired = false, _nrImgQueue = [], _nrImgTotal = 0, _nrImgShown = 0;
 function nrImgToken() { return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
 function nrImgWire() {
   if (_nrImgWired) return;
@@ -243,6 +250,8 @@ function nrImgReset() {
   if (l) l.style.display = 'none';
   if (s) s.innerHTML = '';
   if (t) t.src = '';
+  const q = nrg('nr-img-queue'); if (q) q.style.display = 'none';
+  const note = nrg('nr-factory-note-wrap'); if (note) note.style.display = 'none';
 }
 // Document-level paste handler — added only while the modal is open. Images only.
 function nrImgPaste(e) {
@@ -254,18 +263,33 @@ function nrImgPaste(e) {
     }
   }
 }
-function nrImgHandle(file) {
-  if (!file || (file.type || '').indexOf('image') === -1) return;
+// Resize client-side via canvas so we never POST a multi-MB image (avoids 413).
+function resizeImageToBase64(file, maxPx, callback) {
   const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = reader.result || '';
-    const t = nrg('nr-img-thumb'); if (t) t.src = dataUrl;
-    nrg('nr-img-prompt').style.display = 'none';
-    nrg('nr-img-loaded').style.display = 'flex';
-    const s = nrg('nr-img-status'); if (s) s.innerHTML = '<span class="nr-img-spinner"></span> Extracting product details...';
-    nrImgExtract(String(dataUrl).split(',')[1] || '', file.type || 'image/jpeg');
+  reader.onload = function (e) {
+    const img = new Image();
+    img.onload = function () {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const b64 = canvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+      callback(b64, 'image/jpeg');
+    };
+    img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+function nrImgHandle(file) {
+  if (!file || (file.type || '').indexOf('image') === -1) return;
+  nrg('nr-img-prompt').style.display = 'none';
+  nrg('nr-img-loaded').style.display = 'flex';
+  const s = nrg('nr-img-status'); if (s) s.innerHTML = '<span class="nr-img-spinner"></span> Extracting product details...';
+  resizeImageToBase64(file, 1200, function (b64, mediaType) {
+    const t = nrg('nr-img-thumb'); if (t) t.src = 'data:' + mediaType + ';base64,' + b64;
+    nrImgExtract(b64, mediaType);
+  });
 }
 async function nrImgExtract(base64, mediaType) {
   const s = nrg('nr-img-status');
@@ -273,11 +297,18 @@ async function nrImgExtract(base64, mediaType) {
     const r = await fetch('/api/rfq-extract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + nrImgToken() }, body: JSON.stringify({ image: base64, mediaType }) });
     const d = await r.json().catch(() => ({ error: true }));
     if (!r.ok || !d || d.error) { if (s) s.textContent = 'Could not extract — please fill in manually'; return; }
-    nrImgApply(d);
-    if (s) s.textContent = '✓ Fields auto-filled — review & edit below';
+    const items = Array.isArray(d.items) ? d.items.filter(x => x && typeof x === 'object') : [];
+    if (!items.length) { if (s) s.textContent = 'No products detected — please fill in manually'; return; }
+    _nrImgQueue = items.slice();
+    _nrImgTotal = items.length;
+    _nrImgShown = 1;
+    nrImgApply(_nrImgQueue.shift());   // fill the first item into the already-open modal
+    nrImgShowQueue();
+    if (s) s.textContent = items.length > 1 ? ('✓ ' + items.length + ' products detected — review item 1 below') : '✓ Fields auto-filled — review & edit below';
   } catch (e) { if (s) s.textContent = 'Could not extract — please fill in manually'; }
 }
 function nrImgApply(d) {
+  if (!d) return;
   if (d.product_name) { const el = nrg('nr-desc'); if (el) el.value = d.product_name; }
   if (d.short_description) { const el = nrg('nr-spec'); if (el) el.value = d.short_description; }
   if (d.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = d.packaging_type; }
@@ -289,6 +320,34 @@ function nrImgApply(d) {
       if (match) { sel.value = match; nrCategoryChange(); }
     }
   }
+  const noteWrap = nrg('nr-factory-note-wrap'), noteText = nrg('nr-factory-note-text');
+  if (noteWrap && noteText) {
+    if (d.recommended_factory_type) { noteText.textContent = d.recommended_factory_type; noteWrap.style.display = ''; }
+    else { noteWrap.style.display = 'none'; }
+  }
+}
+// Multi-item queue: one pre-filled modal per detected product (save or discard, then the next).
+function nrImgShowQueue() {
+  const banner = nrg('nr-img-queue'), label = nrg('nr-img-queue-label');
+  if (_nrImgTotal > 1 && banner) { if (label) label.textContent = '📦 Item ' + _nrImgShown + ' of ' + _nrImgTotal + ' detected — review, then save or discard.'; banner.style.display = 'flex'; }
+  else if (banner) { banner.style.display = 'none'; }
+}
+function nrImgFillNext() {
+  if (!_nrImgQueue.length) { nrImgEndFlow(); return; }
+  const item = _nrImgQueue.shift();
+  _nrImgShown++;
+  openNewRfqModal();      // full field reset; keeps the modal open. Queue state survives.
+  nrImgApply(item);
+  nrImgShowQueue();
+}
+function nrImgSkip() {
+  if (_nrImgQueue.length) { nrImgFillNext(); }
+  else { nrImgEndFlow(); nrImgReset(); }   // discarded the last item — end the flow, leave modal open
+}
+function nrImgEndFlow() {
+  _nrImgQueue = []; _nrImgTotal = 0; _nrImgShown = 0;
+  const banner = nrg('nr-img-queue'); if (banner) banner.style.display = 'none';
+  const noteWrap = nrg('nr-factory-note-wrap'); if (noteWrap) noteWrap.style.display = 'none';
 }
 
 function openNewRfqModal(prefill) {
@@ -321,7 +380,7 @@ function openNewRfqModal(prefill) {
   nrg('rfqDrawerBg').classList.add('open');
   setTimeout(() => { try { nrg('nr-desc').focus(); } catch (e) {} }, 80);
 }
-function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); }
+function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); nrImgEndFlow(); }
 async function findMatchingFactories() {
   const cat = nrg('nr-category').value;
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
@@ -376,8 +435,10 @@ async function saveNewRfq(status) {
   } catch (e) { ok = false; }
   dBtn.disabled = false; sBtn.disabled = false;
   if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
-  closeNewRfqModal();
   await loadRFQs();
+  // Multi-item image flow: keep the modal open and load the next detected item.
+  if (_nrImgQueue.length) { err.textContent = ''; nrImgFillNext(); return; }
+  closeNewRfqModal();
   showTab('rfq');
 }
 // Cosmetic checkbox manual override flag.

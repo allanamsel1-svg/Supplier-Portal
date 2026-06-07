@@ -64,15 +64,21 @@ async function readBody(req) {
   return b || {};
 }
 
-function parseJson(text) {
-  const t = (text || '').trim();
-  try { return JSON.parse(t.replace(/```json|```/g, '').trim()); } catch { /* try substring */ }
-  const s = t.indexOf('{'), e = t.lastIndexOf('}');
-  if (s !== -1 && e !== -1) { try { return JSON.parse(t.substring(s, e + 1)); } catch { /* give up */ } }
+// Parse model output into an array of product objects. It may return a JSON array, a single
+// object, or either wrapped in code fences — normalize all of those to an array.
+function parseItems(text) {
+  const t = (text || '').trim().replace(/```json|```/g, '').trim();
+  let v = null;
+  try { v = JSON.parse(t); } catch { /* try to locate a JSON array/object substring */ }
+  if (v == null) { const a = t.indexOf('['), b = t.lastIndexOf(']'); if (a !== -1 && b !== -1) { try { v = JSON.parse(t.substring(a, b + 1)); } catch {} } }
+  if (v == null) { const o = t.indexOf('{'), c = t.lastIndexOf('}'); if (o !== -1 && c !== -1) { try { v = JSON.parse(t.substring(o, c + 1)); } catch {} } }
+  if (v == null) return null;
+  if (Array.isArray(v)) return v.filter(x => x && typeof x === 'object');
+  if (typeof v === 'object') return [v];
   return null;
 }
 
-const SYSTEM = "You are a product analyst. Given a product image, extract: product_name, category (pick from: Personal Care, Hair Care, Skin Care, Home Care, Consumer Electronics, Pet, Baby, Food & Beverage, Other), short_description (1-2 sentences), estimated_retail_price_usd (number only, null if unknown), packaging_type (e.g. bottle, jar, tube, box, pouch, null if unknown). Return ONLY valid JSON, no markdown, no backticks.";
+const SYSTEM = "You are a product analyst. Look at this image carefully. It may contain one or multiple distinct products. For EACH product you can identify, extract: product_name, category (pick from: Personal Care, Hair Care, Skin Care, Home Care, Consumer Electronics, Pet, Baby, Food & Beverage, Other), short_description (1-2 sentences), estimated_retail_price_usd (number only, null if unknown), packaging_type (e.g. bottle, jar, tube, box, pouch, null if unknown), recommended_factory_type (1 sentence describing what kind of factory should make this — e.g. 'Food-grade snack manufacturer specializing in dried/freeze-dried products'). Return ONLY a valid JSON array of objects, even if there is only one product. No markdown, no backticks, no explanation.";
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -98,10 +104,10 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL, max_tokens: 500, system: SYSTEM,
+          model: MODEL, max_tokens: 1200, system: SYSTEM,
           messages: [{ role: 'user', content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: image } },
-            { type: 'text', text: 'Extract the RFQ fields from this product image as JSON.' },
+            { type: 'text', text: 'List every distinct product in this image as a JSON array of objects.' },
           ] }],
         }),
       });
@@ -112,11 +118,13 @@ export default async function handler(req, res) {
 
     logCost(tid, 'rfq_extract', MODEL, d.usage);
 
-    const parsed = parseJson((d.content && d.content[0] && d.content[0].text) || '');
-    if (!parsed || typeof parsed !== 'object') return res.status(200).json({ error: true, message: 'Could not parse AI response' });
+    const items = parseItems((d.content && d.content[0] && d.content[0].text) || '');
+    if (!items || !items.length) return res.status(200).json({ error: true, message: 'Could not parse AI response' });
 
-    parsed.tenant_id = tid;   // so the client can insert the draft RFQ under the right tenant
-    return res.status(200).json(parsed);
+    // Primary response shape: { items: [...] }. For backward compatibility with the older
+    // single-object consumer (scanner.html), also spread the first item's fields at top level.
+    const first = items[0] || {};
+    return res.status(200).json(Object.assign({}, first, { items: items, tenant_id: tid }));
   } catch (e) {
     return res.status(200).json({ error: true, message: 'Extraction failed' });
   }
