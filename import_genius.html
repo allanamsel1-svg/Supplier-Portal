@@ -7,51 +7,116 @@
 <script>(function(){var t=localStorage.getItem('admin_theme')||'light';if(t==='dark')document.documentElement.classList.add('admin-dark');})();</script>
 <script src="admin-theme.js"></script>
 <style>
-.fx{max-width:1100px;margin:0 auto;padding:1.5rem 2rem;}
-
-/* Hero rate card — visual language matches intel_daily.html id-digest / hub-summary */
-.fx-hero{background:linear-gradient(135deg,#1a1a2e 0%,#2244cc 100%);color:#fff;border-radius:14px;padding:1.5rem 1.75rem;margin-bottom:1.25rem;}
-.fx-hero.warn{background:linear-gradient(135deg,#4a3a00 0%,#a07a00 100%);}
-.fx-hero.alert{background:linear-gradient(135deg,#5a0a0a 0%,#a22 100%);}
-.fx-h-label{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;opacity:0.75;margin-bottom:6px;}
-.fx-h-date{font-size:11px;opacity:0.65;margin-bottom:18px;}
-.fx-h-row{display:flex;align-items:baseline;gap:24px;flex-wrap:wrap;}
-.fx-h-rate{font-size:44px;font-weight:700;letter-spacing:-0.02em;line-height:1;font-variant-numeric:tabular-nums;}
-.fx-h-delta{font-size:15px;font-weight:600;display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(255,255,255,0.14);border-radius:8px;font-variant-numeric:tabular-nums;}
-.fx-h-delta .arrow{font-size:14px;}
-.fx-h-note{font-size:11.5px;opacity:0.85;margin-top:14px;line-height:1.5;}
-.fx-h-empty{font-size:13px;opacity:0.7;font-style:italic;}
-
-/* Chart */
-.fx-chart-wrap{padding:0.25rem 0;}
-.fx-chart{width:100%;height:200px;display:block;}
-.fx-chart-meta{display:flex;justify-content:space-between;font-size:11px;color:#888;margin-top:4px;padding:0 4px;}
-.fx-chart-empty{padding:1.5rem;text-align:center;color:#888;font-size:13px;font-style:italic;}
-
-/* Table */
-.fx-table{width:100%;border-collapse:collapse;font-size:13px;}
-.fx-table th{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.06em;text-align:left;padding:8px 12px;border-bottom:1px solid #e0e0d8;}
-.fx-table th.num{text-align:right;}
-.fx-table td{padding:10px 12px;border-bottom:0.5px dashed #f0f0e8;}
-.fx-table tr:last-child td{border-bottom:none;}
-.fx-table .num{font-variant-numeric:tabular-nums;text-align:right;}
-.fx-table .delta-up{color:#a22;font-weight:600;}
-.fx-table .delta-down{color:#1a7a1a;font-weight:600;}
-.fx-table .delta-flat{color:#888;}
-
-.fx-loading{padding:1.5rem;text-align:center;color:#888;font-size:13px;}
-.fx-error{padding:1rem;color:#a22;font-size:12px;background:#fff0f0;border:1px solid #fdd;border-radius:8px;}
-
-.fx-section-head{margin-bottom:0.85rem;}
+.ig-wrap{max-width:1300px;margin:0 auto;padding:1.5rem 2rem;}
+.ig-upload-zone{border:2px dashed #c0c0b8;border-radius:10px;padding:2rem;text-align:center;cursor:pointer;transition:all 0.15s;background:#fafaf8;margin-bottom:1.25rem;}
+.ig-upload-zone:hover,.ig-upload-zone.drag{border-color:#2244cc;background:#f0f4ff;}
+.ig-upload-icon{font-size:28px;margin-bottom:6px;}
+.ig-upload-label{font-size:13px;font-weight:600;color:#333;margin-bottom:3px;}
+.ig-upload-sub{font-size:11px;color:#888;}
+.ig-upload-btn{display:inline-block;margin-top:10px;background:#2244cc;color:#fff;padding:7px 18px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:inherit;}
+.ig-upload-btn:hover{background:#3355dd;}
+#ig-file-input{display:none;}
+.ig-status{font-size:12px;color:#666;padding:8px 12px;background:#f5f5f0;border-radius:6px;margin-bottom:1rem;border:1px solid #e0e0d8;display:none;}
+.ig-status.ok{color:#1a7a1a;background:#edfaed;border-color:#b0e8b0;}
+.ig-status.err{color:#a22;background:#fff0f0;border-color:#fdd;}
+.ig-saved-row{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#fff;border:1px solid #e0e0d8;border-radius:7px;margin-bottom:5px;font-size:12px;}
+.ig-saved-name{font-weight:600;color:#1a1a2e;flex:1;}
+.ig-saved-meta{color:#888;font-size:11px;}
+.ig-saved-load{padding:3px 10px;border:1px solid #2244cc;color:#2244cc;background:#fff;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;}
+.ig-saved-load:hover{background:#2244cc;color:#fff;}
+.ig-saved-del{padding:3px 7px;border:1px solid #fdd;color:#a22;background:#fff;border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit;}
+.ig-saved-del:hover{background:#fff0f0;}
+.ig-stats{display:grid;grid-template-columns:repeat(5,1fr);gap:.75rem;margin-bottom:1.25rem;}
+.ig-stat{background:#fff;border:1px solid #e0e0d8;border-radius:9px;padding:.85rem 1rem;}
+.ig-stat-label{font-size:9px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;}
+.ig-stat-val{font-size:22px;font-weight:700;color:#1a1a2e;font-variant-numeric:tabular-nums;line-height:1;}
+.ig-stat-sub{font-size:10px;color:#888;margin-top:2px;}
+.ig-inner-tabs{display:flex;gap:0;border-bottom:2px solid #e0e0d8;margin-bottom:1.25rem;}
+.ig-inner-tab{padding:9px 18px;font-size:12px;font-weight:600;color:#888;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all 0.12s;}
+.ig-inner-tab:hover{color:#1a1a2e;}
+.ig-inner-tab.active{color:#2244cc;border-bottom-color:#2244cc;}
+.ig-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;align-items:center;}
+.ig-fi{padding:7px 10px;border:1px solid #e0e0d8;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;min-width:140px;}
+.ig-fi-wide{flex:1;min-width:180px;}
+.ig-fi-sm{min-width:110px;}
+.ig-filter-btn{padding:7px 12px;border:1px solid #e0e0d8;border-radius:6px;font-size:12px;font-family:inherit;background:#fff;cursor:pointer;font-weight:600;}
+.ig-filter-btn:hover{background:#fafaf8;}
+.ig-export-btn{margin-left:auto;padding:7px 14px;background:#2244cc;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;}
+.ig-export-btn:hover{background:#3355dd;}
+.ig-table-wrap{background:#fff;border:1px solid #e0e0d8;border-radius:9px;overflow:hidden;}
+.ig-table{width:100%;border-collapse:collapse;font-size:12px;}
+.ig-table th{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.05em;text-align:left;padding:9px 10px;border-bottom:1px solid #e0e0d8;background:#fafaf8;cursor:pointer;white-space:nowrap;user-select:none;}
+.ig-table th:hover{color:#1a1a2e;}
+.ig-table th.sorted{color:#2244cc;}
+.ig-table th .si{margin-left:3px;opacity:0.5;}
+.ig-table th.sorted .si{opacity:1;}
+.ig-table td{padding:9px 10px;border-bottom:0.5px dashed #f0f0e8;vertical-align:top;}
+.ig-table tr:last-child td{border-bottom:none;}
+.ig-table tr:hover td{background:#fafaf8;}
+.ig-table .num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+.ig-table .trunc{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ig-table .trunc:hover{white-space:normal;word-break:break-word;}
+.ig-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;background:#e8f0ff;color:#2244cc;}
+.ig-tag.cn{background:#fff0e0;color:#885500;}
+.ig-tag.kr{background:#f0ffe8;color:#1a7a1a;}
+.ig-tag.hk{background:#f8e8ff;color:#660099;}
+.ig-tag.th{background:#fff8e0;color:#664400;}
+.ig-pag{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-top:1px solid #e0e0d8;font-size:11px;color:#666;}
+.ig-pag-btns{display:flex;gap:4px;}
+.ig-pag-btn{padding:4px 9px;border:1px solid #e0e0d8;border-radius:4px;cursor:pointer;background:#fff;font-size:11px;font-family:inherit;}
+.ig-pag-btn:hover{background:#fafaf8;}
+.ig-pag-btn:disabled{opacity:0.35;cursor:default;}
+.ig-card{background:#fff;border:1px solid #e0e0d8;border-radius:9px;padding:1.1rem 1.25rem;margin-bottom:1rem;}
+.ig-card-title{font-size:10px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:.75rem;}
+.ig-drill-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;}
+.ig-back{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#2244cc;cursor:pointer;margin-bottom:1rem;font-weight:600;}
+.ig-back:hover{text-decoration:underline;}
+.ig-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:11px;}
+.ig-bar-label{width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333;flex-shrink:0;}
+.ig-bar-track{flex:1;background:#f0f0e8;border-radius:3px;height:14px;overflow:hidden;}
+.ig-bar-fill{height:100%;background:#2244cc;border-radius:3px;}
+.ig-bar-fill.kr{background:#1a7a1a;}
+.ig-bar-fill.cn{background:#885500;}
+.ig-bar-fill.hk{background:#660099;}
+.ig-bar-fill.th{background:#664400;}
+.ig-bar-num{width:40px;text-align:right;color:#666;flex-shrink:0;font-variant-numeric:tabular-nums;}
+.ig-month-chart{display:flex;align-items:flex-end;gap:3px;height:100px;margin-top:.5rem;}
+.ig-month-col{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;}
+.ig-month-bar{width:100%;background:#2244cc;border-radius:2px 2px 0 0;min-height:2px;}
+.ig-month-label{font-size:9px;color:#888;margin-top:3px;white-space:nowrap;text-align:center;}
+.ig-month-val{font-size:9px;color:#555;margin-bottom:2px;}
+.ig-empty-state{padding:2.5rem;text-align:center;color:#888;font-size:13px;}
+.admin-dark .ig-upload-zone{background:#1e2030;border-color:#3a3a50;}
+.admin-dark .ig-upload-zone:hover,.admin-dark .ig-upload-zone.drag{border-color:#4466ee;background:#1a2040;}
+.admin-dark .ig-upload-label{color:#ccc;}
+.admin-dark .ig-stat,.admin-dark .ig-table-wrap,.admin-dark .ig-card{background:#1e2030;border-color:#2a2a40;}
+.admin-dark .ig-stat-val{color:#e0e0f0;}
+.admin-dark .ig-table th{background:#191928;color:#aaa;border-color:#2a2a40;}
+.admin-dark .ig-table td{border-color:#222235;}
+.admin-dark .ig-table tr:hover td{background:#232338;}
+.admin-dark .ig-fi,.admin-dark .ig-filter-btn{background:#191928;border-color:#2a2a40;color:#ccc;}
+.admin-dark .ig-inner-tab{color:#666;}
+.admin-dark .ig-inner-tab.active{color:#6688ff;}
+.admin-dark .ig-inner-tabs{border-color:#2a2a40;}
+.admin-dark .ig-bar-track{background:#2a2a40;}
+.admin-dark .ig-pag{border-color:#2a2a40;color:#aaa;}
+.admin-dark .ig-pag-btn{background:#191928;border-color:#2a2a40;color:#ccc;}
+.admin-dark .ig-saved-row{background:#1e2030;border-color:#2a2a40;}
+.admin-dark .ig-status{background:#191928;border-color:#2a2a40;color:#aaa;}
 </style>
 </head>
 <body>
+
 <div id="admin-sidebar"></div>
 
 <div class="ri-top">
-  <div style="display:flex;align-items:center;"><div class="ri-top-title">🎯 Retail Intelligence</div><a class="dash-back" href="admin.html" style="margin-left:24px;color:#888;font-size:13px;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">← Dashboard</a></div>
+  <div style="display:flex;align-items:center;">
+    <div class="ri-top-title">🎯 Retail Intelligence</div>
+    <a class="dash-back" href="admin.html" style="margin-left:24px;color:#888;font-size:13px;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">← Dashboard</a>
+  </div>
   <div class="ri-top-actions">
-    <button id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle dark/light mode" style="background:none;border:1px solid #e0e0d8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;margin-right:8px;">🌙</button>  </div>
+    <button id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle dark/light mode" style="background:none;border:1px solid #e0e0d8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;margin-right:8px;">🌙</button>
+  </div>
 </div>
 
 <div class="ri-tabs">
@@ -69,14 +134,382 @@
   <a href="import_genius.html" class="ri-tab active"><span class="ri-tab-icon">🚢</span> ImportGenius</a>
 </div>
 
-<div style="max-width:1100px;margin:0 auto;padding:3rem 2rem;text-align:center;color:#888;">
-  <div style="font-size:36px;margin-bottom:12px;">🚢</div>
-  <div style="font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:8px;">ImportGenius</div>
-  <div style="font-size:13px;margin-bottom:24px;">Upload an ImportGenius Excel or CSV export to explore shipment data.</div>
-  <p style="font-size:12px;color:#aaa;">Full dashboard coming soon — Shipments · Importers · Suppliers · Trends</p>
+<div class="ig-wrap">
+
+  <div class="ri-section" id="ig-upload-section">
+    <div class="ri-section-title">Upload ImportGenius Export</div>
+    <div class="ig-upload-zone" id="ig-drop" onclick="document.getElementById('ig-file-input').click()">
+      <div class="ig-upload-icon">📂</div>
+      <div class="ig-upload-label">Drop ImportGenius Excel or CSV export here</div>
+      <div class="ig-upload-sub">Supports .xlsx and .csv · columns auto-detected</div>
+      <button class="ig-upload-btn" onclick="event.stopPropagation();document.getElementById('ig-file-input').click()">Choose File</button>
+      <input type="file" id="ig-file-input" accept=".xlsx,.xls,.csv">
+    </div>
+    <div class="ig-status" id="ig-status"></div>
+    <div id="ig-saved-wrap" style="display:none;margin-top:.75rem;">
+      <div class="ri-section-title" style="margin-bottom:6px;">Recent Datasets</div>
+      <div id="ig-saved-list"></div>
+    </div>
+  </div>
+
+  <div id="ig-dashboard" style="display:none;">
+    <div class="ig-stats">
+      <div class="ig-stat"><div class="ig-stat-label">Shipments</div><div class="ig-stat-val" id="st-shipments">—</div><div class="ig-stat-sub">total records</div></div>
+      <div class="ig-stat"><div class="ig-stat-label">Importers</div><div class="ig-stat-val" id="st-importers">—</div><div class="ig-stat-sub">unique entities</div></div>
+      <div class="ig-stat"><div class="ig-stat-label">Suppliers</div><div class="ig-stat-val" id="st-suppliers">—</div><div class="ig-stat-sub">unique shippers</div></div>
+      <div class="ig-stat"><div class="ig-stat-label">Date Range</div><div class="ig-stat-val" id="st-range" style="font-size:13px;padding-top:4px;">—</div><div class="ig-stat-sub">shipment window</div></div>
+      <div class="ig-stat"><div class="ig-stat-label">Total Weight</div><div class="ig-stat-val" id="st-weight">—</div><div class="ig-stat-sub">kg gross</div></div>
+    </div>
+
+    <div class="ig-inner-tabs">
+      <div class="ig-inner-tab active" onclick="switchTab('shipments')">📦 Shipments</div>
+      <div class="ig-inner-tab" onclick="switchTab('importers')">🏢 Importers</div>
+      <div class="ig-inner-tab" onclick="switchTab('suppliers')">🏭 Suppliers</div>
+      <div class="ig-inner-tab" onclick="switchTab('trends')">📈 Trends</div>
+    </div>
+
+    <div id="tab-shipments">
+      <div class="ig-filters">
+        <input type="text" class="ig-fi ig-fi-wide" id="f-product" placeholder="Product keyword…" oninput="renderShipments()">
+        <input type="text" class="ig-fi ig-fi-wide" id="f-importer" placeholder="Importer / entity…" oninput="renderShipments()">
+        <input type="text" class="ig-fi" id="f-shipper" placeholder="Supplier / shipper…" oninput="renderShipments()">
+        <select class="ig-fi ig-fi-sm" id="f-origin" onchange="renderShipments()"><option value="">All Origins</option></select>
+        <input type="date" class="ig-fi ig-fi-sm" id="f-date-from" onchange="renderShipments()">
+        <input type="date" class="ig-fi ig-fi-sm" id="f-date-to" onchange="renderShipments()">
+        <button class="ig-filter-btn" onclick="clearShipmentFilters()">Clear</button>
+        <button class="ig-export-btn" onclick="exportShipments()">⬇ CSV</button>
+      </div>
+      <div id="s-count" style="font-size:11px;color:#888;margin-bottom:.5rem;"></div>
+      <div class="ig-table-wrap">
+        <table class="ig-table">
+          <thead><tr>
+            <th onclick="sortShipments(0)">Date<span class="si">↕</span></th>
+            <th onclick="sortShipments(1)">Importer Entity<span class="si">↕</span></th>
+            <th onclick="sortShipments(2)">Shipper<span class="si">↕</span></th>
+            <th onclick="sortShipments(3)">Origin<span class="si">↕</span></th>
+            <th onclick="sortShipments(4)">Product Description<span class="si">↕</span></th>
+            <th onclick="sortShipments(5)" class="num">Qty<span class="si">↕</span></th>
+            <th onclick="sortShipments(6)">Unit<span class="si">↕</span></th>
+            <th onclick="sortShipments(7)" class="num">KG<span class="si">↕</span></th>
+            <th onclick="sortShipments(8)">Foreign Port<span class="si">↕</span></th>
+          </tr></thead>
+          <tbody id="s-tbody"></tbody>
+        </table>
+        <div class="ig-pag" id="s-pag" style="display:none;">
+          <span id="s-pag-info"></span>
+          <div class="ig-pag-btns">
+            <button class="ig-pag-btn" id="s-prev" onclick="shipPage(-1)">← Prev</button>
+            <button class="ig-pag-btn" id="s-next" onclick="shipPage(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-importers" style="display:none;"><div id="importers-list"></div></div>
+    <div id="tab-suppliers" style="display:none;"><div id="suppliers-list"></div></div>
+    <div id="tab-trends" style="display:none;"><div id="trends-content"></div></div>
+  </div>
+
+  <div class="ig-empty-state" id="ig-empty">
+    <div style="font-size:32px;margin-bottom:8px;">🚢</div>
+    <div style="font-weight:600;margin-bottom:5px;">No data loaded</div>
+    <div>Upload an ImportGenius Excel or CSV export above.</div>
+  </div>
+
 </div>
 
-<script src="admin-shared.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+var DATA=[],sFiltered=[],sPage=1,sSort={col:-1,dir:1};
+var activeTab='shipments';
+var S_PAGE=50,STORAGE_KEY='ig_v2';
 
+var COL_MAP={
+  product:['PRODUCT DESCRIPTION','DESCRIPTION','COMMODITY'],
+  importer:['IMPORTER ENTITY','IMPORTER'],
+  shipper:['SHIPPER','SUPPLIER','EXPORTER'],
+  origin:['COUNTRY OF ORIGIN','ORIGIN COUNTRY','ORIGIN'],
+  date:['ARRIVAL DATE','SHIP DATE','DATE','ETA'],
+  qty:['QUANTITY','QTY'],
+  unit:['QUANTITY UNIT','UNIT'],
+  weight_kg:['GROSS WEIGHT (KG)','WEIGHT KG','WEIGHT (KG)'],
+  foreign_port:['FOREIGN PORT','PORT OF LOADING','LOADING PORT'],
+};
+var CI={};
+
+function detectCols(headers){
+  CI={};
+  for(var key in COL_MAP){
+    var found=-1;
+    COL_MAP[key].forEach(function(c){if(found<0){var i=headers.findIndex(function(h){return h.toUpperCase().trim()===c;});if(i>=0)found=i;}});
+    if(found<0)COL_MAP[key].forEach(function(c){if(found<0){var i=headers.findIndex(function(h){return h.toUpperCase().includes(c);});if(i>=0)found=i;}});
+    CI[key]=found;
+  }
+}
+
+function g(row,key){var i=CI[key];if(i==null||i<0)return '';var v=row[i];return v==null?'':String(v).trim();}
+function gn(row,key){var v=parseFloat(g(row,key));return isNaN(v)?0:v;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function tagCls(o){o=o.toLowerCase();return o.includes('china')?'cn':o.includes('korea')?'kr':o.includes('hong kong')?'hk':o.includes('thailand')?'th':'';}
+
+function getSaved(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');}catch(e){return[];}}
+function saveDS(name,rows,headers){
+  var saved=getSaved();
+  var idx=saved.findIndex(function(d){return d.name===name;});
+  var e={name:name,savedAt:new Date().toISOString(),rowCount:rows.length,headers:headers,rows:rows};
+  if(idx>=0)saved[idx]=e;else{if(saved.length>=5)saved.shift();saved.push(e);}
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(saved));
+  renderSaved();
+}
+function delDS(i){var s=getSaved();s.splice(i,1);localStorage.setItem(STORAGE_KEY,JSON.stringify(s));renderSaved();}
+function renderSaved(){
+  var saved=getSaved();
+  var wrap=document.getElementById('ig-saved-wrap');
+  var list=document.getElementById('ig-saved-list');
+  if(!saved.length){wrap.style.display='none';return;}
+  wrap.style.display='';
+  list.innerHTML=saved.map(function(d,i){return '<div class="ig-saved-row"><div class="ig-saved-name">'+esc(d.name)+'</div><div class="ig-saved-meta">'+d.rowCount.toLocaleString()+' rows &middot; '+new Date(d.savedAt).toLocaleDateString()+'</div><button class="ig-saved-load" onclick="loadDS('+i+')">Load</button><button class="ig-saved-del" onclick="delDS('+i+')">&#x2715;</button></div>';}).join('');
+}
+function loadDS(i){var d=getSaved()[i];if(!d)return;initData(d.rows,d.headers,d.name);}
+
+document.getElementById('ig-file-input').addEventListener('change',function(e){if(e.target.files[0])processFile(e.target.files[0]);});
+var drop=document.getElementById('ig-drop');
+drop.addEventListener('dragover',function(e){e.preventDefault();drop.classList.add('drag');});
+drop.addEventListener('dragleave',function(){drop.classList.remove('drag');});
+drop.addEventListener('drop',function(e){e.preventDefault();drop.classList.remove('drag');if(e.dataTransfer.files[0])processFile(e.dataTransfer.files[0]);});
+
+function processFile(file){
+  setStatus('','Reading '+file.name+'…');
+  var reader=new FileReader();
+  var isCSV=file.name.toLowerCase().endsWith('.csv');
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:isCSV?'string':'binary',cellDates:true,raw:false});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var raw=XLSX.utils.sheet_to_json(ws,{defval:'',header:1});
+      if(raw.length<2){setStatus('err','No data rows found.');return;}
+      var headers=raw[0].map(function(h){return String(h).trim();});
+      var rows=raw.slice(1).map(function(r){return headers.map(function(_,i){return r[i]!=null?r[i]:'';});});
+      saveDS(file.name,rows,headers);
+      initData(rows,headers,file.name);
+    }catch(err){setStatus('err','Could not parse: '+err.message);}
+  };
+  if(isCSV)reader.readAsText(file);else reader.readAsBinaryString(file);
+}
+
+function initData(rows,headers,name){
+  detectCols(headers);
+  DATA=rows;
+  setStatus('ok','Loaded "'+name+'" — '+DATA.length.toLocaleString()+' shipments');
+  document.getElementById('ig-empty').style.display='none';
+  document.getElementById('ig-dashboard').style.display='';
+  buildOriginFilter();
+  renderStats();
+  renderShipments();
+  renderImporters();
+  renderSuppliers();
+  renderTrends();
+}
+
+function buildOriginFilter(){
+  var origins=[...new Set(DATA.map(function(r){return g(r,'origin');}).filter(Boolean))].sort();
+  var sel=document.getElementById('f-origin');
+  sel.innerHTML='<option value="">All Origins</option>'+origins.map(function(o){return '<option>'+esc(o)+'</option>';}).join('');
+}
+
+function renderStats(){
+  document.getElementById('st-shipments').textContent=DATA.length.toLocaleString();
+  document.getElementById('st-importers').textContent=new Set(DATA.map(function(r){return g(r,'importer');}).filter(Boolean)).size.toLocaleString();
+  document.getElementById('st-suppliers').textContent=new Set(DATA.map(function(r){return g(r,'shipper');}).filter(Boolean)).size.toLocaleString();
+  var dates=DATA.map(function(r){return g(r,'date');}).filter(Boolean).sort();
+  if(dates.length){
+    var f=function(d){var p=d.split(/[-\/]/);return p.length>=3?p[1]+'/'+p[2].slice(0,2)+'/'+p[0].slice(-2):d;};
+    document.getElementById('st-range').textContent=f(dates[0])+'–'+f(dates[dates.length-1]);
+  }
+  var kg=DATA.reduce(function(s,r){return s+gn(r,'weight_kg');},0);
+  document.getElementById('st-weight').textContent=kg>0?(kg/1000).toFixed(0)+'t':'—';
+}
+
+function getFilters(){return{product:document.getElementById('f-product').value.toLowerCase(),importer:document.getElementById('f-importer').value.toLowerCase(),shipper:document.getElementById('f-shipper').value.toLowerCase(),origin:document.getElementById('f-origin').value.toLowerCase(),df:document.getElementById('f-date-from').value,dt:document.getElementById('f-date-to').value};}
+
+function renderShipments(){
+  var f=getFilters();
+  sFiltered=DATA.filter(function(row){
+    if(f.product&&!g(row,'product').toLowerCase().includes(f.product))return false;
+    if(f.importer&&!g(row,'importer').toLowerCase().includes(f.importer))return false;
+    if(f.shipper&&!g(row,'shipper').toLowerCase().includes(f.shipper))return false;
+    if(f.origin&&g(row,'origin').toLowerCase()!==f.origin)return false;
+    if(f.df&&g(row,'date')&&g(row,'date')<f.df)return false;
+    if(f.dt&&g(row,'date')&&g(row,'date')>f.dt)return false;
+    return true;
+  });
+  if(sSort.col>=0)sortSD();
+  sPage=1;
+  renderST();
+}
+
+var S_KEYS=['date','importer','shipper','origin','product','qty','unit','weight_kg','foreign_port'];
+function sortShipments(col){
+  sSort.col===col?sSort.dir=-sSort.dir:(sSort.col=col,sSort.dir=1);
+  document.querySelectorAll('#tab-shipments .ig-table th').forEach(function(th,i){
+    th.classList.toggle('sorted',i===col);
+    var si=th.querySelector('.si');
+    if(si)si.textContent=i===col?(sSort.dir===1?'↑':'↓'):'↕';
+  });
+  sortSD();sPage=1;renderST();
+}
+function sortSD(){
+  var key=S_KEYS[sSort.col]||'date';
+  sFiltered.sort(function(a,b){
+    var av=g(a,key),bv=g(b,key),an=parseFloat(av),bn=parseFloat(bv);
+    if(!isNaN(an)&&!isNaN(bn))return(an-bn)*sSort.dir;
+    return av.localeCompare(bv)*sSort.dir;
+  });
+}
+function renderST(){
+  var start=(sPage-1)*S_PAGE,page=sFiltered.slice(start,start+S_PAGE);
+  document.getElementById('s-count').textContent=sFiltered.length.toLocaleString()+' shipments'+(sFiltered.length!==DATA.length?' (filtered)':'');
+  var tb=document.getElementById('s-tbody');
+  if(!page.length){tb.innerHTML='<tr><td colspan="9" style="padding:2rem;text-align:center;color:#888;">No shipments match.</td></tr>';return;}
+  tb.innerHTML=page.map(function(row){
+    var orig=g(row,'origin'),cls=tagCls(orig),desc=g(row,'product').replace(/\n/g,' '),qty=gn(row,'qty'),kg=gn(row,'weight_kg');
+    return '<tr><td style="white-space:nowrap">'+esc(g(row,'date'))+'</td><td>'+esc(g(row,'importer'))+'</td><td>'+esc(g(row,'shipper'))+'</td><td><span class="ig-tag '+cls+'">'+esc(orig)+'</span></td><td class="trunc" title="'+esc(desc)+'">'+esc(desc)+'</td><td class="num">'+(qty>0?qty.toLocaleString():'')+'</td><td>'+esc(g(row,'unit'))+'</td><td class="num">'+(kg>0?kg.toLocaleString():'')+'</td><td>'+esc(g(row,'foreign_port'))+'</td></tr>';
+  }).join('');
+  var total=sFiltered.length,pages=Math.ceil(total/S_PAGE),pag=document.getElementById('s-pag');
+  pag.style.display=total?'flex':'none';
+  document.getElementById('s-pag-info').textContent=(start+1)+'–'+Math.min(start+S_PAGE,total)+' of '+total.toLocaleString();
+  document.getElementById('s-prev').disabled=sPage<=1;
+  document.getElementById('s-next').disabled=sPage>=pages;
+}
+function shipPage(d){sPage=Math.max(1,Math.min(Math.ceil(sFiltered.length/S_PAGE),sPage+d));renderST();}
+function clearShipmentFilters(){['f-product','f-importer','f-shipper'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('f-origin').value='';document.getElementById('f-date-from').value='';document.getElementById('f-date-to').value='';renderShipments();}
+function exportShipments(){
+  if(!sFiltered.length)return;
+  var hdrs=['Date','Importer Entity','Shipper','Origin','Product Description','Quantity','Unit','Weight KG','Foreign Port'];
+  var keys=['date','importer','shipper','origin','product','qty','unit','weight_kg','foreign_port'];
+  var lines=[hdrs.join(',')].concat(sFiltered.map(function(r){return keys.map(function(k){return '"'+g(r,k).replace(/"/g,'""').replace(/\n/g,' ')+'"';}).join(',');}));
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));a.download='shipments.csv';a.click();
+}
+
+function aggBy(key){
+  var map={};
+  DATA.forEach(function(row){
+    var name=g(row,key)||'(unknown)';
+    if(!map[name])map[name]={count:0,kg:0,shippers:new Set(),importers:new Set(),origins:new Set(),months:{}};
+    var m=map[name];m.count++;m.kg+=gn(row,'weight_kg');
+    var sh=g(row,'shipper');if(sh)m.shippers.add(sh);
+    var imp=g(row,'importer');if(imp)m.importers.add(imp);
+    var or=g(row,'origin');if(or)m.origins.add(or);
+    var dt=g(row,'date');if(dt){var mo=dt.slice(0,7);m.months[mo]=(m.months[mo]||0)+1;}
+  });
+  return map;
+}
+
+function renderImporters(drill){
+  var el=document.getElementById('importers-list');
+  if(drill){renderImpDrill(drill,el);return;}
+  var map=aggBy('importer');
+  var sorted=Object.entries(map).sort(function(a,b){return b[1].count-a[1].count;});
+  var maxC=sorted[0]?sorted[0][1].count:1;
+  el.innerHTML='<div class="ig-filters" style="margin-bottom:1rem;"><input type="text" class="ig-fi ig-fi-wide" id="imp-search" placeholder="Filter importers…" oninput="filterImpList()"></div>'
+  +'<div class="ig-table-wrap"><table class="ig-table"><thead><tr><th>Importer / Entity</th><th class="num">Shipments</th><th style="min-width:140px;">Volume</th><th class="num">Weight (t)</th><th class="num">Suppliers</th><th>Origins</th><th>Last Month</th></tr></thead><tbody id="imp-tbody">'
+  +sorted.map(function(e){
+    var name=e[0],m=e[1];
+    var last=Object.keys(m.months).sort().pop()||'—';
+    var tags=[...m.origins].slice(0,3).map(function(o){return '<span class="ig-tag '+tagCls(o)+'">'+esc(o)+'</span>';}).join(' ');
+    var bw=Math.round(m.count/maxC*100);
+    return '<tr data-name="'+esc(name)+'" onclick="renderImporters(\''+esc(name.replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')" style="cursor:pointer"><td><strong>'+esc(name)+'</strong></td><td class="num">'+m.count.toLocaleString()+'</td><td><div style="display:flex;align-items:center;gap:6px"><div class="ig-bar-track" style="flex:1"><div class="ig-bar-fill" style="width:'+bw+'%"></div></div><span style="font-size:10px;color:#888;min-width:25px">'+bw+'%</span></div></td><td class="num">'+(m.kg/1000).toFixed(1)+'</td><td class="num">'+m.shippers.size+'</td><td>'+tags+'</td><td>'+last+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+}
+function filterImpList(){var q=(document.getElementById('imp-search')||{value:''}).value.toLowerCase();document.querySelectorAll('#imp-tbody tr').forEach(function(tr){tr.style.display=!q||tr.dataset.name.toLowerCase().includes(q)?'':'none';});}
+
+function renderImpDrill(name,el){
+  var rows=DATA.filter(function(r){return g(r,'importer')===name;});
+  var suppMap={};rows.forEach(function(r){var sh=g(r,'shipper')||'(unknown)';if(!suppMap[sh])suppMap[sh]={count:0,kg:0,origins:new Set()};suppMap[sh].count++;suppMap[sh].kg+=gn(r,'weight_kg');var or=g(r,'origin');if(or)suppMap[sh].origins.add(or);});
+  var suppS=Object.entries(suppMap).sort(function(a,b){return b[1].count-a[1].count;});
+  var origMap={};rows.forEach(function(r){var o=g(r,'origin')||'Unknown';origMap[o]=(origMap[o]||0)+1;});
+  var origS=Object.entries(origMap).sort(function(a,b){return b[1]-a[1];});var maxO=origS[0]?origS[0][1]:1;
+  var moMap={};rows.forEach(function(r){var dt=g(r,'date');if(dt){var mo=dt.slice(0,7);moMap[mo]=(moMap[mo]||0)+1;}});
+  var months=Object.keys(moMap).sort();var maxM=Math.max.apply(null,Object.values(moMap).concat([1]));
+  var kg=rows.reduce(function(s,r){return s+gn(r,'weight_kg');},0);
+  el.innerHTML='<div class="ig-back" onclick="renderImporters()">← Back to Importers</div>'
+  +'<h3 style="font-size:16px;font-weight:700;margin-bottom:1rem;">'+esc(name)+'</h3>'
+  +'<div class="ig-drill-grid">'
+  +'<div class="ig-card"><div class="ig-card-title">Summary</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem"><div><div style="font-size:20px;font-weight:700">'+rows.length+'</div><div style="font-size:11px;color:#888">shipments</div></div><div><div style="font-size:20px;font-weight:700">'+(kg/1000).toFixed(1)+'t</div><div style="font-size:11px;color:#888">gross weight</div></div><div><div style="font-size:20px;font-weight:700">'+suppS.length+'</div><div style="font-size:11px;color:#888">suppliers</div></div></div></div>'
+  +'<div class="ig-card"><div class="ig-card-title">Origins</div>'+origS.map(function(e){var cls=tagCls(e[0]);return '<div class="ig-bar-row"><div class="ig-bar-label">'+esc(e[0])+'</div><div class="ig-bar-track"><div class="ig-bar-fill '+cls+'" style="width:'+Math.round(e[1]/maxO*100)+'%"></div></div><div class="ig-bar-num">'+e[1]+'</div></div>';}).join('')+'</div>'
+  +'</div>'
+  +'<div class="ig-card"><div class="ig-card-title">Monthly Volume</div><div class="ig-month-chart">'+months.map(function(mo){return '<div class="ig-month-col"><div class="ig-month-val">'+moMap[mo]+'</div><div class="ig-month-bar" style="height:'+Math.round(moMap[mo]/maxM*80)+'px"></div><div class="ig-month-label">'+mo.slice(5)+'<br>'+mo.slice(2,4)+'</div></div>';}).join('')+'</div></div>'
+  +'<div class="ig-card"><div class="ig-card-title">Suppliers ('+suppS.length+')</div><div class="ig-table-wrap" style="margin-top:.5rem"><table class="ig-table"><thead><tr><th>Supplier</th><th class="num">Shipments</th><th class="num">Weight (t)</th><th>Origins</th></tr></thead><tbody>'+suppS.map(function(e){return '<tr><td>'+esc(e[0])+'</td><td class="num">'+e[1].count+'</td><td class="num">'+(e[1].kg/1000).toFixed(1)+'</td><td>'+[...e[1].origins].map(function(o){return '<span class="ig-tag '+tagCls(o)+'">'+esc(o)+'</span>';}).join(' ')+'</td></tr>';}).join('')+'</tbody></table></div></div>'
+  +'<div class="ig-card"><div class="ig-card-title">Recent Shipments (last 50)</div><div class="ig-table-wrap" style="margin-top:.5rem"><table class="ig-table"><thead><tr><th>Date</th><th>Shipper</th><th>Origin</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">KG</th></tr></thead><tbody>'+rows.sort(function(a,b){return g(b,'date').localeCompare(g(a,'date'));}).slice(0,50).map(function(r){var desc=g(r,'product').replace(/\n/g,' ');return '<tr><td style="white-space:nowrap">'+esc(g(r,'date'))+'</td><td>'+esc(g(r,'shipper'))+'</td><td><span class="ig-tag '+tagCls(g(r,'origin'))+'">'+esc(g(r,'origin'))+'</span></td><td class="trunc" title="'+esc(desc)+'">'+esc(desc)+'</td><td class="num">'+gn(r,'qty').toLocaleString()+'</td><td>'+esc(g(r,'unit'))+'</td><td class="num">'+gn(r,'weight_kg').toLocaleString()+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+}
+
+function renderSuppliers(drill){
+  var el=document.getElementById('suppliers-list');
+  if(drill){renderSupDrill(drill,el);return;}
+  var map=aggBy('shipper');
+  var sorted=Object.entries(map).sort(function(a,b){return b[1].count-a[1].count;});
+  var maxC=sorted[0]?sorted[0][1].count:1;
+  var origins=[...new Set(DATA.map(function(r){return g(r,'origin');}).filter(Boolean))].sort();
+  el.innerHTML='<div class="ig-filters" style="margin-bottom:1rem;"><input type="text" class="ig-fi ig-fi-wide" id="sup-search" placeholder="Filter suppliers…" oninput="filterSupList()"><select class="ig-fi ig-fi-sm" id="sup-origin" onchange="filterSupList()"><option value="">All Origins</option>'+origins.map(function(o){return '<option>'+esc(o)+'</option>';}).join('')+'</select></div>'
+  +'<div class="ig-table-wrap"><table class="ig-table"><thead><tr><th>Supplier / Shipper</th><th>Origin</th><th class="num">Shipments</th><th style="min-width:140px;">Volume</th><th class="num">Weight (t)</th><th class="num">Importers</th></tr></thead><tbody id="sup-tbody">'
+  +sorted.map(function(e){
+    var name=e[0],m=e[1];
+    var tags=[...m.origins].slice(0,2).map(function(o){return '<span class="ig-tag '+tagCls(o)+'">'+esc(o)+'</span>';}).join(' ');
+    var bw=Math.round(m.count/maxC*100);
+    var origVal=[...m.origins].join('|').toLowerCase();
+    return '<tr data-name="'+esc(name)+'" data-origin="'+esc(origVal)+'" onclick="renderSuppliers(\''+esc(name.replace(/\\/g,'\\\\').replace(/'/g,"\\'"))+'\')" style="cursor:pointer"><td><strong>'+esc(name)+'</strong></td><td>'+tags+'</td><td class="num">'+m.count.toLocaleString()+'</td><td><div style="display:flex;align-items:center;gap:6px"><div class="ig-bar-track" style="flex:1"><div class="ig-bar-fill" style="width:'+bw+'%"></div></div><span style="font-size:10px;color:#888;min-width:25px">'+bw+'%</span></div></td><td class="num">'+(m.kg/1000).toFixed(1)+'</td><td class="num">'+m.importers.size+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+}
+function filterSupList(){var q=(document.getElementById('sup-search')||{value:''}).value.toLowerCase();var o=(document.getElementById('sup-origin')||{value:''}).value.toLowerCase();document.querySelectorAll('#sup-tbody tr').forEach(function(tr){tr.style.display=(!q||tr.dataset.name.toLowerCase().includes(q))&&(!o||tr.dataset.origin.includes(o))?'':'none';});}
+
+function renderSupDrill(name,el){
+  var rows=DATA.filter(function(r){return g(r,'shipper')===name;});
+  var impMap={};rows.forEach(function(r){var imp=g(r,'importer')||'(unknown)';if(!impMap[imp])impMap[imp]={count:0,kg:0};impMap[imp].count++;impMap[imp].kg+=gn(r,'weight_kg');});
+  var impS=Object.entries(impMap).sort(function(a,b){return b[1].count-a[1].count;});
+  var moMap={};rows.forEach(function(r){var dt=g(r,'date');if(dt){var mo=dt.slice(0,7);moMap[mo]=(moMap[mo]||0)+1;}});
+  var months=Object.keys(moMap).sort();var maxM=Math.max.apply(null,Object.values(moMap).concat([1]));
+  var kg=rows.reduce(function(s,r){return s+gn(r,'weight_kg');},0);
+  var origins=[...new Set(rows.map(function(r){return g(r,'origin');}).filter(Boolean))];
+  el.innerHTML='<div class="ig-back" onclick="renderSuppliers()">← Back to Suppliers</div>'
+  +'<h3 style="font-size:16px;font-weight:700;margin-bottom:1rem;">'+esc(name)+'</h3>'
+  +'<div class="ig-drill-grid">'
+  +'<div class="ig-card"><div class="ig-card-title">Summary</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem"><div><div style="font-size:20px;font-weight:700">'+rows.length+'</div><div style="font-size:11px;color:#888">shipments</div></div><div><div style="font-size:20px;font-weight:700">'+(kg/1000).toFixed(1)+'t</div><div style="font-size:11px;color:#888">gross weight</div></div><div><div style="font-size:20px;font-weight:700">'+impS.length+'</div><div style="font-size:11px;color:#888">importers</div></div></div><div style="margin-top:.75rem;font-size:11px;color:#666">Origins: '+esc(origins.join(', '))+'</div></div>'
+  +'<div class="ig-card"><div class="ig-card-title">Ships To</div>'+impS.map(function(e){return '<div class="ig-bar-row"><div class="ig-bar-label">'+esc(e[0])+'</div><div class="ig-bar-track"><div class="ig-bar-fill" style="width:'+Math.round(e[1].count/rows.length*100)+'%"></div></div><div class="ig-bar-num">'+e[1].count+'</div></div>';}).join('')+'</div>'
+  +'</div>'
+  +'<div class="ig-card"><div class="ig-card-title">Monthly Volume</div><div class="ig-month-chart">'+months.map(function(mo){return '<div class="ig-month-col"><div class="ig-month-val">'+moMap[mo]+'</div><div class="ig-month-bar" style="height:'+Math.round(moMap[mo]/maxM*80)+'px"></div><div class="ig-month-label">'+mo.slice(5)+'<br>'+mo.slice(2,4)+'</div></div>';}).join('')+'</div></div>'
+  +'<div class="ig-card"><div class="ig-card-title">Shipment History (last 50)</div><div class="ig-table-wrap" style="margin-top:.5rem"><table class="ig-table"><thead><tr><th>Date</th><th>Importer</th><th>Origin</th><th>Product</th><th class="num">Qty</th><th>Unit</th><th class="num">KG</th></tr></thead><tbody>'+rows.sort(function(a,b){return g(b,'date').localeCompare(g(a,'date'));}).slice(0,50).map(function(r){var desc=g(r,'product').replace(/\n/g,' ');return '<tr><td style="white-space:nowrap">'+esc(g(r,'date'))+'</td><td>'+esc(g(r,'importer'))+'</td><td><span class="ig-tag '+tagCls(g(r,'origin'))+'">'+esc(g(r,'origin'))+'</span></td><td class="trunc" title="'+esc(desc)+'">'+esc(desc)+'</td><td class="num">'+gn(r,'qty').toLocaleString()+'</td><td>'+esc(g(r,'unit'))+'</td><td class="num">'+gn(r,'weight_kg').toLocaleString()+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+}
+
+function renderTrends(){
+  var el=document.getElementById('trends-content');
+  var moMap={},moKg={};
+  DATA.forEach(function(r){var dt=g(r,'date');if(!dt)return;var mo=dt.slice(0,7);moMap[mo]=(moMap[mo]||0)+1;moKg[mo]=(moKg[mo]||0)+gn(r,'weight_kg');});
+  var months=Object.keys(moMap).sort();
+  var maxM=Math.max.apply(null,Object.values(moMap).concat([1]));
+  var maxK=Math.max.apply(null,Object.values(moKg).concat([1]));
+  var origMap={};DATA.forEach(function(r){var o=g(r,'origin')||'Unknown';origMap[o]=(origMap[o]||0)+1;});
+  var origS=Object.entries(origMap).sort(function(a,b){return b[1]-a[1];});var maxO=origS[0]?origS[0][1]:1;
+  var impMap2={};DATA.forEach(function(r){var imp=g(r,'importer')||'(unknown)';impMap2[imp]=(impMap2[imp]||0)+1;});
+  var topImp=Object.entries(impMap2).sort(function(a,b){return b[1]-a[1];}).slice(0,8);var maxI=topImp[0]?topImp[0][1]:1;
+  el.innerHTML='<div class="ig-card"><div class="ig-card-title">Monthly Shipment Count</div><div class="ig-month-chart" style="height:120px;">'+months.map(function(mo){return '<div class="ig-month-col"><div class="ig-month-val">'+moMap[mo]+'</div><div class="ig-month-bar" style="height:'+Math.round(moMap[mo]/maxM*100)+'px;background:#2244cc;"></div><div class="ig-month-label">'+mo.slice(5)+'<br>'+mo.slice(2,4)+'</div></div>';}).join('')+'</div></div>'
+  +'<div class="ig-drill-grid">'
+  +'<div class="ig-card"><div class="ig-card-title">Shipments by Origin Country</div>'+origS.map(function(e){var cls=tagCls(e[0]);return '<div class="ig-bar-row"><div class="ig-bar-label">'+esc(e[0])+'</div><div class="ig-bar-track"><div class="ig-bar-fill '+cls+'" style="width:'+Math.round(e[1]/maxO*100)+'%"></div></div><div class="ig-bar-num">'+e[1]+'</div></div>';}).join('')+'</div>'
+  +'<div class="ig-card"><div class="ig-card-title">Top Importers by Shipment Count</div>'+topImp.map(function(e){return '<div class="ig-bar-row"><div class="ig-bar-label">'+esc(e[0])+'</div><div class="ig-bar-track"><div class="ig-bar-fill" style="width:'+Math.round(e[1]/maxI*100)+'%"></div></div><div class="ig-bar-num">'+e[1]+'</div></div>';}).join('')+'</div>'
+  +'</div>'
+  +'<div class="ig-card"><div class="ig-card-title">Monthly Weight (tonnes)</div><div class="ig-month-chart" style="height:100px;">'+months.map(function(mo){return '<div class="ig-month-col"><div class="ig-month-val" style="font-size:9px;">'+(moKg[mo]/1000).toFixed(0)+'t</div><div class="ig-month-bar" style="height:'+Math.round(moKg[mo]/maxK*80)+'px;background:#885500;"></div><div class="ig-month-label">'+mo.slice(5)+'<br>'+mo.slice(2,4)+'</div></div>';}).join('')+'</div></div>';
+}
+
+function switchTab(tab){
+  activeTab=tab;
+  var tabs=['shipments','importers','suppliers','trends'];
+  document.querySelectorAll('.ig-inner-tab').forEach(function(t,i){t.classList.toggle('active',tabs[i]===tab);});
+  tabs.forEach(function(t){document.getElementById('tab-'+t).style.display=t===tab?'':'none';});
+}
+
+function setStatus(type,msg){var el=document.getElementById('ig-status');el.className='ig-status'+(type?' '+type:'');el.textContent=msg;el.style.display=msg?'':'none';}
+
+renderSaved();
+</script>
+<script src="admin-shared.js"></script>
 </body>
 </html>
