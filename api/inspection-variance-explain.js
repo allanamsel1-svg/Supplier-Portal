@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // ============================================================
 // /api/inspection-variance-explain.js
 // AI explains a measurement variance found during a pre-shipment inspection.
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in Vercel.' });
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'AI service is not configured.' });
 
   const { measurement_type, spec_value, actual_value, variance_pct, product_category } = readBody(req);
 
@@ -55,7 +56,7 @@ export default async function handler(req, res) {
       headers: { 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: MODEL, max_tokens: 500, system, messages: [{ role: 'user', content: user }] }),
     });
-    if (!r.ok) return res.status(502).json({ error: 'Anthropic ' + r.status + ': ' + (await r.text()).slice(0, 300) });
+    if (!r.ok) return res.status(502).json({ error: 'AI service error ' + r.status + ': ' + (await r.text()).slice(0, 300) });
     const d = await r.json();
     const text = (d.content && d.content[0] && d.content[0].text) || '';
 

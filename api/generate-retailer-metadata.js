@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // ════════════════════════════════════════════════════════════════════
 // /api/generate-retailer-metadata.js
 //
@@ -43,7 +44,7 @@ function extractJson(text) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'Missing ANTHROPIC_API_KEY' });
+  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'AI service is not configured.' });
 
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }

@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 export const config = { maxDuration: 60 };
 
 const SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
   if (!guideId) return res.status(400).json({ error: 'Missing guideId' });
 
   const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY env var not set' });
+  if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'AI service is not configured.' });
 
   try {
     // 1. Mark as processing so the UI can show a spinner
@@ -260,7 +261,7 @@ async function analyzePDF(pdfBase64, fileName, apiKey) {
 
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
-    throw new Error(`Anthropic API: ${e.error?.message || 'HTTP ' + r.status}`);
+    throw new Error(`AI service error: ${e.error?.message || 'HTTP ' + r.status}`);
   }
 
   const data = await r.json();
@@ -331,7 +332,7 @@ async function analyzeDiff(oldPdfBase64, oldFileName, newPdfBase64, newFileName,
 
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
-    throw new Error(`Anthropic API (diff): ${e.error?.message || 'HTTP ' + r.status}`);
+    throw new Error(`AI service error (diff): ${e.error?.message || 'HTTP ' + r.status}`);
   }
 
   const data = await r.json();

@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // /api/detect-location.js
 
 const SUPABASE_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set' });
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'AI service is not configured.' });
 
   try {
     let body = req.body;
@@ -85,7 +86,7 @@ Return ONLY a single JSON object, no prose, no markdown fences:
         messages: [{ role: 'user', content }]
       })
     });
-    if (!aiResp.ok) return res.status(500).json({ error: `Anthropic ${aiResp.status}: ${await aiResp.text()}` });
+    if (!aiResp.ok) return res.status(500).json({ error: `AI service error ${aiResp.status}: ${await aiResp.text()}` });
     const aiData = await aiResp.json();
     const responseText = (aiData.content || []).map(c => c.text || '').join('\n');
 

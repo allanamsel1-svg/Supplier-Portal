@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // /api/backfill-clearance-placement.js
 //
 // Server-side runner for the clearance/placement vision backfill (the Anthropic
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in env' });
+  if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'AI service is not configured.' });
 
   try {
     let body = req.body;

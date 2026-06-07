@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -3639,7 +3640,7 @@ function rfqFromDrawer(){
 
 async function generateRFQ(){
   var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){g('rfq-body').value='Please add your Anthropic API key in Settings to auto-generate RFQs.\n\nYou can type your RFQ manually here.';return;}
+  if(!apiKey){g('rfq-body').value='Please add your API key in Settings to auto-generate RFQs.\n\nYou can type your RFQ manually here.';return;}
   var f=currentRFQFactory;
   g('gen-prog').style.display='block';g('rfq-body').value='';
   var cats=(f.product_categories||[]).join(', ')||'general products';
@@ -3695,7 +3696,7 @@ function sendSQ(el){g('chat-input').value=el.textContent;sendMsg();}
 async function sendMsg(){
   var input=g('chat-input');var text=input.value.trim();if(!text)return;
   var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){addMsg('Please add your Anthropic API key in Settings first.','ai');return;}
+  if(!apiKey){addMsg('Please add your API key in Settings first.','ai');return;}
   input.value='';g('send-btn').disabled=true;addMsg(text,'user');showTyping();
   var db=JSON.stringify(allFactories.map(function(f){
     var ff=f.user_id&&factoryFiles[f.user_id]?factoryFiles[f.user_id]:{catalogs:[],overview:[],quotes:[]};
@@ -5895,7 +5896,7 @@ function qHtsStatusBadge(s){
 async function aiEstimateQuoteHTS(quoteId){
   var apiKey=localStorage.getItem('anthropic_key')||'';
   var msg=g('qhtsmsg-'+quoteId);
-  if(!apiKey){if(msg){msg.style.color='#b00';msg.textContent='Add your Anthropic API key in Settings to use AI HTS estimate.';}return;}
+  if(!apiKey){if(msg){msg.style.color='#b00';msg.textContent='Add your API key in Settings to use AI HTS estimate.';}return;}
   if(msg){msg.style.color='#886600';msg.textContent='✦ AI estimating HTS…';}
   try{
     var qr=await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId+'&select=*,rfqs(item_description,detailed_specifications,category)&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
@@ -7126,7 +7127,7 @@ function rfqBrandChanged(){
 
 async function suggestDutyTariff(){
   var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){alert('Please add your Anthropic API key in Settings to use AI duty suggestions.');return;}
+  if(!apiKey){alert('Please add your API key in Settings to use AI duty suggestions.');return;}
   var country=g('rfq-country-mfg').value;
   var catId=g('rfq-category-id').value;
   var catRow=allCategories.find(function(c){return c.id===catId;});
@@ -12032,7 +12033,7 @@ async function aiSuggestHTSPD(){
   // endpoint is needed — the previous version was hitting a URL that
   // didn't exist and Safari was throwing a JSON-parse error on the 404 HTML.
   var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){alert('Please add your Anthropic API key in Settings to use AI duty suggestions.');return;}
+  if(!apiKey){alert('Please add your API key in Settings to use AI duty suggestions.');return;}
 
   var hts=g('cs-hts')?g('cs-hts').value.trim():'';
   var country=g('cs-origin')?g('cs-origin').value.trim():'';
@@ -13061,7 +13062,7 @@ async function sendComposedEmail(){
 // ── AI Email Search ──
 async function aiSearchInbox(dept){
   var apiKey=localStorage.getItem('anthropic_key')||'';
-  if(!apiKey){alert('Please add your Anthropic API key in Settings to use AI search.');return;}
+  if(!apiKey){alert('Please add your API key in Settings to use AI search.');return;}
   var query=g('inbox-search-'+dept).value.trim();
   if(!query)return;
   var resultEl=g('inbox-search-result-'+dept);

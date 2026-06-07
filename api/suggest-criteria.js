@@ -1,3 +1,4 @@
+// POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements.
 // api/suggest-criteria.js
 // Generates scoring_criteria JSON for a given category path using Claude.
 // Called from setup.html via the "Suggest with AI" button.
@@ -18,7 +19,7 @@ async function handler(req, res) {
   if (!category) return res.status(400).json({ error: 'category is required' });
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY env var not set in Vercel.' });
+    return res.status(500).json({ error: 'AI service is not configured.' });
   }
 
   const markets = Array.isArray(target_markets) && target_markets.length ? target_markets : ['US', 'CA'];
