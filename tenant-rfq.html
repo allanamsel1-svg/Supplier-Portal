@@ -23,6 +23,7 @@
   .rfq-drawer-foot{display:flex;align-items:center;gap:10px;padding:14px 24px;border-top:1px solid var(--border,#334155);flex-shrink:0;background:var(--bg2,#0d1424);}
   .rfq-sec{border:1px solid var(--border,#334155);border-radius:12px;padding:16px 18px;margin-bottom:16px;background:var(--card-bg,#0f172a);}
   .rfq-sec h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2,#94a3b8);margin-bottom:12px;}
+  .rfq-sec-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text2,#94a3b8);margin-bottom:12px;}
   .nr-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
   @media(max-width:640px){.nr-grid{grid-template-columns:1fr;}.rfq-drawer{width:100vw;}}
   .nr-field{margin:8px 0;}
@@ -174,6 +175,83 @@
           <div class="nr-field"></div>
         </div>
         <div class="nr-field"><label>Packaging notes</label><textarea id="nr-pkg-notes" placeholder="Decoration, print method, special requirements…"></textarea></div>
+      </div>
+
+      <div class="rfq-sec">
+        <div class="rfq-sec-title">4 · FREIGHT &amp; LANDED COST</div>
+
+        <!-- Unit packaging inputs -->
+        <div class="nr-grid">
+          <div class="nr-field"><label>Units per inner carton</label><input id="nr-units-inner" type="number" min="1" placeholder="e.g. 12"></div>
+          <div class="nr-field"><label>Inners per master carton</label><input id="nr-inners-master" type="number" min="1" placeholder="e.g. 4"></div>
+          <div class="nr-field"><label>Units per master carton</label><input id="nr-units-master" type="number" min="1" placeholder="e.g. 48" style="background:var(--bg3,#f5f5f0)" readonly></div>
+        </div>
+
+        <!-- Master carton dimensions (optional override) -->
+        <div class="nr-field"><label>Master carton dimensions (optional override)</label></div>
+        <div class="nr-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+          <div class="nr-field"><label>Ctn W</label><input id="nr-ctn-w" type="number" min="0" step="0.1" placeholder="e.g. 40"></div>
+          <div class="nr-field"><label>Ctn H</label><input id="nr-ctn-h" type="number" min="0" step="0.1" placeholder="e.g. 30"></div>
+          <div class="nr-field"><label>Ctn L</label><input id="nr-ctn-l" type="number" min="0" step="0.1" placeholder="e.g. 50"></div>
+          <div class="nr-field"><label>Unit</label><select id="nr-ctn-unit"><option value="cm">cm</option><option value="in">in</option><option value="mm">mm</option></select></div>
+        </div>
+
+        <!-- Calculated CBM (read-only) -->
+        <div class="nr-grid">
+          <div class="nr-field"><label>Unit CBM</label><input id="nr-cbm-unit" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+          <div class="nr-field"><label>Master carton CBM</label><input id="nr-cbm-master" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+          <div class="nr-field"><label>Total CBM (order)</label><input id="nr-cbm-total" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+        </div>
+
+        <!-- Freight -->
+        <div class="nr-grid">
+          <div class="nr-field"><label>Freight rate ($/CBM)</label><input id="nr-freight-rate" type="number" value="92.31" step="0.01"></div>
+          <div class="nr-field"><label>Total freight ($)</label><input id="nr-freight-total" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+          <div class="nr-field"><label>Freight per unit ($)</label><input id="nr-freight-unit" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+        </div>
+
+        <!-- HTS lookup -->
+        <div class="nr-field">
+          <label>HTS Code</label>
+          <div style="display:flex;gap:8px;">
+            <input id="nr-hts-code" placeholder="e.g. 3304.99.5000" style="flex:1;padding:9px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+            <button type="button" class="nr-btn" id="nr-hts-btn" onclick="nrHtsLookup()">Look Up →</button>
+          </div>
+          <div id="nr-hts-desc" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>
+        </div>
+
+        <!-- Duty rates -->
+        <div class="nr-grid">
+          <div class="nr-field"><label>General duty rate (%)</label><input id="nr-duty-general" type="number" min="0" step="0.01" placeholder="auto from HTS"></div>
+          <div class="nr-field">
+            <label>Section 301 (25%)</label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;"><input type="checkbox" id="nr-duty-301"> Apply 25% Section 301</label>
+          </div>
+          <div class="nr-field">
+            <label>Section 122 (10%) <span style="color:#f59e0b;font-size:10px;">⚠ expires Jul 24 2026</span></label>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;"><input type="checkbox" id="nr-duty-122"> Apply 10% Section 122</label>
+          </div>
+        </div>
+        <div class="nr-grid">
+          <div class="nr-field"><label>Total duty (%)</label><input id="nr-duty-total" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+          <div class="nr-field"><label>Duty per unit ($)</label><input id="nr-duty-unit" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
+        </div>
+
+        <!-- ELC summary -->
+        <div style="background:var(--bg2,#f8f8f5);border:1px solid var(--border,#e0e0d8);border-radius:10px;padding:16px;margin-top:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Estimated Landed Cost</div>
+          <div class="nr-grid">
+            <div class="nr-field"><label>FOB / unit ($)</label><input id="nr-elc-fob" readonly style="background:transparent;border:none;font-weight:600;font-size:14px;" placeholder="—"></div>
+            <div class="nr-field"><label>Freight / unit ($)</label><input id="nr-elc-freight" readonly style="background:transparent;border:none;" placeholder="—"></div>
+            <div class="nr-field"><label>Duty / unit ($)</label><input id="nr-elc-duty" readonly style="background:transparent;border:none;" placeholder="—"></div>
+            <div class="nr-field"><label>ELC / unit ($)</label><input id="nr-elc-total" readonly style="background:transparent;border:none;font-weight:700;font-size:16px;color:var(--accent,#2244cc);" placeholder="—"></div>
+          </div>
+          <div class="nr-grid" style="margin-top:8px;">
+            <div class="nr-field"><label>Target retail ($)</label><input id="nr-elc-retail" type="number" min="0" step="0.01" placeholder="e.g. 9.99"></div>
+            <div class="nr-field"><label>Gross margin (%)</label><input id="nr-elc-margin" readonly style="background:transparent;border:none;font-weight:600;" placeholder="—"></div>
+            <div class="nr-field"><label>37.5% margin check</label><input id="nr-elc-check" readonly style="background:transparent;border:none;font-weight:600;" placeholder="—"></div>
+          </div>
+        </div>
       </div>
 
       <div class="rfq-sec"><h3>4 · Compliance</h3>
@@ -377,6 +455,124 @@ function nrDimToNum(fieldId, unitId) {
   return v;
 }
 
+// ── Freight & landed cost calculator ──
+function nrCbmCalc() {
+  const toM = (v, u) => u==='in' ? v*0.0254 : u==='mm' ? v/1000 : v/100;
+  const dimU = (document.getElementById('nr-dim-unit')||{}).value || 'cm';
+  const w = parseFloat((document.getElementById('nr-dim-w')||{}).value);
+  const h = parseFloat((document.getElementById('nr-dim-h')||{}).value);
+  const l = parseFloat((document.getElementById('nr-dim-l')||{}).value);
+  const unitsInner = parseFloat((document.getElementById('nr-units-inner')||{}).value);
+  const innersMaster = parseFloat((document.getElementById('nr-inners-master')||{}).value);
+  const qty = parseFloat((document.getElementById('nr-qty')||{}).value);
+  const freightRate = parseFloat((document.getElementById('nr-freight-rate')||{}).value) || 92.31;
+  const fob = parseFloat((document.getElementById('nr-fob')||{}).value);
+
+  let unitCbm = null;
+  if (!isNaN(w) && !isNaN(h) && !isNaN(l)) {
+    unitCbm = toM(w,dimU) * toM(h,dimU) * toM(l,dimU);
+    document.getElementById('nr-cbm-unit').value = unitCbm.toFixed(6);
+  }
+
+  let unitsMaster = null;
+  if (!isNaN(unitsInner) && !isNaN(innersMaster)) {
+    unitsMaster = unitsInner * innersMaster;
+    document.getElementById('nr-units-master').value = unitsMaster;
+  }
+
+  let masterCbm = null;
+  const ctnU = (document.getElementById('nr-ctn-unit')||{}).value || 'cm';
+  const cw = parseFloat((document.getElementById('nr-ctn-w')||{}).value);
+  const ch = parseFloat((document.getElementById('nr-ctn-h')||{}).value);
+  const cl = parseFloat((document.getElementById('nr-ctn-l')||{}).value);
+  if (!isNaN(cw) && !isNaN(ch) && !isNaN(cl)) {
+    masterCbm = toM(cw,ctnU) * toM(ch,ctnU) * toM(cl,ctnU);
+  } else if (unitCbm && unitsMaster) {
+    masterCbm = unitCbm * unitsMaster;
+  }
+  if (masterCbm) document.getElementById('nr-cbm-master').value = masterCbm.toFixed(6);
+
+  let totalCbm = null;
+  if (masterCbm && !isNaN(qty) && unitsMaster) {
+    const numMasters = Math.ceil(qty / unitsMaster);
+    totalCbm = masterCbm * numMasters;
+    document.getElementById('nr-cbm-total').value = totalCbm.toFixed(4);
+  }
+
+  let freightTotal = null, freightPerUnit = null;
+  if (totalCbm) {
+    freightTotal = totalCbm * freightRate;
+    document.getElementById('nr-freight-total').value = '$' + freightTotal.toFixed(2);
+    if (!isNaN(qty) && qty > 0) {
+      freightPerUnit = freightTotal / qty;
+      document.getElementById('nr-freight-unit').value = '$' + freightPerUnit.toFixed(4);
+    }
+  }
+
+  const dutyGeneral = parseFloat((document.getElementById('nr-duty-general')||{}).value) || 0;
+  const duty301 = document.getElementById('nr-duty-301') && document.getElementById('nr-duty-301').checked ? 25 : 0;
+  const duty122 = document.getElementById('nr-duty-122') && document.getElementById('nr-duty-122').checked ? 10 : 0;
+  const totalDutyPct = dutyGeneral + duty301 + duty122;
+  document.getElementById('nr-duty-total').value = totalDutyPct.toFixed(2) + '%';
+  let dutyPerUnit = null;
+  if (!isNaN(fob) && fob > 0) {
+    dutyPerUnit = fob * (totalDutyPct / 100);
+    document.getElementById('nr-duty-unit').value = '$' + dutyPerUnit.toFixed(4);
+  }
+
+  document.getElementById('nr-elc-fob').value = !isNaN(fob) ? '$' + fob.toFixed(2) : '—';
+  document.getElementById('nr-elc-freight').value = freightPerUnit ? '$' + freightPerUnit.toFixed(4) : '—';
+  document.getElementById('nr-elc-duty').value = dutyPerUnit ? '$' + dutyPerUnit.toFixed(4) : '—';
+  let elc = null;
+  if (!isNaN(fob) && freightPerUnit && dutyPerUnit !== null) {
+    elc = fob + freightPerUnit + dutyPerUnit;
+    document.getElementById('nr-elc-total').value = '$' + elc.toFixed(2);
+  }
+
+  const retail = parseFloat((document.getElementById('nr-elc-retail')||{}).value);
+  if (elc && !isNaN(retail) && retail > 0) {
+    const margin = ((retail - elc) / retail) * 100;
+    const marginEl = document.getElementById('nr-elc-margin');
+    if (marginEl) { marginEl.value = margin.toFixed(1) + '%'; marginEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
+    const checkEl = document.getElementById('nr-elc-check');
+    if (checkEl) { checkEl.value = margin >= 37.5 ? '✓ Meets 37.5% target' : '✗ Below 37.5% target'; checkEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
+  }
+}
+async function nrHtsLookup() {
+  const code = (document.getElementById('nr-hts-code').value || '').trim().replace(/\./g,'');
+  if (!code) return;
+  const btn = document.getElementById('nr-hts-btn');
+  const desc = document.getElementById('nr-hts-desc');
+  btn.disabled = true; btn.textContent = 'Looking up...'; desc.textContent = '';
+  try {
+    const r = await fetch('https://hts.usitc.gov/reststop/api/details/getSection?query=' + encodeURIComponent(code));
+    const d = await r.json();
+    const item = d && (d[0] || d.data && d.data[0] || d.results && d.results[0]);
+    if (item) {
+      desc.textContent = item.description || item.brief_description || '';
+      const rate = item.general || item.duty_rate || '';
+      if (rate) {
+        const pct = parseFloat(rate);
+        if (!isNaN(pct)) document.getElementById('nr-duty-general').value = pct;
+        else if (rate.includes('%')) { const m = rate.match(/([\d.]+)%/); if (m) document.getElementById('nr-duty-general').value = parseFloat(m[1]); }
+        desc.textContent += ' | General duty: ' + rate;
+      }
+      nrCbmCalc();
+    } else { desc.textContent = 'HTS code not found — enter duty rate manually'; }
+  } catch(e) { desc.textContent = 'Lookup failed — enter duty rate manually'; }
+  btn.disabled = false; btn.textContent = 'Look Up →';
+}
+let _nrFreightWired = false;
+function nrFreightWire() {
+  if (_nrFreightWired) return;
+  ['nr-dim-w','nr-dim-h','nr-dim-l','nr-dim-unit','nr-units-inner','nr-inners-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-ctn-unit','nr-qty','nr-fob','nr-freight-rate','nr-duty-general','nr-duty-301','nr-duty-122','nr-elc-retail'].forEach(id => {
+    const el = nrg(id); if (!el) return;
+    const ev = (el.tagName === 'SELECT' || el.type === 'checkbox') ? 'change' : 'input';
+    el.addEventListener(ev, nrCbmCalc);
+  });
+  _nrFreightWired = true;
+}
+
 // ── Additional product images + draft editing ──
 let nrExtraImages = [];   // [{ id, dataUrl, base64 }] — base64 '' for existing (display-only) images
 let nrEditId = null;      // set while editing an existing draft RFQ
@@ -412,6 +608,10 @@ function openNewRfqModal(prefill) {
    'nr-pkg-primary', 'nr-pkg-closure', 'nr-pkg-secondary', 'nr-pkg-finish', 'nr-pkg-color', 'nr-pkg-notes', 'nr-docs'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
   { const du = nrg('nr-dim-unit'); if (du) du.value = 'cm'; const us = nrg('nr-url-status'); if (us) { us.style.display = 'none'; us.textContent = ''; } }
+  // Freight & landed cost reset
+  ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-freight-total','nr-freight-unit','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-fob','nr-elc-freight','nr-elc-duty','nr-elc-total','nr-elc-retail','nr-elc-margin','nr-elc-check'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  { const fr = nrg('nr-freight-rate'); if (fr) fr.value = '92.31'; const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const me = nrg('nr-elc-margin'); if (me) me.style.color = ''; const ce = nrg('nr-elc-check'); if (ce) ce.style.color = ''; }
+  nrFreightWire();
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
   document.querySelectorAll('input[name="nr-ptype"]').forEach(r => { r.checked = r.value === 'single'; });
   nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
@@ -460,6 +660,8 @@ async function saveNewRfq(status) {
   if (!desc) { err.textContent = 'Item description is required.'; return; }
   const num = id => { const v = nrg(id).value; return v === '' ? null : Number(v); };
   const txt = id => { const v = (nrg(id).value || '').trim(); return v || null; };
+  const pint = id => { const v = parseInt((nrg(id) || {}).value, 10); return isNaN(v) ? null : v; };
+  const pflt = id => { const n = parseFloat(((nrg(id) || {}).value || '').replace(/[$,%]/g, '')); return isNaN(n) ? null : n; };
   let spec = (nrg('nr-spec').value || '').trim();
   const ptype = (document.querySelector('input[name="nr-ptype"]:checked') || {}).value || 'single';
   const extras = [];
@@ -482,6 +684,22 @@ async function saveNewRfq(status) {
     packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
     is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
     product_docs_required: txt('nr-docs'),
+    units_per_inner: pint('nr-units-inner'),
+    inners_per_master: pint('nr-inners-master'),
+    units_per_master: pint('nr-units-master'),
+    master_carton_w_cm: nrDimToNum('nr-ctn-w', 'nr-ctn-unit'),
+    master_carton_h_cm: nrDimToNum('nr-ctn-h', 'nr-ctn-unit'),
+    master_carton_l_cm: nrDimToNum('nr-ctn-l', 'nr-ctn-unit'),
+    total_cbm: pflt('nr-cbm-total'),
+    freight_per_unit: pflt('nr-freight-unit'),
+    hts_code: txt('nr-hts-code'),
+    duty_rate_general: pflt('nr-duty-general'),
+    duty_section_301: !!(nrg('nr-duty-301') && nrg('nr-duty-301').checked),
+    duty_section_122: !!(nrg('nr-duty-122') && nrg('nr-duty-122').checked),
+    duty_rate_total: pflt('nr-duty-total'),
+    elc_per_unit: pflt('nr-elc-total'),
+    target_retail_price: pflt('nr-elc-retail'),
+    gross_margin_pct: pflt('nr-elc-margin'),
     factories_to_send: nrSelectedFactories.length ? nrSelectedFactories : null,
   };
   const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
@@ -595,9 +813,20 @@ async function openRFQ(id) {
     setV('nr-dim-w', r.est_unit_width_cm);
     setV('nr-dim-h', r.est_unit_height_cm);
     setV('nr-dim-l', r.est_unit_length_cm);
+    // Freight & landed cost fields
+    setV('nr-units-inner', r.units_per_inner);
+    setV('nr-inners-master', r.inners_per_master);
+    setV('nr-ctn-w', r.master_carton_w_cm);
+    setV('nr-ctn-h', r.master_carton_h_cm);
+    setV('nr-ctn-l', r.master_carton_l_cm);
+    setV('nr-hts-code', r.hts_code);
+    setV('nr-duty-general', r.duty_rate_general);
+    setV('nr-elc-retail', r.target_retail_price);
+    { const d301 = nrg('nr-duty-301'); if (d301) d301.checked = !!r.duty_section_301; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = !!r.duty_section_122; }
     { const c = nrg('nr-cosmetic'); if (c) { c.checked = !!r.is_cosmetic; c.dataset.userOverride = 'true'; } }
     { const p = nrg('nr-prop65'); if (p && r.prop65_strategy) p.value = r.prop65_strategy; }
     nrCategoryChange();
+    nrCbmCalc();
     { const dB = nrg('nr-draft'), sB = nrg('nr-submit'); if (dB) dB.textContent = 'Save Changes'; if (sB) sB.textContent = 'Submit for Review'; }
     // Load existing product images for this RFQ as thumbnails.
     supa('rfq_images?rfq_id=eq.' + encodeURIComponent(r.id) + '&order=sort_order.asc').then(imgs => {
