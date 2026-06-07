@@ -57,6 +57,7 @@
 
   <div class="tabs" id="tabs">
     <button class="tab" data-tab="rfq">RFQs <span class="tab-count" id="cnt-rfq"></span></button>
+    <button class="tab" data-tab="submitted">⚡ Submitted <span class="tab-count" id="cnt-submitted"></span></button>
     <button class="tab" data-tab="pd">Product Development <span class="tab-count" id="cnt-pd"></span></button>
     <button class="tab" data-tab="skus">SKU Library <span class="tab-count" id="cnt-skus"></span></button>
     <button class="tab" id="tab-skusetup" onclick="window.open('setup.html','_blank')">⚙ SKU Setup</button>
@@ -69,6 +70,11 @@
       <button class="nr-btn top" onclick="openNewRfqModal()">+ New RFQ</button>
     </div>
     <div id="box-rfq"><div class="loading">Loading RFQs…</div></div>
+  </div>
+
+  <div class="tab-pane" id="pane-submitted">
+    <div class="toolbar"><div class="page-sub" style="font-size:13px;color:var(--text2);">RFQs you've submitted for TBG Sourcing review.</div></div>
+    <div id="box-submitted"><div class="loading">Loading…</div></div>
   </div>
 
   <div class="tab-pane" id="pane-pd">
@@ -385,7 +391,7 @@
 
 <script src="/tenant-shared.js"></script>
 <script>
-const TABS = ['rfq', 'pd', 'skus'];
+const TABS = ['rfq', 'submitted', 'pd', 'skus'];
 let TID = null, ME_EMAIL = '';
 let rfqs = [], pds = [], skus = [], rfqCategories = [];
 const loaded = {};
@@ -1135,6 +1141,7 @@ function showTab(tab) {
   document.getElementById('pane-' + tab).classList.add('active');
   if (tab === 'pd' && !loaded.pd) { loaded.pd = true; loadPD(); }
   if (tab === 'skus' && !loaded.skus) { loaded.skus = true; loadSKUs(); }
+  if (tab === 'submitted') renderSubmittedQueue();
 }
 function goTab(tab) { location.hash = tab === 'rfq' ? '' : '#' + tab; }
 
@@ -1142,10 +1149,44 @@ function goTab(tab) { location.hash = tab === 'rfq' ? '' : '#' + tab; }
 async function loadRFQs() {
   rfqs = await supa(`rfqs?tenant_id=eq.${TID}&order=created_at.desc&select=*,rfq_factory_assignments(count)`);
   document.getElementById('cnt-rfq').textContent = rfqs.length;
+  const subCount = rfqs.filter(r => r.status === 'pending_review').length;
+  { const c = document.getElementById('cnt-submitted'); if (c) c.textContent = subCount || ''; }
   const statuses = Array.from(new Set(rfqs.map(r => r.status).filter(Boolean))).sort();
   const sel = document.getElementById('rfqStatus');
   statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
   renderRFQs();
+  if (document.getElementById('pane-submitted') && document.getElementById('pane-submitted').classList.contains('active')) renderSubmittedQueue();
+}
+
+// ── Submitted-for-review queue (status='pending_review') ──
+function nrSubmittedBy(r) {
+  const m = (r.detailed_specifications || '').match(/Submitted by:\s*([^\n]+)/i);
+  return (m && m[1].trim()) || ME_EMAIL || '—';
+}
+async function renderSubmittedQueue() {
+  const box = document.getElementById('box-submitted'); if (!box) return;
+  const subs = (rfqs || []).filter(r => r.status === 'pending_review');
+  if (!subs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">⚡</span>No RFQs awaiting review.</div>'; return; }
+  box.innerHTML = '<div class="loading">Loading…</div>';
+  const ids = subs.map(r => r.id);
+  let imap = {};
+  try {
+    const imgs = await supa('rfq_images?rfq_id=in.(' + ids.map(encodeURIComponent).join(',') + ')&sort_order=eq.0&select=rfq_id,image_data,image_url');
+    (imgs || []).forEach(im => { if (!imap[im.rfq_id]) imap[im.rfq_id] = im; });
+  } catch (e) { /* thumbnails optional */ }
+  const src = im => { if (!im) return ''; const d = (im.image_data || '').trim(); if (d) return d.indexOf('data:') === 0 ? d : ('data:image/jpeg;base64,' + d); return (im.image_url || '').trim(); };
+  box.innerHTML = `<table class="data-table"><thead><tr><th></th><th>Project</th><th>Description</th><th>Category</th><th>Submitted by</th><th>Submitted</th><th></th></tr></thead><tbody>${
+    subs.map(r => { const s = src(imap[r.id]);
+      return `<tr>
+        <td>${s ? `<img src="${esc(s)}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">` : '<div style="width:48px;height:48px;border-radius:6px;background:var(--bg2,#f0f0e8);"></div>'}</td>
+        <td>${esc(r.project_number || '—')}</td>
+        <td>${esc(r.item_description || '—')}</td>
+        <td>${esc([r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' › ') || '—')}</td>
+        <td>${esc(nrSubmittedBy(r))}</td>
+        <td>${fmtDate(r.created_at)}</td>
+        <td style="text-align:right;"><button class="nr-btn" onclick="openRFQ('${esc(r.id)}')">Review →</button></td>
+      </tr>`; }).join('')
+  }</tbody></table>`;
 }
 
 function rfqTitle(r) { return [r.project_number, r.item_description].filter(Boolean).join(' — ') || 'Untitled RFQ'; }
@@ -1289,7 +1330,11 @@ async function openRFQ(id) {
       ].filter(Boolean).map(esc).join(' · ') || '—'}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px;">No quotes received.</div>';
 
+  const reviewBanner = r.status === 'pending_review'
+    ? `<div style="background:#fff8e0;border:1px solid #e0c840;border-radius:10px;padding:12px 14px;margin-bottom:12px;color:#665500;font-size:13px;">⏳ <b>Under Review</b> — TBG Sourcing is reviewing your submission.<div style="font-size:11px;color:#998800;margin-top:3px;">Submitted ${fmtDate(r.created_at)}</div></div>`
+    : '';
   document.getElementById('panelBody').innerHTML = `
+    ${reviewBanner}
     ${imagesHtml}
     <div class="panel-section"><h3>RFQ Details</h3>${details}</div>
     <div class="panel-section"><h3>Specifications</h3><div class="sub-list">${spec}</div></div>

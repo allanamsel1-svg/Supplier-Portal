@@ -1072,6 +1072,7 @@
           <!-- Status tabs -->
           <div style="display:flex;overflow-x:auto;border-bottom:1px solid #e0e0d8;background:#fafaf8;">
             <button class="rfq-tab on" onclick="filterRFQs('all')" id="rtab-all">All</button>
+            <button class="rfq-tab" onclick="filterRFQs('submitted')" id="rtab-submitted">⚡ Submitted</button>
             <button class="rfq-tab" onclick="filterRFQs('active')" id="rtab-active">Active</button>
             <button class="rfq-tab" onclick="filterRFQs('new_quotes')" id="rtab-new_quotes">New Quotes</button>
             <button class="rfq-tab" onclick="filterRFQs('in_review')" id="rtab-in_review">In Review</button>
@@ -4123,8 +4124,103 @@ async function deleteRfq(event, id){
   }
 }
 
+// ── Submitted-for-review queue (status='pending_review') ──
+function _axImgSrcRow(im){ if(!im)return ''; var d=(im.image_data||'').trim(); if(d) return d.indexOf('data:')===0?d:('data:image/jpeg;base64,'+d); return (im.image_url||'').trim(); }
+async function renderSubmittedQueue(){
+  var el=g('rfq-list-items'); if(!el)return;
+  var subs=(allRFQs||[]).filter(function(r){return r.status==='pending_review';});
+  if(!subs.length){ el.innerHTML='<div style="padding:2rem;text-align:center;color:#bbb;font-size:13px;">No submitted RFQs awaiting review.</div>'; return; }
+  el.innerHTML='<div style="padding:1rem;color:#bbb;font-size:12px;">Loading…</div>';
+  var tIds=Array.from(new Set(subs.map(function(r){return r.tenant_id;}).filter(Boolean)));
+  var tmap={};
+  if(tIds.length){ try{ var tr=await fetch(SB+'/rest/v1/tenants?select=id,name&id=in.('+tIds.map(encodeURIComponent).join(',')+')',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}); var ts=tr.ok?await tr.json():[]; ts.forEach(function(t){tmap[t.id]=t.name;}); }catch(e){} }
+  var rIds=subs.map(function(r){return r.id;});
+  var imap={};
+  if(rIds.length){ try{ var ir=await fetch(SB+'/rest/v1/rfq_images?rfq_id=in.('+rIds.map(encodeURIComponent).join(',')+')&sort_order=eq.0&select=rfq_id,image_data,image_url',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}}); var imgs=ir.ok?await ir.json():[]; imgs.forEach(function(im){ if(!imap[im.rfq_id])imap[im.rfq_id]=im; }); }catch(e){} }
+  el.innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="text-align:left;color:#888;font-size:10px;text-transform:uppercase;">'
+    +'<th style="padding:8px;">Img</th><th style="padding:8px;">Project</th><th style="padding:8px;">Description</th><th style="padding:8px;">Category</th><th style="padding:8px;">Submitted By</th><th style="padding:8px;">Date</th><th style="padding:8px;"></th></tr></thead><tbody>'
+    +subs.map(function(r){
+      var s=_axImgSrcRow(imap[r.id]);
+      var thumb=s?'<img src="'+esc(s)+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">':'<div style="width:48px;height:48px;border-radius:6px;background:#f0f0e8;"></div>';
+      return '<tr style="border-top:1px solid #f0f0e8;">'
+        +'<td style="padding:8px;">'+thumb+'</td>'
+        +'<td style="padding:8px;font-family:monospace;">'+esc(r.project_number||'—')+'</td>'
+        +'<td style="padding:8px;">'+esc(r.item_description||'—')+'</td>'
+        +'<td style="padding:8px;color:#888;">'+esc([r.category,r.sub_category,r.sub_sub_category].filter(Boolean).join(' › ')||'—')+'</td>'
+        +'<td style="padding:8px;">'+esc(tmap[r.tenant_id]||'—')+'</td>'
+        +'<td style="padding:8px;color:#888;white-space:nowrap;">'+new Date(r.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})+'</td>'
+        +'<td style="padding:8px;"><button data-rid="'+r.id+'" onclick="openRFQDetail(this.dataset.rid)" style="font-size:12px;padding:6px 12px;background:#2244cc;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;white-space:nowrap;">Review →</button></td>'
+      +'</tr>';
+    }).join('')+'</tbody></table>';
+}
+
+// ── Review actions on a submitted RFQ ──
+async function axUpdateRfqStatus(rfqId,status,extra){
+  try{
+    var body=Object.assign({status:status},extra||{});
+    var r=await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfqId,{method:'PATCH',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(body)});
+    if(!r.ok){ var t=await r.text().catch(function(){return'';}); alert('Update failed: '+r.status+' '+t); return false; }
+    await loadRFQs();
+    g('rfq-detail-pane').style.display='none'; g('rfq-detail-empty').style.display='flex'; selectedRFQId=null;
+    return true;
+  }catch(e){ alert('Error: '+e.message); return false; }
+}
+async function axSendBack(rfqId){
+  var notes=prompt('Send this RFQ back to the tenant as a draft.\n\nNotes explaining what to revise (required):');
+  if(notes==null)return; notes=notes.trim(); if(!notes){ alert('Notes are required to send back.'); return; }
+  await axUpdateRfqStatus(rfqId,'draft',{admin_notes:'[Returned for revision] '+notes});
+}
+async function axRejectRfq(rfqId){
+  var reason=prompt('Reject this RFQ.\n\nReason (required):');
+  if(reason==null)return; reason=reason.trim(); if(!reason){ alert('A reason is required to reject.'); return; }
+  await axUpdateRfqStatus(rfqId,'rejected',{admin_notes:'[Rejected] '+reason});
+}
+
+// ── Factory assignment modal (Approve & Assign) ──
+var _faRfqId=null;
+function openFactoryAssignModal(rfqId){
+  var rfq=(allRFQs||[]).find(function(r){return r.id===rfqId;}); if(!rfq)return;
+  _faRfqId=rfqId;
+  var cat=rfq.category||'';
+  var facs=(allFactories||[]).filter(function(f){ return !cat || (f.product_categories||[]).indexOf(cat)>-1; });
+  var ov=g('fa-modal');
+  if(!ov){ ov=document.createElement('div'); ov.id='fa-modal'; ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;'; document.body.appendChild(ov); }
+  var rows = facs.length ? facs.map(function(f){
+    return '<label style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid #f0f0e8;cursor:pointer;">'
+      +'<input type="checkbox" class="fa-fac" value="'+f.id+'">'
+      +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;">'+esc(f.factory_name_english||'Factory')+'</div>'
+      +'<div style="font-size:11px;color:#888;">'+esc([f.city,f.country].filter(Boolean).join(', '))+((f.product_categories&&f.product_categories.length)?' · '+esc(f.product_categories.join(', ')):'')+'</div></div>'
+      +'</label>';
+  }).join('') : '<div style="padding:16px;color:#888;font-size:13px;">No factories tagged with category "'+esc(cat||'—')+'". Add this category to factory profiles, or close and assign via the RFQ edit form.</div>';
+  ov.innerHTML='<div style="background:#fff;border-radius:12px;width:560px;max-width:92vw;max-height:84vh;display:flex;flex-direction:column;overflow:hidden;">'
+    +'<div style="padding:16px 18px;border-bottom:1px solid #eee;font-size:15px;font-weight:700;">Assign Factories'+(cat?' — '+esc(cat):'')+'</div>'
+    +'<div style="overflow-y:auto;flex:1;">'+rows+'</div>'
+    +'<div style="padding:12px 18px;border-top:1px solid #eee;display:flex;justify-content:flex-end;gap:8px;">'
+    +'<button onclick="document.getElementById(\'fa-modal\').style.display=\'none\'" style="padding:8px 14px;border:1px solid #ddd;background:#fff;border-radius:7px;cursor:pointer;font-size:13px;">Cancel</button>'
+    +'<button onclick="confirmFactoryAssign()" style="padding:8px 16px;border:none;background:#16a34a;color:#fff;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;">Send RFQ to Selected Factories →</button>'
+    +'</div></div>';
+  ov.style.display='flex';
+}
+async function confirmFactoryAssign(){
+  var ids=Array.prototype.slice.call(document.querySelectorAll('#fa-modal .fa-fac:checked')).map(function(c){return c.value;});
+  if(!ids.length){ alert('Select at least one factory.'); return; }
+  try{
+    await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+_faRfqId,{method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+    var rows=ids.map(function(fid){ var f=(allFactories||[]).find(function(x){return x.id===fid;}); return {rfq_id:_faRfqId,factory_id:fid,email_sent_to:f?f.sales_email:null,status:'sent'}; });
+    var ar=await fetch(SB+'/rest/v1/rfq_factory_assignments',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(rows)});
+    if(!ar.ok){ var t=await ar.text().catch(function(){return'';}); alert('Assignment failed: '+ar.status+' '+t); return; }
+    var pr=await fetch(SB+'/rest/v1/rfqs?id=eq.'+_faRfqId,{method:'PATCH',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({status:'sent'})});
+    if(!pr.ok){ var t2=await pr.text().catch(function(){return'';}); alert('Status update failed: '+pr.status+' '+t2); return; }
+    var ov=g('fa-modal'); if(ov)ov.style.display='none';
+    await loadRFQs();
+    g('rfq-detail-pane').style.display='none'; g('rfq-detail-empty').style.display='flex'; selectedRFQId=null;
+    alert('RFQ sent to '+ids.length+' factor'+(ids.length===1?'y':'ies')+'.');
+  }catch(e){ alert('Error: '+e.message); }
+}
+
 function renderRFQList(){
   var el=g('rfq-list-items');if(!el)return;
+  if(currentRFQFilter==='submitted'){ renderSubmittedQueue(); return; }
   var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0','on_hold':'#fff8e0','archived':'#f0f0f0'};
   var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected','cancelled':'Cancelled','on_hold':'On Hold','archived':'Archived'};
   var badgeColors={'draft':'#888','sent':'#2244cc','in_review':'#cc7700','quotes_received':'#886600','approved':'#1a7a1a','rejected':'#b00','cancelled':'#b00','on_hold':'#886600','archived':'#999'};
@@ -4576,6 +4672,12 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines,image
   var el=g('rfq-detail-pane');
   var axImgSrc=function(im){ var d=(im.image_data||'').trim(); if(d) return d.indexOf('data:')===0?d:('data:image/jpeg;base64,'+d); return (im.image_url||'').trim(); };
   var imagesHtml=(images&&images.length)?('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem;">'+images.map(function(im){var s=axImgSrc(im);return s?'<img src="'+esc(s)+'" onclick="axLightbox(this.src)" style="width:120px;height:120px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid #e0e0d8;">':'';}).join('')+'</div>'):'';
+  var reviewBar=(rfq.status==='pending_review')?('<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff8e0;border:1px solid #f0d860;border-radius:10px;padding:10px 12px;margin-bottom:1rem;">'
+    +'<div style="flex:1;min-width:150px;font-size:12px;font-weight:600;color:#886600;">⚡ Submitted for review</div>'
+    +'<button data-rid="'+rfq.id+'" onclick="openFactoryAssignModal(this.dataset.rid)" style="font-size:12px;padding:7px 12px;background:#16a34a;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">&#x2713; Approve &amp; Assign Factories</button>'
+    +'<button data-rid="'+rfq.id+'" onclick="axSendBack(this.dataset.rid)" style="font-size:12px;padding:7px 12px;background:#fff;color:#886600;border:1px solid #f0d060;border-radius:6px;cursor:pointer;">&#x21A9; Send Back</button>'
+    +'<button data-rid="'+rfq.id+'" onclick="axRejectRfq(this.dataset.rid)" style="font-size:12px;padding:7px 12px;background:#fff0f0;color:#b00;border:1px solid #fdd;border-radius:6px;cursor:pointer;">&#x2717; Reject</button>'
+    +'</div>'):'';
   var uomStr=rfq.unit_of_measure&&rfq.unit_of_measure!=='N/A'?rfq.product_size+' '+rfq.unit_of_measure:'N/A';
   var qtyStr=rfq.quote_quantity?rfq.quote_quantity.toLocaleString()+' '+(rfq.unit_type||'each')+' — '+uomStr:'—';
 
@@ -4583,6 +4685,7 @@ function renderRFQDetailPane(rfq,assignments,quotes,quoteVersions,kitLines,image
   var statusText={'draft':'Draft','sent':'Sent','in_review':'In Review','quotes_received':'Quotes In','approved':'Approved','rejected':'Rejected'};
 
   var html=''+
+    reviewBar+
     imagesHtml+
     // Header
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;">'+
