@@ -123,12 +123,7 @@
       </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
-          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select>
-            <div id="nr-custom-cat-wrap" style="display:none;margin-top:6px;">
-              <input id="nr-custom-cat" placeholder="Suggest a category name (e.g. Beach Accessories)" style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);">
-              <div style="font-size:10px;color:var(--text2);margin-top:3px;">📋 Submitted for admin review before being added to the official list.</div>
-            </div>
-          </div>
+          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
           <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
         </div>
         <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
@@ -367,7 +362,7 @@ function nrCategoryChange() {
   nrg('nr-factory-list').innerHTML = '';
   nrg('nr-factory-status').textContent = sel.value ? 'Click "Find Matching Factories" to see suppliers for ' + sel.value + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
-  const ccw = nrg('nr-custom-cat-wrap'); if (ccw) ccw.style.display = (sel.value === 'Other') ? 'block' : 'none';
+  if (sel.value === 'Other') nrCatModalOpen();
 }
 // ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
 // One image at a time: extract a single product (the first if the API returns an array).
@@ -716,7 +711,7 @@ function openNewRfqModal(prefill) {
    'nr-elc-fob-wc','nr-elc-freight-wc','nr-elc-duty-wc','nr-elc-total-wc','nr-elc-margin-wc','nr-elc-check-wc',
    'nr-elc-fob-ec','nr-elc-freight-ec','nr-elc-duty-ec','nr-elc-total-ec','nr-elc-margin-ec','nr-elc-check-ec'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   { const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const hr = nrg('nr-hts-rulings'); if (hr) hr.innerHTML = ''; }
-  { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_lcl'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = 'none'; const cc = nrg('nr-custom-cat'); if (cc) cc.value = ''; const ccw = nrg('nr-custom-cat-wrap'); if (ccw) ccw.style.display = 'none'; }
+  { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_lcl'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = 'none'; }
   nrFreightWire();
   nrLoadFreightRates();
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
@@ -843,28 +838,6 @@ async function saveNewRfq(status) {
         body: JSON.stringify({ rfq_id: newId, tenant_id: TID, image_data: im.base64, image_url: '', sort_order: i }),
       }).catch(() => {})
     )).catch(() => {});
-  }
-  // Category suggestion: if "Other" with a custom name, submit it for admin review.
-  if (nrg('nr-category').value === 'Other') {
-    const customCat = ((nrg('nr-custom-cat') || {}).value || '').trim();
-    if (customCat) {
-      const tid = TID || (JSON.parse(localStorage.getItem('tenant_user') || '{}').tenant_id) || null;
-      try {
-        const pcRes = await fetch(SUPA_URL + '/rest/v1/pending_categories', {
-          method: 'POST',
-          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ suggested_name: customCat, tenant_id: tid, rfq_id: newId || null, status: 'pending' }),
-        });
-        if (!pcRes.ok) {
-          const pcErr = await pcRes.text().catch(() => '');
-          console.error('pending_categories insert failed', pcRes.status, pcErr);
-          alert('Category suggestion failed (' + pcRes.status + '): ' + pcErr);
-        }
-      } catch (e) {
-        console.error('pending_categories insert error', e);
-        alert('Category suggestion error: ' + (e && e.message ? e.message : e));
-      }
-    }
   }
   closeNewRfqModal();
   await loadRFQs();
@@ -1298,6 +1271,126 @@ function handleAiRfqAction() {
   }
   // Give categories a moment to load so pre-select can match, then open the pre-filled form.
   setTimeout(function () { openNewRfqModal(p); }, 400);
+}
+</script>
+
+<!-- Category picker modal (opens when "Other" is chosen) -->
+<div id="nr-cat-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+  <div style="background:var(--bg,#fff);border-radius:14px;padding:28px;width:560px;max-height:80vh;overflow-y:auto;position:relative;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;">📂 Select or Add Category</div>
+
+    <input id="nr-cat-search" placeholder="Search existing categories..." style="width:100%;padding:9px 12px;border:1px solid var(--border,#e0e0d8);border-radius:8px;font-size:13px;margin-bottom:12px;box-sizing:border-box;">
+
+    <div id="nr-cat-results" style="max-height:220px;overflow-y:auto;border:1px solid var(--border,#e0e0d8);border-radius:8px;margin-bottom:16px;"></div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">— or add new —</div>
+
+    <div style="display:grid;gap:8px;">
+      <input id="nr-cat-new-cat" placeholder="Category *" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <input id="nr-cat-new-sub" placeholder="Sub-Category (optional)" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <input id="nr-cat-new-subsub" placeholder="Sub-Sub-Category (optional)" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="nr-cat-new-prefix" placeholder="3-letter prefix" maxlength="3" style="width:100px;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;text-transform:uppercase;">
+        <span style="font-size:11px;color:var(--text2);">Model prefix (auto-generated, editable)</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="nrCatModalClose()" style="padding:8px 16px;border:1px solid var(--border,#e0e0d8);border-radius:7px;background:none;cursor:pointer;font-size:13px;">Cancel</button>
+      <button onclick="nrCatSaveNew()" style="padding:8px 18px;border:none;border-radius:7px;background:#2244cc;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">+ Add Category</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Category picker modal (replaces the old "Other" free-text + pending_categories flow) ──
+let nrAllCats = [];
+
+async function nrCatModalOpen() {
+  if (!nrAllCats.length) {
+    const rows = await fetch(SUPA_URL + '/rest/v1/categories?select=id,category,sub_category,sub_sub_category,model_prefix&order=category', {
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+    }).then(r => r.json()).catch(() => []);
+    nrAllCats = Array.isArray(rows) ? rows : [];
+  }
+  document.getElementById('nr-cat-modal').style.display = 'flex';
+  document.getElementById('nr-cat-search').value = '';
+  document.getElementById('nr-cat-new-cat').value = '';
+  document.getElementById('nr-cat-new-sub').value = '';
+  document.getElementById('nr-cat-new-subsub').value = '';
+  const pfx = document.getElementById('nr-cat-new-prefix');
+  pfx.value = ''; delete pfx.dataset.manual;
+  nrCatRenderResults('');
+  document.getElementById('nr-cat-search').focus();
+  document.getElementById('nr-cat-search').oninput = e => nrCatRenderResults(e.target.value);
+  document.getElementById('nr-cat-new-cat').oninput = e => {
+    const v = e.target.value.trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3);
+    if (!document.getElementById('nr-cat-new-prefix').dataset.manual) {
+      document.getElementById('nr-cat-new-prefix').value = v;
+    }
+  };
+  document.getElementById('nr-cat-new-prefix').oninput = e => {
+    document.getElementById('nr-cat-new-prefix').dataset.manual = '1';
+  };
+}
+
+function nrCatRenderResults(q) {
+  const el = document.getElementById('nr-cat-results');
+  const filtered = q.length < 1 ? nrAllCats.slice(0, 50) : nrAllCats.filter(r => {
+    const hay = [r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' ').toLowerCase();
+    return hay.includes(q.toLowerCase());
+  }).slice(0, 30);
+  if (!filtered.length) { el.innerHTML = '<div style="padding:12px;font-size:13px;color:#888;">No matches found</div>'; return; }
+  el.innerHTML = filtered.map(r => {
+    const label = [r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' › ');
+    return `<div onclick="nrCatSelect('${r.id}','${label.replace(/'/g,"\\'")}','${(r.category||'').replace(/'/g,"\\'")}' )" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border,#f0f0e8);" onmouseover="this.style.background='#f5f5f0'" onmouseout="this.style.background=''">${label}</div>`;
+  }).join('');
+}
+
+function nrCatSelect(id, label, catValue) {
+  const sel = document.getElementById('nr-category');
+  let found = false;
+  for (let o of sel.options) { if (o.value === catValue) { sel.value = catValue; found = true; break; } }
+  if (!found) {
+    const opt = document.createElement('option');
+    opt.value = catValue; opt.text = label;
+    sel.insertBefore(opt, sel.lastElementChild);
+    sel.value = catValue;
+  }
+  nrCatModalClose();
+}
+
+async function nrCatSaveNew() {
+  const cat = document.getElementById('nr-cat-new-cat').value.trim();
+  const sub = document.getElementById('nr-cat-new-sub').value.trim();
+  const subsub = document.getElementById('nr-cat-new-subsub').value.trim();
+  const prefix = document.getElementById('nr-cat-new-prefix').value.trim().toUpperCase();
+  if (!cat) { alert('Category name is required'); return; }
+  const body = { category: cat, model_prefix: prefix || cat.slice(0,3).toUpperCase() };
+  if (sub) body.sub_category = sub;
+  if (subsub) body.sub_sub_category = subsub;
+  const res = await fetch(SUPA_URL + '/rest/v1/categories', {
+    method: 'POST',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { alert('Could not save: ' + await res.text()); return; }
+  const rows = await res.json();
+  const newRow = rows[0];
+  nrAllCats.push(newRow);
+  const label = [cat, sub, subsub].filter(Boolean).join(' › ');
+  const sel = document.getElementById('nr-category');
+  const opt = document.createElement('option');
+  opt.value = cat; opt.text = label;
+  sel.insertBefore(opt, sel.lastElementChild);
+  sel.value = cat;
+  nrCatModalClose();
+}
+
+function nrCatModalClose() {
+  document.getElementById('nr-cat-modal').style.display = 'none';
+  const sel = document.getElementById('nr-category');
+  if (sel.value === 'Other') sel.value = '';
 }
 </script>
 </body>

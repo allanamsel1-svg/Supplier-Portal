@@ -1143,10 +1143,6 @@
                 <select id="rfq-category-id" onchange="rfqCategoryChanged();suggestDutyTariff();">
                   <option value="">— Select Category —</option>
                 </select>
-                <div id="ax-custom-cat-wrap" style="display:none;margin-top:6px;">
-                  <input type="text" id="ax-custom-cat" placeholder="Suggest a category name" style="width:100%;border-color:#c8b8f0;" />
-                  <div style="font-size:10px;color:#888;margin-top:3px;">📋 Submitted for review before being added to the official list.</div>
-                </div>
               </div>
               <div class="mf">
                 <label>Unit Type</label>
@@ -6477,7 +6473,7 @@ function rfqCategoryChanged(){
   if(cb&&cb.dataset.userOverride!=='true'){
     cb.checked=isCosmetic;
   }
-  var ccw=g('ax-custom-cat-wrap'); if(ccw)ccw.style.display=(sel.value==='__other__')?'block':'none';
+  if(sel.value==='__other__'){ axCatModalOpen(); return; }
   inheritComplianceForCategory();
 }
 
@@ -7345,8 +7341,6 @@ function axResetTool(){
   var ui=g('ax-url-input'); if(ui)ui.value='';
   var hd=g('ax-hts-desc'); if(hd)hd.textContent='';
   var hr=g('ax-hts-rulings'); if(hr)hr.innerHTML='';
-  var cc=g('ax-custom-cat'); if(cc)cc.value='';
-  var ccw=g('ax-custom-cat-wrap'); if(ccw)ccw.style.display='none';
   axImgWire();
 }
 
@@ -7515,21 +7509,6 @@ async function saveRFQ(action){
       if(savedRFQ){
         g('rfq-id').value=savedRFQ.id;
         g('rfq-project-number').textContent=savedRFQ.project_number;
-
-        // Category suggestion: 'Other' with a custom name -> submit for admin review.
-        if(isOtherCat){
-          var customCat=((g('ax-custom-cat')&&g('ax-custom-cat').value)||'').trim();
-          if(customCat){
-            var brandSelV=g('rfq-brand-id')?g('rfq-brand-id').value:null;
-            var brandObjV=brandSelV?(allBrands||[]).find(function(b){return b.id===brandSelV;}):null;
-            // No tenant variable exists in admin.html — use the selected brand's tenant, else Buyline Brands.
-            var pcTid=(brandObjV&&brandObjV.tenant_id)||'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
-            try{
-              var pcRes=await fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:pcTid,rfq_id:savedRFQ.id,status:'pending'})});
-              if(!pcRes.ok){ var pcErr=await pcRes.text().catch(function(){return '';}); console.error('pending_categories insert failed', pcRes.status, pcErr); alert('Category suggestion failed ('+pcRes.status+'): '+pcErr); }
-            }catch(e){ console.error('pending_categories insert error', e); alert('Category suggestion error: '+(e&&e.message?e.message:e)); }
-          }
-        }
 
         // Attach any additional product images (paste/URL/extra-image tool) to a newly created RFQ.
         if(!rfqId && savedRFQ.id && typeof adminExtraImages!=='undefined' && adminExtraImages.length){
@@ -13716,5 +13695,124 @@ async function rejectPendingCert(btn){
 </script>
 <script src="/admin-gates-snippet.js"></script>
 <script src="admin-shared.js"></script>
+
+<!-- Category picker modal (opens when "Other" is chosen) -->
+<div id="ax-cat-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
+  <div style="background:var(--bg,#fff);border-radius:14px;padding:28px;width:560px;max-height:80vh;overflow-y:auto;position:relative;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:16px;">📂 Select or Add Category</div>
+
+    <input id="ax-cat-search" placeholder="Search existing categories..." style="width:100%;padding:9px 12px;border:1px solid var(--border,#e0e0d8);border-radius:8px;font-size:13px;margin-bottom:12px;box-sizing:border-box;">
+
+    <div id="ax-cat-results" style="max-height:220px;overflow-y:auto;border:1px solid var(--border,#e0e0d8);border-radius:8px;margin-bottom:16px;"></div>
+
+    <div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;">— or add new —</div>
+
+    <div style="display:grid;gap:8px;">
+      <input id="ax-cat-new-cat" placeholder="Category *" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <input id="ax-cat-new-sub" placeholder="Sub-Category (optional)" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <input id="ax-cat-new-subsub" placeholder="Sub-Sub-Category (optional)" style="padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="ax-cat-new-prefix" placeholder="3-letter prefix" maxlength="3" style="width:100px;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;text-transform:uppercase;">
+        <span style="font-size:11px;color:var(--text2);">Model prefix (auto-generated, editable)</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+      <button onclick="axCatModalClose()" style="padding:8px 16px;border:1px solid var(--border,#e0e0d8);border-radius:7px;background:none;cursor:pointer;font-size:13px;">Cancel</button>
+      <button onclick="axCatSaveNew()" style="padding:8px 18px;border:none;border-radius:7px;background:#2244cc;color:#fff;cursor:pointer;font-size:13px;font-weight:600;">+ Add Category</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Category picker modal (replaces the old "Other" free-text + pending_categories flow) ──
+// Admin's #rfq-category-id is keyed by category id (UUID); selecting sets the option value to the id.
+var axAllCats = [];
+
+async function axCatModalOpen() {
+  if (!axAllCats.length) {
+    var rows = await fetch(SB + '/rest/v1/categories?select=id,category,sub_category,sub_sub_category,model_prefix&order=category', {
+      headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY }
+    }).then(function(r){return r.json();}).catch(function(){return [];});
+    axAllCats = Array.isArray(rows) ? rows : [];
+  }
+  g('ax-cat-modal').style.display = 'flex';
+  g('ax-cat-search').value = '';
+  g('ax-cat-new-cat').value = '';
+  g('ax-cat-new-sub').value = '';
+  g('ax-cat-new-subsub').value = '';
+  var pfx = g('ax-cat-new-prefix'); pfx.value = ''; delete pfx.dataset.manual;
+  axCatRenderResults('');
+  g('ax-cat-search').focus();
+  g('ax-cat-search').oninput = function(e){ axCatRenderResults(e.target.value); };
+  g('ax-cat-new-cat').oninput = function(e){
+    var v = e.target.value.trim().toUpperCase().replace(/[^A-Z]/g,'').slice(0,3);
+    if (!g('ax-cat-new-prefix').dataset.manual) g('ax-cat-new-prefix').value = v;
+  };
+  g('ax-cat-new-prefix').oninput = function(){ g('ax-cat-new-prefix').dataset.manual = '1'; };
+}
+
+function axCatRenderResults(q) {
+  var el = g('ax-cat-results');
+  var filtered = q.length < 1 ? axAllCats.slice(0, 50) : axAllCats.filter(function(r){
+    var hay = [r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' ').toLowerCase();
+    return hay.indexOf(q.toLowerCase()) !== -1;
+  }).slice(0, 30);
+  if (!filtered.length) { el.innerHTML = '<div style="padding:12px;font-size:13px;color:#888;">No matches found</div>'; return; }
+  el.innerHTML = filtered.map(function(r){
+    var label = [r.category, r.sub_category, r.sub_sub_category].filter(Boolean).join(' › ');
+    return '<div onclick="axCatSelect(\'' + r.id + '\',\'' + label.replace(/'/g,"\\'") + '\')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border,#f0f0e8);" onmouseover="this.style.background=\'#f5f5f0\'" onmouseout="this.style.background=\'\'">' + label + '</div>';
+  }).join('');
+}
+
+function axCatSelect(id, label) {
+  var sel = g('rfq-category-id');
+  var found = false;
+  for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === id) { sel.value = id; found = true; break; } }
+  if (!found) {
+    var opt = document.createElement('option');
+    opt.value = id; opt.text = label;
+    sel.insertBefore(opt, sel.lastElementChild);
+    sel.value = id;
+  }
+  axCatModalClose();
+  if (typeof rfqCategoryChanged === 'function') { try { rfqCategoryChanged(); } catch(e){} }
+}
+
+async function axCatSaveNew() {
+  var cat = g('ax-cat-new-cat').value.trim();
+  var sub = g('ax-cat-new-sub').value.trim();
+  var subsub = g('ax-cat-new-subsub').value.trim();
+  var prefix = g('ax-cat-new-prefix').value.trim().toUpperCase();
+  if (!cat) { alert('Category name is required'); return; }
+  var body = { category: cat, model_prefix: prefix || cat.slice(0,3).toUpperCase() };
+  if (sub) body.sub_category = sub;
+  if (subsub) body.sub_sub_category = subsub;
+  var res = await fetch(SB + '/rest/v1/categories', {
+    method: 'POST',
+    headers: { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) { alert('Could not save: ' + await res.text()); return; }
+  var rows = await res.json();
+  var newRow = rows[0];
+  axAllCats.push(newRow);
+  if (typeof allCategories !== 'undefined' && Array.isArray(allCategories)) allCategories.push(newRow);
+  var label = [cat, sub, subsub].filter(Boolean).join(' › ');
+  var sel = g('rfq-category-id');
+  var opt = document.createElement('option');
+  opt.value = newRow.id; opt.text = label;
+  sel.insertBefore(opt, sel.lastElementChild);
+  sel.value = newRow.id;
+  axCatModalClose();
+  if (typeof rfqCategoryChanged === 'function') { try { rfqCategoryChanged(); } catch(e){} }
+}
+
+function axCatModalClose() {
+  g('ax-cat-modal').style.display = 'none';
+  var sel = g('rfq-category-id');
+  if (sel.value === '__other__') sel.value = '';
+}
+</script>
 </body>
 </html>
