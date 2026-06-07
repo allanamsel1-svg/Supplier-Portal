@@ -123,7 +123,12 @@
       </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
-          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
+          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select>
+            <div id="nr-custom-cat-wrap" style="display:none;margin-top:6px;">
+              <input id="nr-custom-cat" placeholder="Suggest a category name (e.g. Beach Accessories)" style="width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);">
+              <div style="font-size:10px;color:var(--text2);margin-top:3px;">📋 Submitted for admin review before being added to the official list.</div>
+            </div>
+          </div>
           <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
         </div>
         <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
@@ -181,6 +186,40 @@
       <div class="rfq-sec">
         <div class="rfq-sec-title">4 · FREIGHT &amp; LANDED COST</div>
 
+        <!-- Origin + shipping mode (drives dynamic freight rates) -->
+        <div class="nr-grid">
+          <div class="nr-field">
+            <label>Country of Manufacture</label>
+            <select id="nr-origin-country" onchange="nrLoadFreightRates()">
+              <option value="">Select country...</option>
+              <option value="China" selected>China</option>
+              <option value="Vietnam">Vietnam</option>
+              <option value="India">India</option>
+              <option value="Bangladesh">Bangladesh</option>
+              <option value="Cambodia">Cambodia</option>
+              <option value="Indonesia">Indonesia</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Korea">Korea</option>
+              <option value="Turkey">Turkey</option>
+            </select>
+          </div>
+          <div class="nr-field">
+            <label>Shipping Mode</label>
+            <select id="nr-ship-mode" onchange="nrLoadFreightRates()">
+              <option value="ocean_lcl">Ocean LCL</option>
+              <option value="ocean_fcl">Ocean FCL</option>
+              <option value="air">Air</option>
+            </select>
+          </div>
+          <div class="nr-field" id="nr-fcl-type-wrap" style="display:none;">
+            <label>Container Type</label>
+            <select id="nr-fcl-type" onchange="nrLoadFreightRates()">
+              <option value="20GP">20GP</option>
+              <option value="40HC">40HC</option>
+            </select>
+          </div>
+        </div>
+
         <!-- Unit packaging inputs -->
         <div class="nr-grid">
           <div class="nr-field"><label>Units per inner carton</label><input id="nr-units-inner" type="number" min="1" placeholder="e.g. 12"></div>
@@ -204,21 +243,16 @@
           <div class="nr-field"><label>Total CBM (order)</label><input id="nr-cbm-total" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
         </div>
 
-        <!-- Freight -->
-        <div class="nr-grid">
-          <div class="nr-field"><label>Freight rate ($/CBM)</label><input id="nr-freight-rate" type="number" value="92.31" step="0.01"></div>
-          <div class="nr-field"><label>Total freight ($)</label><input id="nr-freight-total" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
-          <div class="nr-field"><label>Freight per unit ($)</label><input id="nr-freight-unit" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
-        </div>
-
         <!-- HTS lookup -->
         <div class="nr-field">
           <label>HTS Code</label>
           <div style="display:flex;gap:8px;">
-            <input id="nr-hts-code" placeholder="e.g. 3304.99.5000" style="flex:1;padding:9px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;">
+            <input id="nr-hts-code" placeholder="e.g. 3304.99.5000" style="flex:1;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);">
+            <button type="button" class="nr-btn alt" id="nr-hts-suggest-btn" onclick="nrHtsSuggest()">✨ Suggest</button>
             <button type="button" class="nr-btn" id="nr-hts-btn" onclick="nrHtsLookup()">Look Up →</button>
           </div>
           <div id="nr-hts-desc" style="font-size:11px;color:var(--text2);margin-top:4px;"></div>
+          <div id="nr-hts-rulings" style="font-size:11px;margin-top:4px;"></div>
         </div>
 
         <!-- Duty rates -->
@@ -238,19 +272,33 @@
           <div class="nr-field"><label>Duty per unit ($)</label><input id="nr-duty-unit" readonly style="background:var(--bg3,#f5f5f0)" placeholder="auto"></div>
         </div>
 
-        <!-- ELC summary -->
-        <div style="background:var(--bg2,#f8f8f5);border:1px solid var(--border,#e0e0d8);border-radius:10px;padding:16px;margin-top:12px;">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Estimated Landed Cost</div>
-          <div class="nr-grid">
-            <div class="nr-field"><label>FOB / unit ($)</label><input id="nr-elc-fob" readonly style="background:transparent;border:none;font-weight:600;font-size:14px;" placeholder="—"></div>
-            <div class="nr-field"><label>Freight / unit ($)</label><input id="nr-elc-freight" readonly style="background:transparent;border:none;" placeholder="—"></div>
-            <div class="nr-field"><label>Duty / unit ($)</label><input id="nr-elc-duty" readonly style="background:transparent;border:none;" placeholder="—"></div>
-            <div class="nr-field"><label>ELC / unit ($)</label><input id="nr-elc-total" readonly style="background:transparent;border:none;font-weight:700;font-size:16px;color:var(--accent,#2244cc);" placeholder="—"></div>
-          </div>
-          <div class="nr-grid" style="margin-top:8px;">
-            <div class="nr-field"><label>Target retail ($)</label><input id="nr-elc-retail" type="number" min="0" step="0.01" placeholder="e.g. 9.99"></div>
-            <div class="nr-field"><label>Gross margin (%)</label><input id="nr-elc-margin" readonly style="background:transparent;border:none;font-weight:600;" placeholder="—"></div>
-            <div class="nr-field"><label>37.5% margin check</label><input id="nr-elc-check" readonly style="background:transparent;border:none;font-weight:600;" placeholder="—"></div>
+        <!-- Dual ELC: West Coast vs East Coast -->
+        <div style="background:var(--bg2,#f8f8f5);border:1px solid var(--border);border-radius:10px;padding:16px;margin-top:12px;">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px;">Estimated Landed Cost Comparison</div>
+          <div style="display:grid;grid-template-columns:180px 1fr 1fr;gap:8px;align-items:center;">
+            <div></div>
+            <div style="text-align:center;font-weight:600;font-size:12px;">🌊 West Coast (LA)<br><span id="nr-wc-transit" style="font-weight:400;font-size:10px;color:var(--text2)"></span></div>
+            <div style="text-align:center;font-weight:600;font-size:12px;">🗽 East Coast (NJ)<br><span id="nr-ec-transit" style="font-weight:400;font-size:10px;color:var(--text2)"></span></div>
+            <div style="font-size:12px;color:var(--text2)">FOB / unit</div>
+            <div style="text-align:center"><input id="nr-elc-fob-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="text-align:center"><input id="nr-elc-fob-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="font-size:12px;color:var(--text2)">Freight / unit</div>
+            <div style="text-align:center"><input id="nr-elc-freight-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="text-align:center"><input id="nr-elc-freight-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="font-size:12px;color:var(--text2)">Duty / unit</div>
+            <div style="text-align:center"><input id="nr-elc-duty-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="text-align:center"><input id="nr-elc-duty-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;"></div>
+            <div style="font-size:12px;font-weight:700;">ELC / unit</div>
+            <div style="text-align:center"><input id="nr-elc-total-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:16px;font-weight:700;color:var(--accent,#2244cc);"></div>
+            <div style="text-align:center"><input id="nr-elc-total-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:16px;font-weight:700;color:var(--accent,#2244cc);"></div>
+            <div style="font-size:12px;color:var(--text2)">Target retail</div>
+            <div style="text-align:center;grid-column:2/4;"><input id="nr-elc-retail" type="number" min="0" step="0.01" placeholder="e.g. 9.99" style="width:50%;text-align:center;padding:6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:13px;"></div>
+            <div style="font-size:12px;color:var(--text2)">Gross margin</div>
+            <div style="text-align:center"><input id="nr-elc-margin-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;font-weight:600;"></div>
+            <div style="text-align:center"><input id="nr-elc-margin-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:13px;font-weight:600;"></div>
+            <div style="font-size:12px;color:var(--text2)">37.5% target</div>
+            <div style="text-align:center"><input id="nr-elc-check-wc" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:12px;font-weight:600;"></div>
+            <div style="text-align:center"><input id="nr-elc-check-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:12px;font-weight:600;"></div>
           </div>
         </div>
       </div>
@@ -309,7 +357,7 @@ async function loadRfqCategories() {
   rows.forEach(r => { if (r.category && !seen[r.category]) { seen[r.category] = 1; rfqCatMeta.push({ category: r.category, is_cosmetic: !!r.is_cosmetic }); } });
   rfqCategories = rfqCatMeta.map(c => c.category);
   const sel = nrg('nr-category');
-  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCatMeta.map(c => `<option value="${esc(c.category)}" data-cosmetic="${c.is_cosmetic ? '1' : '0'}">${esc(c.category)}</option>`).join('');
+  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCatMeta.map(c => `<option value="${esc(c.category)}" data-cosmetic="${c.is_cosmetic ? '1' : '0'}">${esc(c.category)}</option>`).join('') + '<option value="Other">Other…</option>';
 }
 function nrCategoryChange() {
   const sel = nrg('nr-category'); if (!sel) return;
@@ -319,6 +367,7 @@ function nrCategoryChange() {
   nrg('nr-factory-list').innerHTML = '';
   nrg('nr-factory-status').textContent = sel.value ? 'Click "Find Matching Factories" to see suppliers for ' + sel.value + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
+  const ccw = nrg('nr-custom-cat-wrap'); if (ccw) ccw.style.display = (sel.value === 'Other') ? 'block' : 'none';
 }
 // ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
 // One image at a time: extract a single product (the first if the API returns an array).
@@ -457,8 +506,46 @@ function nrDimToNum(fieldId, unitId) {
 }
 
 // ── Freight & landed cost calculator ──
+// Default freight rates ($/CBM) until nrLoadFreightRates() pulls live rates.
+window.nrFreightRates = window.nrFreightRates || { wc: 180, ec: 200, wcTransit: 28, ecTransit: 35 };
+
+// Pull live freight rates from the freight_rates table for the selected origin + mode.
+async function nrLoadFreightRates() {
+  const country = (document.getElementById('nr-origin-country')||{}).value || '';
+  const mode = (document.getElementById('nr-ship-mode')||{}).value || 'ocean_lcl';
+  const fclWrap = document.getElementById('nr-fcl-type-wrap');
+  if (fclWrap) fclWrap.style.display = (mode === 'ocean_fcl') ? '' : 'none';
+  const def = { wc: 180, ec: 200, wcTransit: 28, ecTransit: 35 };
+  if (!country) { window.nrFreightRates = def; nrCbmCalc(); return; }
+  try {
+    const rows = await supa('freight_rates?origin_country=eq.' + encodeURIComponent(country)
+      + '&mode=eq.' + encodeURIComponent(mode) + '&is_active=eq.true') || [];
+    const ctnCbm = { '20GP': 25, '40HC': 55 };
+    const fclType = (document.getElementById('nr-fcl-type')||{}).value || '20GP';
+    const rateFor = (code) => {
+      if (mode === 'ocean_fcl') {
+        const row = rows.find(x => x.destination_code === code && x.container_type === fclType);
+        return (row && row.rate_per_container != null) ? parseFloat(row.rate_per_container) / (ctnCbm[fclType] || 25) : null;
+      }
+      const row = rows.find(x => x.destination_code === code);   // ocean_lcl (and air fallback)
+      return (row && row.rate_per_cbm != null) ? parseFloat(row.rate_per_cbm) : null;
+    };
+    const transitFor = (code) => { const row = rows.find(x => x.destination_code === code); return (row && row.transit_days != null) ? row.transit_days : null; };
+    const wc = rateFor('US-LAX'), ec = rateFor('US-EWR');
+    const wcT = transitFor('US-LAX'), ecT = transitFor('US-EWR');
+    window.nrFreightRates = {
+      wc: (wc != null && !isNaN(wc)) ? wc : def.wc,
+      ec: (ec != null && !isNaN(ec)) ? ec : def.ec,
+      wcTransit: wcT != null ? wcT : def.wcTransit,
+      ecTransit: ecT != null ? ecT : def.ecTransit,
+    };
+  } catch (e) { window.nrFreightRates = def; }
+  nrCbmCalc();
+}
+
 function nrCbmCalc() {
   const toM = (v, u) => u==='in' ? v*0.0254 : u==='mm' ? v/1000 : v/100;
+  const setV = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
   const dimU = (document.getElementById('nr-dim-unit')||{}).value || 'cm';
   const w = parseFloat((document.getElementById('nr-dim-w')||{}).value);
   const h = parseFloat((document.getElementById('nr-dim-h')||{}).value);
@@ -466,84 +553,66 @@ function nrCbmCalc() {
   const unitsInner = parseFloat((document.getElementById('nr-units-inner')||{}).value);
   const innersMaster = parseFloat((document.getElementById('nr-inners-master')||{}).value);
   const qty = parseFloat((document.getElementById('nr-qty')||{}).value);
-  const freightRate = parseFloat((document.getElementById('nr-freight-rate')||{}).value) || 92.31;
   const fob = parseFloat((document.getElementById('nr-fob')||{}).value);
+  const rates = window.nrFreightRates || { wc: 180, ec: 200, wcTransit: 28, ecTransit: 35 };
 
   let unitCbm = null;
-  if (!isNaN(w) && !isNaN(h) && !isNaN(l)) {
-    unitCbm = toM(w,dimU) * toM(h,dimU) * toM(l,dimU);
-    document.getElementById('nr-cbm-unit').value = unitCbm.toFixed(6);
-  }
+  if (!isNaN(w) && !isNaN(h) && !isNaN(l)) { unitCbm = toM(w,dimU)*toM(h,dimU)*toM(l,dimU); setV('nr-cbm-unit', unitCbm.toFixed(6)); }
 
   let unitsMaster = null;
-  if (!isNaN(unitsInner) && !isNaN(innersMaster)) {
-    unitsMaster = unitsInner * innersMaster;
-    document.getElementById('nr-units-master').value = unitsMaster;
-  }
+  if (!isNaN(unitsInner) && !isNaN(innersMaster)) { unitsMaster = unitsInner*innersMaster; setV('nr-units-master', unitsMaster); }
 
   let masterCbm = null;
   const ctnU = (document.getElementById('nr-ctn-unit')||{}).value || 'cm';
   const cw = parseFloat((document.getElementById('nr-ctn-w')||{}).value);
   const ch = parseFloat((document.getElementById('nr-ctn-h')||{}).value);
   const cl = parseFloat((document.getElementById('nr-ctn-l')||{}).value);
-  if (!isNaN(cw) && !isNaN(ch) && !isNaN(cl)) {
-    masterCbm = toM(cw,ctnU) * toM(ch,ctnU) * toM(cl,ctnU);
-  } else if (unitCbm && unitsMaster) {
-    masterCbm = unitCbm * unitsMaster;
-  }
-  if (masterCbm) document.getElementById('nr-cbm-master').value = masterCbm.toFixed(6);
+  if (!isNaN(cw) && !isNaN(ch) && !isNaN(cl)) masterCbm = toM(cw,ctnU)*toM(ch,ctnU)*toM(cl,ctnU);
+  else if (unitCbm && unitsMaster) masterCbm = unitCbm * unitsMaster;
+  if (masterCbm) setV('nr-cbm-master', masterCbm.toFixed(6));
 
   let totalCbm = null;
-  if (masterCbm && !isNaN(qty) && unitsMaster) {
-    const numMasters = Math.ceil(qty / unitsMaster);
-    totalCbm = masterCbm * numMasters;
-    document.getElementById('nr-cbm-total').value = totalCbm.toFixed(4);
-  }
+  if (masterCbm && !isNaN(qty) && unitsMaster) { totalCbm = masterCbm * Math.ceil(qty/unitsMaster); setV('nr-cbm-total', totalCbm.toFixed(4)); }
 
-  let freightTotal = null, freightPerUnit = null;
-  if (totalCbm) {
-    freightTotal = totalCbm * freightRate;
-    document.getElementById('nr-freight-total').value = '$' + freightTotal.toFixed(2);
-    if (!isNaN(qty) && qty > 0) {
-      freightPerUnit = freightTotal / qty;
-      document.getElementById('nr-freight-unit').value = '$' + freightPerUnit.toFixed(4);
-    }
-  }
+  const wcTEl = document.getElementById('nr-wc-transit'); if (wcTEl) wcTEl.textContent = rates.wcTransit ? ('~' + rates.wcTransit + ' days transit') : '';
+  const ecTEl = document.getElementById('nr-ec-transit'); if (ecTEl) ecTEl.textContent = rates.ecTransit ? ('~' + rates.ecTransit + ' days transit') : '';
 
   const dutyGeneral = parseFloat((document.getElementById('nr-duty-general')||{}).value) || 0;
-  const duty301 = document.getElementById('nr-duty-301') && document.getElementById('nr-duty-301').checked ? 25 : 0;
-  const duty122 = document.getElementById('nr-duty-122') && document.getElementById('nr-duty-122').checked ? 10 : 0;
+  const duty301 = (document.getElementById('nr-duty-301') && document.getElementById('nr-duty-301').checked) ? 25 : 0;
+  const duty122 = (document.getElementById('nr-duty-122') && document.getElementById('nr-duty-122').checked) ? 10 : 0;
   const totalDutyPct = dutyGeneral + duty301 + duty122;
-  document.getElementById('nr-duty-total').value = totalDutyPct.toFixed(2) + '%';
+  setV('nr-duty-total', totalDutyPct.toFixed(2) + '%');
   let dutyPerUnit = null;
-  if (!isNaN(fob) && fob > 0) {
-    dutyPerUnit = fob * (totalDutyPct / 100);
-    document.getElementById('nr-duty-unit').value = '$' + dutyPerUnit.toFixed(4);
-  }
-
-  document.getElementById('nr-elc-fob').value = !isNaN(fob) ? '$' + fob.toFixed(2) : '—';
-  document.getElementById('nr-elc-freight').value = freightPerUnit ? '$' + freightPerUnit.toFixed(4) : '—';
-  document.getElementById('nr-elc-duty').value = dutyPerUnit ? '$' + dutyPerUnit.toFixed(4) : '—';
-  let elc = null;
-  if (!isNaN(fob) && freightPerUnit && dutyPerUnit !== null) {
-    elc = fob + freightPerUnit + dutyPerUnit;
-    document.getElementById('nr-elc-total').value = '$' + elc.toFixed(2);
-  }
+  if (!isNaN(fob) && fob > 0) { dutyPerUnit = fob * (totalDutyPct/100); setV('nr-duty-unit', '$' + dutyPerUnit.toFixed(4)); }
 
   const retail = parseFloat((document.getElementById('nr-elc-retail')||{}).value);
-  if (elc && !isNaN(retail) && retail > 0) {
-    const margin = ((retail - elc) / retail) * 100;
-    const marginEl = document.getElementById('nr-elc-margin');
-    if (marginEl) { marginEl.value = margin.toFixed(1) + '%'; marginEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
-    const checkEl = document.getElementById('nr-elc-check');
-    if (checkEl) { checkEl.value = margin >= 37.5 ? '✓ Meets 37.5% target' : '✗ Below 37.5% target'; checkEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
-  }
+
+  const coast = (suffix, rate) => {
+    let freightPerUnit = null;
+    if (totalCbm && !isNaN(qty) && qty > 0) freightPerUnit = (totalCbm * rate) / qty;
+    setV('nr-elc-fob-'+suffix, !isNaN(fob) ? '$' + fob.toFixed(2) : '—');
+    setV('nr-elc-freight-'+suffix, freightPerUnit != null ? '$' + freightPerUnit.toFixed(4) : '—');
+    setV('nr-elc-duty-'+suffix, dutyPerUnit != null ? '$' + dutyPerUnit.toFixed(4) : '—');
+    let elc = null;
+    if (!isNaN(fob) && freightPerUnit != null && dutyPerUnit != null) { elc = fob + freightPerUnit + dutyPerUnit; setV('nr-elc-total-'+suffix, '$' + elc.toFixed(2)); }
+    else setV('nr-elc-total-'+suffix, '—');
+    const mEl = document.getElementById('nr-elc-margin-'+suffix), cEl = document.getElementById('nr-elc-check-'+suffix);
+    if (elc != null && !isNaN(retail) && retail > 0) {
+      const margin = ((retail - elc)/retail)*100;
+      if (mEl) { mEl.value = margin.toFixed(1) + '%'; mEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
+      if (cEl) { cEl.value = margin >= 37.5 ? '✓ Meets' : '✗ Below'; cEl.style.color = margin >= 37.5 ? '#16a34a' : '#dc2626'; }
+    } else { if (mEl) { mEl.value = '—'; mEl.style.color = ''; } if (cEl) { cEl.value = '—'; cEl.style.color = ''; } }
+  };
+  coast('wc', rates.wc);
+  coast('ec', rates.ec);
 }
+
 async function nrHtsLookup() {
   const code = (document.getElementById('nr-hts-code').value || '').trim().replace(/\./g,'');
   if (!code) return;
   const btn = document.getElementById('nr-hts-btn');
   const desc = document.getElementById('nr-hts-desc');
+  const rulings = document.getElementById('nr-hts-rulings');
   btn.disabled = true; btn.textContent = 'Looking up...'; desc.textContent = '';
   try {
     const r = await fetch('https://hts.usitc.gov/reststop/api/details/getSection?query=' + encodeURIComponent(code));
@@ -561,12 +630,45 @@ async function nrHtsLookup() {
       nrCbmCalc();
     } else { desc.textContent = 'HTS code not found — enter duty rate manually'; }
   } catch(e) { desc.textContent = 'Lookup failed — enter duty rate manually'; }
+  if (rulings) rulings.innerHTML = '<a href="https://rulings.cbp.dhs.gov/search?term=' + encodeURIComponent(code) + '&type=ALL" target="_blank" style="color:var(--accent,#2244cc);">View CBP Rulings →</a>';
   btn.disabled = false; btn.textContent = 'Look Up →';
 }
+
+// AI HTS code suggestion from the product name + description.
+async function nrHtsSuggest() {
+  const name = ((document.getElementById('nr-desc')||{}).value || '').trim();
+  const spec = ((document.getElementById('nr-spec')||{}).value || '').trim();
+  if (!name && !spec) { alert('Enter product name and description first'); return; }
+  const btn = document.getElementById('nr-hts-suggest-btn');
+  const desc = document.getElementById('nr-hts-desc');
+  const orig = btn ? btn.textContent : '✨ Suggest';
+  if (btn) { btn.textContent = 'Thinking...'; btn.disabled = true; }
+  try {
+    const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
+    const cat = (document.getElementById('nr-category')||{}).value || '';
+    const r = await fetch('/api/hts-suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ product_name: name, description: spec, category: cat }),
+    });
+    const d = await r.json().catch(() => ({ error: true }));
+    if (!r.ok || !d || d.error || !d.hts_code) {
+      if (desc) desc.textContent = (d && d.message) || 'Could not suggest a code — enter manually';
+    } else {
+      document.getElementById('nr-hts-code').value = d.hts_code;
+      if (desc) desc.textContent = '✨ AI suggested: ' + (d.reasoning || '') + (d.confidence ? ' · ' + d.confidence + ' confidence' : '');
+      if (btn) { btn.textContent = orig; btn.disabled = false; }
+      nrHtsLookup();
+      return;
+    }
+  } catch (e) { if (desc) desc.textContent = 'Could not suggest a code — enter manually'; }
+  if (btn) { btn.textContent = orig; btn.disabled = false; }
+}
+
 let _nrFreightWired = false;
 function nrFreightWire() {
   if (_nrFreightWired) return;
-  ['nr-dim-w','nr-dim-h','nr-dim-l','nr-dim-unit','nr-units-inner','nr-inners-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-ctn-unit','nr-qty','nr-fob','nr-freight-rate','nr-duty-general','nr-duty-301','nr-duty-122','nr-elc-retail'].forEach(id => {
+  ['nr-dim-w','nr-dim-h','nr-dim-l','nr-dim-unit','nr-units-inner','nr-inners-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-ctn-unit','nr-qty','nr-fob','nr-duty-general','nr-duty-301','nr-duty-122','nr-elc-retail'].forEach(id => {
     const el = nrg(id); if (!el) return;
     const ev = (el.tagName === 'SELECT' || el.type === 'checkbox') ? 'change' : 'input';
     el.addEventListener(ev, nrCbmCalc);
@@ -610,9 +712,13 @@ function openNewRfqModal(prefill) {
   nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
   { const du = nrg('nr-dim-unit'); if (du) du.value = 'cm'; const us = nrg('nr-url-status'); if (us) { us.style.display = 'none'; us.textContent = ''; } }
   // Freight & landed cost reset
-  ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-freight-total','nr-freight-unit','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-fob','nr-elc-freight','nr-elc-duty','nr-elc-total','nr-elc-retail','nr-elc-margin','nr-elc-check'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
-  { const fr = nrg('nr-freight-rate'); if (fr) fr.value = '92.31'; const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const me = nrg('nr-elc-margin'); if (me) me.style.color = ''; const ce = nrg('nr-elc-check'); if (ce) ce.style.color = ''; }
+  ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-retail',
+   'nr-elc-fob-wc','nr-elc-freight-wc','nr-elc-duty-wc','nr-elc-total-wc','nr-elc-margin-wc','nr-elc-check-wc',
+   'nr-elc-fob-ec','nr-elc-freight-ec','nr-elc-duty-ec','nr-elc-total-ec','nr-elc-margin-ec','nr-elc-check-ec'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  { const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const hr = nrg('nr-hts-rulings'); if (hr) hr.innerHTML = ''; }
+  { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_lcl'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = 'none'; const cc = nrg('nr-custom-cat'); if (cc) cc.value = ''; const ccw = nrg('nr-custom-cat-wrap'); if (ccw) ccw.style.display = 'none'; }
   nrFreightWire();
+  nrLoadFreightRates();
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
   document.querySelectorAll('input[name="nr-ptype"]').forEach(r => { r.checked = r.value === 'single'; });
   nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
@@ -692,15 +798,15 @@ async function saveNewRfq(status) {
     master_carton_h_cm: nrDimToNum('nr-ctn-h', 'nr-ctn-unit'),
     master_carton_l_cm: nrDimToNum('nr-ctn-l', 'nr-ctn-unit'),
     total_cbm: pflt('nr-cbm-total'),
-    freight_per_unit: pflt('nr-freight-unit'),
+    freight_per_unit: pflt('nr-elc-freight-wc'),   // West Coast = primary stored value
     hts_code: txt('nr-hts-code'),
     duty_rate_general: pflt('nr-duty-general'),
     duty_section_301: !!(nrg('nr-duty-301') && nrg('nr-duty-301').checked),
     duty_section_122: !!(nrg('nr-duty-122') && nrg('nr-duty-122').checked),
     duty_rate_total: pflt('nr-duty-total'),
-    elc_per_unit: pflt('nr-elc-total'),
+    elc_per_unit: pflt('nr-elc-total-wc'),
     target_retail_price: pflt('nr-elc-retail'),
-    gross_margin_pct: pflt('nr-elc-margin'),
+    gross_margin_pct: pflt('nr-elc-margin-wc'),
     factories_to_send: nrSelectedFactories.length ? nrSelectedFactories : null,
   };
   const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
@@ -737,6 +843,17 @@ async function saveNewRfq(status) {
         body: JSON.stringify({ rfq_id: newId, tenant_id: TID, image_data: im.base64, image_url: '', sort_order: i }),
       }).catch(() => {})
     )).catch(() => {});
+  }
+  // Category suggestion: if "Other" with a custom name, submit it for admin review.
+  if (nrg('nr-category').value === 'Other') {
+    const customCat = ((nrg('nr-custom-cat') || {}).value || '').trim();
+    if (customCat) {
+      fetch(SUPA_URL + '/rest/v1/pending_categories', {
+        method: 'POST',
+        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ suggested_name: customCat, tenant_id: TID, rfq_id: newId || null, status: 'pending' }),
+      }).catch(() => {});
+    }
   }
   closeNewRfqModal();
   await loadRFQs();
