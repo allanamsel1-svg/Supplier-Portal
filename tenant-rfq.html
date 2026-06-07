@@ -107,6 +107,12 @@
           <span class="nr-img-status" id="nr-img-status"></span>
         </div>
       </div>
+      <div style="text-align:center;font-size:11px;color:var(--text2);margin:6px 0;">— or —</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input id="nr-url-input" placeholder="Paste a product URL (Amazon, Walmart, Faire, etc.)" style="flex:1;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;background:var(--bg2,#0d1424);color:var(--text,#e2e8f0);font-size:13px;font-family:inherit;">
+        <button class="nr-btn" id="nr-url-btn" onclick="nrUrlFetch()">Fetch &amp; Fill →</button>
+      </div>
+      <div id="nr-url-status" style="font-size:12px;color:var(--text2);margin-bottom:10px;display:none;"></div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
           <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
@@ -122,6 +128,12 @@
         <div class="nr-grid">
           <div class="nr-field"><label>Product size</label><input id="nr-size" placeholder="e.g. 30"></div>
           <div class="nr-field"><label>Size unit</label><select id="nr-sizeunit"><option value="">—</option><option>ml</option><option>g</option><option>oz</option><option>cm</option><option>in</option><option>units</option></select></div>
+        </div>
+        <div class="nr-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+          <div class="nr-field"><label>Width</label><input id="nr-dim-w" type="number" min="0" step="0.1" placeholder="e.g. 5"></div>
+          <div class="nr-field"><label>Height</label><input id="nr-dim-h" type="number" min="0" step="0.1" placeholder="e.g. 10"></div>
+          <div class="nr-field"><label>Length</label><input id="nr-dim-l" type="number" min="0" step="0.1" placeholder="e.g. 3"></div>
+          <div class="nr-field"><label>Dim unit</label><select id="nr-dim-unit"><option value="cm">cm</option><option value="in">in</option><option value="mm">mm</option></select></div>
         </div>
         <div class="nr-grid">
           <div class="nr-field"><label>Color</label><input id="nr-color" placeholder="e.g. Clear / White"></div>
@@ -317,11 +329,55 @@ function nrImgApply(d) {
   }
 }
 
+async function nrUrlFetch() {
+  const url = (document.getElementById('nr-url-input').value || '').trim();
+  const status = document.getElementById('nr-url-status');
+  const btn = document.getElementById('nr-url-btn');
+  if (!url) return;
+  status.style.display = 'block';
+  status.innerHTML = '<span class="nr-img-spinner"></span> Fetching product details...';
+  btn.disabled = true;
+  try {
+    const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
+    const r = await fetch('/api/rfq-extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ url: url })
+    });
+    const d = await r.json().catch(() => ({ error: true }));
+    if (!r.ok || !d || d.error) { status.textContent = 'Could not fetch — check the URL and try again'; btn.disabled = false; return; }
+    const item = d.items ? d.items[0] : d;
+    nrImgApply(item);
+    if (item.image_url) {
+      const thumb = document.getElementById('nr-img-thumb');
+      const prompt = document.getElementById('nr-img-prompt');
+      const loaded = document.getElementById('nr-img-loaded');
+      const imgStatus = document.getElementById('nr-img-status');
+      if (thumb) thumb.src = item.image_url;
+      if (prompt) prompt.style.display = 'none';
+      if (loaded) loaded.style.display = 'flex';
+      if (imgStatus) imgStatus.textContent = '✓ Product fetched from URL';
+    }
+    status.textContent = '✓ Fields auto-filled from URL — review & edit below';
+  } catch(e) { status.textContent = 'Could not fetch — please fill in manually'; }
+  btn.disabled = false;
+}
+function nrDimToNum(fieldId, unitId) {
+  const v = parseFloat(document.getElementById(fieldId).value);
+  if (isNaN(v)) return null;
+  const unit = document.getElementById(unitId).value;
+  if (unit === 'in') return Math.round(v * 2.54 * 100) / 100;
+  if (unit === 'mm') return Math.round(v / 10 * 100) / 100;
+  return v;
+}
+
 function openNewRfqModal(prefill) {
   nrg('nr-err').textContent = '';
   ['nr-desc', 'nr-spec', 'nr-qty', 'nr-fob', 'nr-size', 'nr-color', 'nr-inner', 'nr-master',
+   'nr-dim-w', 'nr-dim-h', 'nr-dim-l', 'nr-url-input',
    'nr-pkg-primary', 'nr-pkg-closure', 'nr-pkg-secondary', 'nr-pkg-finish', 'nr-pkg-color', 'nr-pkg-notes', 'nr-docs'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
+  { const du = nrg('nr-dim-unit'); if (du) du.value = 'cm'; const us = nrg('nr-url-status'); if (us) { us.style.display = 'none'; us.textContent = ''; } }
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
   document.querySelectorAll('input[name="nr-ptype"]').forEach(r => { r.checked = r.value === 'single'; });
   nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
@@ -380,6 +436,9 @@ async function saveNewRfq(status) {
     detailed_specifications: spec || null,
     quote_quantity: num('nr-qty'), max_fob_price: num('nr-fob'),
     product_size: txt('nr-size'), unit_type: (nrg('nr-unit').value || 'Each').toLowerCase(),
+    est_unit_width_cm: nrDimToNum('nr-dim-w', 'nr-dim-unit'),
+    est_unit_height_cm: nrDimToNum('nr-dim-h', 'nr-dim-unit'),
+    est_unit_length_cm: nrDimToNum('nr-dim-l', 'nr-dim-unit'),
     inner_case_pack: num('nr-inner'), master_case_pack: num('nr-master'),
     packaging_primary: txt('nr-pkg-primary'), packaging_closures: txt('nr-pkg-closure'),
     packaging_secondary: txt('nr-pkg-secondary'), packaging_finish: txt('nr-pkg-finish'),
