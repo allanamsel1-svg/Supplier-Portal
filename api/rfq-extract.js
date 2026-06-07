@@ -78,6 +78,57 @@ function parseItems(text) {
   return null;
 }
 
+const URL_SYSTEM = "You are a product analyst. Given this product information scraped from a webpage, extract and return ONLY valid JSON with these fields: product_name (string), category (pick from: Personal Care, Hair Care, Skin Care, Home Care, Consumer Electronics, Pet, Baby, Food & Beverage, Other), short_description (1-2 sentences), estimated_retail_price_usd (number only, null if unknown), packaging_type (e.g. bottle, jar, tube, box, pouch, null if unknown), recommended_factory_type (1 sentence on what factory type should make this). No markdown, no backticks.";
+
+const SCRAPE_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+function decodeEntities(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/g, ' ');
+}
+// Pull a <meta property|name="<prop>" content="..."> value (attributes in any order).
+function metaContent(html, prop) {
+  const p = prop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = html.match(new RegExp('<meta[^>]+(?:property|name)=["\']' + p + '["\'][^>]*content=["\']([^"\']*)["\']', 'i'))
+        || html.match(new RegExp('<meta[^>]+content=["\']([^"\']*)["\'][^>]*(?:property|name)=["\']' + p + '["\']', 'i'));
+  return m ? decodeEntities(m[1]).trim() : '';
+}
+// Scrape product fields from raw HTML (best-effort).
+function scrapeProduct(html) {
+  const out = { image_url: null, product_name: null, short_description: null, estimated_retail_price_usd: null };
+  // image_url: og:image, else first http(s) <img src>
+  out.image_url = metaContent(html, 'og:image') || null;
+  if (!out.image_url) { const m = html.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i); if (m) out.image_url = m[1]; }
+  // product_name: og:title, else <title> (strip " | site" / " - site")
+  let name = metaContent(html, 'og:title');
+  if (!name) { const t = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i); if (t) name = decodeEntities(t[1]).trim(); }
+  if (name) name = name.split(/\s+[|\-–—]\s+/)[0].trim();
+  out.product_name = name || null;
+  // short_description: og:description, else first <p> with >50 chars
+  let desc = metaContent(html, 'og:description');
+  if (!desc) {
+    const ps = html.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) || [];
+    for (let i = 0; i < ps.length; i++) { const txt = decodeEntities(ps[i].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim(); if (txt.length > 50) { desc = txt; break; } }
+  }
+  out.short_description = desc || null;
+  // estimated_retail_price_usd: first $XX.XX or $X,XXX.XX
+  const pm = html.match(/\$\s?(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})/);
+  if (pm) { const n = parseFloat(pm[1].replace(/,/g, '')); if (!isNaN(n)) out.estimated_retail_price_usd = n; }
+  return out;
+}
+// Fetch a URL's HTML with a browser UA and a 10s timeout.
+async function fetchUrlHtml(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const r = await fetch(url, { headers: { 'User-Agent': SCRAPE_UA, 'Accept': 'text/html,application/xhtml+xml' }, redirect: 'follow', signal: ctrl.signal });
+    if (!r.ok) return null;
+    return await r.text();
+  } catch (e) { return null; }
+  finally { clearTimeout(timer); }
+}
+
 const SYSTEM = "You are a product analyst. Look at this image carefully. It may contain one or multiple distinct products. For EACH product you can identify, extract: product_name, category (pick from: Personal Care, Hair Care, Skin Care, Home Care, Consumer Electronics, Pet, Baby, Food & Beverage, Other), short_description (1-2 sentences), estimated_retail_price_usd (number only, null if unknown), packaging_type (e.g. bottle, jar, tube, box, pouch, null if unknown), recommended_factory_type (1 sentence describing what kind of factory should make this — e.g. 'Food-grade snack manufacturer specializing in dried/freeze-dried products'). Return ONLY a valid JSON array of objects, even if there is only one product. No markdown, no backticks, no explanation.";
 
 export default async function handler(req, res) {
@@ -94,6 +145,36 @@ export default async function handler(req, res) {
     if (!ANTHROPIC_KEY) return res.status(200).json({ error: true, message: 'AI service temporarily unavailable.' });
 
     const body = await readBody(req);
+    const url = (body.url || '').toString().trim();
+
+    // ── URL path: scrape the page, then normalize the fields via Claude ──
+    if (url && !body.image) {
+      const html = await fetchUrlHtml(url);
+      if (!html) return res.status(200).json({ error: true, message: 'Could not fetch URL' });
+      const scraped = scrapeProduct(html);
+      const promptText =
+        'Product page URL: ' + url + '\n' +
+        'Title: ' + (scraped.product_name || '(none found)') + '\n' +
+        'Description: ' + (scraped.short_description || '(none found)') + '\n' +
+        'Price seen on page: ' + (scraped.estimated_retail_price_usd != null ? '$' + scraped.estimated_retail_price_usd : '(none found)');
+      let ur, ud;
+      try {
+        ur = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: MODEL, max_tokens: 600, system: URL_SYSTEM, messages: [{ role: 'user', content: promptText }] }),
+        });
+        ud = await ur.json().catch(() => ({}));
+      } catch (e) { return res.status(200).json({ error: true, message: 'Could not fetch URL' }); }
+      if (!ur.ok) return res.status(200).json({ error: true, message: (ud && ud.error && ud.error.message) || ('AI error ' + ur.status) });
+      logCost(tid, 'rfq_extract_url', MODEL, ud.usage);
+      const parsed = parseItems((ud.content && ud.content[0] && ud.content[0].text) || '');
+      const fields = (parsed && parsed[0]) ? parsed[0] : {};
+      // Merge the scrape's image_url (Claude doesn't return it).
+      const item = Object.assign({}, fields, { image_url: scraped.image_url || null });
+      return res.status(200).json({ items: [item], tenant_id: tid });
+    }
+
     const image = body.image || '';
     const mediaType = body.mediaType || 'image/jpeg';
     if (!image) return res.status(400).json({ error: true, message: 'No image provided' });
