@@ -1140,9 +1140,21 @@
             <div class="mf-row">
               <div class="mf">
                 <label>Category *</label>
-                <select id="rfq-category-id" onchange="rfqCategoryChanged();suggestDutyTariff();">
-                  <option value="">— Select Category —</option>
+                <input type="hidden" id="rfq-category-id" />
+                <select id="ax-cat-l1" onchange="axCatL1Change()">
+                  <option value="">Select category...</option>
+                  <option value="__other__">+ Add New Category</option>
                 </select>
+                <div id="ax-cat-l2-wrap" style="display:none;margin-top:6px;">
+                  <select id="ax-cat-l2" onchange="axCatL2Change()" style="width:100%;">
+                    <option value="">Select sub-category...</option>
+                  </select>
+                </div>
+                <div id="ax-cat-l3-wrap" style="display:none;margin-top:6px;">
+                  <select id="ax-cat-l3" onchange="axCatL3Change()" style="width:100%;">
+                    <option value="">Select (optional)...</option>
+                  </select>
+                </div>
               </div>
               <div class="mf">
                 <label>Unit Type</label>
@@ -6025,7 +6037,7 @@ async function populateRFQEditForm(rfq){
   g('rfq-form-title').textContent='Edit RFQ';
   g('rfq-project-number').textContent=rfq.project_number||'';
   g('rfq-id').value=rfq.id||'';
-  if(g('rfq-category-id'))g('rfq-category-id').value=rfq.category_id||'';
+  axCatSetFromId(rfq.category_id||'');
   // Set cosmetic checkbox to current RFQ value, mark as user-overridden so category change doesn't reset it
   var cosCb=g('rfq-is-cosmetic');
   if(cosCb){cosCb.checked=!!rfq.is_cosmetic;cosCb.dataset.userOverride='true';}
@@ -6134,7 +6146,7 @@ async function openRFQForm(id){
   if(typeof axResetTool==='function')axResetTool();
   await populateRFQDropdowns();
   // Fill form fields
-  g('rfq-category-id').value=rfq.category_id||'';
+  axCatSetFromId(rfq.category_id||'');
   g('rfq-uom').value=rfq.unit_of_measure||'';
   g('rfq-description').value=rfq.item_description||'';
   g('rfq-specs').value=rfq.detailed_specifications||'';
@@ -6219,7 +6231,7 @@ async function loadKitForEdit(rfq){
 
 function resetRFQForm(){
   g('rfq-id').value='';
-  g('rfq-category-id').value='';g('rfq-uom').value='N/A';
+  axCatReset();g('rfq-uom').value='N/A';
   g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
   g('rfq-description').value='';g('rfq-specs').value='';
   g('rfq-color').value='';g('rfq-quantity').value='';
@@ -6288,19 +6300,90 @@ async function populateRFQDropdowns(){
     allBrands.forEach(function(b){brandSel.innerHTML+='<option value="'+b.id+'">'+b.brand_name+'</option>';});
   }
 
-  var catSel=g('rfq-category-id');
-  if(!catSel)return;
-  catSel.innerHTML='<option value="">— Select Category —</option>';
-  if(!allCategories.length){
-    catSel.innerHTML+='<option disabled>No categories found — add them in Product Setup</option>';
-    return;
-  }
-  allCategories.forEach(function(c){
-    var path=[c.category,c.sub_category,c.sub_sub_category].filter(Boolean).join(' › ');
-    catSel.innerHTML+='<option value="'+c.id+'" data-cosmetic="'+c.is_cosmetic+'" data-category="'+rfqEsc(c.category)+'">'+path+(c.model_prefix?' ['+c.model_prefix+']':'')+'</option>';
-  });
-  catSel.innerHTML+='<option value="__other__">Other…</option>';
+  // Category is now a 3-level cascade backed by allCategories; #rfq-category-id is a hidden id mirror.
+  axCatPopulateL1();
   // Colors are hardcoded in HTML dropdown
+}
+
+// ── 3-level cascading category selector (admin) ──
+// allCategories is the tree; #rfq-category-id (hidden) holds the resolved category row id.
+function axCatPopulateL1(){
+  var sel=g('ax-cat-l1'); if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML='<option value="">Select category...</option>';
+  var seen={};
+  (allCategories||[]).forEach(function(c){ if(c.category&&!seen[c.category]){seen[c.category]=1; var o=document.createElement('option');o.value=c.category;o.text=c.category;sel.appendChild(o);} });
+  var oo=document.createElement('option');oo.value='__other__';oo.text='+ Add New Category';sel.appendChild(oo);
+  if(cur&&cur!=='__other__')sel.value=cur;
+}
+function axCatRow(){
+  var id=(g('rfq-category-id')||{}).value;
+  return id?((allCategories||[]).find(function(c){return c.id===id;})||null):null;
+}
+function axCatResolveId(){
+  var l1=(g('ax-cat-l1')||{}).value||'';
+  var hid=g('rfq-category-id');
+  if(l1==='__other__'||!l1){ if(hid)hid.value=''; return; }
+  var l2=(g('ax-cat-l2')||{}).value||'';
+  var l3=(g('ax-cat-l3')||{}).value||'';
+  var row=(allCategories||[]).find(function(c){
+    return (c.category||'')===l1 && ((c.sub_category||'')===(l2||'')) && ((c.sub_sub_category||'')===(l3||''));
+  });
+  if(hid)hid.value=row?row.id:'';
+}
+function axCatL1Change(){
+  var v=(g('ax-cat-l1')||{}).value;
+  if(v==='__other__'){ axCatModalOpen(); return; }
+  var l2wrap=g('ax-cat-l2-wrap'), l2sel=g('ax-cat-l2'), l3wrap=g('ax-cat-l3-wrap');
+  l2sel.innerHTML='<option value="">Select sub-category...</option>';
+  l3wrap.style.display='none'; g('ax-cat-l3').innerHTML='<option value="">Select (optional)...</option>';
+  if(v){
+    var subs=[]; var seen={};
+    (allCategories||[]).forEach(function(r){ if(r.category===v&&r.sub_category&&!seen[r.sub_category]){seen[r.sub_category]=1; var o=document.createElement('option');o.value=r.sub_category;o.text=r.sub_category;l2sel.appendChild(o); subs.push(r.sub_category);} });
+    l2wrap.style.display=subs.length?'':'none';
+  } else { l2wrap.style.display='none'; }
+  axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged();
+}
+function axCatL2Change(){
+  var l1=(g('ax-cat-l1')||{}).value, l2=(g('ax-cat-l2')||{}).value;
+  var l3wrap=g('ax-cat-l3-wrap'), l3sel=g('ax-cat-l3');
+  l3sel.innerHTML='<option value="">Select (optional)...</option>';
+  if(l2){
+    var ss=[]; var seen={};
+    (allCategories||[]).forEach(function(r){ if(r.category===l1&&r.sub_category===l2&&r.sub_sub_category&&!seen[r.sub_sub_category]){seen[r.sub_sub_category]=1; var o=document.createElement('option');o.value=r.sub_sub_category;o.text=r.sub_sub_category;l3sel.appendChild(o); ss.push(r.sub_sub_category);} });
+    l3wrap.style.display=ss.length?'':'none';
+  } else { l3wrap.style.display='none'; }
+  axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged();
+}
+function axCatL3Change(){ axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged(); }
+function axCatReset(){
+  var l1=g('ax-cat-l1'); if(l1)l1.value='';
+  var l2=g('ax-cat-l2'); if(l2)l2.innerHTML='<option value="">Select sub-category...</option>';
+  var l3=g('ax-cat-l3'); if(l3)l3.innerHTML='<option value="">Select (optional)...</option>';
+  var l2w=g('ax-cat-l2-wrap'); if(l2w)l2w.style.display='none';
+  var l3w=g('ax-cat-l3-wrap'); if(l3w)l3w.style.display='none';
+  var hid=g('rfq-category-id'); if(hid)hid.value='';
+}
+function axCatSetFromId(id){
+  axCatReset();
+  if(!id)return;
+  var row=(allCategories||[]).find(function(c){return c.id===id;});
+  if(!row){ var hid=g('rfq-category-id'); if(hid)hid.value=id; return; }
+  axCatPopulateL1();
+  g('ax-cat-l1').value=row.category||''; axCatL1Change();
+  if(row.sub_category){ g('ax-cat-l2').value=row.sub_category; axCatL2Change(); }
+  if(row.sub_sub_category){ g('ax-cat-l3').value=row.sub_sub_category; }
+  axCatResolveId();
+}
+function axCatAutoSelect(catString){
+  if(!catString||!allCategories)return;
+  var s=String(catString).toLowerCase();
+  var m1=allCategories.find(function(r){return r.category&&r.category.toLowerCase()===s;});
+  if(m1){ g('ax-cat-l1').value=m1.category; axCatL1Change(); return; }
+  var m2=allCategories.find(function(r){return r.sub_category&&r.sub_category.toLowerCase()===s;});
+  if(m2){ g('ax-cat-l1').value=m2.category; axCatL1Change(); setTimeout(function(){ g('ax-cat-l2').value=m2.sub_category; axCatL2Change(); },50); return; }
+  var m3=allCategories.find(function(r){return r.sub_sub_category&&r.sub_sub_category.toLowerCase()===s;});
+  if(m3){ g('ax-cat-l1').value=m3.category; axCatL1Change(); setTimeout(function(){ g('ax-cat-l2').value=m3.sub_category; axCatL2Change(); setTimeout(function(){ g('ax-cat-l3').value=m3.sub_sub_category; axCatL3Change(); },50); },50); }
 }
 
 // ── RFQ Compliance Requirements (certs + product docs, required/preferred) ──
@@ -6413,15 +6496,14 @@ var RFQ_BASELINE_COSMETIC=['TRA (Toxicological Risk Assessment)','Heavy Metals T
 
 async function inheritComplianceForCategory(){
   if(rfqComplianceUserTouched)return;
-  var sel=g('rfq-category-id');
-  var opt=sel&&sel.options[sel.selectedIndex];
-  var catName=opt?(opt.dataset.category||opt.textContent.split(' › ')[0].trim()):'';
+  var row=axCatRow();
+  var catName=row?(row.category||''):'';
 
   var applied={};
   // 1. Baseline floor — always Req. Never removed.
   RFQ_BASELINE_UNIVERSAL.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
   var cosCb=g('rfq-is-cosmetic');
-  var isCos=(opt&&opt.dataset.cosmetic==='true')||(cosCb&&cosCb.checked);
+  var isCos=(row&&row.is_cosmetic)||(cosCb&&cosCb.checked);
   if(isCos){
     RFQ_BASELINE_COSMETIC.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
   }
@@ -6465,15 +6547,12 @@ function isRenderedCert(name){
 }
 
 function rfqCategoryChanged(){
-  var sel=g('rfq-category-id');
-  var opt=sel.options[sel.selectedIndex];
-  var isCosmetic=opt&&opt.dataset.cosmetic==='true';
+  var row=axCatRow();
   var cb=g('rfq-is-cosmetic');
   // Only auto-set the checkbox if user hasn't manually overridden it
   if(cb&&cb.dataset.userOverride!=='true'){
-    cb.checked=isCosmetic;
+    cb.checked=!!(row&&row.is_cosmetic);
   }
-  if(sel.value==='__other__'){ axCatModalOpen(); return; }
   inheritComplianceForCategory();
 }
 
@@ -6988,9 +7067,8 @@ async function findMatchingFactories(){
   var catId=g('rfq-category-id').value;
   if(!catId){alert('Please select a category first.');return;}
 
-  var catOpt=g('rfq-category-id').options[g('rfq-category-id').selectedIndex];
-  var catText=catOpt?catOpt.textContent.replace(/\[.*?\]/,'').trim():'';
   var catRow=allCategories.find(function(c){return c.id===catId;});
+  var catText=catRow?[catRow.category,catRow.sub_category,catRow.sub_sub_category].filter(Boolean).join(' › '):'';
 
   g('factory-match-status').textContent='Searching for factories in this category...';
   g('factory-match-list').innerHTML='';
@@ -7267,10 +7345,7 @@ function axApply(d){
   var it = (d.items && d.items[0]) ? d.items[0] : d;
   if(it.product_name && g('rfq-description')) g('rfq-description').value = it.product_name;
   if(it.short_description && g('rfq-specs')) g('rfq-specs').value = it.short_description;
-  if(it.category && g('rfq-category-id')){
-    var sel = g('rfq-category-id'), want = String(it.category).toLowerCase();
-    for(var i=0;i<sel.options.length;i++){ if((sel.options[i].textContent||'').toLowerCase().indexOf(want) !== -1){ sel.value = sel.options[i].value; if(typeof rfqCategoryChanged==='function'){ try{ rfqCategoryChanged(); }catch(e){} } break; } }
-  }
+  if(it.category){ try{ axCatAutoSelect(it.category); }catch(e){} }
   if(typeof rfqDescChanged==='function'){ try{ rfqDescChanged(); }catch(e){} }
 }
 function axImgReset(){
@@ -7354,8 +7429,7 @@ async function axHtsSuggest(){
   if(btn){btn.textContent='Thinking...';btn.disabled=true;}
   try{
     var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
-    var catSel=g('rfq-category-id'), catName='';
-    if(catSel&&catSel.selectedIndex>=0){var o=catSel.options[catSel.selectedIndex];catName=(o&&o.getAttribute('data-category'))||(o&&o.textContent)||'';}
+    var _cr=axCatRow(), catName=_cr?(_cr.category||''):'';
     var r=await fetch('/api/hts-suggest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({product_name:name,description:spec,category:catName})});
     var d=await r.json().catch(function(){return{error:true};});
     if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';}
@@ -13766,17 +13840,12 @@ function axCatRenderResults(q) {
 }
 
 function axCatSelect(id, label) {
-  var sel = g('rfq-category-id');
-  var found = false;
-  for (var i = 0; i < sel.options.length; i++) { if (sel.options[i].value === id) { sel.value = id; found = true; break; } }
-  if (!found) {
-    var opt = document.createElement('option');
-    opt.value = id; opt.text = label;
-    sel.insertBefore(opt, sel.lastElementChild);
-    sel.value = id;
+  // Select an existing category in the cascade by its row id.
+  g('ax-cat-modal').style.display = 'none';
+  if (typeof allCategories !== 'undefined' && Array.isArray(allCategories) && !allCategories.find(function(c){return c.id===id;})) {
+    var r = (axAllCats||[]).find(function(c){return c.id===id;}); if (r) allCategories.push(r);
   }
-  axCatModalClose();
-  if (typeof rfqCategoryChanged === 'function') { try { rfqCategoryChanged(); } catch(e){} }
+  axCatSetFromId(id);
 }
 
 async function axCatSaveNew() {
@@ -13798,20 +13867,15 @@ async function axCatSaveNew() {
   var newRow = rows[0];
   axAllCats.push(newRow);
   if (typeof allCategories !== 'undefined' && Array.isArray(allCategories)) allCategories.push(newRow);
-  var label = [cat, sub, subsub].filter(Boolean).join(' › ');
-  var sel = g('rfq-category-id');
-  var opt = document.createElement('option');
-  opt.value = newRow.id; opt.text = label;
-  sel.insertBefore(opt, sel.lastElementChild);
-  sel.value = newRow.id;
-  axCatModalClose();
-  if (typeof rfqCategoryChanged === 'function') { try { rfqCategoryChanged(); } catch(e){} }
+  g('ax-cat-modal').style.display = 'none';
+  axCatPopulateL1();                 // refresh L1 with the new top-level (if any)
+  axCatSetFromId(newRow.id);         // select the new category in the cascade
 }
 
 function axCatModalClose() {
   g('ax-cat-modal').style.display = 'none';
-  var sel = g('rfq-category-id');
-  if (sel.value === '__other__') sel.value = '';
+  var sel = g('ax-cat-l1');
+  if (sel && sel.value === '__other__') sel.value = '';
 }
 </script>
 </body>

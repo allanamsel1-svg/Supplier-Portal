@@ -123,7 +123,25 @@
       </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
-          <div class="nr-field"><label>Category</label><select id="nr-category" onchange="nrCategoryChange()"><option value="">Select category…</option></select></div>
+          <div class="nr-field">
+            <label>Category</label>
+            <select id="nr-cat-l1" onchange="nrCatL1Change()">
+              <option value="">Select category...</option>
+              <option value="__other__">+ Add New Category</option>
+            </select>
+          </div>
+          <div class="nr-field" id="nr-cat-l2-wrap" style="display:none;">
+            <label>Sub-Category</label>
+            <select id="nr-cat-l2" onchange="nrCatL2Change()">
+              <option value="">Select sub-category...</option>
+            </select>
+          </div>
+          <div class="nr-field" id="nr-cat-l3-wrap" style="display:none;">
+            <label>Sub-Sub-Category</label>
+            <select id="nr-cat-l3">
+              <option value="">Select (optional)...</option>
+            </select>
+          </div>
           <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
         </div>
         <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
@@ -347,22 +365,97 @@ let rfqCatMeta = [];   // [{category, is_cosmetic}]
 let nrSelectedFactories = [];
 function nrg(id) { return document.getElementById(id); }
 async function loadRfqCategories() {
+  // Builds rfqCatMeta (top-level category + is_cosmetic) used for the cosmetic auto-set.
   const rows = await supa('categories?select=category,is_cosmetic&order=category');
   const seen = {}; rfqCatMeta = [];
   rows.forEach(r => { if (r.category && !seen[r.category]) { seen[r.category] = 1; rfqCatMeta.push({ category: r.category, is_cosmetic: !!r.is_cosmetic }); } });
   rfqCategories = rfqCatMeta.map(c => c.category);
-  const sel = nrg('nr-category');
-  if (sel) sel.innerHTML = '<option value="">Select category…</option>' + rfqCatMeta.map(c => `<option value="${esc(c.category)}" data-cosmetic="${c.is_cosmetic ? '1' : '0'}">${esc(c.category)}</option>`).join('') + '<option value="Other">Other…</option>';
 }
+// Top-level (L1) category currently chosen — used by factory matching, cosmetic auto-set, HTS context.
+function nrCurrentCategory() { const el = nrg('nr-cat-l1'); return (el && el.value !== '__other__') ? el.value : ''; }
+
+// Refresh cosmetic checkbox + factory-status text from the selected top-level category.
 function nrCategoryChange() {
-  const sel = nrg('nr-category'); if (!sel) return;
-  const opt = sel.options[sel.selectedIndex];
+  const cat = nrCurrentCategory();
   const cos = nrg('nr-cosmetic');
-  if (opt && cos && !cos.dataset.userOverride) cos.checked = opt.getAttribute('data-cosmetic') === '1';
-  nrg('nr-factory-list').innerHTML = '';
-  nrg('nr-factory-status').textContent = sel.value ? 'Click "Find Matching Factories" to see suppliers for ' + sel.value + '.' : 'Select a category, then find suppliers that match it.';
+  if (cos && !cos.dataset.userOverride) {
+    const meta = (rfqCatMeta || []).find(c => c.category === cat);
+    cos.checked = !!(meta && meta.is_cosmetic);
+  }
+  const fl = nrg('nr-factory-list'); if (fl) fl.innerHTML = '';
+  const fs = nrg('nr-factory-status'); if (fs) fs.textContent = cat ? 'Click "Find Matching Factories" to see suppliers for ' + cat + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
-  if (sel.value === 'Other') nrCatModalOpen();
+}
+
+// ── 3-level cascading category selector ──
+async function nrLoadCategoryTree() {
+  const rows = await fetch(SUPA_URL + '/rest/v1/categories?select=id,category,sub_category,sub_sub_category&order=category', {
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY }
+  }).then(r => r.json()).catch(() => []);
+  window.nrCatTree = Array.isArray(rows) ? rows : [];
+  const sel = nrg('nr-cat-l1'); if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select category...</option>';
+  [...new Set(window.nrCatTree.map(r => r.category).filter(Boolean))].forEach(c => {
+    const o = document.createElement('option'); o.value = c; o.text = c; sel.appendChild(o);
+  });
+  const oo = document.createElement('option'); oo.value = '__other__'; oo.text = '+ Add New Category'; sel.appendChild(oo);
+  if (cur && cur !== '__other__') sel.value = cur;
+}
+
+function nrCatL1Change() {
+  const v = nrg('nr-cat-l1').value;
+  if (v === '__other__') { nrCatModalOpen(); return; }
+  const l2wrap = nrg('nr-cat-l2-wrap'), l2sel = nrg('nr-cat-l2'), l3wrap = nrg('nr-cat-l3-wrap');
+  l2sel.innerHTML = '<option value="">Select sub-category...</option>';
+  l3wrap.style.display = 'none';
+  nrg('nr-cat-l3').innerHTML = '<option value="">Select (optional)...</option>';
+  if (!v) { l2wrap.style.display = 'none'; nrCategoryChange(); return; }
+  const subs = [...new Set((window.nrCatTree || []).filter(r => r.category === v && r.sub_category).map(r => r.sub_category))];
+  if (!subs.length) { l2wrap.style.display = 'none'; nrCategoryChange(); return; }
+  subs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l2sel.appendChild(o); });
+  l2wrap.style.display = '';
+  nrCategoryChange();
+}
+
+function nrCatL2Change() {
+  const l1 = nrg('nr-cat-l1').value, l2 = nrg('nr-cat-l2').value;
+  const l3wrap = nrg('nr-cat-l3-wrap'), l3sel = nrg('nr-cat-l3');
+  l3sel.innerHTML = '<option value="">Select (optional)...</option>';
+  if (!l2) { l3wrap.style.display = 'none'; return; }
+  const subsubs = [...new Set((window.nrCatTree || []).filter(r => r.category === l1 && r.sub_category === l2 && r.sub_sub_category).map(r => r.sub_sub_category))];
+  if (!subsubs.length) { l3wrap.style.display = 'none'; return; }
+  subsubs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l3sel.appendChild(o); });
+  l3wrap.style.display = '';
+}
+
+// Set the full cascade to a known path (used by draft edit + picker selection).
+function nrCatSetPath(cat, sub, subsub) {
+  const l1 = nrg('nr-cat-l1'); if (!l1 || !cat) return;
+  l1.value = cat; nrCatL1Change();
+  if (sub) { const l2 = nrg('nr-cat-l2'); if (l2) { l2.value = sub; nrCatL2Change(); } }
+  if (subsub) { const l3 = nrg('nr-cat-l3'); if (l3) l3.value = subsub; }
+}
+
+// AI auto-suggest: match a single category string against any level and select the cascade.
+function nrCatAutoSelect(catString) {
+  if (!catString || !window.nrCatTree) return;
+  const l1Match = window.nrCatTree.find(r => r.category && r.category.toLowerCase() === catString.toLowerCase());
+  if (l1Match) { nrg('nr-cat-l1').value = l1Match.category; nrCatL1Change(); return; }
+  const l2Match = window.nrCatTree.find(r => r.sub_category && r.sub_category.toLowerCase() === catString.toLowerCase());
+  if (l2Match) {
+    nrg('nr-cat-l1').value = l2Match.category; nrCatL1Change();
+    setTimeout(() => { nrg('nr-cat-l2').value = l2Match.sub_category; nrCatL2Change(); }, 50);
+    return;
+  }
+  const l3Match = window.nrCatTree.find(r => r.sub_sub_category && r.sub_sub_category.toLowerCase() === catString.toLowerCase());
+  if (l3Match) {
+    nrg('nr-cat-l1').value = l3Match.category; nrCatL1Change();
+    setTimeout(() => {
+      nrg('nr-cat-l2').value = l3Match.sub_category; nrCatL2Change();
+      setTimeout(() => { nrg('nr-cat-l3').value = l3Match.sub_sub_category; }, 50);
+    }, 50);
+  }
 }
 // ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
 // One image at a time: extract a single product (the first if the API returns an array).
@@ -443,14 +536,7 @@ function nrImgApply(d) {
   if (it.product_name) { const el = nrg('nr-desc'); if (el) el.value = it.product_name; }
   if (it.short_description) { const el = nrg('nr-spec'); if (el) el.value = it.short_description; }
   if (it.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = it.packaging_type; }
-  if (it.category) {
-    const sel = nrg('nr-category');
-    if (sel) {
-      const want = String(it.category).toLowerCase();
-      const match = rfqCategories.find(c => c.toLowerCase() === want) || rfqCategories.find(c => c.toLowerCase().indexOf(want) !== -1 || want.indexOf(c.toLowerCase()) !== -1);
-      if (match) { sel.value = match; nrCategoryChange(); }
-    }
-  }
+  if (it.category) nrCatAutoSelect(it.category);
   const noteWrap = nrg('nr-factory-note-wrap'), noteText = nrg('nr-factory-note-text');
   if (noteWrap && noteText) {
     if (it.recommended_factory_type) { noteText.textContent = it.recommended_factory_type; noteWrap.style.display = ''; }
@@ -477,6 +563,7 @@ async function nrUrlFetch() {
     if (!r.ok || !d || d.error) { status.textContent = 'Could not fetch — check the URL and try again'; btn.disabled = false; return; }
     const item = d.items ? d.items[0] : d;
     nrImgApply(item);
+    if (item.category) nrCatAutoSelect(item.category);
     if (item.image_url) {
       const thumb = document.getElementById('nr-img-thumb');
       const prompt = document.getElementById('nr-img-prompt');
@@ -640,7 +727,7 @@ async function nrHtsSuggest() {
   if (btn) { btn.textContent = 'Thinking...'; btn.disabled = true; }
   try {
     const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
-    const cat = (document.getElementById('nr-category')||{}).value || '';
+    const cat = nrCurrentCategory();
     const r = await fetch('/api/hts-suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -717,15 +804,13 @@ function openNewRfqModal(prefill) {
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }
   document.querySelectorAll('input[name="nr-ptype"]').forEach(r => { r.checked = r.value === 'single'; });
   nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
-  const catSel = nrg('nr-category');
-  if (catSel) {
-    catSel.value = '';
-    if (prefill && prefill.category) {
-      const want = String(prefill.category).toLowerCase();
-      const match = rfqCategories.find(c => c.toLowerCase() === want) || rfqCategories.find(c => c.toLowerCase().includes(want));
-      if (match) catSel.value = match;
-    }
-  }
+  // Reset the 3-level category cascade
+  { const l1 = nrg('nr-cat-l1'); if (l1) l1.value = '';
+    const l2 = nrg('nr-cat-l2'); if (l2) l2.innerHTML = '<option value="">Select sub-category...</option>';
+    const l3 = nrg('nr-cat-l3'); if (l3) l3.innerHTML = '<option value="">Select (optional)...</option>';
+    const l2w = nrg('nr-cat-l2-wrap'); if (l2w) l2w.style.display = 'none';
+    const l3w = nrg('nr-cat-l3-wrap'); if (l3w) l3w.style.display = 'none'; }
+  if (prefill && prefill.category) nrCatAutoSelect(prefill.category);
   if (prefill) {
     if (prefill.product) nrg('nr-desc').value = prefill.product;
     if (prefill.quantity != null) nrg('nr-qty').value = prefill.quantity;
@@ -744,7 +829,7 @@ function openNewRfqModal(prefill) {
 }
 function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); nrEditId = null; }
 async function findMatchingFactories() {
-  const cat = nrg('nr-category').value;
+  const cat = nrCurrentCategory();
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
   if (!cat) { status.textContent = 'Please select a category first.'; return; }
   status.textContent = 'Searching…'; listEl.innerHTML = '';
@@ -772,8 +857,15 @@ async function saveNewRfq(status) {
   if (ptype === 'kit') extras.push('Product type: Kit');
   if (ME_EMAIL) extras.push('Submitted by: ' + ME_EMAIL);   // rfqs has no created_by column
   if (extras.length) spec = (spec ? spec + '\n\n' : '') + extras.join('\n');
+  const catL1 = (nrg('nr-cat-l1') || {}).value || null;
+  const catL2 = (nrg('nr-cat-l2') || {}).value || null;
+  const catL3 = (nrg('nr-cat-l3') || {}).value || null;
   const body = {
-    tenant_id: TID, item_description: desc, category: nrg('nr-category').value || null, status: status,
+    tenant_id: TID, item_description: desc,
+    category: (catL1 && catL1 !== '__other__') ? catL1 : null,
+    sub_category: catL2 || null,
+    sub_sub_category: catL3 || null,
+    status: status,
     detailed_specifications: spec || null,
     quote_quantity: num('nr-qty'), max_fob_price: num('nr-fob'),
     product_size: txt('nr-size'), unit_type: (nrg('nr-unit').value || 'Each').toLowerCase(),
@@ -912,7 +1004,7 @@ async function openRFQ(id) {
     openNewRfqModal();
     nrEditId = r.id;
     const setV = (elId, val) => { const el = nrg(elId); if (el && val != null && val !== '') el.value = val; };
-    const catSel = nrg('nr-category'); if (catSel && r.category) catSel.value = r.category;
+    if (r.category) nrCatSetPath(r.category, r.sub_category, r.sub_sub_category);
     setV('nr-desc', r.item_description);
     setV('nr-spec', r.detailed_specifications);
     setV('nr-qty', r.quote_quantity);
@@ -1231,6 +1323,7 @@ async function loadInvStatusTenant(skuId) {
   renderSidebar(user);
   document.getElementById('pageSub').textContent = user.tenant.name + ' · RFQs and product development';
   loadRfqCategories();
+  nrLoadCategoryTree();
   document.getElementById('rfqDrawerBg').addEventListener('click', e => { if (e.target.id === 'rfqDrawerBg') closeNewRfqModal(); });
 
   document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
@@ -1348,16 +1441,11 @@ function nrCatRenderResults(q) {
 }
 
 function nrCatSelect(id, label, catValue) {
-  const sel = document.getElementById('nr-category');
-  let found = false;
-  for (let o of sel.options) { if (o.value === catValue) { sel.value = catValue; found = true; break; } }
-  if (!found) {
-    const opt = document.createElement('option');
-    opt.value = catValue; opt.text = label;
-    sel.insertBefore(opt, sel.lastElementChild);
-    sel.value = catValue;
-  }
-  nrCatModalClose();
+  // Select an existing category in the cascade using its full path.
+  const row = (window.nrCatTree || []).find(r => String(r.id) === String(id)) || (nrAllCats || []).find(r => String(r.id) === String(id));
+  document.getElementById('nr-cat-modal').style.display = 'none';
+  if (row) nrCatSetPath(row.category, row.sub_category, row.sub_sub_category);
+  else if (catValue) nrCatSetPath(catValue, null, null);
 }
 
 async function nrCatSaveNew() {
@@ -1376,21 +1464,16 @@ async function nrCatSaveNew() {
   });
   if (!res.ok) { alert('Could not save: ' + await res.text()); return; }
   const rows = await res.json();
-  const newRow = rows[0];
-  nrAllCats.push(newRow);
-  const label = [cat, sub, subsub].filter(Boolean).join(' › ');
-  const sel = document.getElementById('nr-category');
-  const opt = document.createElement('option');
-  opt.value = cat; opt.text = label;
-  sel.insertBefore(opt, sel.lastElementChild);
-  sel.value = cat;
-  nrCatModalClose();
+  nrAllCats.push(rows[0]);
+  document.getElementById('nr-cat-modal').style.display = 'none';
+  await nrLoadCategoryTree();          // refresh tree so the new category appears
+  nrCatSetPath(cat, sub || null, subsub || null);
 }
 
 function nrCatModalClose() {
   document.getElementById('nr-cat-modal').style.display = 'none';
-  const sel = document.getElementById('nr-category');
-  if (sel.value === 'Other') sel.value = '';
+  const sel = document.getElementById('nr-cat-l1');
+  if (sel && sel.value === '__other__') sel.value = '';
 }
 </script>
 </body>
