@@ -885,6 +885,17 @@ async function loadRFQs() {
 function rfqTitle(r) { return [r.project_number, r.item_description].filter(Boolean).join(' — ') || 'Untitled RFQ'; }
 function asgCount(r) { const a = r.rfq_factory_assignments; return (Array.isArray(a) && a[0] && a[0].count) || 0; }
 
+async function deleteRfq(event, id) {
+  event.stopPropagation();
+  if (!confirm('Delete this draft RFQ? This cannot be undone.')) return;
+  const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
+  await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + token, 'Prefer': 'return=minimal' }
+  });
+  loadRFQs();
+}
+
 function renderRFQs() {
   const q = (document.getElementById('rfqSearch').value || '').toLowerCase().trim();
   const st = document.getElementById('rfqStatus').value;
@@ -894,11 +905,12 @@ function renderRFQs() {
     .some(v => (v || '').toLowerCase().includes(q)));
   const box = document.getElementById('box-rfq');
   if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">📋</span>No RFQs found.</div>'; return; }
-  box.innerHTML = `<table class="data-table"><thead><tr><th>Project</th><th>Description</th><th>Category</th><th>Status</th><th>Factories</th><th>Created</th></tr></thead><tbody>${
+  box.innerHTML = `<table class="data-table"><thead><tr><th>Project</th><th>Description</th><th>Category</th><th>Status</th><th>Factories</th><th>Created</th><th></th></tr></thead><tbody>${
     rows.map(r => `<tr class="clickable" data-id="${esc(r.id)}">
       <td>${esc(r.project_number || '—')}</td><td>${esc(r.item_description || '—')}</td>
       <td>${esc([r.category, r.sub_category].filter(Boolean).join(' › ') || '—')}</td>
-      <td>${statusBadge(r.status)}</td><td>${asgCount(r)}</td><td>${fmtDate(r.created_at)}</td></tr>`).join('')
+      <td>${statusBadge(r.status)}</td><td>${asgCount(r)}</td><td>${fmtDate(r.created_at)}</td>
+      <td style="text-align:right;">${r.status === 'draft' ? `<button class="rfq-delete-btn" onclick="deleteRfq(event,'${esc(r.id)}')" title="Delete draft" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:4px 8px;">🗑</button>` : ''}</td></tr>`).join('')
   }</tbody></table>`;
   box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openRFQ(tr.dataset.id)));
 }

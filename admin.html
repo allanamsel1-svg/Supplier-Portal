@@ -4111,6 +4111,16 @@ function rfqTypeBadge(r){
   return '';
 }
 
+async function deleteRfq(event, id){
+  event.stopPropagation();
+  if(!confirm('Delete this draft RFQ? This cannot be undone.'))return;
+  await fetch(SB+'/rest/v1/rfqs?id=eq.'+id,{
+    method:'DELETE',
+    headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Prefer':'return=minimal'}
+  });
+  loadRFQs();
+}
+
 function renderRFQList(){
   var el=g('rfq-list-items');if(!el)return;
   var statusColors={'draft':'#f0f0e8','sent':'#e8f0ff','in_review':'#fff0e0','quotes_received':'#fff8e0','approved':'#e8f8e8','rejected':'#fff0f0','cancelled':'#fff0f0','on_hold':'#fff8e0','archived':'#f0f0f0'};
@@ -4154,6 +4164,7 @@ function renderRFQList(){
       '<div class="rli-meta">'+
         '<span class="rli-date">'+date+(r.category?' · '+r.category:'')+'</span>'+
         (quoteCount?'<span class="rli-quotes">'+quoteCount+'/'+sentCount+' quoted</span>':'<span style="font-size:11px;color:#bbb;">'+sentCount+' sent</span>')+
+        (r.status==='draft'?'<button class="rfq-delete-btn" onclick="deleteRfq(event,\''+r.id+'\')" title="Delete draft" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:14px;padding:4px 8px;margin-left:auto;">🗑</button>':'')+
       '</div>'+
     '</div>';
   }).join('');
