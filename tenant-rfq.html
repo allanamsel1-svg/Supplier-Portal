@@ -888,21 +888,15 @@ function asgCount(r) { const a = r.rfq_factory_assignments; return (Array.isArra
 async function deleteRfq(event, id) {
   event.stopPropagation();
   if (!confirm('Delete this draft RFQ? This cannot be undone.')) return;
-  const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
-  const headers = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + (token || SUPA_KEY), 'Content-Type': 'application/json', 'Prefer': 'return=minimal' };
-
-  // Null out non-cascading foreign key references first
-  await fetch(SUPA_URL + '/rest/v1/email_threads?rfq_id=eq.' + id, { method: 'PATCH', headers, body: JSON.stringify({ rfq_id: null }) }).catch(() => {});
-  await fetch(SUPA_URL + '/rest/v1/reference_component_costs?rfq_id=eq.' + id, { method: 'PATCH', headers, body: JSON.stringify({ rfq_id: null }) }).catch(() => {});
-  await fetch(SUPA_URL + '/rest/v1/sku_factory_sources?rfq_id=eq.' + id, { method: 'PATCH', headers, body: JSON.stringify({ rfq_id: null }) }).catch(() => {});
-  await fetch(SUPA_URL + '/rest/v1/product_development?rfq_id=eq.' + id, { method: 'PATCH', headers, body: JSON.stringify({ rfq_id: null }) }).catch(() => {});
-
-  // Now delete the RFQ (cascading children delete automatically)
-  const res = await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + id, { method: 'DELETE', headers });
+  const res = await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + id, {
+    method: 'DELETE',
+    headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Prefer': 'return=minimal' }
+  });
   if (res.ok) {
-    loadRFQs ? loadRFQs() : loadRfqs && loadRfqs();
+    loadRFQs ? loadRFQs() : (loadRfqs && loadRfqs());
   } else {
-    alert('Could not delete — please try again.');
+    const err = await res.text().catch(() => '');
+    alert('Could not delete: ' + err);
   }
 }
 
