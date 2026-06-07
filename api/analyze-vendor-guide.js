@@ -276,7 +276,7 @@ async function analyzePDF(pdfBase64, fileName, apiKey) {
   try {
     return JSON.parse(jsonText);
   } catch (e) {
-    throw new Error(`Could not parse Anthropic response as JSON: ${e.message}`);
+    throw new Error(`Could not parse AI response as JSON: ${e.message}`);
   }
 }
 
@@ -346,6 +346,6 @@ async function analyzeDiff(oldPdfBase64, oldFileName, newPdfBase64, newFileName,
   try {
     return JSON.parse(jsonText);
   } catch (e) {
-    throw new Error(`Could not parse Anthropic diff response as JSON: ${e.message}`);
+    throw new Error(`Could not parse AI diff response as JSON: ${e.message}`);
   }
 }

@@ -75,7 +75,7 @@ export default async function handler(req, res) {
 
     if (!aiResp.ok) {
       const errText = await aiResp.text();
-      throw new Error(`Anthropic API ${aiResp.status}: ${errText}`);
+      throw new Error(`AI service error ${aiResp.status}: ${errText}`);
     }
 
     const aiData = await aiResp.json();

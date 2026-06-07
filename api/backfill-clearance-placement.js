@@ -113,7 +113,7 @@ async function detect(b64) {
       ] }]
     })
   });
-  if (!r.ok) throw new Error(`anthropic ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) throw new Error(`AI service error ${r.status}: ${(await r.text()).slice(0, 200)}`);
   const data = await r.json();
   const text = (data.content || []).map(c => c.text || '').join('\n');
   const fence = text.match(/```json\s*([\s\S]*?)\s*```/);
