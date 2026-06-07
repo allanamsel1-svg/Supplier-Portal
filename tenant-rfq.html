@@ -175,10 +175,10 @@
         </div>
         <div class="nr-grid">
           <div class="nr-field"><label>Color</label>
-            <select id="nr-color" onchange="nrColorOther(this)">
-              <option value="">—</option><option>Clear</option><option>White</option><option>Black</option><option>Clear/White</option><option>Clear/Black</option><option>Silver</option><option>Gold</option><option>Pink</option><option>Red</option><option>Blue</option><option>Green</option><option>Purple</option><option>Natural</option><option>Custom/Other</option>
+            <select id="nr-color" onchange="nrPkgOther(this)">
+              <option value="">—</option><option>Clear</option><option>Frosted Clear</option><option>White</option><option>Off-White / Ivory</option><option>Black</option><option>Charcoal / Dark Gray</option><option>Silver / Chrome</option><option>Gold</option><option>Rose Gold</option><option>Copper / Bronze</option><option>Amber / Honey</option><option>Brown / Kraft</option><option>Tan / Beige</option><option>Cream</option><option>Light Pink</option><option>Hot Pink / Fuchsia</option><option>Red</option><option>Burgundy / Wine</option><option>Orange</option><option>Peach / Coral</option><option>Yellow</option><option>Lime / Yellow-Green</option><option>Olive / Army Green</option><option>Sage Green</option><option>Forest / Dark Green</option><option>Mint / Pale Green</option><option>Teal / Turquoise</option><option>Sky / Baby Blue</option><option>Royal Blue</option><option>Navy</option><option>Purple / Violet</option><option>Lavender</option><option>Nude / Blush</option><option>Metallic Blue</option><option>Metallic Green</option><option>Metallic Pink</option><option>Multi-Color</option><option value="__other__">Custom / Other</option>
             </select>
-            <input id="nr-color-other" placeholder="Custom color description (optional, e.g. Frosted Clear with Gold Accent)" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+            <input id="nr-color-other" placeholder="Custom color description (e.g. Frosted Clear with Gold Accent)" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
           </div>
           <div class="nr-field"></div>
         </div>
@@ -250,15 +250,15 @@
             <label>Shipping Mode</label>
             <select id="nr-ship-mode" onchange="nrLoadFreightRates()">
               <option value="ocean_lcl">Ocean LCL</option>
-              <option value="ocean_fcl">Ocean FCL</option>
+              <option value="ocean_fcl" selected>Ocean FCL</option>
               <option value="air">Air</option>
             </select>
           </div>
-          <div class="nr-field" id="nr-fcl-type-wrap" style="display:none;">
+          <div class="nr-field" id="nr-fcl-type-wrap">
             <label>Container Type</label>
             <select id="nr-fcl-type" onchange="nrLoadFreightRates()">
               <option value="20GP">20GP</option>
-              <option value="40HC">40HC</option>
+              <option value="40HC" selected>40HC</option>
             </select>
           </div>
         </div>
@@ -453,11 +453,8 @@ function nrSelOrOther(selId) {
   return v;
 }
 function nrColorValue() {
-  const sel = nrg('nr-color'); const inp = nrg('nr-color-other');
-  const base = sel ? sel.value : ''; const extra = inp ? (inp.value || '').trim() : '';
-  if (base === 'Custom/Other') return extra || base;
-  if (extra) return base ? (base + ' — ' + extra) : extra;
-  return base;
+  // Custom / Other (value __other__) -> read the text input; otherwise the selected label.
+  return nrSelOrOther('nr-color');
 }
 // Set a select to a stored value; if not an option, fall back to the "Other" option + text input.
 function nrSetSelOrOther(selId, val) {
@@ -737,22 +734,22 @@ function nrDimToNum(fieldId, unitId) {
 }
 
 // ── Freight & landed cost calculator ──
-// Default freight rates ($/CBM) until nrLoadFreightRates() pulls live rates.
-window.nrFreightRates = window.nrFreightRates || { wc: 180, ec: 200, wcTransit: 28, ecTransit: 35 };
+// Default freight rates ($/CBM) until nrLoadFreightRates() pulls live rates. Default = China 40HC FCL.
+window.nrFreightRates = window.nrFreightRates || { wc: 109.09, ec: 109.09, wcTransit: 25, ecTransit: 32 };
 
 // Pull live freight rates from the freight_rates table for the selected origin + mode.
 async function nrLoadFreightRates() {
   const country = (document.getElementById('nr-origin-country')||{}).value || '';
-  const mode = (document.getElementById('nr-ship-mode')||{}).value || 'ocean_lcl';
+  const mode = (document.getElementById('nr-ship-mode')||{}).value || 'ocean_fcl';
   const fclWrap = document.getElementById('nr-fcl-type-wrap');
   if (fclWrap) fclWrap.style.display = (mode === 'ocean_fcl') ? '' : 'none';
-  const def = { wc: 180, ec: 200, wcTransit: 28, ecTransit: 35 };
+  const def = { wc: 109.09, ec: 109.09, wcTransit: 25, ecTransit: 32 };
   if (!country) { window.nrFreightRates = def; nrCbmCalc(); return; }
   try {
     const rows = await supa('freight_rates?origin_country=eq.' + encodeURIComponent(country)
       + '&mode=eq.' + encodeURIComponent(mode) + '&is_active=eq.true') || [];
     const ctnCbm = { '20GP': 25, '40HC': 55 };
-    const fclType = (document.getElementById('nr-fcl-type')||{}).value || '20GP';
+    const fclType = (document.getElementById('nr-fcl-type')||{}).value || '40HC';
     const rateFor = (code) => {
       if (mode === 'ocean_fcl') {
         const row = rows.find(x => x.destination_code === code && x.container_type === fclType);
@@ -846,9 +843,14 @@ async function nrHtsLookup() {
   const rulings = document.getElementById('nr-hts-rulings');
   btn.disabled = true; btn.textContent = 'Looking up...'; desc.textContent = '';
   try {
-    const r = await fetch('https://hts.usitc.gov/reststop/api/details/getSection?query=' + encodeURIComponent(code));
+    const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
+    const r = await fetch('/api/hts-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ hts_code: code }),
+    });
     const d = await r.json();
-    const item = d && (d[0] || d.data && d.data[0] || d.results && d.results[0]);
+    const item = d && !d.error && (d[0] || d.data && d.data[0] || d.results && d.results[0]);
     if (item) {
       desc.textContent = item.description || item.brief_description || '';
       const rate = item.general || item.duty_rate || '';
@@ -950,7 +952,7 @@ function openNewRfqModal(prefill) {
    'nr-elc-fob-wc','nr-elc-freight-wc','nr-elc-duty-wc','nr-elc-total-wc','nr-elc-margin-wc','nr-elc-check-wc',
    'nr-elc-fob-ec','nr-elc-freight-ec','nr-elc-duty-ec','nr-elc-total-ec','nr-elc-margin-ec','nr-elc-check-ec'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
   { const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const hr = nrg('nr-hts-rulings'); if (hr) hr.innerHTML = ''; }
-  { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_lcl'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = 'none'; }
+  { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_fcl'; const ft = nrg('nr-fcl-type'); if (ft) ft.value = '40HC'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = ''; }
   nrFreightWire();
   nrLoadFreightRates();
   const cos = nrg('nr-cosmetic'); if (cos) { cos.checked = false; delete cos.dataset.userOverride; }

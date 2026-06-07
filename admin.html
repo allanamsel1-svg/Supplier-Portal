@@ -1188,29 +1188,11 @@
             </div>
             <div class="mf-row">
               <div class="mf"><label>Color</label>
-                <select id="rfq-color">
+                <select id="rfq-color" onchange="axOtherToggle(this)">
                   <option value="">None / Not Applicable</option>
-                  <option value="BK">Black (BK)</option>
-                  <option value="WH">White (WH)</option>
-                  <option value="GY">Gray (GY)</option>
-                  <option value="SL">Silver (SL)</option>
-                  <option value="GD">Gold (GD)</option>
-                  <option value="RD">Red (RD)</option>
-                  <option value="PK">Pink (PK)</option>
-                  <option value="OR">Orange (OR)</option>
-                  <option value="YL">Yellow (YL)</option>
-                  <option value="GN">Green (GN)</option>
-                  <option value="BL">Blue (BL)</option>
-                  <option value="NV">Navy (NV)</option>
-                  <option value="PL">Purple (PL)</option>
-                  <option value="BR">Brown (BR)</option>
-                  <option value="BG">Beige (BG)</option>
-                  <option value="CR">Cream (CR)</option>
-                  <option value="CL">Clear (CL)</option>
-                  <option value="MT">Multi (MT)</option>
-                  <option value="NA">Natural (NA)</option>
-                  <option value="RW">Raw (RW)</option>
+                  <option>Clear</option><option>Frosted Clear</option><option>White</option><option>Off-White / Ivory</option><option>Black</option><option>Charcoal / Dark Gray</option><option>Silver / Chrome</option><option>Gold</option><option>Rose Gold</option><option>Copper / Bronze</option><option>Amber / Honey</option><option>Brown / Kraft</option><option>Tan / Beige</option><option>Cream</option><option>Light Pink</option><option>Hot Pink / Fuchsia</option><option>Red</option><option>Burgundy / Wine</option><option>Orange</option><option>Peach / Coral</option><option>Yellow</option><option>Lime / Yellow-Green</option><option>Olive / Army Green</option><option>Sage Green</option><option>Forest / Dark Green</option><option>Mint / Pale Green</option><option>Teal / Turquoise</option><option>Sky / Baby Blue</option><option>Royal Blue</option><option>Navy</option><option>Purple / Violet</option><option>Lavender</option><option>Nude / Blush</option><option>Metallic Blue</option><option>Metallic Green</option><option>Metallic Pink</option><option>Multi-Color</option><option value="__other__">Custom / Other</option>
                 </select>
+                <input id="rfq-color-other" placeholder="Custom color description (e.g. Frosted Clear with Gold Accent)" style="display:none;margin-top:6px;width:100%;padding:8px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
               </div>
 
             </div>
@@ -6053,7 +6035,7 @@ async function populateRFQEditForm(rfq){
   axSetSelOrOther('rfq-unit-type', rfq.unit_type||'each');
   if(g('rfq-description'))g('rfq-description').value=rfq.item_description||'';
   if(g('rfq-specs'))g('rfq-specs').value=rfq.detailed_specifications||'';
-  if(g('rfq-color'))g('rfq-color').value=rfq.color_code||'';
+  axSetSelOrOther('rfq-color', rfq.color_code||'');
   if(g('rfq-quantity'))g('rfq-quantity').value=rfq.quote_quantity||'';
   if(g('rfq-product-size'))g('rfq-product-size').value=rfq.product_size||'';
   axSetSelOrOther('rfq-uom', rfq.unit_of_measure||'');
@@ -6159,7 +6141,7 @@ async function openRFQForm(id){
   axSetSelOrOther('rfq-uom', rfq.unit_of_measure||'');
   g('rfq-description').value=rfq.item_description||'';
   g('rfq-specs').value=rfq.detailed_specifications||'';
-  g('rfq-color').value=rfq.color_code||'';
+  axSetSelOrOther('rfq-color', rfq.color_code||'');
   g('rfq-quantity').value=rfq.quote_quantity||'';
   g('rfq-inner-pack').value=rfq.inner_case_pack||'';
   g('rfq-master-pack').value=rfq.master_case_pack||'';
@@ -6244,7 +6226,7 @@ function resetRFQForm(){
   g('rfq-product-size').value='N/A';g('rfq-unit-type').value='each';
   ['rfq-unit-type-other','rfq-uom-other'].forEach(function(id){var el=g(id);if(el){el.value='';el.style.display='none';}});
   g('rfq-description').value='';g('rfq-specs').value='';
-  g('rfq-color').value='';g('rfq-quantity').value='';
+  g('rfq-color').value='';{var cco=g('rfq-color-other');if(cco){cco.value='';cco.style.display='none';}}g('rfq-quantity').value='';
   if(g('rfq-fob-port'))g('rfq-fob-port').value='';
   // Reset deductions to 0
   ['rfq-est-returns','rfq-est-dilution','rfq-est-commission','rfq-est-ad','rfq-est-royalty'].forEach(function(id){if(g(id))g(id).value='0';});
@@ -7579,9 +7561,10 @@ async function axHtsLookup(){
   if(btn){btn.disabled=true;btn.textContent='Looking up...';}
   if(desc)desc.textContent='';
   try{
-    var r=await fetch('https://hts.usitc.gov/reststop/api/details/getSection?query='+encodeURIComponent(code));
+    var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
+    var r=await fetch('/api/hts-lookup',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({hts_code:code})});
     var d=await r.json();
-    var item=d&&(d[0]||(d.data&&d.data[0])||(d.results&&d.results[0]));
+    var item=d&&!d.error&&(d[0]||(d.data&&d.data[0])||(d.results&&d.results[0]));
     if(item){
       var rate=item.general||item.duty_rate||'';
       if(rate){
@@ -7635,7 +7618,7 @@ async function saveRFQ(action){
     unit_type:axSelOrOther('rfq-unit-type')||'each',
     product_size:g('rfq-product-size').value==='N/A'?null:g('rfq-product-size').value||null,
     unit_of_measure:(function(){var u=axSelOrOther('rfq-uom');return (!u||u==='N/A')?null:u;})(),
-    color_code:g('rfq-color').value||null,
+    color_code:axSelOrOther('rfq-color')||null,
     quote_quantity:parseInt(g('rfq-quantity').value)||null,
     inner_case_pack:parseInt(g('rfq-inner-pack').value)||null,
     master_case_pack:parseInt(g('rfq-master-pack').value)||null,
