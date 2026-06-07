@@ -196,6 +196,14 @@
 <!-- ══════════════════════════════════════ -->
 <div class="tab-panel on" id="tab-categories">
   <div class="wrap">
+    <!-- Pending category suggestions (submitted from RFQ "Other") -->
+    <div id="pending-cat-section" style="display:none;margin-bottom:1rem;">
+      <div id="pending-cat-bar" onclick="togglePendingCats()" style="background:#fff8e0;border:1px solid #e0c840;border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+        <span id="pending-cat-title" style="font-size:13px;font-weight:600;color:#665500;">📋 0 pending category suggestions</span>
+        <span id="pending-cat-chev" style="font-size:12px;color:#998800;">▼</span>
+      </div>
+      <div id="pending-cat-rows" style="border:1px solid #e0c840;border-top:none;border-radius:0 0 8px 8px;background:#fffdf5;"></div>
+    </div>
     <div class="grid2">
       <!-- List -->
       <div class="card">
@@ -878,9 +886,75 @@ function switchTab(name){
 }
 
 // ════════════════════════════════════════
+// PENDING CATEGORY SUGGESTIONS (from RFQ "Other")
+// ════════════════════════════════════════
+var _pendingCats=[];
+async function loadPendingCats(){
+  var sec=g('pending-cat-section'); if(!sec)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/pending_categories?status=eq.pending&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    _pendingCats=r.ok?(await r.json()):[];
+  }catch(e){_pendingCats=[];}
+  if(!Array.isArray(_pendingCats)||!_pendingCats.length){ sec.style.display='none'; return; }
+  sec.style.display='block';
+  var n=_pendingCats.length;
+  g('pending-cat-title').textContent='📋 '+n+' pending category suggestion'+(n===1?'':'s');
+  g('pending-cat-rows').innerHTML=_pendingCats.map(renderPendingCatRow).join('');
+}
+function renderPendingCatRow(p){
+  var d=''; try{ d=new Date(p.created_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){}
+  return '<div class="pending-cat-row" id="pcat-'+esc(p.id)+'" style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f0e6c0;">'
+    +'<div style="flex:1;font-size:13px;color:#333;"><b>'+esc(p.suggested_name)+'</b></div>'
+    +'<div style="font-size:11px;color:#999;white-space:nowrap;">'+esc(d)+'</div>'
+    +'<button class="btn-new" style="background:#16a34a;color:#fff;" onclick="approvePendingCat(\''+esc(p.id)+'\')">✓ Approve</button>'
+    +'<button class="btn-new" style="background:#fff;color:#dc2626;border:1px solid #dc2626;" onclick="rejectPendingCat(\''+esc(p.id)+'\')">✗ Reject</button>'
+    +'</div>';
+}
+function approvePendingCat(id){
+  var p=_pendingCats.find(function(x){return x.id===id;}); if(!p)return;
+  var row=g('pcat-'+id); if(!row)return;
+  row.innerHTML='<div style="display:flex;align-items:center;gap:8px;width:100%;">'
+    +'<input type="text" id="pcat-off-'+esc(id)+'" value="'+esc(p.suggested_name)+'" placeholder="Official category name" style="flex:1;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;" />'
+    +'<button class="btn-new" style="background:#16a34a;color:#fff;" onclick="confirmApprovePendingCat(\''+esc(id)+'\')">Confirm</button>'
+    +'<button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button>'
+    +'<span id="pcat-msg-'+esc(id)+'" style="font-size:11px;color:#999;white-space:nowrap;"></span></div>';
+  var inp=g('pcat-off-'+id); if(inp){ inp.focus(); inp.select(); }
+}
+async function confirmApprovePendingCat(id){
+  var off=((g('pcat-off-'+id)||{}).value||'').trim();
+  var msg=g('pcat-msg-'+id);
+  if(!off){ if(msg){msg.style.color='#dc2626';msg.textContent='Enter a name.';} return; }
+  if(msg){msg.style.color='#999';msg.textContent='Saving…';}
+  try{
+    var r1=await fetch(SB+'/rest/v1/pending_categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'approved',approved_as:off})});
+    if(!r1.ok)throw new Error('patch failed');
+    // The categories table keys the name on the `category` column (no name/is_active columns).
+    await fetch(SB+'/rest/v1/categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({category:off})}).catch(function(){});
+    await loadPendingCats();
+    await loadCats();
+  }catch(e){ if(msg){msg.style.color='#dc2626';msg.textContent='Failed — try again.';} }
+}
+async function rejectPendingCat(id){
+  try{
+    var r=await fetch(SB+'/rest/v1/pending_categories?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected'})});
+    if(!r.ok)throw new Error('patch failed');
+    var row=g('pcat-'+id); if(row)row.style.display='none';
+    await loadPendingCats();
+  }catch(e){ alert('Could not reject — try again.'); }
+}
+function togglePendingCats(){
+  var rows=g('pending-cat-rows'), chev=g('pending-cat-chev');
+  if(!rows)return;
+  var open=rows.style.display!=='none';
+  rows.style.display=open?'none':'block';
+  if(chev)chev.textContent=open?'▶':'▼';
+}
+
+// ════════════════════════════════════════
 // CATEGORIES
 // ════════════════════════════════════════
 async function loadCats(){
+  loadPendingCats();
   if(g('cat-list'))g('cat-list').innerHTML='<div class="empty-list">Loading...</div>';
   try{
     var r=await fetch(SB+'/rest/v1/categories?select=*&order=category,sub_category,sub_sub_category',{

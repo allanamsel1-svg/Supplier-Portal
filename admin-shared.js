@@ -37,7 +37,6 @@
       { icon: '⏰', label: 'RFQ Follow-ups',   href: 'tenant-factories.html#followups' },
       { icon: '🛡', label: 'Compliance Alerts',href: 'tenant-factories.html#compliance' },
       { icon: '📋', label: 'Compliance Rules', href: 'tenant-factories.html#compliance-rules' },
-      { icon: '⚙',  label: 'Pending Categories', href: 'admin-categories.html' },
     ]},
     { section: 'Communications', items: [
       { icon: '💬', label: 'Messages',   href: 'tenant-communications.html' },
