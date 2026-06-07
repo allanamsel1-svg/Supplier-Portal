@@ -59,6 +59,7 @@
     <button class="tab" data-tab="rfq">RFQs <span class="tab-count" id="cnt-rfq"></span></button>
     <button class="tab" data-tab="pd">Product Development <span class="tab-count" id="cnt-pd"></span></button>
     <button class="tab" data-tab="skus">SKU Library <span class="tab-count" id="cnt-skus"></span></button>
+    <button class="tab" id="tab-skusetup" onclick="window.open('setup.html','_blank')">⚙ SKU Setup</button>
   </div>
 
   <div class="tab-pane" id="pane-rfq">
@@ -1028,7 +1029,7 @@ async function openSKU(id) {
   loadRfqCategories();
   document.getElementById('rfqDrawerBg').addEventListener('click', e => { if (e.target.id === 'rfqDrawerBg') closeNewRfqModal(); });
 
-  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
+  document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
   document.getElementById('rfqSearch').addEventListener('input', renderRFQs);
   document.getElementById('rfqStatus').addEventListener('change', renderRFQs);
   document.getElementById('pdSearch').addEventListener('input', renderPD);
@@ -1037,10 +1038,11 @@ async function openSKU(id) {
   document.getElementById('skuStatus').addEventListener('change', renderSKUs);
   document.getElementById('panelCloseBtn').addEventListener('click', closePanel);
   document.getElementById('panelOverlay').addEventListener('click', closePanel);
-  window.addEventListener('hashchange', () => showTab((location.hash || '#rfq').slice(1)));
+  window.addEventListener('hashchange', () => { if (location.hash === '#skusetup') { const b = document.getElementById('tab-skusetup'); if (b) b.click(); return; } showTab((location.hash || '#rfq').slice(1)); });
 
   await loadRFQs();
   showTab((location.hash || '#rfq').slice(1));
+  if (location.hash === '#skusetup') { const b = document.getElementById('tab-skusetup'); if (b) b.click(); }
   handleAiRfqAction();
 })();
 

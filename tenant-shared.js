@@ -159,7 +159,7 @@ const TENANT_NAV = [
     { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html#rfq', feature: 'rfq' },
     { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd', feature: 'product_development' },
     { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus', feature: 'sku_library' },
-    { icon: '⚙', label: 'SKU Setup', href: 'setup.html', newtab: true, feature: 'sku_library' },
+    { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup', feature: 'sku_library' },
   ]},
 ];
 

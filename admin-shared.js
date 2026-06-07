@@ -53,7 +53,7 @@
       { icon: '📋', label: 'RFQs',            href: 'tenant-rfq.html#rfq' },
       { icon: '🧪', label: 'Product Dev',     href: 'tenant-rfq.html#pd' },
       { icon: '📦', label: 'SKU Library',     href: 'tenant-rfq.html#skus' },
-      { icon: '⚙', label: 'SKU Setup', href: 'setup.html', newtab: true },
+      { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup' },
     ]},
   ];
 
