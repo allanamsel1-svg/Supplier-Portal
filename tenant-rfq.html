@@ -848,11 +848,19 @@ async function saveNewRfq(status) {
   if (nrg('nr-category').value === 'Other') {
     const customCat = ((nrg('nr-custom-cat') || {}).value || '').trim();
     if (customCat) {
-      fetch(SUPA_URL + '/rest/v1/pending_categories', {
-        method: 'POST',
-        headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ suggested_name: customCat, tenant_id: TID, rfq_id: newId || null, status: 'pending' }),
-      }).catch(() => {});
+      try {
+        const pcRes = await fetch(SUPA_URL + '/rest/v1/pending_categories', {
+          method: 'POST',
+          headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ suggested_name: customCat, tenant_id: TID, rfq_id: newId || null, status: 'pending' }),
+        });
+        if (!pcRes.ok) {
+          const pcErr = await pcRes.text().catch(() => '');
+          console.error('pending_categories insert failed', pcRes.status, pcErr);
+        }
+      } catch (e) {
+        console.error('pending_categories insert error', e);
+      }
     }
   }
   closeNewRfqModal();

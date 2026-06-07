@@ -7522,7 +7522,10 @@ async function saveRFQ(action){
           if(customCat){
             var brandSelV=g('rfq-brand-id')?g('rfq-brand-id').value:null;
             var brandObjV=brandSelV?(allBrands||[]).find(function(b){return b.id===brandSelV;}):null;
-            fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:(brandObjV&&brandObjV.tenant_id)||null,rfq_id:savedRFQ.id,status:'pending'})}).catch(function(){});
+            try{
+              var pcRes=await fetch(SB+'/rest/v1/pending_categories',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({suggested_name:customCat,tenant_id:(brandObjV&&brandObjV.tenant_id)||null,rfq_id:savedRFQ.id,status:'pending'})});
+              if(!pcRes.ok){ var pcErr=await pcRes.text().catch(function(){return '';}); console.error('pending_categories insert failed', pcRes.status, pcErr); }
+            }catch(e){ console.error('pending_categories insert error', e); }
           }
         }
 
