@@ -1149,7 +1149,36 @@ async function openSKU(id) {
     <div class="panel-section"><h3>Costing</h3>${cost}</div>
     <div class="panel-section"><h3>Documents (${docs.length})</h3><div class="sub-list">${docItems}</div></div>
     <div class="panel-section"><h3>Factory Sources (${sources.length})</h3><div class="sub-list">${srcItems}</div></div>
+    <div class="panel-section"><h3>Inventory States</h3><div id="inv-states-${id}"><div class="loading">Loading…</div></div></div>
   `;
+  loadInvStatesTenant(id);
+}
+
+// Read-only inventory-state display for the tenant SKU Library. Tenants can see
+// states but not approve/reject/change them (admin-only, in skus.html).
+// Scoped to the tenant via tenant_id; supa() prepends /rest/v1/ so no prefix here.
+async function loadInvStatesTenant(skuId) {
+  var el = document.getElementById('inv-states-' + skuId);
+  if (!el) return;
+  try {
+    var r = await supa('sku_inventory_states?sku_id=eq.' + skuId + '&tenant_id=eq.' + TID + '&select=*,purchase_orders(po_number)&order=created_at.desc');
+    var rows = Array.isArray(r) ? r : [];
+    if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:#bbb;">No inventory state records yet.</div>'; return; }
+    var sc = {in_development:'#888',on_rfq:'#2244cc',on_order:'#885500',in_production:'#664400',pending_inspection:'#cc6600',at_forwarder:'#006633',in_transit:'#1a7a1a',at_port:'#007755',in_warehouse:'#1a1a2e',allocated_sales:'#660099',shipped:'#4488cc',sold_through:'#888',written_off:'#a22'};
+    var html = rows.map(function(row) {
+      var cur = row.current_state || '—';
+      var cc = sc[cur] || '#888';
+      var prop = row.proposed_state;
+      var pc = sc[prop] || '#888';
+      var po = row.purchase_orders ? (row.purchase_orders.po_number || 'PO') : '—';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px dashed #f0f0e8;font-size:12px;">' +
+        '<span style="color:#888;min-width:60px;">' + po + '</span>' +
+        '<span style="background:' + cc + '22;color:' + cc + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + cur.replace(/_/g,' ') + '</span>' +
+        (prop ? '<span style="color:#aaa;font-size:11px;">→</span><span style="background:' + pc + '22;color:' + pc + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + prop.replace(/_/g,' ') + '</span><span style="font-size:10px;color:#aaa;">(pending approval)</span>' : '') +
+        '</div>';
+    }).join('');
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#a22;">Could not load.</div>'; }
 }
 
 (async function init() {
