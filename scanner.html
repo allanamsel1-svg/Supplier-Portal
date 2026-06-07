@@ -144,9 +144,13 @@
     .lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; }
     .lightbox-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.15); color:rgb(255,255,255); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 22px; cursor: pointer; }
     /* ── Two-column layout: card scanner (left) + RFQ image intake (right) ── */
-    .rfq-cols { display: flex; gap: 24px; align-items: flex-start; }
+    .rfq-cols { display: flex; gap: 24px; align-items: stretch; }
     .rfq-col { flex: 1; min-width: 0; }
     @media(max-width:900px){ .rfq-cols { flex-direction: column; } }
+    /* Factory from Text (right column) */
+    .fx-textarea { width: 100%; min-height: 200px; padding: 12px; border: 1px solid #d0d0c8; border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
+    .fx-review { margin-top: 14px; border: 1px solid #e0e0d8; border-radius: 12px; padding: 14px; background: var(--bg2); }
+    .fx-spinner { width: 14px; height: 14px; border: 2px solid rgba(120,120,120,0.3); border-top-color: var(--text); border-radius: 50%; animation: rfqspin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
 
     /* ── RFQ image intake ── */
     .rfq-head { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
@@ -219,21 +223,16 @@
   <div class="queue" id="queue"></div>
   </div><!-- /rfq-col (left: card scanner) -->
 
-  <div class="rfq-col" id="rfq">
-    <div class="rfq-head">📦 RFQ from Images</div>
-    <div class="rfq-subhead">Paste or drop product images to generate draft RFQs</div>
+  <div class="rfq-col" id="factory-intake">
+    <div class="rfq-head">🏭 Factory from Text</div>
+    <div class="rfq-subhead">Paste any factory contact info — email, WeChat message, website text, etc.</div>
     <div class="upload-card">
-      <div class="rfq-drop" id="rfq-drop">
-        <div class="rfq-drop-icon">📦</div>
-        <div class="rfq-drop-title">Drop or paste product images</div>
-        <div class="rfq-drop-sub">JPG, PNG, WEBP, GIF &nbsp;·&nbsp; drag, click, or Cmd/Ctrl+V</div>
-        <label class="browse-btn" onclick="event.stopPropagation()">Browse Files<input type="file" id="rfq-file-input" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display:none" /></label>
-        <div class="rfq-thumbs" id="rfq-thumbs"></div>
-        <button class="rfq-extract-btn" id="rfq-extract-btn" style="display:none;" onclick="event.stopPropagation();rfqExtractAll();">Extract &amp; Create RFQs →</button>
-      </div>
-      <div class="rfq-cards" id="rfq-cards"></div>
+      <textarea id="fx-text" class="fx-textarea" placeholder="Paste factory contact details here — name, address, email, phone, WeChat, product categories, anything you have..."></textarea>
+      <button class="rfq-extract-btn" id="fx-extract-btn" onclick="fxExtract()">Extract &amp; Create Factory →</button>
+      <div id="fx-status" style="font-size:13px;color:#999;margin-top:10px;"></div>
+      <div id="fx-card"></div>
     </div>
-  </div><!-- /rfq-col (right: RFQ image intake) -->
+  </div><!-- /rfq-col (right: Factory from Text) -->
  </div><!-- /rfq-cols -->
 </div>
 
@@ -1189,137 +1188,91 @@ function escapeHtml(s){if(s==null)return '';return String(s).replace(/&/g,'&amp;
 
 </script>
 <script>
-// ── RFQ from Images (right column) — reuses global SB, KEY, g() from the main script ──
-var RFQ_IMAGES = [];   // { id, dataUrl, base64, mediaType, name, status }
-var RFQ_DRAFTS = [];   // { id, thumb, tenant_id, error, product_name, category, description, price, packaging_type, created }
-var RFQ_SEQ = 0;
+// ── Factory from Text (right column) — reuses global SB, KEY, g() from the main script ──
+function fxToken(){ return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
+function fxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+var FX_TENANT = null;
 
-function rfqAuthToken(){ return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
-function rfqEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-function rfqInit(){
-  var dz = g('rfq-drop'), fi = g('rfq-file-input');
-  if (!dz || !fi) return;
-  dz.addEventListener('click', function(e){
-    if (e.target.closest('.browse-btn') || e.target.closest('.rfq-extract-btn') || e.target.closest('.rfq-thumb')) return;
-    fi.click();
-  });
-  fi.addEventListener('change', function(){ rfqAddFiles(fi.files); fi.value=''; });
-  ['dragenter','dragover'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add('drag-over'); }); });
-  dz.addEventListener('dragleave', function(e){ if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over'); });
-  dz.addEventListener('drop', function(e){ e.preventDefault(); dz.classList.remove('drag-over'); rfqAddFiles(e.dataTransfer.files); });
-  document.addEventListener('paste', function(e){
-    var items = (e.clipboardData && e.clipboardData.items) || [], files = [];
-    for (var i=0;i<items.length;i++){ if (items[i].type && items[i].type.indexOf('image/')===0){ var f=items[i].getAsFile(); if (f) files.push(f); } }
-    if (files.length) rfqAddFiles(files);
-  });
-}
-
-function rfqAddFiles(fileList){
-  Array.prototype.slice.call(fileList || []).forEach(function(file){
-    if (!file || !/^image\/(jpeg|png|webp|gif)$/.test(file.type)) return;
-    var reader = new FileReader();
-    reader.onload = function(){
-      var dataUrl = reader.result || '';
-      RFQ_IMAGES.push({ id:'img'+(++RFQ_SEQ), dataUrl:dataUrl, base64:(String(dataUrl).split(',')[1]||''), mediaType:file.type||'image/jpeg', name:file.name||'image', status:'' });
-      rfqRenderThumbs();
-    };
-    reader.readAsDataURL(file);
-  });
-}
-
-function rfqRenderThumbs(){
-  var wrap = g('rfq-thumbs'); if (!wrap) return;
-  wrap.innerHTML = RFQ_IMAGES.map(function(im){
-    var spin = im.status==='processing' ? '<div class="rfq-thumb-spin"><div class="rfq-spinner"></div></div>' : '';
-    var x = im.status==='processing' ? '' : '<button class="rfq-thumb-x" onclick="rfqRemoveThumb(\''+im.id+'\')" title="Remove">×</button>';
-    return '<div class="rfq-thumb"><img src="'+im.dataUrl+'" alt="">'+x+spin+'</div>';
-  }).join('');
-  var btn = g('rfq-extract-btn'); if (btn) btn.style.display = RFQ_IMAGES.length ? 'inline-block' : 'none';
-}
-
-function rfqRemoveThumb(id){ RFQ_IMAGES = RFQ_IMAGES.filter(function(im){ return im.id!==id; }); rfqRenderThumbs(); }
-
-async function rfqExtractAll(){
-  if (!RFQ_IMAGES.length) return;
-  var btn = g('rfq-extract-btn'); if (btn){ btn.disabled = true; btn.textContent = 'Extracting…'; }
-  RFQ_IMAGES.forEach(function(im){ im.status = 'processing'; }); rfqRenderThumbs();
-  var token = rfqAuthToken();
-  var jobs = RFQ_IMAGES.map(function(im){
-    return fetch('/api/rfq-extract', { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+token }, body: JSON.stringify({ image: im.base64, mediaType: im.mediaType }) })
-      .then(function(r){ return r.json().catch(function(){ return { error:true, message:'Bad response' }; }); })
-      .then(function(d){ return { im:im, data:d }; })
-      .catch(function(){ return { im:im, data:{ error:true, message:'Connection error' } }; });
-  });
-  var results = await Promise.all(jobs);
-  RFQ_IMAGES.forEach(function(im){ im.status = ''; }); rfqRenderThumbs();
-  results.forEach(function(res){
-    var d = res.data || {};
-    RFQ_DRAFTS.push({
-      id: 'draft'+(++RFQ_SEQ), thumb: res.im.dataUrl, tenant_id: d.tenant_id || null,
-      error: d.error ? (d.message || 'Extraction failed') : '',
-      product_name: d.product_name || '', category: d.category || '',
-      description: d.short_description || '', price: (d.estimated_retail_price_usd != null ? d.estimated_retail_price_usd : ''),
-      packaging_type: d.packaging_type || null
-    });
-  });
-  // Clear processed images so the same batch isn't re-extracted; drafts are now below.
-  RFQ_IMAGES = []; rfqRenderThumbs();
-  rfqRenderCards();
-  if (btn){ btn.disabled = false; btn.textContent = 'Extract & Create RFQs →'; }
-}
-
-function rfqRenderCards(){
-  var wrap = g('rfq-cards'); if (!wrap) return;
-  wrap.innerHTML = RFQ_DRAFTS.map(function(c){
-    if (c.created) {
-      return '<div class="rfq-card created" id="'+c.id+'"><img class="rfq-card-thumb" src="'+c.thumb+'" alt="">'+
-        '<div class="rfq-card-body"><div style="font-weight:600;font-size:13px;">'+rfqEsc(c.product_name||'Draft RFQ')+'</div>'+
-        '<div class="rfq-card-msg" style="color:#1a7a1a;">✓ Created</div></div></div>';
-    }
-    var err = c.error ? '<div class="rfq-card-msg" style="color:#b00;">'+rfqEsc(c.error)+'</div>' : '';
-    return '<div class="rfq-card" id="'+c.id+'">'+
-      '<img class="rfq-card-thumb" src="'+c.thumb+'" alt="">'+
-      '<div class="rfq-card-body">'+
-        '<div class="rfq-field-label">Product Name</div><input class="rfq-input" id="'+c.id+'-name" value="'+rfqEsc(c.product_name)+'">'+
-        '<div class="rfq-field-label">Category</div><input class="rfq-input" id="'+c.id+'-cat" value="'+rfqEsc(c.category)+'">'+
-        '<div class="rfq-field-label">Description</div><textarea class="rfq-textarea" id="'+c.id+'-desc">'+rfqEsc(c.description)+'</textarea>'+
-        '<div class="rfq-field-label">Estimated Retail Price (USD)</div><input class="rfq-input" id="'+c.id+'-price" type="number" step="0.01" value="'+rfqEsc(c.price)+'">'+
-        err +
-        '<div class="rfq-card-actions">'+
-          '<button class="rfq-btn-create" onclick="rfqCreate(\''+c.id+'\')">✓ Create Draft RFQ</button>'+
-          '<button class="rfq-btn-discard" onclick="rfqDiscard(\''+c.id+'\')">✗ Discard</button>'+
-        '</div>'+
-        '<div class="rfq-card-msg" id="'+c.id+'-msg"></div>'+
-      '</div></div>';
-  }).join('');
-}
-
-function rfqDiscard(id){ RFQ_DRAFTS = RFQ_DRAFTS.filter(function(c){ return c.id!==id; }); rfqRenderCards(); }
-
-async function rfqCreate(id){
-  var c = RFQ_DRAFTS.filter(function(x){ return x.id===id; })[0];
-  if (!c) return;
-  var msg = g(id+'-msg');
-  var name = ((g(id+'-name')||{}).value || '').trim();
-  var cat = ((g(id+'-cat')||{}).value || '').trim();
-  var desc = ((g(id+'-desc')||{}).value || '').trim();
-  var priceRaw = (g(id+'-price')||{}).value || '';
-  var price = priceRaw === '' ? null : (parseFloat(priceRaw) || null);
-  if (!name){ if (msg){ msg.style.color='#b00'; msg.textContent='Product name is required.'; } return; }
-  if (msg){ msg.style.color='#888'; msg.textContent='Creating…'; }
-  var payload = { item_description: name, category: cat || null, detailed_specifications: desc || null, target_retail_price: price, status: 'draft' };
-  if (c.tenant_id) payload.tenant_id = c.tenant_id;
-  if (c.packaging_type) payload.packaging_type = c.packaging_type;
+async function fxExtract(){
+  var ta = g('fx-text'); var text = (ta && ta.value || '').trim();
+  var status = g('fx-status'), card = g('fx-card'), btn = g('fx-extract-btn');
+  if (!text){ if (status) status.textContent = 'Paste some factory text first.'; return; }
+  if (card) card.innerHTML = '';
+  if (status) status.innerHTML = '<span class="fx-spinner"></span> Extracting factory details...';
+  if (btn){ btn.disabled = true; btn.textContent = 'Extracting…'; }
   try {
-    var r = await fetch(SB+'/rest/v1/rfqs', { method:'POST', headers:{ 'apikey':KEY, 'Authorization':'Bearer '+KEY, 'Content-Type':'application/json', 'Prefer':'return=minimal' }, body: JSON.stringify(payload) });
-    if (!r.ok){ var e = await r.json().catch(function(){ return {}; }); if (msg){ msg.style.color='#b00'; msg.textContent = 'Failed: '+(e.message || e.details || r.status); } return; }
-    c.product_name = name; c.created = true; rfqRenderCards();
-  } catch (e){ if (msg){ msg.style.color='#b00'; msg.textContent='Connection error.'; } }
+    var r = await fetch('/api/factory-extract', { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + fxToken() }, body: JSON.stringify({ text: text }) });
+    var d = await r.json().catch(function(){ return { error:true }; });
+    if (!r.ok || !d || d.error){ if (status) status.textContent = (d && d.message) || 'Could not extract — please try again.'; return; }
+    FX_TENANT = d.tenant_id || null;
+    if (status) status.textContent = '';
+    fxRenderCard(d);
+  } catch (e){ if (status) status.textContent = 'Connection error. Please try again.'; }
+  finally { if (btn){ btn.disabled = false; btn.textContent = 'Extract & Create Factory →'; } }
 }
 
-rfqInit();
+function fxRenderCard(d){
+  var card = g('fx-card'); if (!card) return;
+  var cats = Array.isArray(d.product_categories) ? d.product_categories.join(', ') : (d.product_categories || '');
+  function fld(label, id, val){ return '<div class="rfq-field-label">' + label + '</div><input class="rfq-input" id="' + id + '" value="' + fxEsc(val) + '">'; }
+  card.innerHTML =
+    '<div class="fx-review">' +
+      fld('Factory name (English)', 'fx-f-name-en', d.factory_name_english || '') +
+      fld('Factory name (Chinese)', 'fx-f-name-zh', d.factory_name_chinese || '') +
+      fld('Contact name', 'fx-f-contact', d.contact_name || '') +
+      fld('Email', 'fx-f-email', d.email || '') +
+      fld('Phone', 'fx-f-phone', d.phone || '') +
+      fld('WeChat ID', 'fx-f-wechat', d.wechat_id || '') +
+      fld('Address', 'fx-f-address', d.address || '') +
+      fld('City', 'fx-f-city', d.city || '') +
+      fld('Country', 'fx-f-country', d.country || '') +
+      fld('Product categories (comma-separated)', 'fx-f-cats', cats) +
+      fld('Website', 'fx-f-website', d.website || '') +
+      '<div class="rfq-card-actions">' +
+        '<button class="rfq-btn-create" onclick="fxSave()">✓ Save Factory</button>' +
+        '<button class="rfq-btn-discard" onclick="fxDiscard()">✗ Discard</button>' +
+      '</div>' +
+      '<div class="rfq-card-msg" id="fx-save-msg"></div>' +
+    '</div>';
+}
+
+function fxDiscard(){ var card = g('fx-card'); if (card) card.innerHTML = ''; var s = g('fx-status'); if (s) s.textContent = ''; }
+
+async function fxSave(){
+  var msg = g('fx-save-msg');
+  function v(id){ return ((g(id) || {}).value || '').trim(); }
+  var nameEn = v('fx-f-name-en');
+  if (!nameEn){ if (msg){ msg.style.color = '#b00'; msg.textContent = 'Factory name (English) is required.'; } return; }
+  var catsRaw = v('fx-f-cats');
+  var cats = catsRaw ? catsRaw.split(',').map(function(c){ return c.trim(); }).filter(Boolean) : [];
+  var website = v('fx-f-website');
+  var notes = ['Added from pasted text.', website ? 'Website: ' + website : ''].filter(Boolean).join('\n');
+  var payload = {
+    factory_name_english: nameEn,
+    factory_name_local: v('fx-f-name-zh') || null,
+    sales_contact_name: v('fx-f-contact') || null,
+    sales_email: v('fx-f-email') || null,
+    sales_mobile: v('fx-f-phone') || null,
+    sales_wechat: v('fx-f-wechat') || null,
+    address: v('fx-f-address') || null,
+    city: v('fx-f-city') || null,
+    country: v('fx-f-country') || null,
+    product_categories: cats,
+    internal_notes: notes,
+    status: 'pending'
+  };
+  if (FX_TENANT) payload.tenant_id = FX_TENANT;
+  if (msg){ msg.style.color = '#888'; msg.textContent = 'Saving…'; }
+  try {
+    var r = await fetch(SB + '/rest/v1/factories', { method:'POST', headers:{ 'apikey':KEY, 'Authorization':'Bearer ' + KEY, 'Content-Type':'application/json', 'Prefer':'return=minimal' }, body: JSON.stringify(payload) });
+    if (!r.ok){ var e = await r.json().catch(function(){ return {}; }); if (msg){ msg.style.color = '#b00'; msg.textContent = 'Failed: ' + (e.message || e.details || r.status); } return; }
+    if (msg){ msg.style.color = '#1a7a1a'; msg.innerHTML = '✓ Saved — <a href="tenant-factories.html" style="color:#1a7a1a;text-decoration:underline;">view in Factories</a>'; }
+    var actions = document.querySelector('#fx-card .rfq-card-actions'); if (actions) actions.style.display = 'none';
+    var ta = g('fx-text'); if (ta) ta.value = '';
+  } catch (e){ if (msg){ msg.style.color = '#b00'; msg.textContent = 'Connection error.'; } }
+}
 </script>
+<script>
 <script src="admin-shared.js"></script>
 </body>
 </html>

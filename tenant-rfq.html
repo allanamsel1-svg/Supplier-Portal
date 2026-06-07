@@ -43,7 +43,6 @@
   .nr-img-status{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:7px;}
   .nr-img-spinner{width:14px;height:14px;border:2px solid rgba(120,120,120,0.3);border-top-color:var(--text);border-radius:50%;animation:nrimgspin 0.7s linear infinite;display:inline-block;}
   @keyframes nrimgspin{to{transform:rotate(360deg);}}
-  .nr-img-queue{display:none;align-items:center;justify-content:space-between;gap:10px;background:rgba(59,130,246,0.08);border:1px solid #3b82f6;border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12.5px;color:var(--text);}
 </style>
 </head>
 <body>
@@ -107,10 +106,6 @@
           <div class="nr-img-thumb-wrap"><img id="nr-img-thumb" class="nr-img-thumb" alt=""><button type="button" class="nr-img-x" id="nr-img-x" title="Remove">×</button></div>
           <span class="nr-img-status" id="nr-img-status"></span>
         </div>
-      </div>
-      <div class="nr-img-queue" id="nr-img-queue">
-        <span id="nr-img-queue-label"></span>
-        <button type="button" class="nr-btn alt" id="nr-img-skip" style="padding:4px 10px;font-size:12px;" onclick="nrImgSkip()">✗ Discard this item</button>
       </div>
       <div class="rfq-sec"><h3>1 · Product Information</h3>
         <div class="nr-grid">
@@ -229,8 +224,8 @@ function nrCategoryChange() {
   nrSelectedFactories = [];
 }
 // ── New RFQ image auto-fill (optional) — posts to /api/rfq-extract and fills the form ──
-// May detect MULTIPLE products in one image; each becomes a pre-filled modal, shown in a queue.
-let _nrImgWired = false, _nrImgQueue = [], _nrImgTotal = 0, _nrImgShown = 0;
+// One image at a time: extract a single product (the first if the API returns an array).
+let _nrImgWired = false;
 function nrImgToken() { return localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || ''; }
 function nrImgWire() {
   if (_nrImgWired) return;
@@ -250,7 +245,6 @@ function nrImgReset() {
   if (l) l.style.display = 'none';
   if (s) s.innerHTML = '';
   if (t) t.src = '';
-  const q = nrg('nr-img-queue'); if (q) q.style.display = 'none';
   const note = nrg('nr-factory-note-wrap'); if (note) note.style.display = 'none';
 }
 // Document-level paste handler — added only while the modal is open. Images only.
@@ -297,57 +291,30 @@ async function nrImgExtract(base64, mediaType) {
     const r = await fetch('/api/rfq-extract', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + nrImgToken() }, body: JSON.stringify({ image: base64, mediaType }) });
     const d = await r.json().catch(() => ({ error: true }));
     if (!r.ok || !d || d.error) { if (s) s.textContent = 'Could not extract — please fill in manually'; return; }
-    const items = Array.isArray(d.items) ? d.items.filter(x => x && typeof x === 'object') : [];
-    if (!items.length) { if (s) s.textContent = 'No products detected — please fill in manually'; return; }
-    _nrImgQueue = items.slice();
-    _nrImgTotal = items.length;
-    _nrImgShown = 1;
-    nrImgApply(_nrImgQueue.shift());   // fill the first item into the already-open modal
-    nrImgShowQueue();
-    if (s) s.textContent = items.length > 1 ? ('✓ ' + items.length + ' products detected — review item 1 below') : '✓ Fields auto-filled — review & edit below';
+    nrImgApply(d);
+    if (s) s.textContent = '✓ Fields auto-filled — review & edit below';
   } catch (e) { if (s) s.textContent = 'Could not extract — please fill in manually'; }
 }
+// Reads the first product whether the API returns { items: [...] } or a single object.
 function nrImgApply(d) {
   if (!d) return;
-  if (d.product_name) { const el = nrg('nr-desc'); if (el) el.value = d.product_name; }
-  if (d.short_description) { const el = nrg('nr-spec'); if (el) el.value = d.short_description; }
-  if (d.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = d.packaging_type; }
-  if (d.category) {
+  const it = (d.items && d.items[0]) ? d.items[0] : d;
+  if (it.product_name) { const el = nrg('nr-desc'); if (el) el.value = it.product_name; }
+  if (it.short_description) { const el = nrg('nr-spec'); if (el) el.value = it.short_description; }
+  if (it.packaging_type) { const el = nrg('nr-pkg-primary'); if (el) el.value = it.packaging_type; }
+  if (it.category) {
     const sel = nrg('nr-category');
     if (sel) {
-      const want = String(d.category).toLowerCase();
+      const want = String(it.category).toLowerCase();
       const match = rfqCategories.find(c => c.toLowerCase() === want) || rfqCategories.find(c => c.toLowerCase().indexOf(want) !== -1 || want.indexOf(c.toLowerCase()) !== -1);
       if (match) { sel.value = match; nrCategoryChange(); }
     }
   }
   const noteWrap = nrg('nr-factory-note-wrap'), noteText = nrg('nr-factory-note-text');
   if (noteWrap && noteText) {
-    if (d.recommended_factory_type) { noteText.textContent = d.recommended_factory_type; noteWrap.style.display = ''; }
+    if (it.recommended_factory_type) { noteText.textContent = it.recommended_factory_type; noteWrap.style.display = ''; }
     else { noteWrap.style.display = 'none'; }
   }
-}
-// Multi-item queue: one pre-filled modal per detected product (save or discard, then the next).
-function nrImgShowQueue() {
-  const banner = nrg('nr-img-queue'), label = nrg('nr-img-queue-label');
-  if (_nrImgTotal > 1 && banner) { if (label) label.textContent = '📦 Item ' + _nrImgShown + ' of ' + _nrImgTotal + ' detected — review, then save or discard.'; banner.style.display = 'flex'; }
-  else if (banner) { banner.style.display = 'none'; }
-}
-function nrImgFillNext() {
-  if (!_nrImgQueue.length) { nrImgEndFlow(); return; }
-  const item = _nrImgQueue.shift();
-  _nrImgShown++;
-  openNewRfqModal();      // full field reset; keeps the modal open. Queue state survives.
-  nrImgApply(item);
-  nrImgShowQueue();
-}
-function nrImgSkip() {
-  if (_nrImgQueue.length) { nrImgFillNext(); }
-  else { nrImgEndFlow(); nrImgReset(); }   // discarded the last item — end the flow, leave modal open
-}
-function nrImgEndFlow() {
-  _nrImgQueue = []; _nrImgTotal = 0; _nrImgShown = 0;
-  const banner = nrg('nr-img-queue'); if (banner) banner.style.display = 'none';
-  const noteWrap = nrg('nr-factory-note-wrap'); if (noteWrap) noteWrap.style.display = 'none';
 }
 
 function openNewRfqModal(prefill) {
@@ -380,7 +347,7 @@ function openNewRfqModal(prefill) {
   nrg('rfqDrawerBg').classList.add('open');
   setTimeout(() => { try { nrg('nr-desc').focus(); } catch (e) {} }, 80);
 }
-function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); nrImgEndFlow(); }
+function closeNewRfqModal() { nrg('rfqDrawerBg').classList.remove('open'); document.removeEventListener('paste', nrImgPaste); }
 async function findMatchingFactories() {
   const cat = nrg('nr-category').value;
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
@@ -435,10 +402,8 @@ async function saveNewRfq(status) {
   } catch (e) { ok = false; }
   dBtn.disabled = false; sBtn.disabled = false;
   if (!ok) { err.textContent = 'Could not save the RFQ. Please try again.'; return; }
-  await loadRFQs();
-  // Multi-item image flow: keep the modal open and load the next detected item.
-  if (_nrImgQueue.length) { err.textContent = ''; nrImgFillNext(); return; }
   closeNewRfqModal();
+  await loadRFQs();
   showTab('rfq');
 }
 // Cosmetic checkbox manual override flag.
