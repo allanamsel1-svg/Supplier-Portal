@@ -1030,8 +1030,13 @@ async function saveNewRfq(status) {
     est_unit_height_cm: nrDimToNum('nr-dim-h', 'nr-dim-unit'),
     est_unit_length_cm: nrDimToNum('nr-dim-l', 'nr-dim-unit'),
     inner_case_pack: num('nr-inner'), master_case_pack: num('nr-master'),
-    packaging_primary: nrSelOrOther('nr-pkg-primary') || null, packaging_closures: nrSelOrOther('nr-pkg-closure') || null,
-    packaging_secondary: nrSelOrOther('nr-pkg-secondary') || null, packaging_finish: nrSelOrOther('nr-pkg-finish') || null,
+    packaging_primary: nrSelOrOther('nr-pkg-primary') || null,
+    // packaging_closures and packaging_secondary are text[] columns in rfqs — wrap the single
+    // selected value as an array (e.g. ["Rigid setup box"]); a bare string fails with
+    // "malformed array literal". packaging_primary/finish are plain text and stay strings.
+    packaging_closures: (nrSelOrOther('nr-pkg-closure') ? [nrSelOrOther('nr-pkg-closure')] : null),
+    packaging_secondary: (nrSelOrOther('nr-pkg-secondary') ? [nrSelOrOther('nr-pkg-secondary')] : null),
+    packaging_finish: nrSelOrOther('nr-pkg-finish') || null,
     packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
     is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
     product_docs_required: txt('nr-docs'),
@@ -1199,8 +1204,10 @@ async function openRFQ(id) {
     setV('nr-inner', r.inner_case_pack);
     setV('nr-master', r.master_case_pack);
     nrSetSelOrOther('nr-pkg-primary', r.packaging_primary);
-    nrSetSelOrOther('nr-pkg-closure', r.packaging_closures);
-    nrSetSelOrOther('nr-pkg-secondary', r.packaging_secondary);
+    // packaging_closures / packaging_secondary come back as text[] arrays — unwrap to the
+    // first value so the select can re-match its option (instead of falling to "Other").
+    nrSetSelOrOther('nr-pkg-closure', Array.isArray(r.packaging_closures) ? r.packaging_closures[0] : r.packaging_closures);
+    nrSetSelOrOther('nr-pkg-secondary', Array.isArray(r.packaging_secondary) ? r.packaging_secondary[0] : r.packaging_secondary);
     nrSetSelOrOther('nr-pkg-finish', r.packaging_finish);
     setV('nr-pkg-color', r.packaging_color);
     setV('nr-pkg-notes', r.packaging_notes);
