@@ -135,12 +135,14 @@
             <select id="nr-cat-l2" onchange="nrCatL2Change()">
               <option value="">Select sub-category...</option>
             </select>
+            <input id="nr-cat-l2-input" placeholder="Type sub-category (optional)" style="display:none;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;">
           </div>
           <div class="nr-field" id="nr-cat-l3-wrap" style="display:none;">
             <label>Sub-Sub-Category</label>
-            <select id="nr-cat-l3">
+            <select id="nr-cat-l3" onchange="nrCatL3Change()">
               <option value="">Select (optional)...</option>
             </select>
+            <input id="nr-cat-l3-input" placeholder="Type sub-sub-category (optional)" style="display:none;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;">
           </div>
           <div class="nr-field"><label>Unit type</label><select id="nr-unit"><option>Each</option><option>Pair</option><option>Set</option><option>Pack</option></select></div>
         </div>
@@ -403,38 +405,99 @@ async function nrLoadCategoryTree() {
   if (cur && cur !== '__other__') sel.value = cur;
 }
 
+// Current sub / sub-sub value, reading from whichever control (select or text input) is visible.
+function nrCatL2Value() {
+  const inp = nrg('nr-cat-l2-input');
+  if (inp && inp.style.display !== 'none') return (inp.value || '').trim();
+  const sel = nrg('nr-cat-l2'); const v = sel ? sel.value : '';
+  return (v && v !== '__new__') ? v : '';
+}
+function nrCatL3Value() {
+  const inp = nrg('nr-cat-l3-input');
+  if (inp && inp.style.display !== 'none') return (inp.value || '').trim();
+  const sel = nrg('nr-cat-l3'); const v = sel ? sel.value : '';
+  return (v && v !== '__new__') ? v : '';
+}
+// Show the L3 wrap as a free-text input (used when the sub is brand-new / has no children).
+function nrCatShowL3Input(show) {
+  const l3wrap = nrg('nr-cat-l3-wrap'), l3sel = nrg('nr-cat-l3'), l3inp = nrg('nr-cat-l3-input');
+  if (!l3wrap) return;
+  if (show) { if (l3sel) l3sel.style.display = 'none'; if (l3inp) { l3inp.style.display = ''; } l3wrap.style.display = ''; }
+}
+
 function nrCatL1Change() {
   const v = nrg('nr-cat-l1').value;
   if (v === '__other__') { nrCatModalOpen(); return; }
-  const l2wrap = nrg('nr-cat-l2-wrap'), l2sel = nrg('nr-cat-l2'), l3wrap = nrg('nr-cat-l3-wrap');
-  l2sel.innerHTML = '<option value="">Select sub-category...</option>';
-  l3wrap.style.display = 'none';
-  nrg('nr-cat-l3').innerHTML = '<option value="">Select (optional)...</option>';
+  const l2wrap = nrg('nr-cat-l2-wrap'), l2sel = nrg('nr-cat-l2'), l2inp = nrg('nr-cat-l2-input');
+  const l3wrap = nrg('nr-cat-l3-wrap'), l3sel = nrg('nr-cat-l3'), l3inp = nrg('nr-cat-l3-input');
+  // Reset L3
+  if (l3wrap) l3wrap.style.display = 'none';
+  if (l3sel) { l3sel.innerHTML = '<option value="">Select (optional)...</option>'; l3sel.style.display = ''; }
+  if (l3inp) { l3inp.value = ''; l3inp.style.display = 'none'; }
+  // Reset L2
+  l2sel.innerHTML = '<option value="">Select sub-category...</option>'; l2sel.style.display = '';
+  if (l2inp) { l2inp.value = ''; l2inp.style.display = 'none'; }
   if (!v) { l2wrap.style.display = 'none'; nrCategoryChange(); return; }
+  l2wrap.style.display = '';   // L2 area always shown once a category is chosen
   const subs = [...new Set((window.nrCatTree || []).filter(r => r.category === v && r.sub_category).map(r => r.sub_category))];
-  if (!subs.length) { l2wrap.style.display = 'none'; nrCategoryChange(); return; }
-  subs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l2sel.appendChild(o); });
-  l2wrap.style.display = '';
+  if (subs.length) {
+    subs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l2sel.appendChild(o); });
+    const o = document.createElement('option'); o.value = '__new__'; o.text = '+ Add new sub-category'; l2sel.appendChild(o);
+  } else {
+    // No existing sub-categories → free-text optional sub + sub-sub
+    l2sel.style.display = 'none'; if (l2inp) l2inp.style.display = '';
+    nrCatShowL3Input(true);
+  }
   nrCategoryChange();
 }
 
 function nrCatL2Change() {
-  const l1 = nrg('nr-cat-l1').value, l2 = nrg('nr-cat-l2').value;
-  const l3wrap = nrg('nr-cat-l3-wrap'), l3sel = nrg('nr-cat-l3');
-  l3sel.innerHTML = '<option value="">Select (optional)...</option>';
-  if (!l2) { l3wrap.style.display = 'none'; return; }
+  const l2sel = nrg('nr-cat-l2'), l2inp = nrg('nr-cat-l2-input');
+  // "+ Add new sub-category" → swap select for a text input
+  if (l2sel && l2sel.style.display !== 'none' && l2sel.value === '__new__') {
+    l2sel.style.display = 'none'; if (l2inp) { l2inp.value = ''; l2inp.style.display = ''; l2inp.focus(); }
+    nrCatShowL3Input(true);
+    return;
+  }
+  const l1 = nrg('nr-cat-l1').value, l2 = nrCatL2Value();
+  const l3wrap = nrg('nr-cat-l3-wrap'), l3sel = nrg('nr-cat-l3'), l3inp = nrg('nr-cat-l3-input');
+  if (l3sel) { l3sel.innerHTML = '<option value="">Select (optional)...</option>'; l3sel.style.display = ''; }
+  if (l3inp) { l3inp.value = ''; l3inp.style.display = 'none'; }
+  if (!l2) { if (l3wrap) l3wrap.style.display = 'none'; return; }
   const subsubs = [...new Set((window.nrCatTree || []).filter(r => r.category === l1 && r.sub_category === l2 && r.sub_sub_category).map(r => r.sub_sub_category))];
-  if (!subsubs.length) { l3wrap.style.display = 'none'; return; }
-  subsubs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l3sel.appendChild(o); });
-  l3wrap.style.display = '';
+  if (subsubs.length) {
+    subsubs.forEach(s => { const o = document.createElement('option'); o.value = s; o.text = s; l3sel.appendChild(o); });
+    const o = document.createElement('option'); o.value = '__new__'; o.text = '+ Add new sub-sub-category'; l3sel.appendChild(o);
+    l3sel.style.display = ''; if (l3inp) l3inp.style.display = 'none'; l3wrap.style.display = '';
+  } else {
+    // No existing sub-sub-categories → free-text optional
+    if (l3sel) l3sel.style.display = 'none'; if (l3inp) l3inp.style.display = ''; l3wrap.style.display = '';
+  }
+}
+
+function nrCatL3Change() {
+  const l3sel = nrg('nr-cat-l3'), l3inp = nrg('nr-cat-l3-input');
+  if (l3sel && l3sel.style.display !== 'none' && l3sel.value === '__new__') {
+    l3sel.style.display = 'none'; if (l3inp) { l3inp.value = ''; l3inp.style.display = ''; l3inp.focus(); }
+  }
 }
 
 // Set the full cascade to a known path (used by draft edit + picker selection).
 function nrCatSetPath(cat, sub, subsub) {
   const l1 = nrg('nr-cat-l1'); if (!l1 || !cat) return;
   l1.value = cat; nrCatL1Change();
-  if (sub) { const l2 = nrg('nr-cat-l2'); if (l2) { l2.value = sub; nrCatL2Change(); } }
-  if (subsub) { const l3 = nrg('nr-cat-l3'); if (l3) l3.value = subsub; }
+  if (sub) {
+    const l2sel = nrg('nr-cat-l2'), l2inp = nrg('nr-cat-l2-input');
+    const hasOpt = l2sel && Array.prototype.some.call(l2sel.options, o => o.value === sub);
+    if (hasOpt) { l2sel.value = sub; l2sel.style.display = ''; if (l2inp) l2inp.style.display = 'none'; nrCatL2Change(); }
+    else { if (l2sel) l2sel.style.display = 'none'; if (l2inp) { l2inp.style.display = ''; l2inp.value = sub; } nrCatShowL3Input(true); }
+  }
+  if (subsub) {
+    const l3sel = nrg('nr-cat-l3'), l3inp = nrg('nr-cat-l3-input'), l3wrap = nrg('nr-cat-l3-wrap');
+    const hasOpt = l3sel && Array.prototype.some.call(l3sel.options, o => o.value === subsub);
+    if (hasOpt) { l3sel.value = subsub; l3sel.style.display = ''; if (l3inp) l3inp.style.display = 'none'; }
+    else { if (l3sel) l3sel.style.display = 'none'; if (l3inp) { l3inp.style.display = ''; l3inp.value = subsub; } if (l3wrap) l3wrap.style.display = ''; }
+  }
 }
 
 // AI auto-suggest: match a single category string against any level and select the cascade.
@@ -806,8 +869,10 @@ function openNewRfqModal(prefill) {
   nrg('nr-factory-list').innerHTML = ''; nrSelectedFactories = [];
   // Reset the 3-level category cascade
   { const l1 = nrg('nr-cat-l1'); if (l1) l1.value = '';
-    const l2 = nrg('nr-cat-l2'); if (l2) l2.innerHTML = '<option value="">Select sub-category...</option>';
-    const l3 = nrg('nr-cat-l3'); if (l3) l3.innerHTML = '<option value="">Select (optional)...</option>';
+    const l2 = nrg('nr-cat-l2'); if (l2) { l2.innerHTML = '<option value="">Select sub-category...</option>'; l2.style.display = ''; }
+    const l3 = nrg('nr-cat-l3'); if (l3) { l3.innerHTML = '<option value="">Select (optional)...</option>'; l3.style.display = ''; }
+    const l2i = nrg('nr-cat-l2-input'); if (l2i) { l2i.value = ''; l2i.style.display = 'none'; }
+    const l3i = nrg('nr-cat-l3-input'); if (l3i) { l3i.value = ''; l3i.style.display = 'none'; }
     const l2w = nrg('nr-cat-l2-wrap'); if (l2w) l2w.style.display = 'none';
     const l3w = nrg('nr-cat-l3-wrap'); if (l3w) l3w.style.display = 'none'; }
   if (prefill && prefill.category) nrCatAutoSelect(prefill.category);
@@ -858,8 +923,8 @@ async function saveNewRfq(status) {
   if (ME_EMAIL) extras.push('Submitted by: ' + ME_EMAIL);   // rfqs has no created_by column
   if (extras.length) spec = (spec ? spec + '\n\n' : '') + extras.join('\n');
   const catL1 = (nrg('nr-cat-l1') || {}).value || null;
-  const catL2 = (nrg('nr-cat-l2') || {}).value || null;
-  const catL3 = (nrg('nr-cat-l3') || {}).value || null;
+  const catL2 = nrCatL2Value();   // reads select OR text input, whichever is visible
+  const catL3 = nrCatL3Value();
   const body = {
     tenant_id: TID, item_description: desc,
     category: (catL1 && catL1 !== '__other__') ? catL1 : null,

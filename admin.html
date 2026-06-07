@@ -1149,11 +1149,13 @@
                   <select id="ax-cat-l2" onchange="axCatL2Change()" style="width:100%;">
                     <option value="">Select sub-category...</option>
                   </select>
+                  <input id="ax-cat-l2-input" placeholder="Type sub-category (optional)" style="display:none;width:100%;margin-top:6px;border-color:#c8b8f0;" />
                 </div>
                 <div id="ax-cat-l3-wrap" style="display:none;margin-top:6px;">
                   <select id="ax-cat-l3" onchange="axCatL3Change()" style="width:100%;">
                     <option value="">Select (optional)...</option>
                   </select>
+                  <input id="ax-cat-l3-input" placeholder="Type sub-sub-category (optional)" style="display:none;width:100%;margin-top:6px;border-color:#c8b8f0;" />
                 </div>
               </div>
               <div class="mf">
@@ -6037,7 +6039,7 @@ async function populateRFQEditForm(rfq){
   g('rfq-form-title').textContent='Edit RFQ';
   g('rfq-project-number').textContent=rfq.project_number||'';
   g('rfq-id').value=rfq.id||'';
-  axCatSetFromId(rfq.category_id||'');
+  axCatLoadFromRfq(rfq);
   // Set cosmetic checkbox to current RFQ value, mark as user-overridden so category change doesn't reset it
   var cosCb=g('rfq-is-cosmetic');
   if(cosCb){cosCb.checked=!!rfq.is_cosmetic;cosCb.dataset.userOverride='true';}
@@ -6146,7 +6148,7 @@ async function openRFQForm(id){
   if(typeof axResetTool==='function')axResetTool();
   await populateRFQDropdowns();
   // Fill form fields
-  axCatSetFromId(rfq.category_id||'');
+  axCatLoadFromRfq(rfq);
   g('rfq-uom').value=rfq.unit_of_measure||'';
   g('rfq-description').value=rfq.item_description||'';
   g('rfq-specs').value=rfq.detailed_specifications||'';
@@ -6320,60 +6322,112 @@ function axCatRow(){
   var id=(g('rfq-category-id')||{}).value;
   return id?((allCategories||[]).find(function(c){return c.id===id;})||null):null;
 }
+// Current sub / sub-sub value, reading from whichever control (select or text input) is visible.
+function axCatL2Value(){ var inp=g('ax-cat-l2-input'); if(inp&&inp.style.display!=='none')return (inp.value||'').trim(); var sel=g('ax-cat-l2'); var v=sel?sel.value:''; return (v&&v!=='__new__')?v:''; }
+function axCatL3Value(){ var inp=g('ax-cat-l3-input'); if(inp&&inp.style.display!=='none')return (inp.value||'').trim(); var sel=g('ax-cat-l3'); var v=sel?sel.value:''; return (v&&v!=='__new__')?v:''; }
+function axCatShowL3Input(show){ var w=g('ax-cat-l3-wrap'), s=g('ax-cat-l3'), i=g('ax-cat-l3-input'); if(!w)return; if(show){ if(s)s.style.display='none'; if(i)i.style.display=''; w.style.display=''; } }
 function axCatResolveId(){
+  var hid=g('rfq-category-id'); if(!hid)return;
   var l1=(g('ax-cat-l1')||{}).value||'';
-  var hid=g('rfq-category-id');
-  if(l1==='__other__'||!l1){ if(hid)hid.value=''; return; }
-  var l2=(g('ax-cat-l2')||{}).value||'';
-  var l3=(g('ax-cat-l3')||{}).value||'';
-  var row=(allCategories||[]).find(function(c){
-    return (c.category||'')===l1 && ((c.sub_category||'')===(l2||'')) && ((c.sub_sub_category||'')===(l3||''));
-  });
-  if(hid)hid.value=row?row.id:'';
+  if(l1==='__other__'||!l1){ hid.value=''; return; }
+  var l2=axCatL2Value(), l3=axCatL3Value();
+  function find(c,s,ss){ return (allCategories||[]).find(function(r){ return (r.category||'')===c && ((r.sub_category||'')===(s||'')) && ((r.sub_sub_category||'')===(ss||'')); }); }
+  // Deepest existing match; fall back to the closest ancestor that exists (typed-new sub/sub-sub still links to its parent).
+  var row=find(l1,l2,l3) || (l3?find(l1,l2,''):null) || (l2?find(l1,'',''):null);
+  hid.value=row?row.id:'';
 }
 function axCatL1Change(){
   var v=(g('ax-cat-l1')||{}).value;
   if(v==='__other__'){ axCatModalOpen(); return; }
-  var l2wrap=g('ax-cat-l2-wrap'), l2sel=g('ax-cat-l2'), l3wrap=g('ax-cat-l3-wrap');
-  l2sel.innerHTML='<option value="">Select sub-category...</option>';
-  l3wrap.style.display='none'; g('ax-cat-l3').innerHTML='<option value="">Select (optional)...</option>';
-  if(v){
-    var subs=[]; var seen={};
-    (allCategories||[]).forEach(function(r){ if(r.category===v&&r.sub_category&&!seen[r.sub_category]){seen[r.sub_category]=1; var o=document.createElement('option');o.value=r.sub_category;o.text=r.sub_category;l2sel.appendChild(o); subs.push(r.sub_category);} });
-    l2wrap.style.display=subs.length?'':'none';
-  } else { l2wrap.style.display='none'; }
+  var l2wrap=g('ax-cat-l2-wrap'), l2sel=g('ax-cat-l2'), l2inp=g('ax-cat-l2-input');
+  var l3wrap=g('ax-cat-l3-wrap'), l3sel=g('ax-cat-l3'), l3inp=g('ax-cat-l3-input');
+  if(l3wrap)l3wrap.style.display='none';
+  if(l3sel){ l3sel.innerHTML='<option value="">Select (optional)...</option>'; l3sel.style.display=''; }
+  if(l3inp){ l3inp.value=''; l3inp.style.display='none'; }
+  l2sel.innerHTML='<option value="">Select sub-category...</option>'; l2sel.style.display='';
+  if(l2inp){ l2inp.value=''; l2inp.style.display='none'; }
+  if(!v){ l2wrap.style.display='none'; axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged(); return; }
+  l2wrap.style.display='';
+  var subs=[]; var seen={};
+  (allCategories||[]).forEach(function(r){ if(r.category===v&&r.sub_category&&!seen[r.sub_category]){seen[r.sub_category]=1; var o=document.createElement('option');o.value=r.sub_category;o.text=r.sub_category;l2sel.appendChild(o); subs.push(r.sub_category);} });
+  if(subs.length){
+    var on=document.createElement('option');on.value='__new__';on.text='+ Add new sub-category';l2sel.appendChild(on);
+  } else {
+    l2sel.style.display='none'; if(l2inp)l2inp.style.display='';
+    axCatShowL3Input(true);
+  }
   axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged();
 }
 function axCatL2Change(){
-  var l1=(g('ax-cat-l1')||{}).value, l2=(g('ax-cat-l2')||{}).value;
-  var l3wrap=g('ax-cat-l3-wrap'), l3sel=g('ax-cat-l3');
-  l3sel.innerHTML='<option value="">Select (optional)...</option>';
-  if(l2){
-    var ss=[]; var seen={};
-    (allCategories||[]).forEach(function(r){ if(r.category===l1&&r.sub_category===l2&&r.sub_sub_category&&!seen[r.sub_sub_category]){seen[r.sub_sub_category]=1; var o=document.createElement('option');o.value=r.sub_sub_category;o.text=r.sub_sub_category;l3sel.appendChild(o); ss.push(r.sub_sub_category);} });
-    l3wrap.style.display=ss.length?'':'none';
-  } else { l3wrap.style.display='none'; }
+  var l2sel=g('ax-cat-l2'), l2inp=g('ax-cat-l2-input');
+  if(l2sel&&l2sel.style.display!=='none'&&l2sel.value==='__new__'){
+    l2sel.style.display='none'; if(l2inp){ l2inp.value=''; l2inp.style.display=''; l2inp.focus(); }
+    axCatShowL3Input(true);
+    axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged(); return;
+  }
+  var l1=(g('ax-cat-l1')||{}).value, l2=axCatL2Value();
+  var l3wrap=g('ax-cat-l3-wrap'), l3sel=g('ax-cat-l3'), l3inp=g('ax-cat-l3-input');
+  if(l3sel){ l3sel.innerHTML='<option value="">Select (optional)...</option>'; l3sel.style.display=''; }
+  if(l3inp){ l3inp.value=''; l3inp.style.display='none'; }
+  if(!l2){ if(l3wrap)l3wrap.style.display='none'; axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged(); return; }
+  var ss=[]; var seen={};
+  (allCategories||[]).forEach(function(r){ if(r.category===l1&&r.sub_category===l2&&r.sub_sub_category&&!seen[r.sub_sub_category]){seen[r.sub_sub_category]=1; var o=document.createElement('option');o.value=r.sub_sub_category;o.text=r.sub_sub_category;l3sel.appendChild(o); ss.push(r.sub_sub_category);} });
+  if(ss.length){
+    var on=document.createElement('option');on.value='__new__';on.text='+ Add new sub-sub-category';l3sel.appendChild(on);
+    l3sel.style.display=''; if(l3inp)l3inp.style.display='none'; l3wrap.style.display='';
+  } else {
+    if(l3sel)l3sel.style.display='none'; if(l3inp)l3inp.style.display=''; l3wrap.style.display='';
+  }
   axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged();
 }
-function axCatL3Change(){ axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged(); }
+function axCatL3Change(){
+  var l3sel=g('ax-cat-l3'), l3inp=g('ax-cat-l3-input');
+  if(l3sel&&l3sel.style.display!=='none'&&l3sel.value==='__new__'){
+    l3sel.style.display='none'; if(l3inp){ l3inp.value=''; l3inp.style.display=''; l3inp.focus(); }
+  }
+  axCatResolveId(); if(typeof rfqCategoryChanged==='function')rfqCategoryChanged();
+}
 function axCatReset(){
   var l1=g('ax-cat-l1'); if(l1)l1.value='';
-  var l2=g('ax-cat-l2'); if(l2)l2.innerHTML='<option value="">Select sub-category...</option>';
-  var l3=g('ax-cat-l3'); if(l3)l3.innerHTML='<option value="">Select (optional)...</option>';
+  var l2=g('ax-cat-l2'); if(l2){ l2.innerHTML='<option value="">Select sub-category...</option>'; l2.style.display=''; }
+  var l3=g('ax-cat-l3'); if(l3){ l3.innerHTML='<option value="">Select (optional)...</option>'; l3.style.display=''; }
+  var l2i=g('ax-cat-l2-input'); if(l2i){ l2i.value=''; l2i.style.display='none'; }
+  var l3i=g('ax-cat-l3-input'); if(l3i){ l3i.value=''; l3i.style.display='none'; }
   var l2w=g('ax-cat-l2-wrap'); if(l2w)l2w.style.display='none';
   var l3w=g('ax-cat-l3-wrap'); if(l3w)l3w.style.display='none';
   var hid=g('rfq-category-id'); if(hid)hid.value='';
+}
+// Set the cascade to a known path (text columns) — used by edit load + picker selection. Handles typed-new values.
+function axCatSetFromPath(cat, sub, subsub){
+  axCatReset();
+  if(!cat)return;
+  axCatPopulateL1();
+  var l1=g('ax-cat-l1'); if(l1)l1.value=cat; axCatL1Change();
+  if(sub){
+    var l2sel=g('ax-cat-l2'), l2inp=g('ax-cat-l2-input');
+    var hasOpt=l2sel&&Array.prototype.some.call(l2sel.options,function(o){return o.value===sub;});
+    if(hasOpt){ l2sel.value=sub; l2sel.style.display=''; if(l2inp)l2inp.style.display='none'; axCatL2Change(); }
+    else { if(l2sel)l2sel.style.display='none'; if(l2inp){ l2inp.style.display=''; l2inp.value=sub; } axCatShowL3Input(true); }
+  }
+  if(subsub){
+    var l3sel=g('ax-cat-l3'), l3inp=g('ax-cat-l3-input'), l3w=g('ax-cat-l3-wrap');
+    var hasOpt3=l3sel&&Array.prototype.some.call(l3sel.options,function(o){return o.value===subsub;});
+    if(hasOpt3){ l3sel.value=subsub; l3sel.style.display=''; if(l3inp)l3inp.style.display='none'; }
+    else { if(l3sel)l3sel.style.display='none'; if(l3inp){ l3inp.style.display=''; l3inp.value=subsub; } if(l3w)l3w.style.display=''; }
+  }
+  axCatResolveId();
 }
 function axCatSetFromId(id){
   axCatReset();
   if(!id)return;
   var row=(allCategories||[]).find(function(c){return c.id===id;});
   if(!row){ var hid=g('rfq-category-id'); if(hid)hid.value=id; return; }
-  axCatPopulateL1();
-  g('ax-cat-l1').value=row.category||''; axCatL1Change();
-  if(row.sub_category){ g('ax-cat-l2').value=row.sub_category; axCatL2Change(); }
-  if(row.sub_sub_category){ g('ax-cat-l3').value=row.sub_sub_category; }
-  axCatResolveId();
+  axCatSetFromPath(row.category, row.sub_category, row.sub_sub_category);
+}
+// Prefer the stored text columns (round-trips typed-new values); fall back to category_id.
+function axCatLoadFromRfq(rfq){
+  if(rfq && rfq.category) axCatSetFromPath(rfq.category, rfq.sub_category, rfq.sub_sub_category);
+  else axCatSetFromId((rfq && rfq.category_id) || '');
 }
 function axCatAutoSelect(catString){
   if(!catString||!allCategories)return;
@@ -7500,9 +7554,9 @@ async function saveRFQ(action){
     detailed_specifications:g('rfq-specs').value.trim()||null,
     brand_id:brandId||null,
     category_id:catId||null,
-    category:catRow?catRow.category:null,
-    sub_category:catRow?catRow.sub_category:null,
-    sub_sub_category:catRow?catRow.sub_sub_category:null,
+    category:((g('ax-cat-l1')&&g('ax-cat-l1').value!=='__other__')?(g('ax-cat-l1').value||null):null),
+    sub_category:axCatL2Value()||null,
+    sub_sub_category:axCatL3Value()||null,
     unit_type:g('rfq-unit-type').value||'each',
     product_size:g('rfq-product-size').value==='N/A'?null:g('rfq-product-size').value||null,
     unit_of_measure:g('rfq-uom').value==='N/A'?null:g('rfq-uom').value||null,
