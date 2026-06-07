@@ -1005,57 +1005,68 @@ function renderPcatAnalysis(id){
 function placeFromAI(id){ showPlacementForm(id,true); }
 function placeManual(id){ showPlacementForm(id,false); }
 
+function _placeOpts(tops,sel){ var o='<option value="">Top level (no parent)</option>'; tops.forEach(function(n){ o+='<option value="'+esc(n)+'"'+(n.toLowerCase()===(sel||'').toLowerCase()?' selected':'')+'>'+esc(n)+'</option>'; }); return o; }
+function _subUnderOpts(list,sel){ var o='<option value="">— add directly under parent —</option>'; list.forEach(function(n){ o+='<option value="'+esc(n)+'"'+(n.toLowerCase()===(sel||'').toLowerCase()?' selected':'')+'>'+esc(n)+'</option>'; }); o+='<option value="__new__"'+((sel||'')==='__new__'?' selected':'')+'>+ New sub-category…</option>'; return o; }
+
 function showPlacementForm(id, useAI){
   var st=_pcatState[id]; if(!st)return; var row=g('pcat-'+id); if(!row)return;
   _pcatPrefixEdited[id]=false;
   var ai=useAI?st.ai:null;
-  var level=(ai&&ai.recommendation)||'top_level';
-  var parent=(ai&&ai.suggested_parent)||'';
-  var sub=(ai&&ai.suggested_sub)||'';
+  var rec=(ai&&ai.recommendation)||'top_level';
   var leaf=st.suggested;
-  var tops=_topLevelNames();
-  var subList=parent?_subNamesUnder(parent):[];
-  var showParent=(level!=='top_level');
-  var showSub=(level==='sub_sub_category');
   var ie=esc(id);
+  var tops=_topLevelNames();
+  // AI pre-fill: Place under = parent (blank = top level); Sub under = suggested_sub (sub-sub only)
+  var placeVal = (rec==='top_level') ? '' : ((ai&&ai.suggested_parent)||'');
+  var subVal   = (rec==='sub_sub_category') ? ((ai&&ai.suggested_sub)||'') : '';
+  var subList  = placeVal ? _subNamesUnder(placeVal) : [];
+  if(subVal && subList.map(function(s){return s.toLowerCase();}).indexOf(subVal.toLowerCase())<0) subList=[subVal].concat(subList);
+  var showSub = !!placeVal;
+
   var html='<div style="width:100%;padding:6px 0;display:flex;flex-direction:column;gap:7px;">';
+  // Category name + model prefix
   html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
   html+='<input type="text" id="pcat-name-'+ie+'" value="'+esc(leaf)+'" placeholder="Category name" style="flex:1;min-width:160px;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;" oninput="pcatPrefixAuto(\''+ie+'\')" />';
   html+='<input type="text" id="pcat-prefix-'+ie+'" value="'+esc(_genCatPrefix(leaf))+'" maxlength="5" placeholder="PFX" title="Model prefix" oninput="_pcatPrefixEdited[\''+ie+'\']=true" style="width:72px;text-transform:uppercase;font-family:monospace;font-weight:700;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;" />';
   html+='</div>';
-  html+='<div style="display:flex;gap:14px;align-items:center;font-size:12px;color:#333;flex-wrap:wrap;">';
-  [['top_level','Top Level'],['sub_category','Sub-Category'],['sub_sub_category','Sub-Sub-Category']].forEach(function(o){ html+='<label style="cursor:pointer;"><input type="radio" name="pcat-level-'+ie+'" value="'+o[0]+'"'+(o[0]===level?' checked':'')+' onchange="pcatLevelChange(\''+ie+'\')"> '+o[1]+'</label>'; });
-  html+='</div>';
-  html+='<div id="pcat-parent-wrap-'+ie+'" style="display:'+(showParent?'block':'none')+';"><select id="pcat-parent-'+ie+'" onchange="pcatParentChange(\''+ie+'\')" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_catOpts(tops,parent)+'</select></div>';
-  html+='<div id="pcat-sub-wrap-'+ie+'" style="display:'+(showSub?'block':'none')+';"><select id="pcat-sub-'+ie+'" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_catOpts(subList,sub)+'</select></div>';
+  // Place under (parent)
+  html+='<label style="font-size:11px;color:#888;">Place under</label>';
+  html+='<select id="pcat-parent-'+ie+'" onchange="pcatPlaceUnderChange(\''+ie+'\')" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_placeOpts(tops,placeVal)+'</select>';
+  // Sub under (only when a parent is chosen)
+  html+='<div id="pcat-sub-wrap-'+ie+'" style="display:'+(showSub?'block':'none')+';"><label style="font-size:11px;color:#888;">Sub under</label><select id="pcat-sub-'+ie+'" onchange="pcatSubUnderChange(\''+ie+'\')" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;">'+_subUnderOpts(subList,subVal)+'</select></div>';
+  // New sub-category typed name (only when "+ New sub-category" chosen)
+  html+='<div id="pcat-newsub-wrap-'+ie+'" style="display:none;"><input type="text" id="pcat-newsub-'+ie+'" placeholder="New sub-category name" style="width:100%;padding:6px 9px;font-size:13px;border:1px solid #c8b8f0;border-radius:6px;font-family:inherit;" /></div>';
+  // Actions
   html+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn-new" style="background:#16a34a;color:#fff;" onclick="confirmPlacement(\''+ie+'\')">✓ Add to Categories</button><button class="btn-new" style="background:#fff;color:#666;border:1px solid #ccc;" onclick="loadPendingCats()">Cancel</button><span id="pcat-msg-'+ie+'" style="font-size:11px;color:#999;"></span></div>';
   html+='</div>';
   row.innerHTML=html;
 }
 function pcatPrefixAuto(id){ var pf=g('pcat-prefix-'+id), nm=g('pcat-name-'+id); if(pf&&nm&&!_pcatPrefixEdited[id])pf.value=_genCatPrefix(nm.value); }
-function pcatLevelChange(id){
-  var lvl=(document.querySelector('input[name="pcat-level-'+id+'"]:checked')||{}).value||'top_level';
-  var pw=g('pcat-parent-wrap-'+id), sw=g('pcat-sub-wrap-'+id);
-  if(pw)pw.style.display=(lvl==='top_level')?'none':'block';
-  if(sw)sw.style.display=(lvl==='sub_sub_category')?'block':'none';
-}
-function pcatParentChange(id){
+function pcatPlaceUnderChange(id){
   var parent=(g('pcat-parent-'+id)||{}).value||'';
-  var sel=g('pcat-sub-'+id); if(!sel)return;
-  sel.innerHTML=_catOpts(_subNamesUnder(parent),'');
+  var sw=g('pcat-sub-wrap-'+id), sel=g('pcat-sub-'+id), nw=g('pcat-newsub-wrap-'+id);
+  if(sw)sw.style.display=parent?'block':'none';
+  if(nw)nw.style.display='none';
+  if(sel)sel.innerHTML=_subUnderOpts(parent?_subNamesUnder(parent):[],'');
+}
+function pcatSubUnderChange(id){
+  var v=(g('pcat-sub-'+id)||{}).value||'';
+  var nw=g('pcat-newsub-wrap-'+id);
+  if(nw)nw.style.display=(v==='__new__')?'block':'none';
 }
 
 async function confirmPlacement(id){
   var name=((g('pcat-name-'+id)||{}).value||'').trim();
   var prefix=((g('pcat-prefix-'+id)||{}).value||'').trim().toUpperCase();
-  var lvl=(document.querySelector('input[name="pcat-level-'+id+'"]:checked')||{}).value||'top_level';
   var parent=((g('pcat-parent-'+id)||{}).value||'').trim();
-  var sub=((g('pcat-sub-'+id)||{}).value||'').trim();
-  if(!name){ _pcatMsg(id,'Enter a name.','#dc2626'); return; }
+  var subSel=((g('pcat-sub-'+id)||{}).value||'').trim();
+  var sub = (subSel==='__new__') ? ((g('pcat-newsub-'+id)||{}).value||'').trim() : subSel;
+  if(!name){ _pcatMsg(id,'Enter a category name.','#dc2626'); return; }
+  if(subSel==='__new__' && !sub){ _pcatMsg(id,'Enter the new sub-category name.','#dc2626'); return; }
   var cat,scat,sscat;
-  if(lvl==='top_level'){ cat=name; scat=null; sscat=null; }
-  else if(lvl==='sub_category'){ if(!parent){_pcatMsg(id,'Pick a parent category.','#dc2626');return;} cat=parent; scat=name; sscat=null; }
-  else { if(!parent||!sub){_pcatMsg(id,'Pick a parent and sub-category.','#dc2626');return;} cat=parent; scat=sub; sscat=name; }
+  if(!parent){ cat=name; scat=null; sscat=null; }            // top level
+  else if(!sub){ cat=parent; scat=name; sscat=null; }        // sub-category
+  else { cat=parent; scat=sub; sscat=name; }                 // sub-sub-category
   if(_existsExactCat(cat,scat,sscat)){ _pcatMsg(id,'That category already exists.','#dc2626'); return; }
   _pcatMsg(id,'Saving…','#999');
   try{
