@@ -1160,36 +1160,94 @@ async function openSKU(id) {
     <div class="panel-section"><h3>Costing</h3>${cost}</div>
     <div class="panel-section"><h3>Documents (${docs.length})</h3><div class="sub-list">${docItems}</div></div>
     <div class="panel-section"><h3>Factory Sources (${sources.length})</h3><div class="sub-list">${srcItems}</div></div>
-    <div class="panel-section"><h3>Inventory States</h3><div id="inv-states-${id}"><div class="loading">Loading…</div></div></div>
+    <div class="panel-section"><h3>Inventory Status</h3><div id="inv-status-${id}"><div class="loading">Loading…</div></div></div>
   `;
-  loadInvStatesTenant(id);
+  loadInvStatusTenant(id);
 }
 
-// Read-only inventory-state display for the tenant SKU Library. Tenants can see
-// states but not approve/reject/change them (admin-only, in skus.html).
-// Scoped to the tenant via tenant_id; supa() prepends /rest/v1/ so no prefix here.
-async function loadInvStatesTenant(skuId) {
-  var el = document.getElementById('inv-states-' + skuId);
+// Read-only inventory ledger for the tenant SKU Library: position, key stats,
+// purchase history, sales history. Tenants can SEE but not approve/reject/change
+// (admin-only, in skus.html). Scoped by tenant_id; supa() prepends /rest/v1/.
+// Purchases come from purchase_orders (header-level sku_id) — purchase_order_lines
+// is empty and has no FK to purchase_orders so it can't be embedded.
+var T_INV_STATES = ['in_development','on_rfq','on_order','in_production','pending_inspection','at_forwarder','in_transit','at_port','in_warehouse','allocated_sales','shipped','sold_through','written_off'];
+var T_INV_COLORS = {in_development:'#9aa3b2',on_rfq:'#6688ff',on_order:'#d08a3a',in_production:'#caa15a',pending_inspection:'#e08a3a',at_forwarder:'#3aa873',in_transit:'#4ec07a',at_port:'#3ab0a0',in_warehouse:'#8aa0ff',allocated_sales:'#a06ad0',shipped:'#6aa0e0',sold_through:'#9aa3b2',written_off:'#d06a6a'};
+function tInvSub(title,inner){return '<div style="margin-bottom:14px;"><div style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">'+title+'</div>'+inner+'</div>';}
+function tInvStat(label,val){return '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:7px;padding:8px 10px;"><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px;">'+label+'</div><div style="font-size:16px;font-weight:700;color:#e2e8f0;">'+val+'</div></div>';}
+function tInvTh(cols){return '<thead><tr>'+cols.map(function(hd){return '<th style="text-align:left;padding:5px 8px;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,0.12);white-space:nowrap;">'+hd+'</th>';}).join('')+'</tr></thead>';}
+var T_TD = 'padding:6px 8px;border-bottom:0.5px dashed rgba(255,255,255,0.08);';
+
+async function loadInvStatusTenant(skuId) {
+  var el = document.getElementById('inv-status-' + skuId);
   if (!el) return;
   try {
-    var r = await supa('sku_inventory_states?sku_id=eq.' + skuId + '&tenant_id=eq.' + TID + '&select=*,purchase_orders(po_number)&order=created_at.desc');
-    var rows = Array.isArray(r) ? r : [];
-    if (!rows.length) { el.innerHTML = '<div style="font-size:12px;color:#bbb;">No inventory state records yet.</div>'; return; }
-    var sc = {in_development:'#888',on_rfq:'#2244cc',on_order:'#885500',in_production:'#664400',pending_inspection:'#cc6600',at_forwarder:'#006633',in_transit:'#1a7a1a',at_port:'#007755',in_warehouse:'#1a1a2e',allocated_sales:'#660099',shipped:'#4488cc',sold_through:'#888',written_off:'#a22'};
-    var html = rows.map(function(row) {
-      var cur = row.current_state || '—';
-      var cc = sc[cur] || '#888';
-      var prop = row.proposed_state;
-      var pc = sc[prop] || '#888';
-      var po = row.purchase_orders ? (row.purchase_orders.po_number || 'PO') : '—';
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px dashed #f0f0e8;font-size:12px;">' +
-        '<span style="color:#888;min-width:60px;">' + po + '</span>' +
-        '<span style="background:' + cc + '22;color:' + cc + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + cur.replace(/_/g,' ') + '</span>' +
-        (prop ? '<span style="color:#aaa;font-size:11px;">→</span><span style="background:' + pc + '22;color:' + pc + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + prop.replace(/_/g,' ') + '</span><span style="font-size:10px;color:#aaa;">(pending approval)</span>' : '') +
+    var res = await Promise.all([
+      supa('sku_inventory_states?sku_id=eq.' + skuId + '&tenant_id=eq.' + TID + '&select=*,purchase_orders(po_number)&order=created_at.desc').catch(function(){return [];}),
+      supa('purchase_orders?sku_id=eq.' + skuId + '&tenant_id=eq.' + TID + '&select=po_number,status,created_at,quantity,unit_fob_price,factories(factory_name_english)&order=created_at.desc').catch(function(){return [];}),
+      supa('customer_order_lines?sku_id=eq.' + skuId + '&select=qty_ordered,unit_price,total_price,customer_orders(order_number,order_date,customers(customer_name))&order=created_at.desc').catch(function(){return [];})
+    ]);
+    var states = Array.isArray(res[0])?res[0]:[], purchases = Array.isArray(res[1])?res[1]:[], sales = Array.isArray(res[2])?res[2]:[];
+
+    // A) POSITION — pills (all 13) + read-only state rows
+    var counts = {};
+    states.forEach(function(s){ if(s.current_state) counts[s.current_state]=(counts[s.current_state]||0)+1; });
+    var pills = T_INV_STATES.map(function(st){
+      var n = counts[st]||0;
+      if (n>0) { var col=T_INV_COLORS[st]||'#9aa3b2'; return '<span style="background:'+col+'33;color:'+col+';padding:3px 9px;border-radius:11px;font-size:11px;font-weight:600;margin:0 5px 5px 0;display:inline-block;">'+esc(st.replace(/_/g,' '))+' ('+n+')</span>'; }
+      return '<span style="background:rgba(255,255,255,0.06);color:#6b7280;padding:3px 9px;border-radius:11px;font-size:11px;margin:0 5px 5px 0;display:inline-block;">'+esc(st.replace(/_/g,' '))+'</span>';
+    }).join('');
+    var stateRows = states.map(function(row){
+      var cur=row.current_state||'—', cc=T_INV_COLORS[cur]||'#9aa3b2', prop=row.proposed_state, pc=T_INV_COLORS[prop]||'#9aa3b2';
+      var po=row.purchase_orders?(row.purchase_orders.po_number||'PO'):'—';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:0.5px dashed rgba(255,255,255,0.08);font-size:12px;">'+
+        '<span style="color:#94a3b8;min-width:60px;">'+esc(po)+'</span>'+
+        '<span style="background:'+cc+'33;color:'+cc+';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">'+esc(cur.replace(/_/g,' '))+'</span>'+
+        (prop?'<span style="color:#94a3b8;">→</span><span style="background:'+pc+'33;color:'+pc+';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">'+esc(prop.replace(/_/g,' '))+'</span><span style="font-size:10px;color:#94a3b8;">(pending approval)</span>':'')+
         '</div>';
     }).join('');
-    el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#a22;">Could not load.</div>'; }
+
+    // B) KEY STATS
+    var totPurch = purchases.reduce(function(a,p){return a+(parseInt(p.quantity,10)||0);},0);
+    var totSold = sales.reduce(function(a,s){return a+(parseInt(s.qty_ordered,10)||0);},0);
+    var lastPurch = purchases.length ? ((purchases[0].created_at||'').slice(0,10)||'—') : '—';
+    var saleDates = sales.map(function(s){return s.customer_orders&&s.customer_orders.order_date;}).filter(Boolean).sort();
+    var lastSale = saleDates.length ? saleDates[saleDates.length-1] : '—';
+    var statsHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">'+
+      tInvStat('Units Purchased', totPurch.toLocaleString())+tInvStat('Units Sold', totSold.toLocaleString())+
+      tInvStat('Last Purchase', esc(lastPurch))+tInvStat('Last Sale', esc(lastSale))+'</div>';
+
+    // C) PURCHASE HISTORY
+    var purchHtml = purchases.length
+      ? '<table style="width:100%;border-collapse:collapse;font-size:12px;">'+tInvTh(['Date','PO #','Factory','Qty','FOB Price','Status'])+'<tbody>'+
+        purchases.map(function(p){var fac=(p.factories&&p.factories.factory_name_english)||'—';return '<tr>'+
+          '<td style="'+T_TD+'white-space:nowrap;">'+esc((p.created_at||'').slice(0,10)||'—')+'</td>'+
+          '<td style="'+T_TD+'font-family:monospace;font-size:11px;">'+esc(p.po_number||'—')+'</td>'+
+          '<td style="'+T_TD+'">'+esc(fac)+'</td>'+
+          '<td style="'+T_TD+'text-align:right;">'+(p.quantity!=null?Number(p.quantity).toLocaleString():'—')+'</td>'+
+          '<td style="'+T_TD+'text-align:right;">'+(p.unit_fob_price!=null?'$'+parseFloat(p.unit_fob_price).toFixed(4):'—')+'</td>'+
+          '<td style="'+T_TD+'">'+esc(p.status||'—')+'</td>'+
+        '</tr>';}).join('')+'</tbody></table>'
+      : '<div style="font-size:12px;color:#94a3b8;">No purchases on record.</div>';
+
+    // D) SALES HISTORY
+    var salesHtml = sales.length
+      ? '<table style="width:100%;border-collapse:collapse;font-size:12px;">'+tInvTh(['Date','Order #','Customer','Qty','Unit Price','Total'])+'<tbody>'+
+        sales.map(function(s){var o=s.customer_orders||{};var c=o.customers||{};return '<tr>'+
+          '<td style="'+T_TD+'white-space:nowrap;">'+esc(o.order_date||'—')+'</td>'+
+          '<td style="'+T_TD+'font-family:monospace;font-size:11px;">'+esc(o.order_number||'—')+'</td>'+
+          '<td style="'+T_TD+'">'+esc(c.customer_name||'—')+'</td>'+
+          '<td style="'+T_TD+'text-align:right;">'+(s.qty_ordered!=null?Number(s.qty_ordered).toLocaleString():'—')+'</td>'+
+          '<td style="'+T_TD+'text-align:right;">'+(s.unit_price!=null?'$'+parseFloat(s.unit_price).toFixed(2):'—')+'</td>'+
+          '<td style="'+T_TD+'text-align:right;font-weight:600;">'+(s.total_price!=null?'$'+parseFloat(s.total_price).toFixed(2):'—')+'</td>'+
+        '</tr>';}).join('')+'</tbody></table>'
+      : '<div style="font-size:12px;color:#94a3b8;">No sales on record.</div>';
+
+    el.innerHTML =
+      tInvSub('Position', pills + (stateRows?'<div style="margin-top:6px;">'+stateRows+'</div>':'')) +
+      tInvSub('Key Stats', statsHtml) +
+      tInvSub('Purchase History', purchHtml) +
+      tInvSub('Sales History', salesHtml);
+  } catch(e) { el.innerHTML = '<div style="font-size:12px;color:#d06a6a;">Could not load inventory status.</div>'; }
 }
 
 (async function init() {
