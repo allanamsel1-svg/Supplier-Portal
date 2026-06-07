@@ -117,11 +117,13 @@ async function approve(id){
       body: JSON.stringify({ status:'approved', approved_as: off })
     });
     if(!r1.ok) throw new Error('patch failed');
-    // Add to the official product category list.
-    await h(SB+'/rest/v1/product_categories', {
+    // Add to the official categories list so it appears in the RFQ category dropdowns
+    // (tenant + admin). The categories table keys the name on the `category` column
+    // (no name/is_active columns exist); other columns have safe defaults.
+    await h(SB+'/rest/v1/categories', {
       method:'POST',
       headers:{'Content-Type':'application/json', Prefer:'return=minimal'},
-      body: JSON.stringify({ name: off, parent_id: null, tenant_id: null })
+      body: JSON.stringify({ category: off })
     }).catch(function(){});
     await load();
   } catch(e){ if(msg){ msg.style.color='#dc2626'; msg.textContent='Could not approve — try again.'; } }
