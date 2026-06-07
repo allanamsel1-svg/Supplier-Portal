@@ -162,7 +162,41 @@ async function openSKU(id) {
     <div class="panel-section"><h3>Packaging</h3>${packaging}</div>
     <div class="panel-section"><h3>Documents (${docs.length})</h3><div class="sub-list">${docItems}</div></div>
     <div class="panel-section"><h3>Factory Sources (${sources.length})</h3><div class="sub-list">${srcItems}</div></div>
+    <div class="panel-section"><h3>Inventory States</h3><div class="sub-list" id="inv-states-${id}"><div class="loading">Loading…</div></div></div>
   `;
+  loadInvStatesTenant(id);
+}
+
+// Read-only inventory-state display for the tenant portal. Tenants can SEE their
+// SKU inventory states but cannot approve/reject/change them — those are admin
+// actions (handled in skus.html). Scoped to the tenant via tenant_id=eq.${TID}.
+async function loadInvStatesTenant(id) {
+  var el = document.getElementById('inv-states-' + id);
+  if (!el) return;
+  var stateColors = {
+    in_development:'#9ca3af', on_rfq:'#6688ff', on_order:'#d08a3a',
+    in_production:'#caa15a', pending_inspection:'#e08a3a', at_forwarder:'#3aa873',
+    in_transit:'#4ec07a', at_port:'#3ab0a0', in_warehouse:'#8aa0ff',
+    allocated_sales:'#a06ad0', shipped:'#6688ff', sold_through:'#9ca3af', written_off:'#d06a6a'
+  };
+  try {
+    var rows = await supa(`sku_inventory_states?sku_id=eq.${id}&tenant_id=eq.${TID}&select=*,purchase_orders(po_number,status)&order=created_at.desc`);
+    if (!rows || !rows.length) {
+      el.innerHTML = '<div class="empty" style="padding:12px;">No inventory state records yet.</div>';
+      return;
+    }
+    el.innerHTML = rows.map(function(r) {
+      var po = r.purchase_orders ? (r.purchase_orders.po_number || 'PO') : '—';
+      var cur = r.current_state || '—';
+      var curColor = stateColors[cur] || '#9ca3af';
+      var prop = r.proposed_state;
+      var chip = '<span style="background:' + curColor + '22;color:' + curColor + ';padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">' + esc(cur.replace(/_/g, ' ')) + '</span>';
+      var propChip = prop ? ' <span style="background:#e0c04022;color:#caa15a;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">→ ' + esc(prop.replace(/_/g, ' ')) + ' (pending)</span>' : '';
+      return '<div class="sub-item"><div class="si-title">' + esc(po) + '</div><div class="si-meta">' + chip + propChip + '</div></div>';
+    }).join('');
+  } catch (e) {
+    el.innerHTML = '<div class="empty" style="padding:12px;">Could not load inventory states.</div>';
+  }
 }
 
 (async function init() {

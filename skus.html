@@ -64,7 +64,7 @@ td{padding:7px 10px;border-top:0.5px solid #f0f0e8;}
 var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 function g(id){return document.getElementById(id);}
-function h(url){return fetch(url,{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});}
+function h(url,opts){opts=opts||{};opts.headers=Object.assign({'apikey':KEY,'Authorization':'Bearer '+KEY},opts.headers||{});return fetch(url,opts);}
 
 var allSkus=[],currentId=null;
 
@@ -426,6 +426,12 @@ async function openSku(skuId){
     :'<div style="font-size:12px;color:#bbb;">No production runs yet.</div>')+
   '</div>'+
 
+  // Inventory States
+  '<div class="card">'+
+    '<div class="card-title">Inventory States</div>'+
+    '<div id="inv-states-'+skuId+'"><div style="color:#bbb;font-size:12px;">Loading…</div></div>'+
+  '</div>'+
+
   // Sales History
   '<div class="card">'+
     '<div class="card-title">Sales History</div>'+
@@ -447,6 +453,106 @@ async function openSku(skuId){
   '</div>';
 
   det.innerHTML=html;
+  loadInvStates(skuId);
+}
+
+async function loadInvStates(skuId) {
+  var el = document.getElementById('inv-states-' + skuId);
+  if (!el) return;
+  try {
+    var r = await h(SB + '/rest/v1/sku_inventory_states?sku_id=eq.' + skuId + '&select=*,purchase_orders(po_number,status)&order=created_at.desc');
+    var rows = r.ok ? await r.json() : [];
+
+    if (!rows.length) {
+      el.innerHTML = '<div style="font-size:12px;color:#bbb;">No inventory state records yet. States are created automatically when a PO is linked to this SKU.</div>';
+      return;
+    }
+
+    var stateColors = {
+      in_development:'#888', on_rfq:'#2244cc', on_order:'#885500',
+      in_production:'#664400', pending_inspection:'#cc6600', at_forwarder:'#006633',
+      in_transit:'#1a7a1a', at_port:'#007755', in_warehouse:'#1a1a2e',
+      allocated_sales:'#660099', shipped:'#2244cc', sold_through:'#888', written_off:'#a22'
+    };
+
+    var pending = rows.filter(function(r){ return r.proposed_state; });
+    var html = '';
+
+    if (pending.length) {
+      html += '<div style="background:#fff8e0;border:1px solid #e0c040;border-radius:7px;padding:10px 12px;margin-bottom:10px;font-size:12px;">⚠️ <strong>' + pending.length + ' pending state transition' + (pending.length>1?'s':'') + '</strong> awaiting approval</div>';
+    }
+
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr>' +
+      '<th style="text-align:left;padding:6px 8px;font-size:10px;color:#888;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e0e0d8;">PO</th>' +
+      '<th style="text-align:left;padding:6px 8px;font-size:10px;color:#888;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e0e0d8;">Current State</th>' +
+      '<th style="text-align:left;padding:6px 8px;font-size:10px;color:#888;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e0e0d8;">Proposed</th>' +
+      '<th style="text-align:left;padding:6px 8px;font-size:10px;color:#888;font-weight:600;text-transform:uppercase;border-bottom:1px solid #e0e0d8;">Action</th>' +
+      '</tr></thead><tbody>';
+
+    rows.forEach(function(row) {
+      var poLabel = row.purchase_orders ? (row.purchase_orders.po_number || 'PO') : '—';
+      var cur = row.current_state || '—';
+      var curColor = stateColors[cur] || '#888';
+      var prop = row.proposed_state;
+      var propColor = stateColors[prop] || '#888';
+      var actionHtml = '';
+      if (prop) {
+        actionHtml = '<button onclick="approveStateTransition(\''+row.id+'\',\''+prop+'\')" style="background:#1a7a1a;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;margin-right:4px;">✓ Approve</button>' +
+          '<button onclick="rejectStateTransition(\''+row.id+'\')" style="background:#a22;color:#fff;border:none;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;">✗ Reject</button>';
+      } else {
+        actionHtml = '<button onclick="manualStateChange(\''+row.id+'\',\''+cur+'\')" style="background:none;border:1px solid #e0e0d8;border-radius:4px;padding:3px 8px;font-size:11px;cursor:pointer;font-family:inherit;color:#666;">Change</button>';
+      }
+      html += '<tr>' +
+        '<td style="padding:7px 8px;border-bottom:0.5px dashed #f0f0e8;font-weight:600;">' + poLabel + '</td>' +
+        '<td style="padding:7px 8px;border-bottom:0.5px dashed #f0f0e8;"><span style="background:'+curColor+'22;color:'+curColor+';padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600;">' + cur.replace(/_/g,' ') + '</span></td>' +
+        '<td style="padding:7px 8px;border-bottom:0.5px dashed #f0f0e8;">' + (prop ? '<span style="background:'+propColor+'22;color:'+propColor+';padding:2px 7px;border-radius:10px;font-size:11px;font-weight:600;">→ ' + prop.replace(/_/g,' ') + '</span>' : '<span style="color:#bbb;font-size:11px;">—</span>') + '</td>' +
+        '<td style="padding:7px 8px;border-bottom:0.5px dashed #f0f0e8;">' + actionHtml + '</td>' +
+        '</tr>';
+    });
+
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div style="font-size:12px;color:#a22;">Could not load inventory states.</div>';
+  }
+}
+
+async function approveStateTransition(stateId, newState) {
+  var note = prompt('Approval note (optional):') || '';
+  var now = new Date().toISOString();
+  await h(SB + '/rest/v1/sku_state_transitions', {
+    method:'POST', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({ sku_inventory_state_id:stateId, to_state:newState, triggered_by:'manual', approved_by:localStorage.getItem('admin_user')||'admin', approved_at:now, notes:note })
+  });
+  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
+    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({ current_state:newState, proposed_state:null, proposed_at:null, proposed_reason:null, approved_by:localStorage.getItem('admin_user')||'admin', approved_at:now })
+  });
+  var el = document.querySelector('[id^="inv-states-"]');
+  if (el) loadInvStates(el.id.replace('inv-states-',''));
+}
+
+async function rejectStateTransition(stateId) {
+  var note = prompt('Reason for rejection:') || 'Rejected';
+  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
+    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({ proposed_state:null, proposed_at:null, proposed_reason:null, notes:note })
+  });
+  var el = document.querySelector('[id^="inv-states-"]');
+  if (el) loadInvStates(el.id.replace('inv-states-',''));
+}
+
+async function manualStateChange(stateId, currentState) {
+  var states = ['in_development','on_rfq','on_order','in_production','pending_inspection','at_forwarder','in_transit','at_port','in_warehouse','allocated_sales','shipped','sold_through','written_off'];
+  var newState = prompt('Change state to (type exactly):\n\n' + states.filter(function(s){return s!==currentState;}).join('\n'));
+  if (!newState || !states.includes(newState)) { alert('Invalid state.'); return; }
+  var note = prompt('Note (optional):') || '';
+  await h(SB + '/rest/v1/sku_inventory_states?id=eq.' + stateId, {
+    method:'PATCH', headers:{'Content-Type':'application/json','Prefer':'return=minimal'},
+    body: JSON.stringify({ proposed_state:newState, proposed_at:new Date().toISOString(), proposed_reason:'Manual change request: '+note })
+  });
+  var el = document.querySelector('[id^="inv-states-"]');
+  if (el) loadInvStates(el.id.replace('inv-states-',''));
 }
 
 function docIcon(t){
