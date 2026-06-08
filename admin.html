@@ -5899,6 +5899,18 @@ function openQuoteEmailModal(action,ctx,onConfirm,opts){
   });
 }
 
+// FIX 2: pre-written per-action fallback templates (used when the AI draft fails).
+function qemFallbackBody(action,factoryName,product){
+  var sign='\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  var t={
+    followup:'Dear '+factoryName+', I wanted to follow up on the RFQ we sent for '+product+'. We have not yet received your quotation. Could you please provide your pricing and specifications at your earliest convenience? We look forward to your response.'+sign,
+    approved:'Dear '+factoryName+', we are pleased to inform you that your quotation for '+product+' has been approved. Please proceed with sample preparation per the agreed specifications.'+sign,
+    rejected:'Dear '+factoryName+', thank you for your quotation for '+product+'. After careful review we will not be moving forward at this time. We appreciate your participation and hope to work together in the future.'+sign,
+    more_info:'Dear '+factoryName+', thank you for your quotation for '+product+'. We require additional information before proceeding. Please provide further details on your submission.'+sign
+  };
+  return t[action]||t.followup;
+}
+
 async function qemDraft(){
   var s=qemState;
   var sub=g('qem-subject'),bod=g('qem-body'),send=g('qem-send'),regen=g('qem-regen'),msg=g('qem-msg');
@@ -5910,9 +5922,18 @@ async function qemDraft(){
     s.aiSubject=d.subject||'';s.aiBody=d.body||'';
     sub.value=s.aiSubject;bod.value=s.aiBody;
   }catch(e){
-    bod.value='';
-    msg.textContent='⚠ Could not draft email: '+e.message+'. You can still write and send it manually.';
-    msg.style.color='#b00';msg.style.background='#fff0f0';msg.style.display='block';
+    // FIX 2: pre-fill a proper per-action template instead of leaving the body empty.
+    var product='this item',proj='';
+    try{
+      var rr=await fetch(SB+'/rest/v1/rfqs?id=eq.'+s.ctx.rfq_id+'&select=item_description,project_number&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var rrows=rr.ok?await rr.json():[];
+      if(rrows[0]){product=rrows[0].item_description||product;proj=rrows[0].project_number||'';}
+    }catch(_){}
+    s.aiSubject='['+(proj||'PRJ-XXXX')+'] '+product;
+    s.aiBody=qemFallbackBody(s.action,s.ctx.factoryName||'Factory',product);
+    sub.value=s.aiSubject;bod.value=s.aiBody;
+    msg.textContent='⚠ AI draft unavailable — a standard template was pre-filled. Please review and edit before sending.';
+    msg.style.color='#886600';msg.style.background='#fff8e0';msg.style.display='block';
   }
   sub.disabled=false;bod.disabled=false;send.disabled=false;regen.disabled=false;
 }

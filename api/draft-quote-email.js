@@ -14,7 +14,7 @@
 //
 // Env vars:
 //   SUPABASE_URL, SUPABASE_SERVICE_KEY (falls back to SUPABASE_SERVICE_ROLE_KEY),
-//   ANTHROPIC_API_KEY, DRAFT_EMAIL_MODEL (defaults to claude-sonnet-4-20250514)
+//   ANTHROPIC_API_KEY, DRAFT_EMAIL_MODEL (defaults to claude-sonnet-4-5)
 // ============================================================
 
 const _sdk = require('@anthropic-ai/sdk');
@@ -23,7 +23,19 @@ const Anthropic = _sdk.default || _sdk.Anthropic || _sdk;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-const MODEL = process.env.DRAFT_EMAIL_MODEL || 'claude-sonnet-4-20250514';
+const MODEL = process.env.DRAFT_EMAIL_MODEL || 'claude-sonnet-4-5';
+
+// Pre-written per-action fallback templates used when the AI draft fails / is empty.
+function fallbackTemplate(action, factoryName, product) {
+  const sign = '\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  const t = {
+    followup:  'Dear ' + factoryName + ', I wanted to follow up on the RFQ we sent for ' + product + '. We have not yet received your quotation. Could you please provide your pricing and specifications at your earliest convenience? We look forward to your response.' + sign,
+    approved:  'Dear ' + factoryName + ', we are pleased to inform you that your quotation for ' + product + ' has been approved. Please proceed with sample preparation per the agreed specifications.' + sign,
+    rejected:  'Dear ' + factoryName + ', thank you for your quotation for ' + product + '. After careful review we will not be moving forward at this time. We appreciate your participation and hope to work together in the future.' + sign,
+    more_info: 'Dear ' + factoryName + ', thank you for your quotation for ' + product + '. We require additional information before proceeding. Please provide further details on your submission.' + sign
+  };
+  return t[action] || t.followup;
+}
 
 const SOURCING_SYSTEM_PROMPT =
   'You are Sarah Lindburg, Sourcing Manager at TBG Sourcing. Write professional, ' +
@@ -218,14 +230,17 @@ async function handler(req, res) {
       parsed = parseModelJson(text);
     } catch (e) {
       console.error('draft-quote-email parse error:', e.message, '| raw:', text.slice(0, 500));
-      // Fall back to a deterministic subject + the raw text as the body.
-      parsed = { subject: `[${rfq.project_number || 'PRJ-XXXX'}] ${rfq.product_description || ''}`.trim(), body: text.trim() };
+      // Fall back to a deterministic subject + a proper per-action template (never raw text).
+      parsed = {
+        subject: `[${rfq.project_number || 'PRJ-XXXX'}] ${rfq.product_description || ''}`.trim(),
+        body: fallbackTemplate(action, factory.name || 'Factory', rfq.product_description || 'this item')
+      };
     }
 
     const subject = (parsed.subject && String(parsed.subject).trim()) ||
       `[${rfq.project_number || 'PRJ-XXXX'}] ${rfq.product_description || ''}`.trim();
-    const draftBody = (parsed.body && String(parsed.body).trim()) || '';
-    if (!draftBody) return res.status(502).json({ error: 'AI returned an empty draft.' });
+    const draftBody = (parsed.body && String(parsed.body).trim()) ||
+      fallbackTemplate(action, factory.name || 'Factory', rfq.product_description || 'this item');
 
     return res.status(200).json({ subject, body: draftBody });
   } catch (err) {
