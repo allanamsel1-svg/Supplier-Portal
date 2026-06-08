@@ -31,13 +31,29 @@ async function supa(path) {
 }
 
 // ── Auth ── (validate token from localStorage; redirect to login if invalid)
+//
+// Two completely independent sessions:
+//   • admin_session  → the TBG admin portal
+//   • tenant_token   → a tenant portal
+// The ADMIN session takes precedence: a signed-in TBG admin stays "TBG Sourcing — Admin"
+// on every shared tenant-*.html page (these are linked from the admin sidebar) and is NEVER
+// re-detected as a tenant. We only ever clear the session that actually failed validation —
+// a failure on one portal must never sign the user out of the other.
 async function tenantAuth() {
-  // Tenant users authenticate with tenant_token. Admins (admin_session, no tenant_token)
-  // are allowed through: the validate endpoint accepts a valid admin session token and
-  // returns the Byline Brands tenant, so admins can browse tenant pages without a tenant login.
-  let token = localStorage.getItem('tenant_token');
-  if (!token) token = localStorage.getItem('admin_session');
+  const adminToken = localStorage.getItem('admin_session');
+  const tenantToken = localStorage.getItem('tenant_token');
+  const isAdmin = !!adminToken;
+  const token = isAdmin ? adminToken : tenantToken;
+  // No session of either kind → this tenant page sends you to the tenant login.
   if (!token) return window.location.href = 'tenant-login.html';
+
+  // Where to send the user if THIS session is invalid (never cross-clear the other portal).
+  const bounce = () => {
+    if (isAdmin) { localStorage.removeItem('admin_session'); window.location.href = 'admin.html'; }
+    else { localStorage.removeItem('tenant_token'); window.location.href = 'tenant-login.html'; }
+    return undefined;
+  };
+
   let res;
   try {
     res = await fetch('/api/tenant-auth?action=validate', { headers: { 'Authorization': 'Bearer ' + token } });
@@ -46,13 +62,27 @@ async function tenantAuth() {
     document.body.innerHTML = '<div style="color:#fca5a5;font-family:sans-serif;padding:40px;">Could not reach the server. Refresh to retry — you have not been signed out.</div>';
     return null;
   }
-  if (!res.ok) { localStorage.removeItem('tenant_token'); return window.location.href = 'tenant-login.html'; }
+  if (!res.ok) return bounce();
   const data = await res.json();
-  if (!data.valid) { localStorage.removeItem('tenant_token'); return window.location.href = 'tenant-login.html'; }
-  return data.user;
+  if (!data.valid) return bounce();
+  const user = data.user || {};
+  if (isAdmin) user.isAdmin = true;   // drives the "TBG Sourcing — Admin" identity in the header/sidebar
+  return user;
+}
+
+// Portal identity label shown in the header + sidebar so it's always obvious which portal you're in.
+function portalIdentityLabel(user) {
+  if (user && user.isAdmin) return 'TBG Sourcing — Admin';
+  return (user && user.tenant && user.tenant.name) || 'Tenant';
 }
 
 function doLogout() {
+  // An admin browsing a shared tenant page signs out of the ADMIN portal (and only that).
+  if (localStorage.getItem('admin_session')) {
+    localStorage.removeItem('admin_session');
+    window.location.href = 'admin.html';
+    return;
+  }
   const token = localStorage.getItem('tenant_token');
   if (token) {
     fetch('/api/tenant-auth?action=logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {});
@@ -81,7 +111,10 @@ try { if (document.body) applySavedTheme(); } catch (e) {}
 // ── Fixed top header ──
 function renderHeader(user) {
   if (document.getElementById('tenantHeader')) return;
-  const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
+  const isAdmin = !!(user && user.isAdmin);
+  const tenantName = portalIdentityLabel(user);
+  // Admin viewing a shared tenant page gets a high-contrast chip so the portal is unmistakable.
+  const identityStyle = isAdmin ? 'background:#1a1a2e;color:#fff;padding:3px 11px;border-radius:8px;font-weight:700;' : '';
   // "← Dashboard" link, hidden when we're already on the dashboard page.
   const onDashboard = window.location.pathname.includes('tenant-dashboard.html');
   const dashLink =
@@ -98,7 +131,7 @@ function renderHeader(user) {
       '</div>' +
       '<div class="th-right">' +
         '<button class="th-btn" id="themeToggleBtn" title="Toggle light/dark">☀️</button>' +
-        '<span class="th-tenant">' + esc(tenantName) + '</span>' +
+        '<span class="th-tenant" id="portalIdentity"' + (identityStyle ? ' style="' + identityStyle + '"' : '') + '>' + esc(tenantName) + '</span>' +
         '<button class="th-signout" id="headerSignOut">Sign Out</button>' +
       '</div>' +
     '</div>' +
@@ -182,7 +215,7 @@ function renderSidebar(user) {
   // .sidebar (outerHTML), which that selector can't hide. Returning leaves the empty
   // #sidebar placeholder, which the embed CSS correctly hides.
   try { if (new URLSearchParams(location.search).get('embed') === '1' || window.self !== window.top) return; } catch (e) {}
-  const tenantName = (user && user.tenant && user.tenant.name) || 'Tenant';
+  const tenantName = portalIdentityLabel(user);
   const who = (user && (user.full_name || user.email)) || '—';
   TENANT_FEATURES = (user && user.tenant && user.tenant.features) || {};
 
