@@ -48,8 +48,22 @@ const COMPLIANCE_SYSTEM_PROMPT =
   'Always use subject format: [PRJ-XXXX] Product Description. ' +
   'Sarah Lindburg (Sourcing) is copied on this email.';
 
+const APPROVED_SYSTEM_PROMPT =
+  'You are Sarah Lindburg, Sourcing Manager at TBG Sourcing. Write a professional, warm approval email. ' +
+  'Never mention AI or scoring. Always use subject format: [PRJ-XXXX] Product Description.\n\n' +
+  'Based on the specific packaging requirements below, generate a precise numbered list of every physical and ' +
+  'digital asset the factory must provide so the graphics team can create complete artwork. Be specific and technical — examples:\n' +
+  '- Glass dropper bottle → request: STEP/3D CAD file of bottle, mold drawing with dimensions, neck finish spec\n' +
+  '- Printed paper label → request: label dieline (AI/PDF), label dimensions confirmed, label substrate spec\n' +
+  '- Folding carton gift box → request: structural dieline (AI/PDF), all panel dimensions confirmed\n' +
+  '- Soft touch lamination + spot UV → request: finishing specification sheet, UV spot area callout file\n' +
+  '- Direct print on bottle → request: bottle surface template/unwrap file\n' +
+  'Do NOT use a generic asset list. Generate assets specific to exactly what this product requires.';
+
 function systemPromptFor(action) {
-  return action === 'document_request' ? COMPLIANCE_SYSTEM_PROMPT : SOURCING_SYSTEM_PROMPT;
+  if (action === 'document_request') return COMPLIANCE_SYSTEM_PROMPT;
+  if (action === 'approved') return APPROVED_SYSTEM_PROMPT;
+  return SOURCING_SYSTEM_PROMPT;
 }
 
 // ── Supabase REST helper (service key) ──────────────────────
@@ -105,7 +119,25 @@ function buildUserPrompt(action, ctx) {
 
   if (action === 'approved') {
     lines.push('# Action: APPROVED');
-    lines.push('Warmly congratulate the factory that their quote has been approved. Confirm the next steps are to provide samples and confirm the production timeline. Keep it warm but direct.');
+    lines.push('Warmly congratulate the factory that their quotation has been approved (keep the warm Sarah voice).');
+    lines.push('');
+    lines.push('# Packaging & product details (use these to determine the EXACT assets required)');
+    lines.push(`Product name: ${productDescription}`);
+    lines.push(`Category: ${rfq.category_path || '—'}`);
+    lines.push(`Cosmetic product: ${rfq.is_cosmetic ? 'yes' : 'no'}`);
+    lines.push(`Primary packaging type: ${rfq.packaging_type || rfq.packaging_primary || '—'}`);
+    if (rfq.packaging_primary) lines.push(`Primary container: ${rfq.packaging_primary}`);
+    if (Array.isArray(rfq.packaging_secondary) && rfq.packaging_secondary.length) lines.push(`Secondary packaging / printing treatments: ${rfq.packaging_secondary.join(', ')}`);
+    if (rfq.packaging_finish) lines.push(`Finish: ${rfq.packaging_finish}`);
+    if (Array.isArray(rfq.packaging_decoration) && rfq.packaging_decoration.length) lines.push(`Decoration: ${rfq.packaging_decoration.join(', ')}`);
+    if (rfq.detailed_specifications) lines.push(`Detailed specifications: ${rfq.detailed_specifications}`);
+    lines.push('');
+    lines.push('# The email body MUST contain, in this order:');
+    lines.push('1. A warm congratulations paragraph.');
+    lines.push('2. The exact sentence: "To proceed with artwork creation, please provide the following assets through the factory portal:"');
+    lines.push('3. A numbered list of the specific assets required for THIS product (one per line, formatted "1. ...", "2. ...").');
+    lines.push('4. The exact sentence: "Please upload all assets within 5 business days."');
+    lines.push('5. The Sarah Lindburg signature.');
   } else if (action === 'rejected') {
     lines.push('# Action: REJECTED');
     lines.push('Politely decline this quote. Do not give harsh or overly specific reasons. Thank them and keep the door open for future opportunities.');
@@ -186,13 +218,21 @@ async function handler(req, res) {
   try {
     // RFQ — spec field names mapped to the live schema:
     //   product_description → item_description, category_path → category
-    const rfqRows = await sb(`rfqs?id=eq.${rfq_id}&select=project_number,item_description,category&limit=1`);
+    const rfqRows = await sb(`rfqs?id=eq.${rfq_id}&select=project_number,item_description,category,packaging_type,packaging_secondary,is_cosmetic,detailed_specifications,packaging_primary,packaging_finish,packaging_decoration&limit=1`);
     if (!rfqRows.length) return res.status(404).json({ error: 'RFQ not found.' });
     const rfqRow = rfqRows[0];
     const rfq = {
       project_number: rfqRow.project_number,
       product_description: rfqRow.item_description,
-      category_path: rfqRow.category
+      category_path: rfqRow.category,
+      // Packaging details — drive the dynamic asset list on approval.
+      packaging_type: rfqRow.packaging_type,
+      packaging_secondary: rfqRow.packaging_secondary,
+      is_cosmetic: rfqRow.is_cosmetic,
+      detailed_specifications: rfqRow.detailed_specifications,
+      packaging_primary: rfqRow.packaging_primary,
+      packaging_finish: rfqRow.packaging_finish,
+      packaging_decoration: rfqRow.packaging_decoration
     };
 
     // Factory — name → factory_name_english, wechat → sales_wechat, whatsapp → sales_whatsapp
@@ -219,7 +259,7 @@ async function handler(req, res) {
     const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 500,
+      max_tokens: action === 'approved' ? 900 : 500,   // approval emails carry a full asset list
       system: systemPromptFor(action),
       messages: [{ role: 'user', content: userPrompt }]
     });

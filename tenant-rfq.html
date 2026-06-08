@@ -478,6 +478,12 @@
     <input type="text" id="qem-subject" style="width:100%;padding:9px 11px;font-size:13px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);box-sizing:border-box;margin-bottom:12px;font-family:inherit;" />
     <label style="font-size:12px;color:var(--muted,#94a3b8);display:block;margin-bottom:4px;">Email body (edit freely before sending)</label>
     <textarea id="qem-body" rows="10" placeholder="Drafting…" style="width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);box-sizing:border-box;min-height:240px;resize:vertical;line-height:1.6;font-family:inherit;"></textarea>
+    <!-- Factory Asset Request panel — shown only for the 'approved' action; parsed from the email body -->
+    <div id="qem-assets-panel" style="display:none;margin-top:12px;border:1px solid var(--border,#334155);border-radius:9px;padding:12px 14px;background:var(--bg2,#0d1424);">
+      <div style="font-size:14px;font-weight:700;color:var(--text,#e2e8f0);margin-bottom:4px;">Assets Being Requested:</div>
+      <div style="font-size:11px;color:var(--muted,#94a3b8);margin-bottom:10px;">Parsed from the approval email. Uncheck any to remove them from the email and the artwork project.</div>
+      <div id="qem-assets-list"></div>
+    </div>
     <div id="qem-msg" style="font-size:12px;margin-top:10px;display:none;padding:8px 12px;border-radius:7px;"></div>
     <div style="display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap;">
       <button type="button" id="qem-regen" onclick="qemRegenerate()" style="padding:9px 14px;background:#3b2d6b;color:#d6c8ff;border:1px solid #5a4a9c;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">↻ Regenerate</button>
@@ -1760,9 +1766,11 @@ async function tenantApproveQuote(q, factory, ctx) {
     }
   } catch (e) { console.error('product_development create', e); }
   // 2. product_development_items (sample-approval workflow) — skip if one already exists for this quote.
+  let pdItemId = null;
   try {
     const existPdi = await supa('product_development_items?accepted_quote_id=eq.' + encodeURIComponent(ctx.quote_id) + '&select=id&limit=1');
-    if (!existPdi || !existPdi.length) {
+    if (existPdi && existPdi.length) { pdItemId = existPdi[0].id; }
+    else {
       const pdiPayload = {
         product_development_id: pdId, accepted_quote_id: ctx.quote_id, rfq_id: ctx.rfq_id, factory_id: ctx.factory_id, tenant_id: tid,
         status: 'awaiting_initial_sample', current_version: 0,
@@ -1773,9 +1781,30 @@ async function tenantApproveQuote(q, factory, ctx) {
         quote_inspection_offset_days: q.quote_inspection_offset_days || null,
         quote_cargo_ready_offset_days: q.quote_cargo_ready_offset_days || null
       };
-      await fetch(SUPA_URL + '/rest/v1/product_development_items', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify(pdiPayload) });
+      const pdiRes = await fetch(SUPA_URL + '/rest/v1/product_development_items', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=representation' }), body: JSON.stringify(pdiPayload) });
+      const pdiRows = pdiRes.ok ? await pdiRes.json().catch(() => []) : [];
+      const pdiRow = Array.isArray(pdiRows) ? pdiRows[0] : pdiRows;
+      pdItemId = (pdiRow && pdiRow.id) || null;
     }
   } catch (e) { console.error('product_development_items create', e); }
+  // 3. artwork_projects — kick off the asset-collection workflow, deduped by pd_item_id.
+  // assets_required comes from the checked asset list captured in the approval email modal.
+  try {
+    if (pdItemId) {
+      const existAp = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id&limit=1');
+      if (!existAp || !existAp.length) {
+        const assetNames = (qemState && Array.isArray(qemState.assets)) ? qemState.assets : [];
+        const apPayload = {
+          pd_item_id: pdItemId, tenant_id: tid,
+          product_name: rfq.item_description || null,
+          status: 'waiting_for_assets',
+          assets_required: assetNames.map(a => ({ name: a, received: false })),
+          priority: 999, artwork_types: []
+        };
+        await fetch(SUPA_URL + '/rest/v1/artwork_projects', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify(apPayload) });
+      }
+    }
+  } catch (e) { console.error('artwork_projects create', e); }
 }
 
 // Action buttons reuse the existing AI email draft modal (openQuoteEmailModal).
@@ -1997,6 +2026,12 @@ function openQuoteEmailModal(action, ctx, onConfirm, opts) {
     qemEl('qem-progress').textContent = opts.progressText || '';
     qemEl('qem-msg').style.display = 'none';
     qemEl('qem-send').textContent = 'Send & Confirm ✉';
+    // PART 3: factory asset request panel — only for 'approved' (rendered from the AI body in qemDraft).
+    const assetsPanel = qemEl('qem-assets-panel');
+    if (action === 'approved') {
+      const al = qemEl('qem-assets-list'); if (al) al.innerHTML = '<div style="font-size:12px;color:var(--muted,#94a3b8);">Generating asset list…</div>';
+      if (assetsPanel) assetsPanel.style.display = 'block';
+    } else if (assetsPanel) { assetsPanel.style.display = 'none'; }
     qemEl('qem-modal').style.display = 'flex';
     qemDraft();
   });
@@ -2012,6 +2047,34 @@ function qemFallbackBody(action, factoryName, product) {
     more_info: 'Dear ' + factoryName + ', thank you for your quotation for ' + product + '. We require additional information before proceeding. Please provide further details on your submission.' + sign
   };
   return t[action] || t.followup;
+}
+
+// PART 3: parse / render / rebuild the numbered asset list from the approval email body.
+function qemExtractAssets(body) {
+  const out = [];
+  (body || '').split('\n').forEach(ln => { const m = ln.match(/^\s*\d+[\.\)]\s+(.+\S)\s*$/); if (m) out.push(m[1].trim()); });
+  return out;
+}
+function qemRenderAssetsFromBody() {
+  const el = qemEl('qem-assets-list'); if (!el) return;
+  const items = qemExtractAssets((qemEl('qem-body') || {}).value || '');
+  if (!items.length) { el.innerHTML = '<div style="font-size:12px;color:var(--muted,#94a3b8);">No asset list detected in the email — the factory will be asked for assets via the portal.</div>'; return; }
+  el.innerHTML = items.map(a => `<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:var(--text,#e2e8f0);cursor:pointer;"><input type="checkbox" class="qem-asset-cb" value="${esc(a)}" checked style="width:16px;height:16px;cursor:pointer;flex:0 0 auto;"><span>${esc(a)}</span></label>`).join('');
+}
+function getCheckedQemAssets() {
+  return Array.prototype.slice.call(document.querySelectorAll('.qem-asset-cb')).filter(cb => cb.checked).map(cb => cb.value);
+}
+function qemRebuildBody(body, checked) {
+  const SENT = 'QEM_ASSET_LIST';
+  const lines = (body || '').split('\n'); const out = []; let placed = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*\d+[\.\)]\s+\S/.test(lines[i])) { if (!placed) { out.push(SENT); placed = true; } }
+    else { out.push(lines[i]); }
+  }
+  const listText = (checked || []).map((a, i) => (i + 1) + '. ' + a).join('\n');
+  let joined = out.join('\n');
+  if (placed) joined = joined.replace(SENT, listText);
+  return joined;
 }
 
 async function qemDraft() {
@@ -2037,6 +2100,8 @@ async function qemDraft() {
     msg.textContent = '⚠ AI draft unavailable — a standard template was pre-filled. Please review and edit before sending.';
     msg.style.color = '#fcd34d'; msg.style.background = '#4a3a0e'; msg.style.display = 'block';
   }
+  // PART 3: build the editable asset checklist from the drafted body.
+  if (s.action === 'approved') qemRenderAssetsFromBody();
   sub.disabled = false; bod.disabled = false; send.disabled = false; regen.disabled = false;
 }
 function qemRegenerate() { qemDraft(); }
@@ -2051,8 +2116,14 @@ async function qemSend() {
   const s = qemState, send = qemEl('qem-send');
   if (send.disabled) return;
   const finalSubject = qemEl('qem-subject').value.trim();
-  const finalBody = qemEl('qem-body').value.trim();
+  let finalBody = qemEl('qem-body').value.trim();
   if (!finalBody) { alert('Email body is empty.'); return; }
+  // PART 3: rebuild the body with ONLY the checked assets and stash them for the artwork project.
+  if (s.action === 'approved') {
+    s.assets = getCheckedQemAssets();
+    finalBody = qemRebuildBody(finalBody, s.assets);
+    qemEl('qem-body').value = finalBody;
+  }
   send.disabled = true; send.textContent = 'Sending…';
   qemEl('qem-modal').style.display = 'none';
   try {

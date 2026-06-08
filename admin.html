@@ -2323,8 +2323,8 @@
     <textarea id="qem-body" rows="10" placeholder="Drafting…" style="min-height:240px;"></textarea>
     <!-- Factory Asset Request panel — shown only for the 'approved' (accept quote) action -->
     <div id="qem-assets-panel" style="display:none;margin-top:12px;border:1px solid #e0e0d8;border-radius:9px;padding:12px 14px;background:#faf9f4;">
-      <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Factory Asset Request</div>
-      <div style="font-size:11px;color:#888;margin-bottom:10px;">Pre-selected from the product category. These are appended to the email as a numbered list and tracked in the artwork project. Check/uncheck as needed.</div>
+      <div style="font-size:14px;font-weight:700;color:#1a1a2e;margin-bottom:4px;">Assets Being Requested:</div>
+      <div style="font-size:11px;color:#888;margin-bottom:10px;">Parsed from the approval email. Uncheck any to remove them from the email and the artwork project.</div>
       <div id="qem-assets-list"></div>
     </div>
     <div class="modal-btns" style="justify-content:space-between;">
@@ -5894,13 +5894,10 @@ function openQuoteEmailModal(action,ctx,onConfirm,opts){
     g('qem-msg').style.display='none';
     g('qem-send').textContent='Send & Confirm ✉';
     // Factory asset request checklist — only for the 'approved' (accept quote) action.
+    // The list is parsed from the AI-generated approval email (qemRenderAssetsFromBody, called by qemDraft).
     var assetsPanel=g('qem-assets-panel');
     if(action==='approved'){
-      try{
-        var rr=await fetch(SB+'/rest/v1/rfqs?id=eq.'+ctx.rfq_id+'&select=category,is_cosmetic&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-        var rrows=rr.ok?await rr.json():[];
-        renderQemAssets(rrows[0]||{});
-      }catch(e){renderQemAssets({});}
+      if(g('qem-assets-list'))g('qem-assets-list').innerHTML='<div style="font-size:12px;color:#888;">Generating asset list…</div>';
       if(assetsPanel)assetsPanel.style.display='block';
     }else{
       if(assetsPanel)assetsPanel.style.display='none';
@@ -5946,6 +5943,8 @@ async function qemDraft(){
     msg.textContent='⚠ AI draft unavailable — a standard template was pre-filled. Please review and edit before sending.';
     msg.style.color='#886600';msg.style.background='#fff8e0';msg.style.display='block';
   }
+  // PART 3: build the editable asset checklist from the drafted body.
+  if(s.action==='approved')qemRenderAssetsFromBody();
   sub.disabled=false;bod.disabled=false;send.disabled=false;regen.disabled=false;
 }
 function qemRegenerate(){qemDraft();}
@@ -5962,15 +5961,13 @@ async function qemSend(){
   var finalSubject=g('qem-subject').value.trim();
   var finalBody=g('qem-body').value.trim();
   if(!finalBody){alert('Email body is empty.');return;}
-  // For the accept-quote action, append the selected factory assets as a numbered
-  // list and stash the selection so acceptQuote() can persist it to the artwork project.
+  // PART 3: rebuild the body so its numbered asset list contains ONLY the checked items,
+  // and stash the selection so acceptQuote() can persist it to the artwork project.
   if(s.action==='approved'){
     var assets=getCheckedQemAssets();
     s.assets=assets;
-    if(assets.length){
-      finalBody+='\n\nPlease provide the following assets at your earliest convenience:\n'+
-        assets.map(function(a,i){return (i+1)+'. '+a;}).join('\n');
-    }
+    finalBody=qemRebuildBody(finalBody,assets);
+    g('qem-body').value=finalBody;
   }
   send.disabled=true;send.textContent='Sending…';
   g('qem-modal').classList.remove('on');
@@ -6164,6 +6161,41 @@ function getCheckedQemAssets(){
   return Array.prototype.slice.call(document.querySelectorAll('.qem-asset-cb'))
     .filter(function(cb){return cb.checked;})
     .map(function(cb){return cb.value;});
+}
+// PART 3: parse the numbered asset list out of the AI-generated email body.
+function qemExtractAssets(body){
+  var out=[];
+  (body||'').split('\n').forEach(function(ln){
+    var m=ln.match(/^\s*\d+[\.\)]\s+(.+\S)\s*$/);
+    if(m)out.push(m[1].trim());
+  });
+  return out;
+}
+// Render the parsed assets as editable (all-checked) checkboxes under "Assets Being Requested:".
+function qemRenderAssetsFromBody(){
+  var el=g('qem-assets-list'); if(!el)return;
+  var items=qemExtractAssets(g('qem-body')?g('qem-body').value:'');
+  if(!items.length){ el.innerHTML='<div style="font-size:12px;color:#888;">No asset list detected in the email — the factory will be asked for assets via the portal.</div>'; return; }
+  el.innerHTML=items.map(function(a){
+    var safe=a.replace(/"/g,'&quot;');
+    return '<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;color:#1a1a2e;cursor:pointer;">'+
+      '<input type="checkbox" class="qem-asset-cb" value="'+safe+'" checked style="width:16px;height:16px;cursor:pointer;flex:0 0 auto;">'+
+      '<span>'+esc(a)+'</span></label>';
+  }).join('');
+}
+// Rebuild the email body so its numbered asset list contains ONLY the checked items (renumbered, in place).
+function qemRebuildBody(body, checked){
+  var SENT='QEM_ASSET_LIST';
+  var lines=(body||'').split('\n'), out=[], placed=false;
+  for(var i=0;i<lines.length;i++){
+    if(/^\s*\d+[\.\)]\s+\S/.test(lines[i])){
+      if(!placed){ out.push(SENT); placed=true; }
+    }else{ out.push(lines[i]); }
+  }
+  var listText=(checked||[]).map(function(a,i){return (i+1)+'. '+a;}).join('\n');
+  var joined=out.join('\n');
+  if(placed) joined=joined.replace(SENT, listText);
+  return joined;
 }
 
 async function acceptQuote(quoteId,rfqId,factoryName,override){
