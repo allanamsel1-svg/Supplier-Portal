@@ -5823,7 +5823,11 @@ function renderQuoteCard(q,rfq,idx,versions,peerStats){
 
 function toggleQuoteCard(id){
   var body=g('qbody-'+id);
-  if(body)body.classList.toggle('open');
+  if(!body)return;
+  var willOpen=!body.classList.contains('open');
+  // One card open at a time — collapse any other open quote card first.
+  document.querySelectorAll('.quote-card-body.open').forEach(function(b){ if(b!==body) b.classList.remove('open'); });
+  body.classList.toggle('open',willOpen);
 }
 
 // ─────────────────────────────────────────────────────────────

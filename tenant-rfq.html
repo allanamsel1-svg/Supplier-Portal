@@ -512,6 +512,24 @@
   </div>
 </div>
 
+<style>
+/* Expandable quote cards (Quotes Received) */
+.tq-card { background: var(--card,#1e293b); border: 1px solid var(--border,#334155); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.tq-head { display: flex; align-items: center; gap: 10px; padding: 11px 13px; cursor: pointer; }
+.tq-head:hover { background: rgba(148,163,184,0.06); }
+.tq-chev { color: var(--text2,#94a3b8); font-size: 14px; flex-shrink: 0; }
+.tq-body { display: none; padding: 12px 13px; border-top: 1px solid var(--border,#334155); }
+.tq-body.open { display: block; }
+.tq-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border,#334155); }
+.tq-kv .tq-k { color: var(--text2,#94a3b8); }
+.tq-kv .tq-v { font-weight: 600; text-align: right; word-break: break-word; }
+.tq-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tq-btn { padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 7px; cursor: pointer; font-family: inherit; border: 1px solid var(--border,#334155); background: var(--bg2,#0d1424); color: var(--text,#e2e8f0); }
+.tq-btn.green { background: #16a34a; border-color: #16a34a; color: #fff; }
+.tq-btn.amber { background: #b45309; border-color: #b45309; color: #fff; }
+.tq-btn.red { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+</style>
+
 <script src="/tenant-shared.js"></script>
 <script>
 const TABS = ['rfq', 'submitted', 'pd', 'skus'];
@@ -1615,6 +1633,105 @@ function renderRFQs() {
   box.querySelectorAll('tr.clickable').forEach(tr => tr.addEventListener('click', () => openRFQ(tr.dataset.id)));
 }
 
+// ── Quote cards (expandable, one open at a time) ──
+let tQuotes = [];
+function tqList(v) { return Array.isArray(v) ? (v.length ? v.map(esc).join(', ') : '—') : (v ? esc(v) : '—'); }
+function tScoreBadge(qt) {
+  if (qt.score_overall_v2 == null) return '';
+  const tier = qt.score_tier || '';
+  const c = tier === 'green' ? ['#16a34a', 'rgba(34,197,94,0.15)']
+    : tier === 'yellow' ? ['#eab308', 'rgba(234,179,8,0.15)']
+    : tier === 'red' ? ['#dc2626', 'rgba(239,68,68,0.15)']
+    : ['#94a3b8', 'rgba(148,163,184,0.15)'];
+  return `<span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;background:${c[1]};color:${c[0]};margin-left:6px;">${Math.round(qt.score_overall_v2)}/100${tier ? ' · ' + esc(tier) : ''}</span>`;
+}
+function tenantQuoteCard(qt) {
+  const f = qt.factories || {};
+  const fob = parseFloat(qt.unit_fob_price) || 0;
+  const pkg = parseFloat(qt.packaging_price_per_unit) || 0;
+  const total = qt.total_fob_price != null ? parseFloat(qt.total_fob_price) : (fob + pkg);
+  const sb = qt.score_breakdown_v2;
+  const dims = (sb && Array.isArray(sb.dimensions)) ? sb.dimensions : [];
+  const kvr = (k, v) => `<div class="tq-kv"><span class="tq-k">${esc(k)}</span><span class="tq-v">${(v == null || v === '') ? '—' : v}</span></div>`;
+  const specs = qt.factory_specifications || qt.factory_description || '';
+  const qid = esc(qt.id);
+  return `<div class="tq-card" id="tqcard-${qid}">
+    <div class="tq-head" onclick="toggleQuoteCard('${qid}')">
+      <div style="min-width:0;flex:1;">
+        <div style="font-weight:600;">${esc(f.factory_name_english || 'Factory')} — ${esc(qt.factory_model_number || ('Option ' + (qt.quote_option || '')))}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:3px;">${statusBadge(qt.status)}${total ? ' · ' + money(total) + ' total FOB' : ''}${tScoreBadge(qt)}</div>
+      </div>
+      <span class="tq-chev">▾</span>
+    </div>
+    <div class="tq-body" id="tqbody-${qid}">
+      ${kvr('Factory', esc(f.factory_name_english || '—'))}
+      ${kvr('Quote option / model #', esc(qt.factory_model_number || qt.quote_option || '—'))}
+      ${kvr('Unit FOB price', fob ? money(fob) : '—')}
+      ${kvr('Packaging price', pkg ? money(pkg) : '—')}
+      ${kvr('Total FOB', total ? money(total) : '—')}
+      ${kvr('MOQ', qt.moq != null ? Number(qt.moq).toLocaleString() : '—')}
+      ${kvr('Sample lead time', qt.sample_lead_time_days != null ? qt.sample_lead_time_days + ' days' : '—')}
+      ${kvr('Production lead time', qt.production_lead_time_days != null ? qt.production_lead_time_days + ' days' : '—')}
+      ${kvr('Country of manufacture', tqList(qt.country_of_manufacture))}
+      ${kvr('Certifications confirmed', tqList(qt.certifications_confirmed))}
+      ${kvr('Certifications can obtain', tqList(qt.certifications_can_obtain))}
+      ${kvr('Certifications cannot', tqList(qt.certifications_cannot))}
+      ${specs ? `<div class="tq-kv" style="flex-direction:column;align-items:flex-start;gap:3px;"><span class="tq-k">Specifications</span><span class="tq-v" style="text-align:left;white-space:pre-wrap;font-weight:400;">${esc(specs)}</span></div>` : ''}
+      ${dims.length ? `<div style="margin-top:8px;border-top:1px solid var(--border,#334155);padding-top:8px;">
+        <div onclick="event.stopPropagation();var n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.firstChild.textContent=n.style.display==='none'?'▸':'▾';" style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent,#2244cc);"><span>▸</span> Per-criterion scorecard</div>
+        <div style="display:none;margin-top:6px;">${dims.map(d => `<div class="tq-kv"><span class="tq-k">${esc(d.label || '')}${d.weight ? ' (/' + d.weight + ')' : ''}</span><span class="tq-v">${d.score != null ? Number(d.score).toFixed(1) : '—'}</span></div>${d.detail ? `<div style="font-size:11px;color:var(--text2);margin:-2px 0 6px;">${esc(d.detail)}</div>` : ''}`).join('')}</div>
+      </div>` : ''}
+      <div class="tq-actions">
+        <button class="tq-btn" onclick="event.stopPropagation();tScoreQuote('${qid}')">✦ Score with AI</button>
+        <button class="tq-btn green" onclick="event.stopPropagation();tQuoteAction('approved','${qid}')">✓ Approve</button>
+        <button class="tq-btn amber" onclick="event.stopPropagation();tQuoteAction('more_info','${qid}')">↩ Request Info</button>
+        <button class="tq-btn red" onclick="event.stopPropagation();tQuoteAction('rejected','${qid}')">✗ Reject</button>
+      </div>
+    </div>
+  </div>`;
+}
+function toggleQuoteCard(id) {
+  const body = document.getElementById('tqbody-' + id);
+  if (!body) return;
+  const willOpen = !body.classList.contains('open');
+  document.querySelectorAll('.tq-body.open').forEach(b => { if (b !== body) b.classList.remove('open'); });
+  const chev = document.querySelector('#tqcard-' + id + ' .tq-chev'); if (chev) chev.textContent = willOpen ? '▴' : '▾';
+  document.querySelectorAll('.tq-card .tq-chev').forEach(c => { if (c !== chev) c.textContent = '▾'; });
+  body.classList.toggle('open', willOpen);
+}
+function tQuoteCtx(quoteId) {
+  const q = tQuotes.find(x => x.id === quoteId) || {};
+  const f = q.factories || {};
+  return { quote: q, factory: f, ctx: { quote_id: quoteId, rfq_id: q.rfq_id, factory_id: q.factory_id, factoryName: f.factory_name_english, salesEmail: f.sales_email } };
+}
+// Action buttons reuse the existing AI email draft modal (openQuoteEmailModal).
+async function tQuoteAction(action, quoteId) {
+  const { factory, ctx } = tQuoteCtx(quoteId);
+  if (!ctx.rfq_id) { alert('Quote not found.'); return; }
+  const statusMap = { approved: 'accepted', rejected: 'rejected', more_info: 'more_info_requested' };
+  await openQuoteEmailModal(action, ctx, async (subject, body) => {
+    const patch = { status: statusMap[action] || 'more_info_requested' };
+    if (action === 'approved') patch.is_selected = true;
+    await fetch(SUPA_URL + '/rest/v1/rfq_quotes?id=eq.' + encodeURIComponent(quoteId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+    if (factory.sales_email) await tenantSendEmail(factory.sales_email, factory.sales_contact_name || factory.factory_name_english || 'Team', subject, body, ctx.factory_id, ctx.rfq_id);
+    await maybeCloseRfq(ctx.rfq_id);
+  });
+  openRFQ(ctx.rfq_id);
+}
+// Score with AI — calls the existing scoring endpoint, then reloads the panel.
+async function tScoreQuote(quoteId) {
+  const { ctx } = tQuoteCtx(quoteId);
+  try {
+    if (typeof toast === 'function') toast('Scoring quote…');
+    const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
+    const r = await fetch('/api/score-quote', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, body: JSON.stringify({ quote_id: quoteId }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { alert('Scoring failed: ' + (d.error || r.status)); return; }
+    if (typeof toast === 'function') toast('Quote scored.');
+    if (ctx.rfq_id) openRFQ(ctx.rfq_id);
+  } catch (e) { alert('Error: ' + (e && e.message || e)); }
+}
+
 async function openRFQ(id) {
   const r = rfqs.find(x => x.id === id);
   if (!r) return;
@@ -1689,7 +1806,7 @@ async function openRFQ(id) {
 
   const [assignments, quotes, images] = await Promise.all([
     supa(`rfq_factory_assignments?rfq_id=eq.${id}&select=*,factories(factory_name_english,sales_email,sales_contact_name,sales_wechat,sales_whatsapp)&order=sent_at.desc`),
-    supa(`rfq_quotes?rfq_id=eq.${id}&select=id,factory_id,quote_option,status,total_fob_price,unit_fob_price,score_overall_v2,score_tier,compliance_status,factory_model_number&order=score_overall_v2.desc.nullslast`),
+    supa(`rfq_quotes?rfq_id=eq.${id}&status=neq.draft&select=*,factories(factory_name_english,country,sales_email,sales_contact_name)&order=score_overall_v2.desc.nullslast`),
     supa(`rfq_images?rfq_id=eq.${id}&order=sort_order.asc`),
   ]);
   const nrImgDetailSrc = im => { const d = (im.image_data || '').trim(); if (d) return d.indexOf('data:') === 0 ? d : ('data:image/jpeg;base64,' + d); return (im.image_url || '').trim(); };
@@ -1721,15 +1838,9 @@ async function openRFQ(id) {
       <div class="si-meta">${statusBadge(a.status)} · sent ${fmtDate(a.sent_at)}${a.quoted_at ? ' · quoted ' + fmtDate(a.quoted_at) : ''}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px;">No factory assignments.</div>';
 
-  const quoteItems = quotes.length ? quotes.map(qt => `<div class="sub-item">
-      <div class="si-title">${esc(qt.factory_model_number || ('Option ' + (qt.quote_option || '')))} ${qt.score_tier ? '· ' + esc(qt.score_tier) : ''}</div>
-      <div class="si-meta">${[
-        qt.status && 'status: ' + qt.status,
-        qt.total_fob_price != null && 'FOB ' + money(qt.total_fob_price),
-        qt.score_overall_v2 != null && 'score ' + qt.score_overall_v2,
-        qt.compliance_status && 'compliance: ' + qt.compliance_status,
-      ].filter(Boolean).map(esc).join(' · ') || '—'}</div>
-    </div>`).join('') : '<div class="empty" style="padding:12px;">No quotes received.</div>';
+  // BUG FIX: expandable quote cards (one open at a time) with full detail + action buttons.
+  tQuotes = quotes;
+  const quoteItems = quotes.length ? quotes.map(tenantQuoteCard).join('') : '<div class="empty" style="padding:12px;">No quotes received.</div>';
 
   const reviewBanner = r.status === 'pending_review'
     ? `<div style="background:#fff8e0;border:1px solid #e0c840;border-radius:10px;padding:12px 14px;margin-bottom:12px;color:#665500;font-size:13px;">⏳ <b>Under Review</b> — TBG Sourcing is reviewing your submission.<div style="font-size:11px;color:#998800;margin-top:3px;">Submitted ${fmtDate(r.created_at)}</div></div>`
