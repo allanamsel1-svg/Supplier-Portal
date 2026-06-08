@@ -69,6 +69,13 @@
       <select class="filter-select" id="rfqStatus"><option value="all">All statuses</option></select>
       <button class="nr-btn top" onclick="openNewRfqModal()">+ New RFQ</button>
     </div>
+    <div id="critical-items-widget" style="display:none;margin-bottom:16px;padding:14px 16px;background:#fff5f5;border:2px solid #e03030;border-radius:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:14px;font-weight:700;color:#b00;">⚠ Critical Open Items — Awaiting Factory Assets</div>
+        <span id="critical-items-count" style="font-size:11px;color:#b00;font-weight:600;"></span>
+      </div>
+      <div id="critical-items-list" style="font-size:12px;"></div>
+    </div>
     <div id="box-rfq"><div class="loading">Loading RFQs…</div></div>
   </div>
 
@@ -1439,6 +1446,45 @@ async function loadRFQs() {
   statuses.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); });
   renderRFQs();
   if (document.getElementById('pane-submitted') && document.getElementById('pane-submitted').classList.contains('active')) renderSubmittedQueue();
+  loadCriticalItems();
+}
+
+// ── Dashboard widget: Critical Open Items — Awaiting Factory Assets ──
+async function loadCriticalItems() {
+  const wrap = document.getElementById('critical-items-widget');
+  const list = document.getElementById('critical-items-list');
+  const cnt = document.getElementById('critical-items-count');
+  if (!list) return;
+  const sel = 'id,product_name,assets_required,created_at,pd_item_id,' +
+    'product_development_items!artwork_projects_pd_item_id_fkey(factory_id,factories(factory_name_english),rfqs(item_description,project_number))';
+  const rows = await supa(`artwork_projects?tenant_id=eq.${TID}&status=eq.waiting_for_assets&order=created_at.asc&select=${encodeURIComponent(sel)}`);
+  if (!Array.isArray(rows) || !rows.length) { if (wrap) wrap.style.display = 'none'; return; }
+  if (wrap) wrap.style.display = 'block';
+  if (cnt) cnt.textContent = rows.length + (rows.length === 1 ? ' item' : ' items');
+  const now = Date.now();
+  list.innerHTML = rows.map(ap => {
+    const pdi = ap.product_development_items || {};
+    const fac = pdi.factories || {};
+    const rfq = pdi.rfqs || {};
+    const days = Math.floor((now - new Date(ap.created_at).getTime()) / 86400000);
+    const dayColor = days >= 7 ? '#b00' : (days >= 3 ? '#c87000' : '#666');
+    const dayWeight = days >= 7 ? '700' : '400';
+    const missing = (Array.isArray(ap.assets_required) ? ap.assets_required : []).filter(a => a && a.received !== true).map(a => a.name);
+    const projName = `${rfq.project_number || ''} · ${ap.product_name || rfq.item_description || '(unnamed)'}`.replace(/^ · /, '');
+    return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff;border:1px solid #f0c0c0;border-radius:8px;margin-bottom:8px;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;color:var(--text,#1a1a2e);">${esc(projName)}</div>
+        <div style="font-size:11px;color:#666;margin-top:2px;">${esc(fac.factory_name_english || '(factory unknown)')} · <span style="color:${dayColor};font-weight:${dayWeight};">${days} day${days === 1 ? '' : 's'} waiting</span></div>
+        <div style="font-size:11px;color:#888;margin-top:4px;">Missing: ${missing.length ? esc(missing.join(', ')) : '<span style="color:#1a7a1a;">none</span>'}</div>
+      </div>
+      <button onclick="followUpAsset('${esc(ap.id)}')" style="flex:0 0 auto;padding:6px 12px;background:#b00;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Follow Up</button>
+    </div>`;
+  }).join('');
+}
+
+// Tenants cannot email factories directly; the daily cron handles outreach.
+function followUpAsset(apId) {
+  alert('Our sourcing team automatically sends the factory a follow-up reminder every day until these assets are received.');
 }
 
 // ── Submitted-for-review queue (status='pending_review') ──

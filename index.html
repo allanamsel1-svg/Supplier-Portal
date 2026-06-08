@@ -2075,6 +2075,7 @@ async function loadSamples(){
     pdItems.forEach(function(pd){
       loadPdAssetsList(pd.id);
       loadPdOutstandingActions(pd.id);
+      loadArtworkProgress(pd.id);
     });
     // Update badge
     var attentionCount=pdItems.filter(function(p){return p.status==='awaiting_initial_sample'||p.status==='in_revision';}).length;
@@ -2249,6 +2250,7 @@ function renderPDCard(pd,subs,destinations){
           '<button onclick="uploadPdAssetOther(\''+pd.id+'\')" style="margin-top:6px;padding:6px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">'+t('common.upload')+'</button>'+
         '</div>'+
       '</div>'+
+      '<div id="pd-asset-progress-'+pd.id+'" style="font-size:12px;font-weight:600;margin-top:8px;"></div>'+
       '<div id="pd-assets-list-'+pd.id+'" style="margin-top:8px;font-size:12px;color:#888;">'+t('samples.loadingAssets')+'</div>'+
       '<div id="pd-asset-msg-'+pd.id+'" style="font-size:11px;margin-top:6px;"></div>'+
     '</div>';
@@ -2368,6 +2370,7 @@ async function uploadPdAssets(pdId, docType, inputId) {
 
   var files = Array.from(input.files);
   var successCount = 0, failCount = 0;
+  var uploadedFiles = [];
   for (var i = 0; i < files.length; i++) {
     var file = files[i];
     if (file.size > 25 * 1024 * 1024) {
@@ -2408,12 +2411,18 @@ async function uploadPdAssets(pdId, docType, inputId) {
         body: JSON.stringify(assetPayload)
       });
       if(!dr.ok){ failCount++; continue; }
+      uploadedFiles.push({ file_name: file.name, file_path: storagePath, file_size: file.size });
       successCount++;
     } catch(e) {
       failCount++;
     }
   }
   input.value = '';
+  // Mirror uploads into the artwork project (asset-request flow): record assets,
+  // mark the matching required asset(s) received, and promote when all are in.
+  if (successCount > 0) {
+    try { await syncArtworkAssets(pdId, docType, uploadedFiles); } catch(e) { /* non-fatal */ }
+  }
   if(msg){
     if(successCount > 0 && failCount === 0){
       msg.style.color='#1a7a1a';
@@ -2443,6 +2452,104 @@ async function uploadPdAssetOther(pdId) {
   // Delegate to the standard upload helper with the typed value
   await uploadPdAssets(pdId, t, 'pd-oth-input-'+pdId);
   if (typeEl) typeEl.value = '';
+}
+
+// ── Artwork asset-request flow ──────────────────────────────────────────────
+// Maps a factory upload doc-type (e.g. "Product Image", "3D STEP File", or a
+// free-typed "Other" type) to the matching required-asset name(s) on the
+// artwork project's assets_required checklist.
+function matchRequiredAssetNames(docType, requiredArr) {
+  var s = (docType || '').toLowerCase();
+  var keys;
+  if (/image|photo/.test(s)) keys = ['product image'];
+  else if (/tech|drawing|spec/.test(s)) keys = ['technical drawing','spec sheet'];
+  else if (/die/.test(s)) keys = ['dieline'];
+  else if (/step|3d|cad/.test(s)) keys = ['step','3d','cad'];
+  else if (/quick.?start/.test(s)) keys = ['quick start'];
+  else if (/manual/.test(s)) keys = ['user manual','manual'];
+  else if (/content/.test(s)) keys = ['contents'];
+  else if (/lifestyle|in.?use/.test(s)) keys = ['lifestyle','in-use'];
+  else if (/video/.test(s)) keys = ['video'];
+  else keys = [s];
+  return (requiredArr || []).filter(function(a){
+    var n = (a && a.name || '').toLowerCase();
+    return keys.some(function(k){ return k && n.indexOf(k) >= 0; });
+  }).map(function(a){ return a.name; });
+}
+
+// Records uploaded files in artwork_assets, marks matching required assets as
+// received, and promotes the project to ready_for_design once all are in.
+async function syncArtworkAssets(pdId, docType, uploadedFiles) {
+  // Look up the artwork project by pd_item_id (== this PD item's id)
+  var apR = await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdId+'&select=id,assets_required,status&limit=1', {
+    headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+  });
+  if (!apR.ok) return;
+  var apRows = await apR.json();
+  var ap = Array.isArray(apRows) && apRows[0];
+  if (!ap) return; // no artwork project for this PD item — nothing to sync
+
+  // 1. Record each uploaded file in artwork_assets
+  for (var i = 0; i < (uploadedFiles || []).length; i++) {
+    var uf = uploadedFiles[i];
+    await fetch(SB+'/rest/v1/artwork_assets', {
+      method:'POST',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify({
+        artwork_project_id: ap.id,
+        asset_type: docType,
+        file_name: uf.file_name,
+        file_url: uf.file_path,
+        file_size_bytes: uf.file_size || null
+      })
+    }).catch(function(){});
+  }
+
+  // 2. Mark matching required assets as received
+  var required = Array.isArray(ap.assets_required) ? ap.assets_required : [];
+  var matched = matchRequiredAssetNames(docType, required);
+  var changed = false;
+  required.forEach(function(a){
+    if (a && matched.indexOf(a.name) >= 0 && a.received !== true) { a.received = true; changed = true; }
+  });
+
+  // 3. Promote to ready_for_design when every required asset has been received
+  var allReceived = required.length > 0 && required.every(function(a){ return a && a.received === true; });
+  var patch = {};
+  if (changed) patch.assets_required = required;
+  if (allReceived && ap.status === 'waiting_for_assets') patch.status = 'ready_for_design';
+  if (Object.keys(patch).length) {
+    await fetch(SB+'/rest/v1/artwork_projects?id=eq.'+ap.id, {
+      method:'PATCH',
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body: JSON.stringify(patch)
+    });
+  }
+
+  // 4. Refresh the factory-facing progress indicator
+  loadArtworkProgress(pdId);
+}
+
+// Renders "Assets submitted: N of M" for a PD item's artwork project.
+async function loadArtworkProgress(pdId) {
+  var el = g('pd-asset-progress-'+pdId);
+  if (!el) return;
+  try {
+    var apR = await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdId+'&select=assets_required,status&limit=1', {
+      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN}
+    });
+    if (!apR.ok) { el.textContent = ''; return; }
+    var rows = await apR.json();
+    var ap = Array.isArray(rows) && rows[0];
+    if (!ap || !Array.isArray(ap.assets_required) || !ap.assets_required.length) { el.textContent = ''; return; }
+    var total = ap.assets_required.length;
+    var got = ap.assets_required.filter(function(a){ return a && a.received === true; }).length;
+    var done = (ap.status === 'ready_for_design') || (got >= total);
+    el.textContent = done
+      ? ('✓ All assets submitted (' + got + ' of ' + total + ') — ready for design')
+      : ('Assets submitted: ' + got + ' of ' + total);
+    el.style.color = done ? '#1a7a1a' : '#886600';
+  } catch(e) { el.textContent = ''; }
 }
 
 
