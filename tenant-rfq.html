@@ -513,21 +513,23 @@
 </div>
 
 <style>
-/* Expandable quote cards (Quotes Received) */
-.tq-card { background: var(--card,#1e293b); border: 1px solid var(--border,#334155); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
-.tq-head { display: flex; align-items: center; gap: 10px; padding: 11px 13px; cursor: pointer; }
-.tq-head:hover { background: rgba(148,163,184,0.06); }
-.tq-chev { color: var(--text2,#94a3b8); font-size: 14px; flex-shrink: 0; }
-.tq-body { display: none; padding: 12px 13px; border-top: 1px solid var(--border,#334155); }
-.tq-body.open { display: block; }
-.tq-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border,#334155); }
-.tq-kv .tq-k { color: var(--text2,#94a3b8); }
-.tq-kv .tq-v { font-weight: 600; text-align: right; word-break: break-word; }
+/* Expandable quote cards (Quotes Received) — always light with dark text, regardless of page theme */
+.tq-card { background: #fff !important; color: #1a1a2e !important; border: 1px solid #e0e0d8; border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+.tq-card * { color: #1a1a2e; }
+.tq-head { display: flex; align-items: center; gap: 10px; padding: 11px 13px; cursor: pointer; background: #f8f8f4; color: #1a1a2e; }
+.tq-head:hover { background: #f0f0ea; }
+.tq-head .tq-chev { color: #888; }
+.tq-chev { color: #888; font-size: 14px; flex-shrink: 0; }
+.tq-body { display: none; padding: 12px 13px; border-top: 1px solid #e0e0d8; background: #fff; color: #1a1a2e; }
+.tq-body.open { display: block !important; }
+.tq-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid #eee; }
+.tq-kv .tq-k { color: #666; }
+.tq-kv .tq-v { font-weight: 600; text-align: right; word-break: break-word; color: #1a1a2e; }
 .tq-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.tq-btn { padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 7px; cursor: pointer; font-family: inherit; border: 1px solid var(--border,#334155); background: var(--bg2,#0d1424); color: var(--text,#e2e8f0); }
-.tq-btn.green { background: #16a34a; border-color: #16a34a; color: #fff; }
-.tq-btn.amber { background: #b45309; border-color: #b45309; color: #fff; }
-.tq-btn.red { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.tq-btn { padding: 8px 14px; font-size: 12px; font-weight: 600; border-radius: 7px; cursor: pointer; font-family: inherit; border: 1px solid #d0d0c8; background: #f5f5f0; color: #1a1a2e; }
+.tq-btn.green { background: #16a34a !important; border-color: #16a34a; color: #fff !important; }
+.tq-btn.amber { background: #b45309 !important; border-color: #b45309; color: #fff !important; }
+.tq-btn.red { background: #b91c1c !important; border-color: #b91c1c; color: #fff !important; }
 </style>
 
 <script src="/tenant-shared.js"></script>
@@ -1671,7 +1673,7 @@ function tenantQuoteCard(qt) {
     <div class="tq-head" onclick="toggleQuoteCard('${qid}')">
       <div style="min-width:0;flex:1;">
         <div style="font-weight:600;">${esc(f.factory_name_english || 'Factory')} — ${esc(qt.factory_model_number || ('Option ' + (qt.quote_option || '')))}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:3px;">${statusBadge(qt.status)}${total ? ' · ' + money(total) + ' total FOB' : ''}${tScoreBadge(qt)}</div>
+        <div style="font-size:12px;color:#666;margin-top:3px;">${statusBadge(qt.status)}${total ? ' · ' + money(total) + ' total FOB' : ''}${tScoreBadge(qt)}</div>
       </div>
       <span class="tq-chev">▾</span>
     </div>
@@ -1689,9 +1691,9 @@ function tenantQuoteCard(qt) {
       ${kvr('Certifications can obtain', tqList(qt.certifications_can_obtain))}
       ${kvr('Certifications cannot', tqList(qt.certifications_cannot))}
       ${specs ? `<div class="tq-kv" style="flex-direction:column;align-items:flex-start;gap:3px;"><span class="tq-k">Specifications</span><span class="tq-v" style="text-align:left;white-space:pre-wrap;font-weight:400;">${esc(specs)}</span></div>` : ''}
-      ${dims.length ? `<div style="margin-top:8px;border-top:1px solid var(--border,#334155);padding-top:8px;">
-        <div onclick="event.stopPropagation();var n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.firstChild.textContent=n.style.display==='none'?'▸':'▾';" style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent,#2244cc);"><span>▸</span> Per-criterion scorecard</div>
-        <div style="display:none;margin-top:6px;">${dims.map(d => `<div class="tq-kv"><span class="tq-k">${esc(d.label || '')}${d.weight ? ' (/' + d.weight + ')' : ''}</span><span class="tq-v">${d.score != null ? Number(d.score).toFixed(1) : '—'}</span></div>${d.detail ? `<div style="font-size:11px;color:var(--text2);margin:-2px 0 6px;">${esc(d.detail)}</div>` : ''}`).join('')}</div>
+      ${dims.length ? `<div style="margin-top:8px;border-top:1px solid #e0e0d8;padding-top:8px;">
+        <div onclick="event.stopPropagation();var n=this.nextElementSibling;n.style.display=n.style.display==='none'?'block':'none';this.firstChild.textContent=n.style.display==='none'?'▸':'▾';" style="cursor:pointer;font-size:12px;font-weight:600;color:#2244cc;"><span>▸</span> Per-criterion scorecard</div>
+        <div style="display:none;margin-top:6px;">${dims.map(d => `<div class="tq-kv"><span class="tq-k">${esc(d.label || '')}${d.weight ? ' (/' + d.weight + ')' : ''}</span><span class="tq-v">${d.score != null ? Number(d.score).toFixed(1) : '—'}</span></div>${d.detail ? `<div style="font-size:11px;color:#888;margin:-2px 0 6px;">${esc(d.detail)}</div>` : ''}`).join('')}</div>
       </div>` : ''}
       <div class="tq-actions">
         <button class="tq-btn" onclick="event.stopPropagation();tScoreQuote('${qid}')">✦ Score with AI</button>
@@ -1706,10 +1708,17 @@ function toggleQuoteCard(id) {
   const body = document.getElementById('tqbody-' + id);
   if (!body) return;
   const willOpen = !body.classList.contains('open');
+  // One card open at a time — collapse every other open card first.
   document.querySelectorAll('.tq-body.open').forEach(b => { if (b !== body) b.classList.remove('open'); });
-  const chev = document.querySelector('#tqcard-' + id + ' .tq-chev'); if (chev) chev.textContent = willOpen ? '▴' : '▾';
-  document.querySelectorAll('.tq-card .tq-chev').forEach(c => { if (c !== chev) c.textContent = '▾'; });
+  // Toggle the target body BEFORE any cosmetic chevron work so nothing can block the expand.
   body.classList.toggle('open', willOpen);
+  // Chevron cosmetics (guarded — never throw out of the toggle).
+  try {
+    const card = document.getElementById('tqcard-' + id);
+    document.querySelectorAll('.tq-card .tq-chev').forEach(c => { c.textContent = '▾'; });
+    const chev = card ? card.querySelector('.tq-chev') : null;
+    if (chev) chev.textContent = willOpen ? '▴' : '▾';
+  } catch (e) {}
 }
 function tQuoteCtx(quoteId) {
   const q = tQuotes.find(x => x.id === quoteId) || {};
