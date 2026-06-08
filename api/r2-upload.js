@@ -83,6 +83,19 @@ async function isAuthed(token) {
     return !!(s && new Date(s.expires_at) >= new Date());
   } catch { return false; }
 }
+// Factory asset-upload links are token-gated (no login): accept a non-expired
+// artwork_projects.factory_link_token as authorization for uploads.
+async function isValidFactoryToken(token) {
+  if (!token) return false;
+  try {
+    const r = await fetch(SB_URL + '/rest/v1/artwork_projects?select=factory_link_expires_at&factory_link_token=eq.' + encodeURIComponent(token) + '&limit=1', { headers: H });
+    const arr = r.ok ? await r.json() : [];
+    const row = Array.isArray(arr) ? arr[0] : null;
+    if (!row) return false;
+    if (row.factory_link_expires_at && new Date(row.factory_link_expires_at) < new Date()) return false;
+    return true;
+  } catch { return false; }
+}
 async function readRaw(req) {
   const chunks = [];
   await new Promise((resolve) => { req.on('data', c => chunks.push(typeof c === 'string' ? Buffer.from(c) : c)); req.on('end', resolve); req.on('error', resolve); });
@@ -136,7 +149,7 @@ export default async function handler(req, res) {
 
   try {
     const token = (req.headers.authorization || req.headers.Authorization || '').replace('Bearer ', '').trim();
-    if (!(await isAuthed(token))) return res.status(401).json({ error: true, message: 'Unauthorized' });
+    if (!(await isAuthed(token)) && !(await isValidFactoryToken(token))) return res.status(401).json({ error: true, message: 'Unauthorized' });
     if (!CF_ACCOUNT_ID || !CF_R2_BUCKET || !CF_R2_ACCESS_KEY_ID || !CF_R2_SECRET_ACCESS_KEY) {
       return res.status(200).json({ error: true, message: 'R2 is not configured (missing CF_ACCOUNT_ID / CF_R2_BUCKET / CF_R2_ACCESS_KEY_ID / CF_R2_SECRET_ACCESS_KEY).' });
     }

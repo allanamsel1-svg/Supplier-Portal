@@ -194,6 +194,33 @@ function parseModelJson(text) {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+// Locate the artwork project's factory_link_token for the secure no-login upload link.
+// Looks up by pd_item_id when provided, else walks quote_id → product_development_items → artwork_projects.
+async function findFactoryLinkToken(quoteId, pdItemId) {
+  try {
+    if (pdItemId) {
+      const r = await sb(`artwork_projects?pd_item_id=eq.${pdItemId}&select=factory_link_token&limit=1`);
+      if (r.length && r[0].factory_link_token) return r[0].factory_link_token;
+    }
+    if (quoteId) {
+      const pdi = await sb(`product_development_items?accepted_quote_id=eq.${quoteId}&select=id&limit=1`);
+      if (pdi.length) {
+        const ap = await sb(`artwork_projects?pd_item_id=eq.${pdi[0].id}&select=factory_link_token&limit=1`);
+        if (ap.length && ap[0].factory_link_token) return ap[0].factory_link_token;
+      }
+    }
+  } catch (e) {
+    console.error('findFactoryLinkToken error:', e.message);
+  }
+  return null;
+}
+
+// Secure factory upload link block appended after the asset list in approval emails.
+function factoryUploadLinkBlock(token) {
+  return `\n\nPlease upload all required assets using this secure link: https://portal.tbgsourcing.net/factory-assets.html?token=${token}` +
+    '\n\nThis link is unique to your order and does not require a login.';
+}
+
 async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -207,7 +234,7 @@ async function handler(req, res) {
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-  const { quote_id, rfq_id, factory_id, action } = body;
+  const { quote_id, rfq_id, factory_id, action, pd_item_id } = body;
   if (!rfq_id || !factory_id || !action) {
     return res.status(400).json({ error: 'Missing rfq_id, factory_id, or action.' });
   }
@@ -279,8 +306,17 @@ async function handler(req, res) {
 
     const subject = (parsed.subject && String(parsed.subject).trim()) ||
       `[${rfq.project_number || 'PRJ-XXXX'}] ${rfq.product_description || ''}`.trim();
-    const draftBody = (parsed.body && String(parsed.body).trim()) ||
+    let draftBody = (parsed.body && String(parsed.body).trim()) ||
       fallbackTemplate(action, factory.name || 'Factory', rfq.product_description || 'this item');
+
+    // For approvals, append the secure no-login asset-upload link if the artwork project
+    // (and its factory_link_token) already exists. In the normal flow the artwork record is
+    // created at send time, so the client appends the link then; this covers re-drafts where
+    // the record already exists and a pd_item_id/quote_id resolves a token.
+    if (action === 'approved' && draftBody.indexOf('factory-assets.html?token=') < 0) {
+      const token = await findFactoryLinkToken(quote_id, pd_item_id);
+      if (token) draftBody += factoryUploadLinkBlock(token);
+    }
 
     return res.status(200).json({ subject, body: draftBody });
   } catch (err) {
