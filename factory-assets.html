@@ -61,6 +61,23 @@ function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,
 function root(){ return document.getElementById('root'); }
 function fileSize(b){ b=Number(b)||0; if(b<1024)return b+' B'; if(b<1048576)return (b/1024).toFixed(1)+' KB'; if(b<1073741824)return (b/1048576).toFixed(1)+' MB'; return (b/1073741824).toFixed(2)+' GB'; }
 
+// Map a required-asset display name (e.g. "Packaging dieline (structural)") to a valid
+// artwork_assets.asset_type code. The column has a DB CHECK constraint limiting it to this
+// fixed vocabulary (the same codes the designer portal groups by); sending the raw name
+// fails the constraint with a 400. Unknown names fall back to 'other'.
+function assetTypeCode(name){
+  var n = (name||'').toLowerCase();
+  if (/step|3d|cad/.test(n)) return 'step_file';
+  if (/render/.test(n)) return 'rendering';
+  if (/die\s*-?\s*line|dieline/.test(n)) return 'dieline';
+  if (/image|photo|lifestyle|in[\s-]?use/.test(n)) return 'hi_res_image';
+  if (/manual|quick\s*-?\s*start/.test(n)) return 'user_manual';
+  if (/brand\s*guideline/.test(n)) return 'brand_guidelines';
+  if (/colou?r\s*standard|pantone/.test(n)) return 'color_standard';
+  if (/reference\s*sample/.test(n)) return 'reference_sample';
+  return 'other';
+}
+
 function showInvalid(){
   root().innerHTML = '<div class="center-state"><div class="big">🔒</div><h2>Invalid or expired link</h2>'+
     '<p>This upload link is not valid or has expired. Please contact your TBG Sourcing representative for a new link.</p></div>';
@@ -98,6 +115,18 @@ function render(){
   var pct = total ? Math.round(done/total*100) : 0;
   var allDone = total > 0 && done === total;
 
+  // FIX 1: once every required asset is in, show a full-page thank-you screen with a
+  // Close Window button — no further action is required from the factory.
+  if (allDone){
+    root().innerHTML = '<div class="center-state">'+
+      '<div class="big">✅</div>'+
+      '<h2>All assets submitted successfully! Thank you.</h2>'+
+      '<p>The design team will now begin working on your artwork. You may close this window.</p>'+
+      '<button class="btn" style="margin-top:18px;" onclick="window.close()">Close Window</button>'+
+      '</div>';
+    return;
+  }
+
   var html = '';
   html += '<div class="card">';
   html += '<div class="product">'+esc(PROJECT.product_name || 'Your Product')+'</div>';
@@ -106,10 +135,6 @@ function render(){
   html += '<div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
   html += '<div class="progress-label">'+done+' of '+total+' assets submitted</div></div>';
   html += '</div>';
-
-  if (allDone){
-    html += '<div class="card"><div class="done-banner">✅ All assets submitted! Thank you. The design team will be in touch.</div></div>';
-  }
 
   html += '<div class="card">';
   if (!total){
@@ -165,11 +190,20 @@ async function uploadAsset(i, file){
       return;
     }
 
-    // 2) Record the asset.
-    await fetch(SUPA_URL + '/rest/v1/artwork_assets', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ artwork_project_id: PROJECT.id, asset_type: asset.name, file_name: file.name, file_url: upj.url, file_size_bytes: file.size }) });
+    // 2) Record the asset in artwork_assets. asset_type must be a constrained code (the raw
+    //    asset name fails the DB CHECK constraint with a 400); the original required-asset name
+    //    is preserved in notes. Check response.ok and surface failures instead of swallowing them.
+    var insRes = await fetch(SUPA_URL + '/rest/v1/artwork_assets', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
+      body: JSON.stringify({ artwork_project_id: PROJECT.id, asset_type: assetTypeCode(asset.name), file_name: file.name, file_url: upj.url, file_size_bytes: file.size, notes: asset.name }) });
+    if (!insRes.ok){
+      var insErr = await insRes.text().catch(function(){ return ''; });
+      console.error('artwork_assets insert failed', insRes.status, insErr);
+      if (msg){ msg.style.color = '#dc2626'; msg.textContent = 'File uploaded but could not be recorded (' + insRes.status + '). Please try again.'; }
+      if (btn){ btn.disabled = false; }
+      return;
+    }
 
-    // 3) Mark this asset received in assets_required.
+    // 3) Mark this asset received in assets_required — ONLY after the insert above succeeded.
     var updated = assets.map(function(a){ return { name: a.name, received: a.received || a.name === asset.name }; });
     PROJECT.assets_required = updated;
 

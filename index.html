@@ -2477,6 +2477,22 @@ function matchRequiredAssetNames(docType, requiredArr) {
   }).map(function(a){ return a.name; });
 }
 
+// Map a factory upload doc-type (e.g. "Die Lines", "3D STEP File") to a valid
+// artwork_assets.asset_type code. The column has a DB CHECK constraint limiting it to this
+// fixed vocabulary; sending the raw doc-type label fails the constraint with a 400.
+function artworkAssetTypeCode(docType) {
+  var n = (docType || '').toLowerCase();
+  if (/step|3d|cad/.test(n)) return 'step_file';
+  if (/render/.test(n)) return 'rendering';
+  if (/die/.test(n)) return 'dieline';
+  if (/image|photo|lifestyle|in.?use/.test(n)) return 'hi_res_image';
+  if (/manual|quick.?start/.test(n)) return 'user_manual';
+  if (/brand\s*guideline/.test(n)) return 'brand_guidelines';
+  if (/colou?r\s*standard|pantone/.test(n)) return 'color_standard';
+  if (/reference\s*sample/.test(n)) return 'reference_sample';
+  return 'other';
+}
+
 // Records uploaded files in artwork_assets, marks matching required assets as
 // received, and promotes the project to ready_for_design once all are in.
 async function syncArtworkAssets(pdId, docType, uploadedFiles) {
@@ -2489,21 +2505,32 @@ async function syncArtworkAssets(pdId, docType, uploadedFiles) {
   var ap = Array.isArray(apRows) && apRows[0];
   if (!ap) return; // no artwork project for this PD item — nothing to sync
 
-  // 1. Record each uploaded file in artwork_assets
+  // 1. Record each uploaded file in artwork_assets. asset_type must be a constrained code
+  //    (the raw docType label fails the DB CHECK with a 400); the original label is kept in
+  //    notes. Check response.ok and log failures instead of swallowing them.
+  var anyInserted = false;
   for (var i = 0; i < (uploadedFiles || []).length; i++) {
     var uf = uploadedFiles[i];
-    await fetch(SB+'/rest/v1/artwork_assets', {
-      method:'POST',
-      headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body: JSON.stringify({
-        artwork_project_id: ap.id,
-        asset_type: docType,
-        file_name: uf.file_name,
-        file_url: uf.file_path,
-        file_size_bytes: uf.file_size || null
-      })
-    }).catch(function(){});
+    try {
+      var insRes = await fetch(SB+'/rest/v1/artwork_assets', {
+        method:'POST',
+        headers:{'apikey':KEY,'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body: JSON.stringify({
+          artwork_project_id: ap.id,
+          asset_type: artworkAssetTypeCode(docType),
+          file_name: uf.file_name,
+          file_url: uf.file_path,
+          file_size_bytes: uf.file_size || null,
+          notes: docType
+        })
+      });
+      if (insRes.ok) { anyInserted = true; }
+      else { console.error('artwork_assets insert failed', insRes.status, await insRes.text().catch(function(){ return ''; })); }
+    } catch (e) { console.error('artwork_assets insert error', e); }
   }
+
+  // Only mark required assets received once at least one artwork_assets row was actually recorded.
+  if (!anyInserted) return;
 
   // 2. Mark matching required assets as received
   var required = Array.isArray(ap.assets_required) ? ap.assets_required : [];
