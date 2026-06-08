@@ -389,6 +389,31 @@
   <div class="panel-body" id="panelBody"></div>
 </div>
 
+<!-- ── AI Email Draft Review Modal (follow-up) ── -->
+<div id="qem-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--card,#1e293b);color:var(--text,#e2e8f0);border:1px solid var(--border,#334155);border-radius:14px;padding:22px;width:92%;max-width:640px;max-height:88vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.45);">
+    <h2 id="qem-title" style="font-size:17px;font-weight:600;margin:0 0 4px;">Review Email</h2>
+    <div id="qem-to" style="font-size:13px;color:var(--muted,#94a3b8);margin-bottom:14px;">—</div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+      <span style="font-size:12px;color:var(--muted,#94a3b8);">Action:</span>
+      <span id="qem-action-badge" style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:#334155;color:#cbd5e1;">—</span>
+      <span id="qem-progress" style="font-size:11px;color:var(--muted,#94a3b8);"></span>
+    </div>
+    <label style="font-size:12px;color:var(--muted,#94a3b8);display:block;margin-bottom:4px;">Email subject</label>
+    <input type="text" id="qem-subject" style="width:100%;padding:9px 11px;font-size:13px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);box-sizing:border-box;margin-bottom:12px;font-family:inherit;" />
+    <label style="font-size:12px;color:var(--muted,#94a3b8);display:block;margin-bottom:4px;">Email body (edit freely before sending)</label>
+    <textarea id="qem-body" rows="10" placeholder="Drafting…" style="width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);box-sizing:border-box;min-height:240px;resize:vertical;line-height:1.6;font-family:inherit;"></textarea>
+    <div id="qem-msg" style="font-size:12px;margin-top:10px;display:none;padding:8px 12px;border-radius:7px;"></div>
+    <div style="display:flex;justify-content:space-between;gap:10px;margin-top:16px;flex-wrap:wrap;">
+      <button type="button" id="qem-regen" onclick="qemRegenerate()" style="padding:9px 14px;background:#3b2d6b;color:#d6c8ff;border:1px solid #5a4a9c;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">↻ Regenerate</button>
+      <div style="display:flex;gap:10px;">
+        <button type="button" id="qem-cancel" onclick="qemCancel()" style="padding:9px 16px;background:transparent;color:var(--muted,#94a3b8);border:1px solid var(--border,#334155);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;">Cancel</button>
+        <button type="button" id="qem-send" onclick="qemSend()" style="padding:9px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Send &amp; Confirm ✉</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/tenant-shared.js"></script>
 <script>
 const TABS = ['rfq', 'submitted', 'pd', 'skus'];
@@ -1287,8 +1312,8 @@ async function openRFQ(id) {
   openPanel(rfqTitle(r), [r.category, r.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
 
   const [assignments, quotes, images] = await Promise.all([
-    supa(`rfq_factory_assignments?rfq_id=eq.${id}&select=*,factories(factory_name_english)&order=sent_at.desc`),
-    supa(`rfq_quotes?rfq_id=eq.${id}&select=id,quote_option,status,total_fob_price,unit_fob_price,score_overall_v2,score_tier,compliance_status,factory_model_number&order=score_overall_v2.desc.nullslast`),
+    supa(`rfq_factory_assignments?rfq_id=eq.${id}&select=*,factories(factory_name_english,sales_email,sales_contact_name,sales_wechat,sales_whatsapp)&order=sent_at.desc`),
+    supa(`rfq_quotes?rfq_id=eq.${id}&select=id,factory_id,quote_option,status,total_fob_price,unit_fob_price,score_overall_v2,score_tier,compliance_status,factory_model_number&order=score_overall_v2.desc.nullslast`),
     supa(`rfq_images?rfq_id=eq.${id}&order=sort_order.asc`),
   ]);
   const nrImgDetailSrc = im => { const d = (im.image_data || '').trim(); if (d) return d.indexOf('data:') === 0 ? d : ('data:image/jpeg;base64,' + d); return (im.image_url || '').trim(); };
@@ -1340,7 +1365,239 @@ async function openRFQ(id) {
     <div class="panel-section"><h3>Specifications</h3><div class="sub-list">${spec}</div></div>
     <div class="panel-section"><h3>Factory Assignments (${assignments.length})</h3><div class="sub-list">${asgItems}</div></div>
     <div class="panel-section"><h3>Quotes Received (${quotes.length})</h3><div class="sub-list">${quoteItems}</div></div>
+    ${renderFactoryResponseStatusT(r, assignments, quotes)}
   `;
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI email draft modal + ML edit logging + RFQ closure guard + follow-ups
+// ─────────────────────────────────────────────────────────────
+function toast(msg) {
+  let t = document.getElementById('app-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'app-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1e293b;color:#f1f5f9;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 6px 24px rgba(0,0,0,0.4);z-index:10001;max-width:80vw;text-align:center;opacity:0;transition:opacity 0.2s;border:1px solid #334155;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 4000);
+}
+
+const QEM_ACTION_META = {
+  approved:  { label: 'Approved', bg: '#14532d', color: '#86efac' },
+  rejected:  { label: 'Rejected', bg: '#4c1d1d', color: '#fca5a5' },
+  more_info: { label: 'More Information', bg: '#4a3a0e', color: '#fcd34d' },
+  followup:  { label: 'Follow-Up', bg: '#1e3a5f', color: '#93c5fd' }
+};
+let qemState = { action: null, ctx: null, onConfirm: null, aiSubject: '', aiBody: '', resolve: null, resolved: false };
+function qemEl(id) { return document.getElementById(id); }
+
+async function qemResolveFactory(ctx) {
+  if (ctx.factory_id && ctx.factoryName != null && ctx.salesEmail != null) return ctx;
+  try {
+    if (ctx.quote_id) {
+      const rows = await supa(`rfq_quotes?id=eq.${ctx.quote_id}&select=factory_id,factories(factory_name_english,sales_email)&limit=1`);
+      if (rows[0]) { const f = rows[0].factories || {}; if (!ctx.factory_id) ctx.factory_id = rows[0].factory_id; if (ctx.factoryName == null) ctx.factoryName = f.factory_name_english; if (ctx.salesEmail == null) ctx.salesEmail = f.sales_email; }
+    } else if (ctx.factory_id) {
+      const rows = await supa(`factories?id=eq.${ctx.factory_id}&select=factory_name_english,sales_email&limit=1`);
+      if (rows[0]) { if (ctx.factoryName == null) ctx.factoryName = rows[0].factory_name_english; if (ctx.salesEmail == null) ctx.salesEmail = rows[0].sales_email; }
+    }
+  } catch (e) { console.log('qem resolve', e); }
+  return ctx;
+}
+
+function openQuoteEmailModal(action, ctx, onConfirm, opts) {
+  opts = opts || {};
+  return new Promise(async (resolve) => {
+    qemState = { action, ctx, onConfirm, aiSubject: '', aiBody: '', resolve, resolved: false };
+    const meta = QEM_ACTION_META[action] || { label: action, bg: '#334155', color: '#cbd5e1' };
+    await qemResolveFactory(ctx);
+    qemEl('qem-title').textContent = 'Review Email to ' + (ctx.factoryName || 'Factory');
+    qemEl('qem-to').innerHTML = 'To: <strong>' + esc(ctx.factoryName || 'Factory') + '</strong> &lt;' + esc(ctx.salesEmail || 'no email on file') + '&gt;';
+    const badge = qemEl('qem-action-badge'); badge.textContent = meta.label; badge.style.background = meta.bg; badge.style.color = meta.color;
+    qemEl('qem-progress').textContent = opts.progressText || '';
+    qemEl('qem-msg').style.display = 'none';
+    qemEl('qem-send').textContent = 'Send & Confirm ✉';
+    qemEl('qem-modal').style.display = 'flex';
+    qemDraft();
+  });
+}
+
+async function qemDraft() {
+  const s = qemState;
+  const sub = qemEl('qem-subject'), bod = qemEl('qem-body'), send = qemEl('qem-send'), regen = qemEl('qem-regen'), msg = qemEl('qem-msg');
+  sub.value = ''; bod.value = 'Drafting…'; sub.disabled = true; bod.disabled = true; send.disabled = true; regen.disabled = true; msg.style.display = 'none';
+  try {
+    const r = await fetch('/api/draft-quote-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quote_id: s.ctx.quote_id || null, rfq_id: s.ctx.rfq_id, factory_id: s.ctx.factory_id, action: s.action }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ('Draft failed (' + r.status + ')'));
+    s.aiSubject = d.subject || ''; s.aiBody = d.body || '';
+    sub.value = s.aiSubject; bod.value = s.aiBody;
+  } catch (e) {
+    bod.value = '';
+    msg.textContent = '⚠ Could not draft email: ' + e.message + '. You can still write and send it manually.';
+    msg.style.color = '#fca5a5'; msg.style.background = '#4c1d1d'; msg.style.display = 'block';
+  }
+  sub.disabled = false; bod.disabled = false; send.disabled = false; regen.disabled = false;
+}
+function qemRegenerate() { qemDraft(); }
+
+function qemCancel() {
+  qemEl('qem-modal').style.display = 'none';
+  const s = qemState;
+  if (s && !s.resolved) { s.resolved = true; if (s.resolve) s.resolve('skipped'); }
+}
+
+async function qemSend() {
+  const s = qemState, send = qemEl('qem-send');
+  if (send.disabled) return;
+  const finalSubject = qemEl('qem-subject').value.trim();
+  const finalBody = qemEl('qem-body').value.trim();
+  if (!finalBody) { alert('Email body is empty.'); return; }
+  send.disabled = true; send.textContent = 'Sending…';
+  qemEl('qem-modal').style.display = 'none';
+  try {
+    if (s.onConfirm) await s.onConfirm(finalSubject, finalBody);
+    await logQuoteEmailEdit(s.action, s.ctx.quote_id, s.ctx.rfq_id, s.ctx.factory_id, s.aiSubject, s.aiBody, finalSubject, finalBody);
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+  send.disabled = false; send.textContent = 'Send & Confirm ✉';
+  if (!s.resolved) { s.resolved = true; if (s.resolve) s.resolve('sent'); }
+}
+
+async function logQuoteEmailEdit(action, quoteId, rfqId, factoryId, aiSubject, aiBody, finalSubject, finalBody) {
+  try {
+    const aiLen = (aiBody || '').length, finalLen = (finalBody || '').length;
+    const dist = Math.abs(aiLen - finalLen);
+    const pct = aiLen > 0 ? Math.round(dist / aiLen * 100) : 0;
+    await fetch(SUPA_URL + '/rest/v1/quote_email_edit_log', { method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({
+      quote_id: quoteId || null, rfq_id: rfqId || null, factory_id: factoryId || null, action,
+      ai_draft: aiBody || '', final_sent: finalBody || '', edit_distance: dist, pct_changed: pct,
+      subject_changed: (aiSubject || '') !== (finalSubject || '')
+    }) });
+  } catch (e) { console.log('edit log (non-fatal)', e); }
+}
+
+async function maybeCloseRfq(rfqId) {
+  try {
+    const rows = await supa(`rfq_quotes?rfq_id=eq.${rfqId}&status=neq.draft&select=status`);
+    if (!rows.length) return;
+    const responded = ['accepted', 'rejected', 'more_info_requested'];
+    const anySubmitted = rows.some(q => q.status === 'submitted');
+    const allResponded = rows.every(q => responded.includes(q.status));
+    if (!anySubmitted && allResponded) {
+      await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + rfqId, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'closed' }) });
+      toast('All factories responded. RFQ closed.');
+    }
+  } catch (e) { console.log('closure guard (non-fatal)', e); }
+}
+
+// Send via /api/send-email, then log into email_threads + email_messages (threading).
+async function tenantSendEmail(toEmail, toName, subject, body, factoryId, rfqId) {
+  if (!toEmail) throw new Error('No recipient email address on file');
+  const r = await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: toEmail, toName: toName || '', subject, body, replyTo: 'sourcing@tbgsourcing.net' }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ('Send failed (' + r.status + ')'));
+  try {
+    const now = new Date().toISOString();
+    const clean = (subject || '').replace(/^(Re:|Fwd:|RE:|FW:)\s*/gi, '').trim();
+    const hdr = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' };
+    let threadId = null;
+    const lk = await fetch(SUPA_URL + '/rest/v1/email_threads?to_email=eq.' + encodeURIComponent(toEmail) + '&subject=eq.' + encodeURIComponent(clean) + '&order=created_at.desc&limit=1', { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
+    if (lk.ok) { const rows = await lk.json(); if (rows && rows[0]) threadId = rows[0].id; }
+    if (threadId) {
+      await fetch(SUPA_URL + '/rest/v1/email_threads?id=eq.' + threadId, { method: 'PATCH', headers: Object.assign({}, hdr, { Prefer: 'return=minimal' }), body: JSON.stringify({ last_message_at: now, status: 'read' }) });
+    } else {
+      const tr = await fetch(SUPA_URL + '/rest/v1/email_threads', { method: 'POST', headers: hdr, body: JSON.stringify({ subject, from_email: 'sourcing@tbgsourcing.net', from_name: 'Sarah Lindburg', to_email: toEmail, direction: 'outbound', status: 'read', department: 'sourcing', factory_id: factoryId || null, rfq_id: rfqId || null, last_message_at: now, tenant_id: TID }) });
+      if (tr.ok) { const trrows = await tr.json(); if (trrows && trrows[0]) threadId = trrows[0].id; }
+    }
+    if (threadId) {
+      await fetch(SUPA_URL + '/rest/v1/email_messages', { method: 'POST', headers: Object.assign({}, hdr, { Prefer: 'return=minimal' }), body: JSON.stringify({ thread_id: threadId, from_email: 'sourcing@tbgsourcing.net', from_name: 'Sarah Lindburg', to_email: toEmail, subject, body_text: body, direction: 'outbound', is_read: true, sent_at: now, tenant_id: TID }) });
+    }
+  } catch (e) { console.log('thread log (non-fatal)', e); }
+}
+
+async function sendFollowUp(rfqId, factoryId, subject, body) {
+  const rows = await supa(`factories?id=eq.${factoryId}&select=factory_name_english,sales_email,sales_contact_name&limit=1`);
+  const f = rows[0] || {};
+  if (f.sales_email) await tenantSendEmail(f.sales_email, f.sales_contact_name || 'Team', subject, body, factoryId, rfqId);
+  try {
+    const arows = await supa(`rfq_factory_assignments?rfq_id=eq.${rfqId}&factory_id=eq.${factoryId}&select=id,followup_count`);
+    for (const a of arows) {
+      await fetch(SUPA_URL + '/rest/v1/rfq_factory_assignments?id=eq.' + a.id, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ followup_count: (a.followup_count || 0) + 1 }) });
+    }
+  } catch (e) { console.log('followup_count (non-fatal)', e); }
+  toast('Follow-up sent to ' + (f.sales_email || 'factory') + '.');
+}
+
+async function followUpFactory(rfqId, factoryId) {
+  await openQuoteEmailModal('followup', { quote_id: null, rfq_id: rfqId, factory_id: factoryId }, (subject, body) => sendFollowUp(rfqId, factoryId, subject, body));
+  openRFQ(rfqId);
+}
+
+async function followUpAll(rfqId) {
+  const assignments = await supa(`rfq_factory_assignments?rfq_id=eq.${rfqId}&select=factory_id,factories(factory_name_english)`);
+  const quotes = await supa(`rfq_quotes?rfq_id=eq.${rfqId}&status=neq.draft&select=factory_id`);
+  const responded = {}; quotes.forEach(q => { responded[q.factory_id] = true; });
+  const awaiting = assignments.filter(a => !responded[a.factory_id]);
+  if (!awaiting.length) { toast('All factories have responded.'); return; }
+  for (let i = 0; i < awaiting.length; i++) {
+    const a = awaiting[i];
+    const fname = (a.factories || {}).factory_name_english || 'Factory';
+    await openQuoteEmailModal('followup', { quote_id: null, rfq_id: rfqId, factory_id: a.factory_id, factoryName: fname }, (subject, body) => sendFollowUp(rfqId, a.factory_id, subject, body), { progressText: 'Drafting ' + (i + 1) + ' of ' + awaiting.length + '…' });
+  }
+  openRFQ(rfqId);
+  toast('Follow-up round complete.');
+}
+
+function renderFactoryResponseStatusT(rfq, assignments, quotes) {
+  assignments = assignments || []; quotes = quotes || [];
+  if (!assignments.length) return '';
+  const respondedIds = {};
+  quotes.forEach(q => { if (q.status !== 'draft') respondedIds[q.factory_id] = true; });
+  const responded = assignments.filter(a => respondedIds[a.factory_id]);
+  const awaiting = assignments.filter(a => !respondedIds[a.factory_id]);
+  const now = Date.now();
+  let html = '<div class="panel-section"><h3>Factory Response Status</h3>';
+  html += `<div style="font-size:12px;font-weight:700;color:#22c55e;margin:0 0 6px;">✅ Responded (${responded.length})</div>`;
+  if (responded.length) {
+    html += '<div style="margin-bottom:14px;">' + responded.map(a => {
+      const f = a.factories || {};
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:6px;margin-bottom:4px;font-size:12px;"><span style="color:#22c55e;">✓</span><span style="font-weight:600;">${esc(f.factory_name_english || 'Factory')}</span></div>`;
+    }).join('') + '</div>';
+  } else {
+    html += '<div style="font-size:12px;color:var(--muted,#94a3b8);margin-bottom:14px;">No responses yet.</div>';
+  }
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;"><div style="font-size:12px;font-weight:700;color:#eab308;">⏳ Awaiting Response (${awaiting.length})</div>${awaiting.length > 1 ? `<button onclick="followUpAll('${esc(rfq.id)}')" style="padding:6px 12px;background:#1e3a5f;color:#93c5fd;border:1px solid #2d4a6f;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">✉ Follow Up All</button>` : ''}</div>`;
+  if (awaiting.length) {
+    html += awaiting.map(a => {
+      const f = a.factories || {};
+      const days = a.sent_at ? Math.floor((now - new Date(a.sent_at).getTime()) / 86400000) : null;
+      const fu = a.followup_count || 0;
+      const contacts = [];
+      if (f.sales_wechat) contacts.push(`<span title="WeChat: ${esc(f.sales_wechat)}" style="font-size:11px;color:#22c55e;">💬 WeChat</span>`);
+      if (f.sales_whatsapp) contacts.push(`<span title="WhatsApp: ${esc(f.sales_whatsapp)}" style="font-size:11px;color:#25d366;">📱 WhatsApp</span>`);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:rgba(234,179,8,0.07);border:1px solid rgba(234,179,8,0.22);border-radius:6px;margin-bottom:4px;flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="font-size:12px;font-weight:600;">${esc(f.factory_name_english || 'Factory')}${f.sales_contact_name ? ' · ' + esc(f.sales_contact_name) : ''}</div>
+          <div style="font-size:11px;color:var(--muted,#94a3b8);margin-top:2px;">${esc(f.sales_email || 'no email')}${days != null ? ' · ' + days + 'd since sent' : ''}</div>
+          ${contacts.length ? `<div style="display:flex;gap:10px;margin-top:3px;">${contacts.join('')}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${fu > 0 ? `<span style="font-size:10px;background:rgba(234,179,8,0.12);border:1px solid rgba(234,179,8,0.4);color:#eab308;border-radius:10px;padding:2px 7px;font-weight:600;">${fu} follow-up${fu > 1 ? 's' : ''}</span>` : ''}
+          <button onclick="followUpFactory('${esc(rfq.id)}','${esc(a.factory_id)}')" style="padding:6px 12px;background:transparent;color:#93c5fd;border:1px solid #2d4a6f;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Follow Up</button>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    html += '<div style="font-size:12px;color:var(--muted,#94a3b8);">All assigned factories have responded.</div>';
+  }
+  html += '</div>';
+  return html;
 }
 
 // Full-size image lightbox overlay (shared by RFQ detail thumbnails).
