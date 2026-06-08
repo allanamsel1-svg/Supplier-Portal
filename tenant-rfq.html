@@ -222,21 +222,38 @@
       </div>
 
       <div class="rfq-sec"><h3>3 · Packaging</h3>
-        <div class="nr-grid">
-          <div class="nr-field"><label>Primary container</label>
-            <select id="nr-pkg-primary" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
-            <input id="nr-pkg-primary-other" placeholder="Specify primary container" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
-          </div>
-          <div class="nr-field"><label>Closure / applicator</label>
-            <select id="nr-pkg-closure" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
-            <input id="nr-pkg-closure-other" placeholder="Specify closure / applicator" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
+        <!-- FIX 2: two-level packaging selector -->
+        <div class="nr-field"><label>Primary packaging type</label>
+          <select id="nr-pkg-type" onchange="nrPkgSubToggle()">
+            <option value="">Select packaging type…</option>
+            <option>Bulk / Label only</option>
+            <option>Folding carton (4-color printed gift box)</option>
+            <option>Clamshell</option>
+            <option>Blister pack</option>
+            <option>Pouch / Bag</option>
+            <option>Bottle with label</option>
+            <option>Jar with label</option>
+            <option>Tube with label</option>
+            <option>Sleeve over bottle/jar</option>
+            <option>Display box / PDQ</option>
+          </select>
+        </div>
+        <div class="nr-field" id="nr-pkg-suboptions" style="display:none;">
+          <label>Printing treatments (for printed cartons / display)</label>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:2px 14px;">
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="4-color CMYK print"> 4-color CMYK print</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Spot UV"> Spot UV</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Foil stamping (Gold / Silver / Custom color)"> Foil stamping (Gold / Silver / Custom color)</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Embossing / Debossing"> Embossing / Debossing</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Soft touch lamination"> Soft touch lamination</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Gloss lamination"> Gloss lamination</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Matte lamination"> Matte lamination</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Aqueous coating"> Aqueous coating</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Window cutout"> Window cutout</label>
+            <label class="nr-check"><input type="checkbox" class="nr-pkg-sub" value="Magnetic closure"> Magnetic closure</label>
           </div>
         </div>
         <div class="nr-grid">
-          <div class="nr-field"><label>Secondary / display</label>
-            <select id="nr-pkg-secondary" onchange="nrPkgOther(this)"><option value="">Select...</option></select>
-            <input id="nr-pkg-secondary-other" placeholder="Specify secondary / display" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
-          </div>
           <div class="nr-field"><label>Finish</label>
             <select id="nr-pkg-finish" onchange="nrPkgOther(this)">
               <option value="">Select...</option><option>Matte</option><option>Gloss</option><option>Soft-Touch</option><option>Metallic</option><option>Frosted</option><option>UV Spot Gloss</option><option>Embossed</option><option>Debossed</option><option>Natural/Uncoated</option><option>Custom/Other</option>
@@ -553,6 +570,15 @@ function nrPkgOther(sel) {
   const v = sel.value;
   inp.style.display = (v === 'Other' || v === 'Custom/Other' || v === '__other__') ? '' : 'none';
 }
+// FIX 2: show printing-treatment sub-options for printed cartons / display boxes.
+function nrPkgSubToggle() {
+  const v = (nrg('nr-pkg-type') || {}).value || '';
+  const wrap = nrg('nr-pkg-suboptions'); if (!wrap) return;
+  const show = (v === 'Folding carton (4-color printed gift box)' || v === 'Display box / PDQ');
+  wrap.style.display = show ? '' : 'none';
+  if (!show) document.querySelectorAll('.nr-pkg-sub:checked').forEach(c => { c.checked = false; });
+}
+function nrPkgSubSelections() { return Array.prototype.slice.call(document.querySelectorAll('.nr-pkg-sub:checked')).map(c => c.value); }
 function nrColorOther(sel) {
   const inp = nrg(sel.id + '-other'); if (!inp) return;
   inp.style.display = sel.value ? '' : 'none';
@@ -1113,7 +1139,8 @@ function openNewRfqModal(prefill) {
   nrg('nr-unit').value = 'Each'; nrg('nr-sizeunit').value = ''; nrg('nr-prop65').value = '';
   // Reset Section 3 packaging selects + their "Other" text inputs
   ['nr-unit-other','nr-sizeunit-other','nr-color-other','nr-pkg-primary-other','nr-pkg-closure-other','nr-pkg-secondary-other','nr-pkg-finish-other'].forEach(id => { const el = nrg(id); if (el) { el.value = ''; el.style.display = 'none'; } });
-  ['nr-pkg-primary','nr-pkg-closure','nr-pkg-secondary','nr-pkg-finish'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  ['nr-pkg-type','nr-pkg-primary','nr-pkg-closure','nr-pkg-secondary','nr-pkg-finish'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  document.querySelectorAll('.nr-pkg-sub:checked').forEach(c => { c.checked = false; }); nrPkgSubToggle();
   { const du = nrg('nr-dim-unit'); if (du) du.value = 'cm'; const us = nrg('nr-url-status'); if (us) { us.style.display = 'none'; us.textContent = ''; } }
   // Freight & landed cost reset
   ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-retail',
@@ -1189,36 +1216,43 @@ function nrToggleFactory() {
 
 // ── BUG 7: certifications required/optional, loaded from compliance_requirements ──
 let nrCertState = {};   // { certName: 'required' | 'optional' }
-async function nrLoadCerts(cat) {
-  const statusEl = nrg('nr-cert-status'), rowsEl = nrg('nr-cert-rows');
-  if (!rowsEl) return;
-  nrCertState = {};
-  if (!cat) { if (statusEl) statusEl.textContent = 'Select a category to load its product documents.'; rowsEl.innerHTML = ''; return; }
-  if (statusEl) statusEl.textContent = 'Loading product documents…';
-  let rows = [];
-  // FIX 6: ONLY product docs. Factory-level certs (required/preferred_factory_certs) live on the
-  // factory record and must never appear in the RFQ modal.
-  try { rows = await supa('compliance_requirements?category=eq.' + encodeURIComponent(cat) + '&select=required_product_docs,preferred_product_docs&limit=1'); }
-  catch (e) { console.error('compliance_requirements', e); }
-  const row = rows && rows[0] || {};
-  (row.required_product_docs || []).forEach(c => { if (c) nrCertState[c] = 'required'; });
-  (row.preferred_product_docs || []).forEach(c => { if (c && !nrCertState[c]) nrCertState[c] = 'optional'; });
+// FIX 3: comprehensive, hardcoded product-certification catalog (retailer-agnostic).
+const CERT_CATALOG = [
+  { group: 'Formulation', items: ['INCI List','Full Formulation / Formula Disclosure','Certificate of Analysis (CoA)','Stability Test Report','Challenge Test Report (preservative efficacy)','Safety Assessment Report (EU/US)','Microbiological Test Report'] },
+  { group: 'Regulatory', items: ['FDA Cosmetic Registration (if applicable)','California Prop 65 Compliance Statement','Heavy Metals Test Report','Allergen Declaration'] },
+  { group: 'Quality & Sustainability', items: ['COSMOS Organic Certification','COSMOS Natural Certification','Leaping Bunny (Cruelty Free)','PETA Certified','EWG Verified','NSF/ANSI Certification','Rainforest Alliance','Fair Trade Certified','FSC (packaging)','ISO 22716 (GMP)','GMP Certificate'] },
+  { group: 'Retailer-Specific', items: ['Sephora Clean','Ulta Clean Ingredients','Target Clean','Walmart Free & Clear','CVS Tested & Trusted'] },
+];
+function certDefaults(cat) {
+  const c = (cat || '').toLowerCase();
+  const cosmetic = /skin|hair|beauty|personal|serum|lotion|fragrance|cosmetic|care/.test(c);
+  // Cosmetic / personal care: INCI, Full Formulation and Prop 65 default Required; everything else Optional.
+  const req = cosmetic ? { 'INCI List': 1, 'Full Formulation / Formula Disclosure': 1, 'California Prop 65 Compliance Statement': 1 } : {};
+  const state = {};
+  CERT_CATALOG.forEach(grp => grp.items.forEach(name => { state[name] = req[name] ? 'required' : 'optional'; }));
+  return state;
+}
+function nrLoadCerts(cat) {
+  const statusEl = nrg('nr-cert-status');
+  // Comprehensive list shown regardless of DB — retailers vary, so always present every cert.
+  nrCertState = certDefaults(cat);
   nrRenderCerts();
-  if (statusEl) statusEl.textContent = Object.keys(nrCertState).length
-    ? 'Defaults from this category — toggle Required / Optional per document.'
-    : 'No category product documents on file. Add any below if needed.';
+  if (statusEl) statusEl.textContent = 'Comprehensive certification list — toggle Required / Optional per item.';
 }
 function nrRenderCerts() {
   const rowsEl = nrg('nr-cert-rows'); if (!rowsEl) return;
-  const names = Object.keys(nrCertState);
-  rowsEl.innerHTML = names.map(name => {
-    const st = nrCertState[name];
+  const cell = name => {
+    const st = nrCertState[name] || 'optional';
     return `<div class="nr-cert-row"><span style="flex:1;min-width:0;overflow-wrap:break-word;">${esc(name)}</span>`
       + `<span style="display:flex;gap:4px;flex-shrink:0;">`
       + `<button type="button" onclick="nrSetCert('${esc(name).replace(/'/g, "\\'")}','required')" style="padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${st === 'required' ? '#16a34a' : 'var(--border,#334155)'};background:${st === 'required' ? '#16a34a' : 'transparent'};color:${st === 'required' ? '#fff' : 'var(--text2)'};">Required</button>`
       + `<button type="button" onclick="nrSetCert('${esc(name).replace(/'/g, "\\'")}','optional')" style="padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${st === 'optional' ? '#2563eb' : 'var(--border,#334155)'};background:${st === 'optional' ? '#2563eb' : 'transparent'};color:${st === 'optional' ? '#fff' : 'var(--text2)'};">Optional</button>`
       + `</span></div>`;
-  }).join('');
+  };
+  rowsEl.innerHTML = CERT_CATALOG.map(grp =>
+    `<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.05em;margin:10px 0 4px;">${esc(grp.group)}</div>`
+    + grp.items.map(cell).join('')
+  ).join('');
 }
 function nrSetCert(name, state) { nrCertState[name] = state; nrRenderCerts(); }
 function nrReadCerts() {
@@ -1314,12 +1348,11 @@ async function saveNewRfq(status) {
     est_unit_length_cm: nrDimToNum('nr-dim-l', 'nr-dim-unit'),
     est_unit_weight_kg: pflt('nr-unit-weight'),   // FIX 1
     inner_case_pack: num('nr-inner'), master_case_pack: num('nr-master'),
-    packaging_primary: nrSelOrOther('nr-pkg-primary') || null,
-    // packaging_closures and packaging_secondary are text[] columns in rfqs — wrap the single
-    // selected value as an array (e.g. ["Rigid setup box"]); a bare string fails with
-    // "malformed array literal". packaging_primary/finish are plain text and stay strings.
-    packaging_closures: (nrSelOrOther('nr-pkg-closure') ? [nrSelOrOther('nr-pkg-closure')] : null),
-    packaging_secondary: (nrSelOrOther('nr-pkg-secondary') ? [nrSelOrOther('nr-pkg-secondary')] : null),
+    // FIX 2: primary packaging type → packaging_type (+ packaging_primary for scoring back-compat);
+    // printing sub-options → packaging_secondary (text[] array).
+    packaging_type: ((nrg('nr-pkg-type') || {}).value) || null,
+    packaging_primary: ((nrg('nr-pkg-type') || {}).value) || null,
+    packaging_secondary: (nrPkgSubSelections().length ? nrPkgSubSelections() : null),
     packaging_finish: nrSelOrOther('nr-pkg-finish') || null,
     packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
     is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
@@ -1428,15 +1461,19 @@ async function saveNewRfq(status) {
       // Resolve project number (assigned by DB on insert) for the subject line.
       let proj = nrSavedProject;
       if (!proj) { const pr = await supa('rfqs?id=eq.' + encodeURIComponent(savedRfqId) + '&select=project_number&limit=1'); proj = (pr && pr[0] && pr[0].project_number) || ''; }
-      const subject = '[' + (proj || 'PRJ') + '] RFQ: ' + desc;
+      const subject = '[' + (proj || 'PRJ-XXXX') + '] RFQ: ' + desc;
       const portal = 'https://portal.tbgsourcing.net';
+      let emailedCount = 0;
       for (const f of facs) {
         if (!f.sales_email) continue;
-        const firstName = (f.sales_contact_name || 'Team').split(' ')[0];
-        const emailBody = 'Dear ' + firstName + ',\n\nWe have sent you a new Request for Quotation (' + (proj || '') + ').\n\nProduct: ' + desc + '\n\nPlease log into our supplier portal to review the full specifications and submit your quote.\n\nPortal: ' + portal + '\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
-        try { await tenantSendEmail(f.sales_email, f.sales_contact_name || 'Team', subject, emailBody, f.id, savedRfqId); }
+        const factoryName = f.factory_name_english || f.sales_contact_name || 'Team';
+        const emailBody = 'Dear ' + factoryName + ',\n\nPlease find attached our RFQ for ' + desc + '. Project number: ' + (proj || '') + '.\n\nPlease submit your quote through the factory portal at ' + portal + '.\n\nThank you,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+        // tenantSendEmail posts to /api/send-email (from sourcing@ → Sarah Lindburg) AND logs to email_threads + email_messages.
+        try { await tenantSendEmail(f.sales_email, f.sales_contact_name || factoryName, subject, emailBody, f.id, savedRfqId); emailedCount++; }
         catch (e) { console.error('rfq email to ' + f.sales_email, e); }
       }
+      // FIX 1: stamp the RFQ as sent.
+      await fetch(SUPA_URL + '/rest/v1/rfqs?id=eq.' + encodeURIComponent(savedRfqId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ sent_at: now, sent_to_count: emailedCount }) });
     } catch (e) { console.error('rfq_factory_assignments / email', e); }
   }
   closeNewRfqModal();
@@ -1596,11 +1633,12 @@ async function openRFQ(id) {
     if (r.unit_type) nrSetSelOrOther('nr-unit', String(r.unit_type).charAt(0).toUpperCase() + String(r.unit_type).slice(1));
     setV('nr-inner', r.inner_case_pack);
     setV('nr-master', r.master_case_pack);
-    nrSetSelOrOther('nr-pkg-primary', r.packaging_primary);
-    // packaging_closures / packaging_secondary come back as text[] arrays — unwrap to the
-    // first value so the select can re-match its option (instead of falling to "Other").
-    nrSetSelOrOther('nr-pkg-closure', Array.isArray(r.packaging_closures) ? r.packaging_closures[0] : r.packaging_closures);
-    nrSetSelOrOther('nr-pkg-secondary', Array.isArray(r.packaging_secondary) ? r.packaging_secondary[0] : r.packaging_secondary);
+    // FIX 2: restore the two-level packaging selector.
+    { const t = nrg('nr-pkg-type'); if (t) { t.value = r.packaging_type || r.packaging_primary || ''; } nrPkgSubToggle(); }
+    (Array.isArray(r.packaging_secondary) ? r.packaging_secondary : []).forEach(v => {
+      document.querySelectorAll('.nr-pkg-sub').forEach(c => { if (c.value === v) c.checked = true; });
+    });
+    nrPkgSubToggle();
     nrSetSelOrOther('nr-pkg-finish', r.packaging_finish);
     setV('nr-pkg-color', r.packaging_color);
     setV('nr-pkg-notes', r.packaging_notes);

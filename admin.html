@@ -1267,6 +1267,40 @@
         <div class="mgr-card" id="pkg-type-card" style="margin-bottom:1rem;">
           <div class="mgr-card-title">Packaging <span style="font-size:11px;font-weight:400;color:#888;">— structured selection across primary container, closure/applicator, and secondary display</span></div>
 
+          <!-- FIX 2: two-level packaging type selector (saves packaging_type + packaging_secondary) -->
+          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px dashed #e0e0d8;">
+            <div style="font-size:11px;font-weight:600;color:#444;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;">Primary Packaging Type</div>
+            <select id="ax-pkg-type" onchange="axPkgSubToggle()" style="width:100%;padding:8px 10px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;background:#fff;">
+              <option value="">Select packaging type…</option>
+              <option>Bulk / Label only</option>
+              <option>Folding carton (4-color printed gift box)</option>
+              <option>Clamshell</option>
+              <option>Blister pack</option>
+              <option>Pouch / Bag</option>
+              <option>Bottle with label</option>
+              <option>Jar with label</option>
+              <option>Tube with label</option>
+              <option>Sleeve over bottle/jar</option>
+              <option>Display box / PDQ</option>
+            </select>
+            <div id="ax-pkg-suboptions" style="display:none;margin-top:8px;">
+              <div style="font-size:11px;font-weight:600;color:#444;margin-bottom:4px;">Printing treatments (for printed cartons / display)</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2px 14px;font-size:13px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="4-color CMYK print"> 4-color CMYK print</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Spot UV"> Spot UV</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Foil stamping (Gold / Silver / Custom color)"> Foil stamping (Gold / Silver / Custom color)</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Embossing / Debossing"> Embossing / Debossing</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Soft touch lamination"> Soft touch lamination</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Gloss lamination"> Gloss lamination</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Matte lamination"> Matte lamination</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Aqueous coating"> Aqueous coating</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Window cutout"> Window cutout</label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="ax-pkg-sub" value="Magnetic closure"> Magnetic closure</label>
+              </div>
+            </div>
+            <div style="font-size:10px;color:#999;margin-top:5px;">The structured container/closure/decoration options below remain available for detailed specs.</div>
+          </div>
+
           <!-- Legacy data banner (only shown when editing an old RFQ with no structured packaging) -->
           <div id="pkg-legacy-banner" style="display:none;background:#fff8e0;border:1px solid #f0d860;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:#664400;">
             <strong>Legacy packaging data:</strong> <span id="pkg-legacy-text"></span>
@@ -6981,31 +7015,42 @@ function axCatAutoSelect(catString){
 // compliance-rules.html so category rules map 1:1 with no aliasing.
 // PRODUCT-LEVEL ONLY — factory/market-access certs (ISO, CE, UL, FCC...) live
 // on the factory profile, not the RFQ. Each item carries a short "watch-for" hint.
+// FIX 3: comprehensive, hardcoded product-certification catalog (retailer-agnostic).
 var RFQ_DOC_CATALOG=[
-  {group:'Safety & Toxicology',items:[
-    {name:'TRA (Toxicological Risk Assessment)',hint:'Cosmetics — safety assessment of the finished formula'},
-    {name:'CPSR (Cosmetic Product Safety Report)',hint:'Required for EU; good practice for premium cosmetics'},
-    {name:'Heavy Metals Testing',hint:'Anything skin-contact or ingestible (Pb/As/Hg/Cd limits)'},
-    {name:'Prop 65 Compliance',hint:'Any product sold in California — effectively national'},
-    {name:'Allergen Disclosure',hint:'Fragranced products; EU 26/81 allergen list'},
-    {name:'SDS / MSDS',hint:'Anything with chemical content — baseline for retail'}
+  {group:'Formulation',items:[
+    {name:'INCI List',hint:'Full ingredient list (INCI) for labeling'},
+    {name:'Full Formulation / Formula Disclosure',hint:'Complete formula breakdown with percentages'},
+    {name:'Certificate of Analysis (CoA)',hint:'Per-batch quality analysis'},
+    {name:'Stability Test Report',hint:'Shelf-life under temperature stress'},
+    {name:'Challenge Test Report (preservative efficacy)',hint:'Preservative adequacy (PET)'},
+    {name:'Safety Assessment Report (EU/US)',hint:'Finished-product safety assessment'},
+    {name:'Microbiological Test Report',hint:'Total microbial count / pathogen screen'}
   ]},
-  {group:'Microbial & Stability',items:[
-    {name:'USP <51> Antimicrobial Effectiveness',hint:'Water-containing cosmetics — preservative challenge'},
-    {name:'USP <61> Microbial Enumeration',hint:'Cosmetics — total microbial count'},
-    {name:'USP <62> Specified Microorganisms',hint:'Cosmetics — absence of pathogens'},
-    {name:'Challenge Test (PET)',hint:'Emulsions/creams — preservation adequacy'},
-    {name:'Stability Testing',hint:'Cosmetics — shelf-life under temperature stress'},
-    {name:'Compatibility Testing',hint:'Formula vs packaging — leaching/interaction'},
-    {name:'PAO / Shelf-life Substantiation',hint:'Supports the period-after-opening claim on pack'}
+  {group:'Regulatory',items:[
+    {name:'FDA Cosmetic Registration (if applicable)',hint:'MoCRA facility/product registration'},
+    {name:'California Prop 65 Compliance Statement',hint:'Sold in California — effectively national'},
+    {name:'Heavy Metals Test Report',hint:'Pb/As/Hg/Cd limits — skin-contact/ingestible'},
+    {name:'Allergen Declaration',hint:'Fragrance allergens (EU 26/81 list)'}
   ]},
-  {group:'Documentation & Claims',items:[
-    {name:'COA (Certificate of Analysis)',hint:'Per-batch — baseline retail QA for any product'},
-    {name:'INCI / Full Ingredient Disclosure',hint:'Cosmetics — full ingredient list for labeling'},
-    {name:'Organic Product Certification',hint:'Only if making an organic claim (COSMOS/USDA)'},
-    {name:'Vegan Claim Substantiation',hint:'Only if making a vegan claim'},
-    {name:'Cruelty-Free Claim Substantiation',hint:'Only if making a cruelty-free claim'},
-    {name:'Clinical / Efficacy Testing',hint:'If making performance claims (e.g. "reduces wrinkles")'}
+  {group:'Quality & Sustainability',items:[
+    {name:'COSMOS Organic Certification',hint:'Organic claim'},
+    {name:'COSMOS Natural Certification',hint:'Natural claim'},
+    {name:'Leaping Bunny (Cruelty Free)',hint:'Cruelty-free claim'},
+    {name:'PETA Certified',hint:'Cruelty-free / vegan claim'},
+    {name:'EWG Verified',hint:'Clean-ingredient verification'},
+    {name:'NSF/ANSI Certification',hint:'Ingredient/product standard'},
+    {name:'Rainforest Alliance',hint:'Sustainable sourcing'},
+    {name:'Fair Trade Certified',hint:'Fair-trade sourcing'},
+    {name:'FSC (packaging)',hint:'Responsibly sourced paper/board'},
+    {name:'ISO 22716 (GMP)',hint:'Cosmetics GMP standard'},
+    {name:'GMP Certificate',hint:'Good Manufacturing Practice'}
+  ]},
+  {group:'Retailer-Specific',items:[
+    {name:'Sephora Clean',hint:'Sephora clean-standard'},
+    {name:'Ulta Clean Ingredients',hint:'Ulta conscious-beauty standard'},
+    {name:'Target Clean',hint:'Target clean icon'},
+    {name:'Walmart Free & Clear',hint:'Walmart free-and-clear standard'},
+    {name:'CVS Tested & Trusted',hint:'CVS tested-and-trusted standard'}
   ]}
 ];
 
@@ -7048,11 +7093,12 @@ function setRfqCompliance(val,state){
 // Read current state into the product-doc arrays Layer 2/3 consume.
 // Product-level only — certifications arrays are intentionally left null on the RFQ.
 function readRfqCompliance(){
+  // FIX 3: Required → certifications_required, Optional → certifications_preferred.
   var out={certifications_required:[],certifications_preferred:[],product_docs_required:[],product_docs_preferred:[]};
   Object.keys(rfqComplianceState).forEach(function(v){
     var st=rfqComplianceState[v];
-    if(st==='req')out.product_docs_required.push(v);
-    else if(st==='pref')out.product_docs_preferred.push(v);
+    if(st==='req')out.certifications_required.push(v);
+    else if(st==='pref')out.certifications_preferred.push(v);
   });
   return out;
 }
@@ -7061,11 +7107,11 @@ function readRfqCompliance(){
 function loadRfqComplianceFromRFQ(rfq){
   rfqComplianceState={};
   rfqComplianceUserTouched=false;
-  (rfq.product_docs_required||[]).forEach(function(v){rfqComplianceState[v]='req';});
-  (rfq.product_docs_preferred||[]).forEach(function(v){rfqComplianceState[v]='pref';});
-  // Back-compat: older RFQs stored some product certs in certifications_* — load any that match a doc name.
+  // FIX 3: primary source is certifications_* (Required/Optional); product_docs_* kept for back-compat.
   (rfq.certifications_required||[]).forEach(function(v){if(isRenderedCert(v))rfqComplianceState[v]='req';});
   (rfq.certifications_preferred||[]).forEach(function(v){if(isRenderedCert(v)&&rfqComplianceState[v]!=='req')rfqComplianceState[v]='pref';});
+  (rfq.product_docs_required||[]).forEach(function(v){if(isRenderedCert(v)&&!rfqComplianceState[v])rfqComplianceState[v]='req';});
+  (rfq.product_docs_preferred||[]).forEach(function(v){if(isRenderedCert(v)&&!rfqComplianceState[v])rfqComplianceState[v]='pref';});
   if(Object.keys(rfqComplianceState).length)rfqComplianceUserTouched=true;
   renderRfqCompliance();
 }
@@ -7087,46 +7133,17 @@ async function inheritComplianceForCategory(){
   if(rfqComplianceUserTouched)return;
   var row=axCatRow();
   var catName=row?(row.category||''):'';
-
-  var applied={};
-  // 1. Baseline floor — always Req. Never removed.
-  RFQ_BASELINE_UNIVERSAL.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
   var cosCb=g('rfq-is-cosmetic');
-  var isCos=(row&&row.is_cosmetic)||(cosCb&&cosCb.checked);
+  var isCos=!!((row&&row.is_cosmetic)||(cosCb&&cosCb.checked)||/skin|hair|beauty|personal|serum|lotion|fragrance|cosmetic|care/.test((catName||'').toLowerCase()));
+  // FIX 3: comprehensive list shown regardless of DB. Default every cert Optional;
+  // cosmetic / personal-care categories pre-mark INCI, Full Formulation and Prop 65 as Required.
+  rfqComplianceState={};
+  RFQ_DOC_CATALOG.forEach(function(grp){grp.items.forEach(function(it){rfqComplianceState[it.name]='pref';});});
   if(isCos){
-    RFQ_BASELINE_COSMETIC.forEach(function(v){ if(isRenderedCert(v)){rfqComplianceState[v]='req';applied[v]=true;} });
+    ['INCI List','Full Formulation / Formula Disclosure','California Prop 65 Compliance Statement'].forEach(function(n){if(isRenderedCert(n))rfqComplianceState[n]='req';});
   }
-
-  var noteParts=['US/CA baseline pre-filled'+(isCos?' (incl. cosmetic basics)':'')+'.'];
-
-  // 2. Category rules layer on top (can add, or upgrade pref→req).
-  // Product-docs only — factory certs are NOT applied to the RFQ (they live on the factory).
-  if(catName){
-    try{
-      var r=await fetch(SB+'/rest/v1/compliance_requirements?category=eq.'+encodeURIComponent(catName)+'&select=*&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      if(r.ok){
-        var rows=await r.json();
-        if(rows&&rows.length){
-          var rule=rows[0];
-          function applyDoc(name,state){
-            if(isRenderedCert(name)){
-              // req beats pref; never downgrade an existing req
-              if(state==='req'||rfqComplianceState[name]!=='req'){rfqComplianceState[name]=state;}
-              applied[name]=true;
-            }
-          }
-          (rule.required_product_docs||[]).forEach(function(d){applyDoc(d,'req');});
-          (rule.preferred_product_docs||[]).forEach(function(d){applyDoc(d,'pref');});
-          noteParts.push('Layered '+catName+' product-doc rules on top.');
-        }else{
-          noteParts.push('No category-specific rules set for '+catName+'.');
-        }
-      }
-    }catch(e){/* non-fatal — baseline still applied */}
-  }
-
   var note=g('rfq-compliance-inherit-note');
-  if(note){note.style.display='block';note.textContent=noteParts.join(' ')+' Adjust below as needed.';}
+  if(note){note.style.display='block';note.textContent=(isCos?'Cosmetic / personal-care defaults applied — INCI, Full Formulation and Prop 65 marked Required.':'All certifications default to Optional for this category.')+' Toggle Req / Pref / — below as needed.';}
   renderRfqCompliance();
 }
 function isRenderedCert(name){
@@ -7366,6 +7383,10 @@ var pkgState = { primary:null, primary_material:null, closures:[], secondary:[],
 
 function resetPkgState(){
   pkgState = { primary:null, primary_material:null, closures:[], secondary:[], decoration:[], sustainability:[] };
+  // FIX 2: reset the two-level packaging type selector.
+  if(g('ax-pkg-type'))g('ax-pkg-type').value='';
+  document.querySelectorAll('.ax-pkg-sub:checked').forEach(function(c){c.checked=false;});
+  if(typeof axPkgSubToggle==='function')axPkgSubToggle();
   renderPkgPrimaryChip();
   renderPkgChips('closure');
   renderPkgChips('secondary');
@@ -7554,6 +7575,16 @@ function getPkgFormState(){
   };
 }
 
+// FIX 2: two-level packaging type selector helpers.
+function axPkgSubToggle(){
+  var v=(g('ax-pkg-type')&&g('ax-pkg-type').value)||'';
+  var wrap=g('ax-pkg-suboptions'); if(!wrap)return;
+  var show=(v==='Folding carton (4-color printed gift box)'||v==='Display box / PDQ');
+  wrap.style.display=show?'block':'none';
+  if(!show)document.querySelectorAll('.ax-pkg-sub:checked').forEach(function(c){c.checked=false;});
+}
+function axPkgSubSelections(){return Array.prototype.slice.call(document.querySelectorAll('.ax-pkg-sub:checked')).map(function(c){return c.value;});}
+
 // Build legacy packaging_type comma-string from structured state (backward compat)
 function getPkgLegacyString(){
   var parts=[];
@@ -7591,6 +7622,13 @@ function loadPkgFormState(rfq){
   }
   if(g('pkg-finish')) g('pkg-finish').value=rfq.packaging_finish||'';
   if(g('pkg-color'))  g('pkg-color').value=rfq.packaging_color||'';
+  // FIX 2: restore the two-level packaging type selector + printing sub-options.
+  if(g('ax-pkg-type'))g('ax-pkg-type').value=rfq.packaging_type||rfq.packaging_primary||'';
+  if(typeof axPkgSubToggle==='function')axPkgSubToggle();
+  (Array.isArray(rfq.packaging_secondary)?rfq.packaging_secondary:[]).forEach(function(v){
+    document.querySelectorAll('.ax-pkg-sub').forEach(function(c){if(c.value===v)c.checked=true;});
+  });
+  if(typeof axPkgSubToggle==='function')axPkgSubToggle();
   // Auto-open advanced section if any advanced field is populated
   var hasAdvanced=(rfq.packaging_decoration&&rfq.packaging_decoration.length) ||
                   (rfq.packaging_sustainability&&rfq.packaging_sustainability.length) ||
@@ -8167,6 +8205,9 @@ async function saveRFQ(action){
   // Collect structured packaging from picker state
   var pkgFields=getPkgFormState();
   var legacyPkgString=getPkgLegacyString();
+  // FIX 2: two-level packaging type → packaging_type; printing sub-options → packaging_secondary.
+  var axPkgType=(g('ax-pkg-type')&&g('ax-pkg-type').value)||'';
+  var axPkgSub=axPkgSubSelections();
 
   // Collect compliance (certs + product docs, required/preferred)
   var compliance=readRfqCompliance();
@@ -8196,13 +8237,13 @@ async function saveRFQ(action){
     packaging_primary:           pkgFields.packaging_primary,
     packaging_primary_material:  pkgFields.packaging_primary_material,
     packaging_closures:          pkgFields.packaging_closures,
-    packaging_secondary:         pkgFields.packaging_secondary,
+    packaging_secondary:         (axPkgSub.length ? axPkgSub : pkgFields.packaging_secondary),
     packaging_decoration:        pkgFields.packaging_decoration,
     packaging_finish:            pkgFields.packaging_finish,
     packaging_color:             pkgFields.packaging_color,
     packaging_sustainability:    pkgFields.packaging_sustainability,
     // Legacy packaging_type — auto-derived from structured fields for backward compat
-    packaging_type:legacyPkgString,
+    packaging_type:(axPkgType||legacyPkgString),
     packaging_notes:g('rfq-pkg-notes').value.trim()||null,
     certifications_required:compliance.certifications_required.length?compliance.certifications_required:null,
     certifications_preferred:compliance.certifications_preferred.length?compliance.certifications_preferred:null,
@@ -8371,10 +8412,10 @@ async function saveRFQ(action){
 }
 
 async function sendRFQEmails(rfq){
-  var myEmail=localStorage.getItem('from_email')||'';
-  var portalUrl='https://project-7o416.vercel.app';
+  // FIX 1: send from sourcing@ (→ Sarah Lindburg) and loop EVERY selected factory.
+  var portalUrl='https://portal.tbgsourcing.net';
   var factoryIds=Object.keys(selectedFactoryIds);
-  if(!factoryIds.length){alert('No factories selected.');return;}
+  if(!factoryIds.length){console.log('[sendRFQEmails] no factories selected — nothing to send.');return;}
 
   // Fetch factory details fresh from DB to guarantee emails are included
   var idList=factoryIds.join(',');
@@ -8384,30 +8425,38 @@ async function sendRFQEmails(rfq){
   if(!r.ok){alert('Could not load factory details for emailing.');return;}
   var factories=await r.json();
 
-  var failed=[];var sent=0;
+  var proj=rfq.project_number||'PRJ-XXXX';
+  var item=rfq.item_description||'';
+  var subject='['+proj+'] RFQ: '+item;
+  var failed=[],sent=0;
   for(var i=0;i<factories.length;i++){
     var f=factories[i];
     if(!f.sales_email){
       failed.push((f.factory_name_english||'Unknown')+' (no email)');
       continue;
     }
-    var firstName=(f.sales_contact_name||'').split(' ')[0]||'Team';
-    var emailBody='Dear '+firstName+',\n\n'+
-      'Our sourcing team has sent you a new Request for Quotation ('+rfq.project_number+').\n\n'+
-      'Product: '+rfq.item_description+'\n\n'+
-      'Please log into our supplier portal to review the full specifications and submit your quote.\n\n'+
-      'Portal: '+portalUrl+'\n\n'+
-      'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+    var factoryName=f.factory_name_english||f.sales_contact_name||'Team';
+    var emailBody='Dear '+factoryName+',\n\n'+
+      'Please find attached our RFQ for '+item+'. Project number: '+proj+'.\n\n'+
+      'Please submit your quote through the factory portal at '+portalUrl+'.\n\n'+
+      'Thank you,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
     try{
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','['+rfq.project_number+'] RFQ: '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      // sendEmail() posts to /api/send-email (from sourcing@ → Sarah Lindburg) AND logs to
+      // email_threads + email_messages (existing threading pattern).
+      await sendEmail(f.sales_email,f.sales_contact_name||factoryName,subject,emailBody,'sourcing@tbgsourcing.net');
       sent++;
     }catch(ex){
       failed.push(f.factory_name_english);
       console.log('Email failed for '+f.factory_name_english+':',ex);
     }
   }
-  var msg='Emails sent: '+sent+(failed.length?'\nFailed/no email: '+failed.join(', '):'');
-  console.log('[sendRFQEmails]',msg);
+  // FIX 1: stamp the RFQ as sent once the loop completes.
+  if(rfq.id){
+    try{
+      await fetch(SB+'/rest/v1/rfqs?id=eq.'+rfq.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sent_at:new Date().toISOString(),sent_to_count:sent})});
+    }catch(e){console.log('[sendRFQEmails] rfqs sent_at update failed:',e);}
+  }
+  console.log('[sendRFQEmails] sent '+sent+(failed.length?' · failed/no email: '+failed.join(', '):''));
 }
 
 // ── BRANDS ──
