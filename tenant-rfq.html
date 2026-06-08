@@ -1725,17 +1725,74 @@ function tQuoteCtx(quoteId) {
   const f = q.factories || {};
   return { quote: q, factory: f, ctx: { quote_id: quoteId, rfq_id: q.rfq_id, factory_id: q.factory_id, factoryName: f.factory_name_english, salesEmail: f.sales_email } };
 }
+// Full approve flow (mirrors admin acceptQuote): create product_development + product_development_items.
+async function tenantApproveQuote(q, factory, ctx) {
+  const wHead = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+  // RFQ details for the PD record.
+  let rfq = {};
+  try { const rr = await supa('rfqs?id=eq.' + encodeURIComponent(ctx.rfq_id) + '&select=item_description,category,customer_id,brand_id,tenant_id&limit=1'); rfq = (rr && rr[0]) || {}; } catch (e) {}
+  const tid = rfq.tenant_id || TID;
+  // 4. Update quote: accepted + selected.
+  await fetch(SUPA_URL + '/rest/v1/rfq_quotes?id=eq.' + encodeURIComponent(ctx.quote_id), { method: 'PATCH', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify({ status: 'accepted', is_selected: true }) });
+  // 1. product_development — skip if one already exists for this quote.
+  let pdId = null;
+  try {
+    const exist = await supa('product_development?quote_id=eq.' + encodeURIComponent(ctx.quote_id) + '&select=id&limit=1');
+    if (exist && exist.length) { pdId = exist[0].id; }
+    else {
+      let pdNum = 'PD-0001';
+      try {
+        const cR = await fetch(SUPA_URL + '/rest/v1/product_development?select=id', { headers: Object.assign({}, wHead, { Prefer: 'count=exact', Range: '0-0' }) });
+        const total = parseInt((cR.headers.get('content-range') || '0/0').split('/')[1]) || 0;
+        pdNum = 'PD-' + String(total + 1).padStart(4, '0');
+      } catch (e) {}
+      const pdPayload = {
+        pd_number: pdNum, rfq_id: ctx.rfq_id, quote_id: ctx.quote_id, factory_id: ctx.factory_id, tenant_id: tid,
+        customer_id: rfq.customer_id || null, brand_id: rfq.brand_id || null,
+        item_description: rfq.item_description || null, category: rfq.category || null,
+        unit_length_cm: q.unit_length_cm || null, unit_width_cm: q.unit_width_cm || null, unit_height_cm: q.unit_height_cm || null, unit_weight_kg: q.unit_weight_kg || null,
+        status: 'pending'
+      };
+      const pdRes = await fetch(SUPA_URL + '/rest/v1/product_development', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=representation' }), body: JSON.stringify(pdPayload) });
+      const pdRows = pdRes.ok ? await pdRes.json().catch(() => []) : [];
+      const row = Array.isArray(pdRows) ? pdRows[0] : pdRows;
+      pdId = (row && row.id) || null;
+    }
+  } catch (e) { console.error('product_development create', e); }
+  // 2. product_development_items (sample-approval workflow) — skip if one already exists for this quote.
+  try {
+    const existPdi = await supa('product_development_items?accepted_quote_id=eq.' + encodeURIComponent(ctx.quote_id) + '&select=id&limit=1');
+    if (!existPdi || !existPdi.length) {
+      const pdiPayload = {
+        product_development_id: pdId, accepted_quote_id: ctx.quote_id, rfq_id: ctx.rfq_id, factory_id: ctx.factory_id, tenant_id: tid,
+        status: 'awaiting_initial_sample', current_version: 0,
+        quote_sample_submission_days: q.quote_sample_submission_days || null,
+        quote_materials_offset_days: q.quote_materials_offset_days || null,
+        quote_prod_start_offset_days: q.quote_prod_start_offset_days || null,
+        quote_prod_end_offset_days: q.quote_prod_end_offset_days || null,
+        quote_inspection_offset_days: q.quote_inspection_offset_days || null,
+        quote_cargo_ready_offset_days: q.quote_cargo_ready_offset_days || null
+      };
+      await fetch(SUPA_URL + '/rest/v1/product_development_items', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify(pdiPayload) });
+    }
+  } catch (e) { console.error('product_development_items create', e); }
+}
+
 // Action buttons reuse the existing AI email draft modal (openQuoteEmailModal).
 async function tQuoteAction(action, quoteId) {
-  const { factory, ctx } = tQuoteCtx(quoteId);
+  const { quote, factory, ctx } = tQuoteCtx(quoteId);
   if (!ctx.rfq_id) { alert('Quote not found.'); return; }
-  const statusMap = { approved: 'accepted', rejected: 'rejected', more_info: 'more_info_requested' };
+  const statusMap = { rejected: 'rejected', more_info: 'more_info_requested' };
   await openQuoteEmailModal(action, ctx, async (subject, body) => {
-    const patch = { status: statusMap[action] || 'more_info_requested' };
-    if (action === 'approved') patch.is_selected = true;
-    await fetch(SUPA_URL + '/rest/v1/rfq_quotes?id=eq.' + encodeURIComponent(quoteId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(patch) });
+    if (action === 'approved') {
+      // Full flow: PD + PD-item records, plus status='accepted' & is_selected=true.
+      await tenantApproveQuote(quote, factory, ctx);
+    } else {
+      await fetch(SUPA_URL + '/rest/v1/rfq_quotes?id=eq.' + encodeURIComponent(quoteId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ status: statusMap[action] || 'more_info_requested' }) });
+    }
     if (factory.sales_email) await tenantSendEmail(factory.sales_email, factory.sales_contact_name || factory.factory_name_english || 'Team', subject, body, ctx.factory_id, ctx.rfq_id);
     await maybeCloseRfq(ctx.rfq_id);
+    if (action === 'approved' && typeof toast === 'function') toast('Quote approved. Item moved to Product Development.');
   });
   openRFQ(ctx.rfq_id);
 }
