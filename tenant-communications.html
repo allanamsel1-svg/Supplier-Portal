@@ -48,6 +48,20 @@
   .cs-note { font-size: 12px; color: var(--text2); line-height: 1.55; margin-bottom: 18px; }
   .cs-note.warn { color: #f59e0b; font-size: 11px; margin-top: 12px; margin-bottom: 0; }
   .cs-btn-disabled { background: var(--card-bg); color: var(--text2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: not-allowed; opacity: 0.55; }
+  /* ── Designer mode (?role=designer): minimal header, no tenant sidebar, scoped tabs ── */
+  .designer-topbar { display: none; }
+  body.designer-mode .designer-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; background: var(--bg2); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 50;
+  }
+  body.designer-mode .designer-topbar .dt-l { display: flex; align-items: center; gap: 10px; }
+  body.designer-mode .dt-logo { width: 30px; height: 30px; background: #2563eb; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  body.designer-mode .dt-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  body.designer-mode .dt-back { font-size: 13px; color: var(--text2); text-decoration: none; border: 1px solid var(--border); border-radius: 7px; padding: 6px 12px; font-family: inherit; }
+  body.designer-mode .dt-back:hover { color: var(--text); }
+  body.designer-mode #sidebar { display: none !important; }
+  body.designer-mode .main { margin-left: 0 !important; margin-top: 0 !important; }
 </style>
 </head>
 <body>
@@ -130,6 +144,10 @@
 <script src="tenant-shared.js"></script>
 <script>
 const TABS = ['all', 'allan', 'sourcing', 'sales', 'graphics', 'accounting', 'logistics', 'compliance', 'zoom', 'sms', 'whatsapp'];
+// Designer mode (?role=designer): scope the comms view to designer-only channels.
+// "Email" maps to the consolidated 'all' inbox; plus Zoom and WhatsApp. Everything else is hidden.
+const DESIGNER = (function () { try { return new URLSearchParams(location.search).get('role') === 'designer'; } catch (e) { return false; } })();
+const DESIGNER_TABS = ['all', 'zoom', 'whatsapp'];
 let TID = null;
 let allThreads = [];     // tenant-visible threads
 let current = 'all';
@@ -145,6 +163,8 @@ function tabFromUrl() {
 
 function showTab(tab) {
   if (!TABS.includes(tab)) tab = 'all';
+  // In designer mode, clamp any hidden tab (dept mailboxes, SMS) back to the Email inbox.
+  if (DESIGNER && !DESIGNER_TABS.includes(tab)) tab = 'all';
   current = tab;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   const commsPane = document.getElementById('commsPane');
@@ -233,12 +253,39 @@ async function openThread(id) {
   panel.innerHTML = header + body;
 }
 
+// Designer mode: hide the tenant sidebar, show a minimal "Designer Portal" header with a
+// back link, and restrict the comms tabs to Email | Zoom | WhatsApp.
+function applyDesignerMode() {
+  document.body.classList.add('designer-mode');
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.style.display = 'none';
+  const hdr = document.createElement('div');
+  hdr.className = 'designer-topbar';
+  hdr.innerHTML = '<div class="dt-l"><span class="dt-logo">🎨</span><span class="dt-title">Designer Portal</span></div>' +
+    '<a class="dt-back" href="designer-portal.html">← Back to Designer Portal</a>';
+  document.body.insertAdjacentElement('afterbegin', hdr);
+  // Keep only the designer-allowed tabs; relabel the consolidated 'all' inbox as "Email".
+  document.querySelectorAll('.tab').forEach(t => {
+    if (DESIGNER_TABS.includes(t.dataset.tab)) {
+      if (t.dataset.tab === 'all') t.textContent = '📧 Email';
+    } else {
+      t.style.display = 'none';
+    }
+  });
+}
+
 (async function init() {
   const user = await tenantAuth();
   if (!user || !user.tenant) return;
   TID = user.tenant.id;
-  renderSidebar(user);
-  document.getElementById('pageSub').textContent = user.tenant.name + ' · email inbox';
+  // Designers get a scoped view with no tenant nav; everyone else gets the full tenant sidebar.
+  if (DESIGNER) {
+    applyDesignerMode();
+    document.getElementById('pageSub').textContent = user.tenant.name + ' · designer channels';
+  } else {
+    renderSidebar(user);
+    document.getElementById('pageSub').textContent = user.tenant.name + ' · email inbox';
+  }
 
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => goTab(t.dataset.tab)));
   window.addEventListener('hashchange', () => showTab(tabFromUrl()));  // sidebar #zoom etc.
