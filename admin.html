@@ -2297,6 +2297,30 @@
   </div>
 </div>
 
+<!-- ── Design Brief Modal (Part 2) ── -->
+<div class="modal-overlay" id="dbrief-modal">
+  <div class="modal" style="max-width:680px;">
+    <h2 id="dbrief-title">Create Design Brief</h2>
+    <div style="margin:10px 0 6px;font-size:12px;font-weight:600;color:#555;">Packaging required (pre-selected by category)</div>
+    <div id="dbrief-pkg" style="margin-bottom:14px;"></div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">Reference image (similar packaging — for AI context)</label>
+      <input type="file" id="dbrief-ref" accept="image/*" onchange="dbriefUploadRef(this)" style="font-size:12px;" />
+      <div id="dbrief-ref-status" style="font-size:12px;color:#888;margin-top:4px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <button type="button" id="dbrief-gen-btn" onclick="dbriefGenerate()" style="padding:8px 14px;background:#f3edff;color:#5a2db8;border:1px solid #c8b8e8;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✦ Generate Brief with AI</button>
+      <span style="font-size:11px;color:#999;">Edit the brief below before saving.</span>
+    </div>
+    <textarea id="dbrief-text" rows="10" placeholder="Design brief text — generate with AI or write manually…" style="width:100%;padding:10px 12px;font-size:13px;border:1px solid #ddd;border-radius:8px;font-family:inherit;box-sizing:border-box;resize:vertical;min-height:200px;"></textarea>
+    <div class="modal-btns" style="margin-top:12px;">
+      <button class="btn-cancel" type="button" onclick="closeDesignBriefModal()">Cancel</button>
+      <button class="btn-send" type="button" id="dbrief-save-btn" onclick="dbriefSave()">Save &amp; Send to Designer Queue</button>
+    </div>
+    <div class="modal-msg" id="dbrief-msg"></div>
+  </div>
+</div>
+
 <!-- ── Supplier Detail Drawer ── -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="supplier-drawer">
@@ -11601,7 +11625,8 @@ function renderPDDetail(){
         '</div>'+
 
         (isLive
-          ? '<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Activated as Live SKU '+(p.activated_at?'on '+(p.activated_at||'').slice(0,10):'')+'</button>'
+          ? '<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Activated as Live SKU '+(p.activated_at?'on '+(p.activated_at||'').slice(0,10):'')+'</button>'+
+            '<button onclick="openDesignBriefModal()" style="width:100%;margin-top:8px;padding:12px;background:#5a2db8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🎨 Create Design Brief</button>'
           : '<button onclick="activateAsLiveSku()" '+(!allPass?'disabled ':'')+'style="width:100%;padding:12px;background:'+(!allPass?'#bbb':'#1a7a1a')+';color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:'+(!allPass?'not-allowed':'pointer')+';">'+
               (allPass ? '🚀 Activate as Live SKU' : '🔒 Complete all 8 gates to activate')+
             '</button>'
@@ -12193,6 +12218,79 @@ async function activateAsLiveSku() {
   } finally {
     window._skipApprovalConfirm = false;
   }
+  // Part 2: immediately offer the design brief once the SKU exists.
+  setTimeout(function(){ try{ openDesignBriefModal(); }catch(e){} }, 400);
+}
+
+// ── Design Brief (Part 2): packaging selections → AI brief → designer queue ──
+var DESIGN_PKG_TYPES = ['Label only','Folding carton / gift box','Inner tray / insert','User manual / instruction sheet','Quick start guide','Belly band','Hang tag','Shrink wrap','Sticker / decal'];
+var dbriefCtx = null, dbriefRefUrl = '';
+function dbriefDefaults(cat){
+  var c=(cat||'').toLowerCase(), on={};
+  if(/skin|hair|beauty|serum|lotion|fragrance/.test(c)) on['Label only']=true;
+  if(/electronic|speaker|headphone|charger|cable|device/.test(c)) on['Folding carton / gift box']=true;
+  return on;
+}
+function openDesignBriefModal(){
+  if(!pdCurrentDetail){alert('Open a Product Development item first.');return;}
+  var p=pdCurrentDetail;
+  var skuId=p.activated_sku_id||p.sku_id||null;
+  if(!skuId){alert('Create the Live SKU first — a design brief attaches to a SKU.');return;}
+  dbriefCtx={sku_id:skuId, pd_id:p.id, product_name:p.item_description||p.item_number||'Product', category:p.category||'', tenant_id:p.tenant_id||null};
+  dbriefRefUrl='';
+  var on=dbriefDefaults(dbriefCtx.category);
+  g('dbrief-title').textContent='Create Design Brief — '+(dbriefCtx.product_name||'');
+  g('dbrief-pkg').innerHTML=DESIGN_PKG_TYPES.map(function(t){
+    return '<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer;"><input type="checkbox" class="dbrief-pkg-cb" value="'+esc(t)+'"'+(on[t]?' checked':'')+'> '+esc(t)+'</label>';
+  }).join('');
+  g('dbrief-ref-status').textContent='';
+  g('dbrief-text').value='';
+  g('dbrief-msg').style.display='none';
+  g('dbrief-modal').classList.add('on');
+}
+function closeDesignBriefModal(){ g('dbrief-modal').classList.remove('on'); }
+function dbriefSelections(){ return Array.prototype.slice.call(document.querySelectorAll('.dbrief-pkg-cb:checked')).map(function(cb){return cb.value;}); }
+async function dbriefUploadRef(input){
+  var f=input.files&&input.files[0]; if(!f)return;
+  var st=g('dbrief-ref-status'); st.textContent='Uploading reference…';
+  try{
+    var safe=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    var ctype=f.type||'application/octet-stream';
+    var up=await fetch('/api/r2-upload?folder='+encodeURIComponent('design-briefs/'+dbriefCtx.sku_id)+'&filename='+encodeURIComponent(safe)+'&contentType='+encodeURIComponent(ctype),{method:'POST',headers:{'Authorization':'Bearer '+(localStorage.getItem('admin_session')||''),'Content-Type':ctype},body:f});
+    var upj=await up.json().catch(function(){return{error:true};});
+    if(!up.ok||!upj||upj.error||!upj.url){st.textContent='Upload failed: '+((upj&&upj.message)||up.status);return;}
+    dbriefRefUrl=upj.url;
+    st.innerHTML='✓ Reference uploaded · <a href="'+esc(upj.url)+'" target="_blank" style="color:#5a2db8;">view</a>';
+  }catch(e){st.textContent='Upload error: '+(e&&e.message||e);}
+  input.value='';
+}
+async function dbriefGenerate(){
+  var btn=g('dbrief-gen-btn'); var orig=btn.textContent; btn.disabled=true; btn.textContent='Generating…';
+  try{
+    var r=await fetch('/api/generate-design-brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sku_description:dbriefCtx.product_name,category:dbriefCtx.category,packaging_selections:dbriefSelections(),reference_image_url:dbriefRefUrl||null})});
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok||!d.brief){alert('Could not generate brief: '+(d.error||r.status));}
+    else g('dbrief-text').value=d.brief;
+  }catch(e){alert('Error: '+(e&&e.message||e));}
+  btn.disabled=false; btn.textContent=orig;
+}
+async function dbriefSave(){
+  var sel=dbriefSelections();
+  var dieline=sel.indexOf('Folding carton / gift box')>=0 || sel.indexOf('Inner tray / insert')>=0;
+  var payload={
+    sku_id:dbriefCtx.sku_id, tenant_id:dbriefCtx.tenant_id, product_name:dbriefCtx.product_name,
+    packaging_selections:sel, reference_image_url:dbriefRefUrl||null, ai_brief:g('dbrief-text').value||null,
+    status:'ready_for_design', priority:999, artwork_types:sel, dieline_required:dieline, pd_item_id:dbriefCtx.pd_id
+  };
+  var btn=g('dbrief-save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    var r=await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    if(!r.ok){var t=await r.text().catch(function(){return '';});alert('Save failed: '+r.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Save & Send to Designer Queue';return;}
+    var m=g('dbrief-msg'); m.style.display='block'; m.textContent='✓ Design brief sent to designer queue.';
+    if(typeof toast==='function')toast('Design brief sent to designer queue.');
+    setTimeout(closeDesignBriefModal,1000);
+  }catch(e){alert('Error: '+(e&&e.message||e));}
+  btn.disabled=false; btn.textContent='Save & Send to Designer Queue';
 }
 
 async function approvePDToSKU(){

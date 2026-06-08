@@ -514,7 +514,7 @@ function awTypeBadges(t){return (Array.isArray(t)?t:[]).map(function(x){return '
 function awDesignerName(p){return (p.tenant_users&&p.tenant_users.full_name)||'Unassigned';}
 async function awInit(){
   awg('pane-artwork').innerHTML='<div class="aw-layout">'+
-    '<div class="aw-left"><div class="aw-lhead"><h2>Projects</h2><button class="aw-btn" onclick="awOpenNew()">+ New Project</button></div>'+
+    '<div class="aw-left"><div class="aw-lhead"><h2>Projects</h2><div style="display:flex;gap:6px;"><button class="aw-btn alt" onclick="awOpenPriority()">🎯 Priority</button><button class="aw-btn" onclick="awOpenNew()">+ New Project</button></div></div>'+
     '<div class="aw-tabs" id="awTabs">'+
       '<button class="aw-tab active" data-f="all" onclick="awSetFilter(\'all\')">All</button>'+
       '<button class="aw-tab" data-f="in_progress" onclick="awSetFilter(\'in_progress\')">In Progress</button>'+
@@ -552,6 +552,65 @@ function awRenderList(){
     '<div style="font-size:11px;color:var(--text2);">'+esc(awDesignerName(p))+(p.due_date?' · due '+fmtDate(p.due_date):'')+'</div></div>';}).join('');
 }
 function awSelect(id){AW_SEL=id;awRenderList();var p=AW_PROJECTS.find(function(x){return x.id===id;});if(p)awRenderDetail(p);}
+
+// ── Part 5: priority reorder for status='ready_for_design' ──
+var AW_PRIO=[];
+function awDaysWaiting(s){if(!s)return '';var d=Math.floor((Date.now()-new Date(s).getTime())/86400000);return d+' day'+(d===1?'':'s')+' waiting';}
+function awOpenPriority(){
+  AW_SEL=null; awRenderList();
+  AW_PRIO=AW_PROJECTS.filter(function(p){return p.status==='ready_for_design';})
+    .sort(function(a,b){var pa=a.priority==null?9999:a.priority,pb=b.priority==null?9999:b.priority;return pa-pb||(new Date(a.created_at)-new Date(b.created_at));});
+  awRenderPriority();
+}
+function awRenderPriority(){
+  var host=awg('awDetail');
+  if(!AW_PRIO.length){host.innerHTML='<div class="aw-sec"><h3>Design Queue Priority</h3><div class="empty">No briefs are waiting for design (status “ready for design”).</div></div>';return;}
+  var rows=AW_PRIO.map(function(p,i){
+    return '<div class="aw-prio-row" draggable="true" data-id="'+esc(p.id)+'" data-idx="'+i+'" '+
+      'ondragstart="awPrioDragStart(event)" ondragover="awPrioDragOver(event)" ondrop="awPrioDrop(event)" ondragend="awPrioDragEnd(event)" '+
+      'style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--card-bg);cursor:grab;">'+
+      '<span style="font-size:16px;color:var(--text2);cursor:grab;" title="Drag to reorder">↕</span>'+
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;">'+esc(p.product_name||'Untitled')+'</div>'+
+        '<div style="font-size:11px;color:var(--text2);">'+esc(awDesignerName(p))+' · '+esc(awDaysWaiting(p.created_at))+'</div></div>'+
+      '<input type="number" min="0" value="'+(p.priority==null?'':p.priority)+'" style="width:72px;padding:5px 7px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text);" '+
+        'onchange="awPrioSetManual(\''+esc(p.id)+'\',this.value)" title="Set priority (lower = earlier)">'+
+    '</div>';
+  }).join('');
+  host.innerHTML='<div class="aw-sec"><h3>Design Queue Priority</h3>'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Drag to reorder, or type a priority number (lower = earlier in the queue).</div>'+
+    rows+'<div id="awPrioMsg" style="font-size:12px;color:#22c55e;margin-top:8px;"></div></div>';
+}
+var _awPrioDrag=null;
+function awPrioDragStart(e){_awPrioDrag=e.currentTarget.getAttribute('data-id');try{e.dataTransfer.effectAllowed='move';}catch(_){}}
+function awPrioDragOver(e){e.preventDefault();}
+function awPrioDragEnd(e){_awPrioDrag=null;}
+function awPrioDrop(e){
+  e.preventDefault();
+  var targetId=e.currentTarget.getAttribute('data-id');
+  if(!_awPrioDrag||_awPrioDrag===targetId)return;
+  var from=AW_PRIO.findIndex(function(p){return p.id===_awPrioDrag;});
+  var to=AW_PRIO.findIndex(function(p){return p.id===targetId;});
+  if(from<0||to<0)return;
+  var moved=AW_PRIO.splice(from,1)[0];
+  AW_PRIO.splice(to,0,moved);
+  awPrioPersist();
+}
+function awPrioSetManual(id,val){
+  var n=parseInt(val,10); if(isNaN(n))return;
+  var p=AW_PRIO.find(function(x){return x.id===id;}); if(p)p.priority=n;
+  AW_PRIO.sort(function(a,b){var pa=a.priority==null?9999:a.priority,pb=b.priority==null?9999:b.priority;return pa-pb;});
+  awPrioPersist();
+}
+async function awPrioPersist(){
+  // Write priority = new index for every row (keeps the list dense + ordered).
+  for(var i=0;i<AW_PRIO.length;i++){
+    AW_PRIO[i].priority=i;
+    await fetch(OPS_SB+'/rest/v1/artwork_projects?id=eq.'+AW_PRIO[i].id,{method:'PATCH',headers:{apikey:OPS_KEY,Authorization:'Bearer '+OPS_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({priority:i,updated_at:new Date().toISOString()})});
+    var src=AW_PROJECTS.find(function(x){return x.id===AW_PRIO[i].id;}); if(src)src.priority=i;
+  }
+  awRenderPriority();
+  var m=awg('awPrioMsg'); if(m){m.textContent='✓ Priority saved.';setTimeout(function(){if(m)m.textContent='';},1500);}
+}
 async function awRenderDetail(p){
   var sku=p.skus||{};var html='';
   html+='<div class="aw-sec"><div style="font-size:20px;font-weight:700;">'+esc(p.product_name||'Untitled')+'</div>'+

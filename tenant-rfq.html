@@ -472,6 +472,29 @@
   </div>
 </div>
 
+<!-- ── Design Brief Modal (Part 2) ── -->
+<div id="dbrief-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;display:none;align-items:center;justify-content:center;">
+  <div style="background:var(--card,#1e293b);color:var(--text,#e2e8f0);border:1px solid var(--border,#334155);border-radius:14px;padding:22px;width:92%;max-width:680px;max-height:88vh;overflow-y:auto;box-shadow:0 10px 50px rgba(0,0,0,0.45);">
+    <h2 id="dbrief-title" style="font-size:17px;font-weight:600;margin:0 0 12px;">Create Design Brief</h2>
+    <div style="font-size:12px;font-weight:600;color:var(--text2,#94a3b8);margin-bottom:6px;">Packaging required (pre-selected by category)</div>
+    <div id="dbrief-pkg" style="margin-bottom:14px;"></div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;font-weight:600;color:var(--text2,#94a3b8);display:block;margin-bottom:4px;">Reference image (similar packaging — for AI context)</label>
+      <input type="file" id="dbrief-ref" accept="image/*" onchange="dbriefUploadRef(this)" style="font-size:12px;color:var(--text);">
+      <div id="dbrief-ref-status" style="font-size:12px;color:var(--text2,#94a3b8);margin-top:4px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;">
+      <button type="button" id="dbrief-gen-btn" onclick="dbriefGenerate()" style="padding:8px 14px;background:#3b2d6b;color:#d6c8ff;border:1px solid #5a4a9c;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✦ Generate Brief with AI</button>
+      <span style="font-size:11px;color:var(--text2,#94a3b8);">Edit the brief below before saving.</span>
+    </div>
+    <textarea id="dbrief-text" rows="10" placeholder="Design brief text — generate with AI or write manually…" style="width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border,#334155);border-radius:8px;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);box-sizing:border-box;resize:vertical;min-height:200px;font-family:inherit;line-height:1.5;"></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px;">
+      <button type="button" onclick="closeDesignBriefModal()" style="padding:9px 16px;background:transparent;color:var(--text2,#94a3b8);border:1px solid var(--border,#334155);border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;">Cancel</button>
+      <button type="button" id="dbrief-save-btn" onclick="dbriefSave()" style="padding:9px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Save &amp; Send to Designer Queue</button>
+    </div>
+  </div>
+</div>
+
 <script src="/tenant-shared.js"></script>
 <script>
 const TABS = ['rfq', 'submitted', 'pd', 'skus'];
@@ -1990,9 +2013,131 @@ async function openPD(id) {
 
   document.getElementById('panelBody').innerHTML = `
     <div class="panel-section"><h3>Details</h3>${details}</div>
+    ${pdActionSection(p)}
     <div class="panel-section"><h3>Description</h3><div class="sub-list">${desc}</div></div>
     <div class="panel-section"><h3>Items &amp; Sample Status (${items.length})</h3><div class="sub-list">${itemRows}</div></div>
   `;
+}
+
+// ── Part 1/2: Create Live SKU + Design Brief (gated on the 4 readiness gates) ──
+function pdActionSection(p) {
+  const gatesGreen = !!(p.gate_dimensions_ok && p.gate_compliance_ok && p.gate_artwork_ok && p.gate_assets_ok);
+  const hasSku = !!(p.sku_id || p.activated_sku_id);
+  let inner;
+  if (hasSku) {
+    inner = `<button class="nr-btn" onclick="openDesignBriefModal('${esc(p.id)}')">🎨 Create Design Brief</button>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px;">SKU created${p.skus && p.skus.model_number ? ': <b>' + esc(p.skus.model_number) + '</b>' : ''}. Generate the packaging design brief for the designer queue.</div>`;
+  } else if (gatesGreen) {
+    inner = `<button class="nr-btn" id="pd-create-sku-btn" onclick="tenantCreateLiveSku('${esc(p.id)}')">🎯 Create Live SKU</button>
+      <div style="font-size:12px;color:var(--text2);margin-top:6px;">All gates green — assign UPCs and create the live SKU.</div>`;
+  } else {
+    const pend = [
+      !p.gate_dimensions_ok && 'Dimensions',
+      !p.gate_compliance_ok && 'Compliance',
+      !p.gate_artwork_ok && 'Artwork',
+      !p.gate_assets_ok && 'Assets',
+    ].filter(Boolean);
+    inner = `<div style="font-size:13px;color:var(--text2);">🔒 Complete all gates to create a live SKU. Pending: ${pend.map(esc).join(', ')}.</div>`;
+  }
+  return `<div class="panel-section"><h3>Production</h3><div>${inner}</div></div>`;
+}
+
+// GTIN-14 derivation (mirrors admin) — inner/master/pallet from the unit UPC.
+function tDeriveItf14(unitUpc, indicator) {
+  if (!/^\d{12}$/.test(unitUpc)) return null;
+  const thirteen = String(indicator) + '0' + unitUpc.substring(0, 11);
+  let sum = 0;
+  for (let i = 0; i < 13; i++) { const n = parseInt(thirteen[i], 10); sum += (i % 2 === 0) ? n * 3 : n; }
+  const check = (10 - (sum % 10)) % 10;
+  return thirteen + String(check);
+}
+
+async function tenantCreateLiveSku(pdId) {
+  const p = pds.find(x => x.id === pdId); if (!p) return;
+  if (p.sku_id || p.activated_sku_id) { alert('SKU already created' + (p.skus && p.skus.model_number ? ': ' + p.skus.model_number : '') + '.'); return; }
+  const btn = document.getElementById('pd-create-sku-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+  const wHead = { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
+  try {
+    // 1. Pull next available unit UPC from the pool.
+    const avail = await supa('upc_pool?is_assigned=eq.false&level=eq.unit&order=upc_code&limit=1');
+    if (!avail.length) { alert('UPC pool empty — please upload UPC codes in Settings.'); if (btn) { btn.disabled = false; btn.textContent = '🎯 Create Live SKU'; } return; }
+    const unitUpc = avail[0].upc_code;
+    // 2. Model number (brand_code + category model_prefix + sequence).
+    let brandCode = 'BR', catPrefix = (p.category || 'SKU').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase() || 'SKU';
+    if (p.brand_id) { const b = await supa('brands?id=eq.' + p.brand_id + '&select=brand_code&limit=1'); if (b[0] && b[0].brand_code) brandCode = b[0].brand_code; }
+    if (p.category_id) { const c = await supa('categories?id=eq.' + p.category_id + '&select=model_prefix&limit=1'); if (c[0] && c[0].model_prefix) catPrefix = c[0].model_prefix; }
+    const seq = parseInt(String(Date.now()).slice(-7), 10);
+    const modelNumber = [brandCode, catPrefix, seq].join('-');
+    // 3. Mark UPC assigned.
+    const assignR = await fetch(SUPA_URL + '/rest/v1/upc_pool?upc_code=eq.' + encodeURIComponent(unitUpc), { method: 'PATCH', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify({ is_assigned: true, assigned_to_pd_id: p.id, assigned_at: new Date().toISOString() }) });
+    if (!assignR.ok) { alert('Failed to claim UPC from pool (' + assignR.status + ').'); if (btn) { btn.disabled = false; btn.textContent = '🎯 Create Live SKU'; } return; }
+    const innerUpc = tDeriveItf14(unitUpc, 1), masterUpc = tDeriveItf14(unitUpc, 2), palletUpc = tDeriveItf14(unitUpc, 3);
+    // 4. Insert the SKU (skus stores only the unit UPC in upc_code).
+    const skuPayload = { model_number: modelNumber, brand_prefix: brandCode, category_prefix: catPrefix, sequence_number: seq, description: p.item_description || p.detailed_description || modelNumber, brand_id: p.brand_id || null, category_id: p.category_id || null, status: 'active', upc_code: unitUpc, tenant_id: p.tenant_id || TID, is_cosmetic: !!p.is_cosmetic };
+    const skuR = await fetch(SUPA_URL + '/rest/v1/skus', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=representation' }), body: JSON.stringify(skuPayload) });
+    if (!skuR.ok) { const t = await skuR.text().catch(() => ''); alert('SKU creation failed: ' + skuR.status + ' ' + t.slice(0, 200)); if (btn) { btn.disabled = false; btn.textContent = '🎯 Create Live SKU'; } return; }
+    const skuRows = await skuR.json().catch(() => []); const newSku = Array.isArray(skuRows) ? skuRows[0] : skuRows;
+    // 5. Link the SKU + store all four UPCs on the PD record.
+    await fetch(SUPA_URL + '/rest/v1/product_development?id=eq.' + p.id, { method: 'PATCH', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify({ sku_id: newSku.id, activated_sku_id: newSku.id, sku_lifecycle_status: 'active', unit_upc: unitUpc, inner_upc: innerUpc, master_upc: masterUpc, pallet_upc: palletUpc, updated_at: new Date().toISOString() }) });
+    Object.assign(p, { sku_id: newSku.id, activated_sku_id: newSku.id, sku_lifecycle_status: 'active', unit_upc: unitUpc, inner_upc: innerUpc, master_upc: masterUpc, pallet_upc: palletUpc, skus: { model_number: modelNumber, description: skuPayload.description } });
+    alert('SKU ' + modelNumber + ' created. UPCs assigned.');
+    openPD(p.id);                 // re-render → now shows Create Design Brief
+    openDesignBriefModal(p.id);   // Part 2: immediately offer the brief
+  } catch (e) { alert('Error: ' + (e && e.message || e)); if (btn) { btn.disabled = false; btn.textContent = '🎯 Create Live SKU'; } }
+}
+
+// ── Part 2: Design Brief modal (tenant) ──
+const DESIGN_PKG_TYPES = ['Label only','Folding carton / gift box','Inner tray / insert','User manual / instruction sheet','Quick start guide','Belly band','Hang tag','Shrink wrap','Sticker / decal'];
+let dbriefCtx = null, dbriefRefUrl = '';
+function dbriefDefaults(cat){ const c=(cat||'').toLowerCase(), on={}; if(/skin|hair|beauty|serum|lotion|fragrance/.test(c))on['Label only']=true; if(/electronic|speaker|headphone|charger|cable|device/.test(c))on['Folding carton / gift box']=true; return on; }
+function openDesignBriefModal(pdId){
+  const p=pds.find(x=>x.id===pdId); if(!p)return;
+  const skuId=p.sku_id||p.activated_sku_id; if(!skuId){alert('Create the Live SKU first — a design brief attaches to a SKU.');return;}
+  dbriefCtx={sku_id:skuId,pd_id:p.id,product_name:p.item_description||p.detailed_description||'Product',category:p.category||'',tenant_id:p.tenant_id||TID};
+  dbriefRefUrl='';
+  const on=dbriefDefaults(dbriefCtx.category);
+  document.getElementById('dbrief-title').textContent='Create Design Brief — '+(dbriefCtx.product_name||'');
+  document.getElementById('dbrief-pkg').innerHTML=DESIGN_PKG_TYPES.map(t=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer;"><input type="checkbox" class="dbrief-pkg-cb" value="${esc(t)}"${on[t]?' checked':''}> ${esc(t)}</label>`).join('');
+  document.getElementById('dbrief-ref-status').textContent='';
+  document.getElementById('dbrief-text').value='';
+  document.getElementById('dbrief-modal').style.display='flex';
+}
+function closeDesignBriefModal(){ document.getElementById('dbrief-modal').style.display='none'; }
+function dbriefSelections(){ return Array.prototype.slice.call(document.querySelectorAll('.dbrief-pkg-cb:checked')).map(cb=>cb.value); }
+async function dbriefUploadRef(input){
+  const f=input.files&&input.files[0]; if(!f)return;
+  const st=document.getElementById('dbrief-ref-status'); st.textContent='Uploading reference…';
+  try{
+    const safe=Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'_'); const ctype=f.type||'application/octet-stream';
+    const up=await fetch('/api/r2-upload?folder='+encodeURIComponent('design-briefs/'+dbriefCtx.sku_id)+'&filename='+encodeURIComponent(safe)+'&contentType='+encodeURIComponent(ctype),{method:'POST',headers:{'Authorization':'Bearer '+(localStorage.getItem('tenant_token')||localStorage.getItem('admin_session')||''),'Content-Type':ctype},body:f});
+    const upj=await up.json().catch(()=>({error:true}));
+    if(!up.ok||!upj||upj.error||!upj.url){st.textContent='Upload failed: '+((upj&&upj.message)||up.status);return;}
+    dbriefRefUrl=upj.url; st.innerHTML='✓ Reference uploaded · <a href="'+esc(upj.url)+'" target="_blank" style="color:#93c5fd;">view</a>';
+  }catch(e){st.textContent='Upload error: '+(e&&e.message||e);}
+  input.value='';
+}
+async function dbriefGenerate(){
+  const btn=document.getElementById('dbrief-gen-btn'); const orig=btn.textContent; btn.disabled=true; btn.textContent='Generating…';
+  try{
+    const r=await fetch('/api/generate-design-brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sku_description:dbriefCtx.product_name,category:dbriefCtx.category,packaging_selections:dbriefSelections(),reference_image_url:dbriefRefUrl||null})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.brief)alert('Could not generate brief: '+(d.error||r.status));
+    else document.getElementById('dbrief-text').value=d.brief;
+  }catch(e){alert('Error: '+(e&&e.message||e));}
+  btn.disabled=false; btn.textContent=orig;
+}
+async function dbriefSave(){
+  const sel=dbriefSelections();
+  const dieline=sel.indexOf('Folding carton / gift box')>=0||sel.indexOf('Inner tray / insert')>=0;
+  const payload={sku_id:dbriefCtx.sku_id,tenant_id:dbriefCtx.tenant_id,product_name:dbriefCtx.product_name,packaging_selections:sel,reference_image_url:dbriefRefUrl||null,ai_brief:document.getElementById('dbrief-text').value||null,status:'ready_for_design',priority:999,artwork_types:sel,dieline_required:dieline,pd_item_id:dbriefCtx.pd_id};
+  const btn=document.getElementById('dbrief-save-btn'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    const r=await fetch(SUPA_URL+'/rest/v1/artwork_projects',{method:'POST',headers:{apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(payload)});
+    if(!r.ok){const t=await r.text().catch(()=>'');alert('Save failed: '+r.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Save & Send to Designer Queue';return;}
+    if(typeof toast==='function')toast('Design brief sent to designer queue.'); else alert('Design brief sent to designer queue.');
+    closeDesignBriefModal();
+  }catch(e){alert('Error: '+(e&&e.message||e));}
+  btn.disabled=false; btn.textContent='Save & Send to Designer Queue';
 }
 
 // ── SKU Library (inline; same data as tenant-skus.html) ──
