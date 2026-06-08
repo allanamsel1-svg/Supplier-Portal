@@ -191,8 +191,9 @@ export default async function handler(req, res) {
       const t = await r.text().catch(() => '');
       return res.status(200).json({ error: true, message: 'R2 upload failed: ' + r.status + ' ' + t });
     }
-    // Public access requires a configured public dev URL / custom domain on the bucket.
-    const url = 'https://' + host + '/' + CF_R2_BUCKET + '/' + key;
+    // Prefer the bucket's public dev URL / custom domain; fall back to the (non-public) S3 endpoint URL.
+    const pub = (process.env.CF_R2_PUBLIC_URL || '').replace(/\/+$/, '');
+    const url = pub ? (pub + '/' + key) : ('https://' + host + '/' + CF_R2_BUCKET + '/' + key);
     return res.status(200).json({ success: true, url });
   } catch (e) {
     return res.status(200).json({ error: true, message: 'Upload failed: ' + (e && e.message ? e.message : e) });
