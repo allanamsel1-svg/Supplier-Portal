@@ -8219,6 +8219,11 @@ async function saveRFQ(action){
  try {
   var desc=g('rfq-description').value.trim();
   if(!desc){alert('Item description is required.');return;}
+  // Editing an already-sent (or otherwise non-draft) RFQ: preserve its status, stamp
+  // updated_at, and save SILENTLY — never revert to draft and never re-notify factories.
+  var _editId=g('rfq-id').value;
+  var _existingRFQ=_editId?(allRFQs||[]).find(function(r){return r.id===_editId;}):null;
+  var preserveStatus=!!(_existingRFQ&&_existingRFQ.status&&_existingRFQ.status!=='draft');
   var rfqHts=(g('rfq-est-hts')&&g('rfq-est-hts').value.trim())||'';
   if(rfqHts&&!isValidHts(rfqHts)){alert('The suggested HTS code "'+rfqHts+'" is not a valid format (expected e.g. 3304.10.0000 or 3304.10). Re-run the AI suggestion or clear it before saving.');return;}
 
@@ -8238,7 +8243,7 @@ async function saveRFQ(action){
   var compliance=readRfqCompliance();
 
   var factoryIds=Object.keys(selectedFactoryIds);
-  if(action==='send'&&!factoryIds.length){
+  if(action==='send'&&!preserveStatus&&!factoryIds.length){
     alert('Please select at least one factory before sending. Use the factory search to find and select factories.');
     return;
   }
@@ -8320,6 +8325,14 @@ async function saveRFQ(action){
     factories_to_send:factoryIds,
     sent_to_count:action==='send'?factoryIds.length:0
   };
+  // For a non-draft RFQ keep its existing status, stamp updated_at, and don't clobber sent_to_count.
+  if(preserveStatus){
+    payload.status=_existingRFQ.status;
+    payload.updated_at=new Date().toISOString();
+    if(_existingRFQ.sent_to_count!=null)payload.sent_to_count=_existingRFQ.sent_to_count;
+    // The edit form doesn't repopulate the factory picker; don't blank the stored list unless the user re-selected.
+    if(!factoryIds.length)payload.factories_to_send=(_existingRFQ.factories_to_send||null);
+  }
 
   var rfqId=g('rfq-id').value;
   var url=rfqId?SB+'/rest/v1/rfqs?id=eq.'+rfqId:SB+'/rest/v1/rfqs';
@@ -8386,8 +8399,9 @@ async function saveRFQ(action){
           }
         }
 
-        // Create factory assignments — delete existing first to avoid duplicate key errors
-        if(savedRFQ.id&&factoryIds.length){
+        // Create factory assignments — delete existing first to avoid duplicate key errors.
+        // Skipped when preserving an already-sent RFQ so existing assignments/quotes are kept intact.
+        if(!preserveStatus&&savedRFQ.id&&factoryIds.length){
           await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+savedRFQ.id,{
             method:'DELETE',
             headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}
@@ -8407,8 +8421,8 @@ async function saveRFQ(action){
           }
         }
 
-        // Send emails
-        if(action==='send'){
+        // Send emails — skipped when preserving an already-sent RFQ (no re-notification).
+        if(!preserveStatus&&action==='send'){
           try{
             await sendRFQEmails(savedRFQ);
           }catch(emailErr){
@@ -8417,8 +8431,13 @@ async function saveRFQ(action){
           }
         }
       }
-      var msg=action==='send'?'RFQ sent to '+factoryIds.length+' factories!':'Draft saved as '+(savedRFQ?savedRFQ.project_number:'');
-      showFormMsg('rfq-save-ok',msg);
+      if(preserveStatus){
+        toast('RFQ updated. Factories have not been re-notified. Use Follow Up to notify them of changes.');
+        showFormMsg('rfq-save-ok','RFQ updated.');
+      }else{
+        var msg=action==='send'?'RFQ sent to '+factoryIds.length+' factories!':'Draft saved as '+(savedRFQ?savedRFQ.project_number:'');
+        showFormMsg('rfq-save-ok',msg);
+      }
       if(sendBtn){sendBtn.disabled=false;sendBtn.textContent='✉ Send RFQ to Selected Factories';}
       await loadRFQs();
     }else{

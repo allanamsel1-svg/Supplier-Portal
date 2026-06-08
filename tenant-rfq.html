@@ -1123,7 +1123,8 @@ function nrFreightWire() {
 
 // ── Additional product images + draft editing ──
 let nrExtraImages = [];   // [{ id, dataUrl, base64 }] — base64 '' for existing (display-only) images
-let nrEditId = null;      // set while editing an existing draft RFQ
+let nrEditId = null;      // set while editing an existing RFQ
+let nrForceEdit = null;   // rfq id to force into the editable form regardless of status
 let _nrExtraSeq = 0;
 function nrExtraAddBase64(b64) { nrExtraImages.push({ id: 'x' + (++_nrExtraSeq), dataUrl: 'data:image/jpeg;base64,' + b64, base64: b64 }); nrExtraRender(); }
 function nrExtraAddExisting(dataUrl) { nrExtraImages.push({ id: 'x' + (++_nrExtraSeq), dataUrl: dataUrl, base64: '' }); nrExtraRender(); }
@@ -1399,6 +1400,16 @@ async function saveNewRfq(status) {
     gross_margin_pct: pflt('nr-elc-margin-wc'),
     factories_to_send: nrSelectedFactories.length ? nrSelectedFactories : null,
   };
+  // Editing an already-sent (or otherwise non-draft) RFQ: preserve its status, stamp
+  // updated_at, and save SILENTLY — never revert to draft and never re-notify factories.
+  const nrExisting = nrEditId ? (rfqs || []).find(r => r.id === nrEditId) : null;
+  const nrPreserveStatus = !!(nrExisting && nrExisting.status && nrExisting.status !== 'draft');
+  if (nrPreserveStatus) {
+    body.status = nrExisting.status;
+    body.updated_at = new Date().toISOString();
+    // The edit form doesn't repopulate the factory picker; don't blank the stored list unless the user re-selected.
+    if (!nrSelectedFactories.length) body.factories_to_send = (nrExisting.factories_to_send || null);
+  }
   const dBtn = nrg('nr-draft'), sBtn = nrg('nr-submit');
   dBtn.disabled = true; sBtn.disabled = true;
   let ok = false, newId = null, failDetail = '', nrSavedProject = null;
@@ -1464,7 +1475,7 @@ async function saveNewRfq(status) {
   // BUG 2: on submit, create rfq_factory_assignments for only the checked factories.
   // FIX 7: on Send, create assignments for only the checked factories AND email each from Sarah Lindburg.
   const savedRfqId = newId || nrEditId;
-  if (savedRfqId && status === 'sent' && nrSelectedFactories.length) {
+  if (savedRfqId && status === 'sent' && !nrPreserveStatus && nrSelectedFactories.length) {
     try {
       const facs = await supa('factories?id=in.(' + nrSelectedFactories.join(',') + ')&select=id,factory_name_english,sales_email,sales_contact_name');
       await fetch(SUPA_URL + '/rest/v1/rfq_factory_assignments?rfq_id=eq.' + encodeURIComponent(savedRfqId), {
@@ -1497,6 +1508,7 @@ async function saveNewRfq(status) {
   closeNewRfqModal();
   await loadRFQs();
   showTab('rfq');
+  if (nrPreserveStatus) toast('RFQ updated. Factories have not been re-notified. Use Follow Up to notify them of changes.');
  } catch (e) { alert('Save error: ' + (e && e.message ? e.message : e)); return; }
 }
 // Cosmetic checkbox manual override flag.
@@ -1736,8 +1748,11 @@ async function openRFQ(id) {
   const r = rfqs.find(x => x.id === id);
   if (!r) return;
 
-  // Draft RFQs open in the editable New RFQ form (pre-filled) instead of the read-only panel.
-  if (r.status === 'draft') {
+  // Any RFQ is editable regardless of status. Draft RFQs (or an explicit Edit action on a
+  // sent/closed RFQ) open the editable New RFQ form pre-filled; everything else shows the
+  // read-only detail panel below, which carries an "Edit RFQ" button.
+  if (r.status === 'draft' || nrForceEdit === r.id) {
+    nrForceEdit = null;
     openNewRfqModal();
     nrEditId = r.id;
     const setV = (elId, val) => { const el = nrg(elId); if (el && val != null && val !== '') el.value = val; };
@@ -1846,6 +1861,7 @@ async function openRFQ(id) {
     ? `<div style="background:#fff8e0;border:1px solid #e0c840;border-radius:10px;padding:12px 14px;margin-bottom:12px;color:#665500;font-size:13px;">⏳ <b>Under Review</b> — TBG Sourcing is reviewing your submission.<div style="font-size:11px;color:#998800;margin-top:3px;">Submitted ${fmtDate(r.created_at)}</div></div>`
     : '';
   document.getElementById('panelBody').innerHTML = `
+    <div style="margin-bottom:12px;"><button class="nr-btn" onclick="nrEditRfqById('${esc(r.id)}')">✏️ Edit RFQ</button></div>
     ${reviewBanner}
     ${imagesHtml}
     <div class="panel-section"><h3>RFQ Details</h3>${details}</div>
@@ -1854,6 +1870,13 @@ async function openRFQ(id) {
     <div class="panel-section"><h3>Quotes Received (${quotes.length})</h3><div class="sub-list">${quoteItems}</div></div>
     ${renderFactoryResponseStatusT(r, assignments, quotes)}
   `;
+}
+
+// Force an RFQ of any status into the editable form (used by the panel's Edit button).
+function nrEditRfqById(id) {
+  nrForceEdit = id;
+  if (typeof closePanel === 'function') closePanel();
+  openRFQ(id);
 }
 
 // ─────────────────────────────────────────────────────────────
