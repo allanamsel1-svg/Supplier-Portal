@@ -1111,6 +1111,9 @@
         #rfq-form-view .mf, #rfq-form-view [style*="grid"] > * { min-width: 0; }
         /* FIX 2: read-only calculated fields render light with dark text */
         #rfq-form-view input[readonly] { background: #f5f5f5 !important; color: #1a1a2e !important; }
+        /* HTS auto-suggest spinner */
+        #rfq-form-view .ax-hts-spinner { width:14px; height:14px; border:2px solid rgba(85,34,170,0.25); border-top-color:#5522aa; border-radius:50%; display:inline-block; align-self:center; flex-shrink:0; animation:axhtsspin 0.7s linear infinite; }
+        @keyframes axhtsspin { to { transform:rotate(360deg); } }
       </style>
       <div id="rfq-form-view" style="display:none;padding:1.25rem 1.5rem;max-width:800px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
@@ -1178,7 +1181,7 @@
                 <input id="rfq-unit-type-other" placeholder="Specify unit type" style="display:none;margin-top:6px;width:100%;padding:8px;border:1px solid #d0d0c8;border-radius:6px;font-family:inherit;font-size:13px;box-sizing:border-box;" />
               </div>
             </div>
-            <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" oninput="rfqDescChanged()" /></div>
+            <div class="mf"><label>Item Description *</label><input type="text" id="rfq-description" placeholder="e.g. Facial Moisturizer with SPF 30" oninput="rfqDescChanged()" onblur="axHtsSuggest(true)" /></div>
             <div class="mf"><label>Basic Specifications *</label><textarea id="rfq-specs" rows="4" placeholder="Describe the product specifications. For cosmetics include key actives, texture, fragrance preference, target skin type, etc."></textarea></div>
             <div class="mf-row">
               <div class="mf"><label>Quote Quantity</label><input type="number" id="rfq-quantity" placeholder="e.g. 10000" min="1" /></div>
@@ -1487,6 +1490,7 @@
             <div class="mf"><label>HTS Code</label>
               <div style="display:flex;gap:8px;align-items:center;">
                 <input type="text" id="rfq-est-hts" placeholder="e.g. 3304.99.5000" style="flex:1;border-color:#c8b8f0;" />
+                <span class="ax-hts-spinner" id="ax-hts-spinner" style="display:none;" title="Suggesting HTS code…"></span>
                 <button type="button" id="ax-hts-suggest-btn" onclick="axHtsSuggest()" style="padding:6px 12px;background:#f0eaff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">✨ Suggest</button>
                 <button type="button" id="ax-hts-btn" onclick="axHtsLookup()" style="padding:6px 12px;background:#eef0ff;border:1px solid #c8b8f0;border-radius:6px;font-size:12px;color:#5522aa;cursor:pointer;white-space:nowrap;">Look Up →</button>
               </div>
@@ -6930,6 +6934,7 @@ function rfqCategoryChanged(){
     cb.checked=!!(row&&row.is_cosmetic);
   }
   inheritComplianceForCategory();
+  if(row)axHtsSuggest(true);   // FIX 2: auto-suggest HTS once a category is chosen and a description exists
 }
 
 // ─────────────────────────────────────────────────────────
@@ -7853,30 +7858,38 @@ function axResetTool(){
 }
 
 // AI HTS suggestion + USITC lookup + CBP rulings for the admin RFQ form.
-async function axHtsSuggest(){
+// FIX 2: pass auto=true for the automatic trigger (onblur of description / category change).
+// Auto mode is silent (no alert), never clobbers an existing code, and dedupes repeat calls.
+var _axHtsLastKey='';
+async function axHtsSuggest(auto){
   var name=((g('rfq-description')&&g('rfq-description').value)||'').trim();
   var spec=((g('rfq-specs')&&g('rfq-specs').value)||'').trim();
-  if(!name&&!spec){alert('Enter product name and description first');return;}
-  var btn=g('ax-hts-suggest-btn'), desc=g('ax-hts-desc');
+  var _cr=axCatRow(), catName=_cr?(_cr.category||''):'';
+  if(auto){
+    if(name.length<5)return;                                          // need a real description
+    if(((g('rfq-est-hts')&&g('rfq-est-hts').value)||'').trim())return; // don't overwrite an existing/typed code
+    var key=name+'|'+spec+'|'+catName;
+    if(key===_axHtsLastKey)return;                                    // already auto-suggested for this input
+    _axHtsLastKey=key;
+  } else if(!name&&!spec){ alert('Enter product name and description first'); return; }
+  var btn=g('ax-hts-suggest-btn'), desc=g('ax-hts-desc'), spin=g('ax-hts-spinner');
   var orig=btn?btn.textContent:'✨ Suggest';
-  if(btn){btn.textContent='Thinking...';btn.disabled=true;}
+  if(btn){if(!auto)btn.textContent='Thinking...';btn.disabled=true;}
+  if(spin)spin.style.display='inline-block';
   try{
     var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
-    var _cr=axCatRow(), catName=_cr?(_cr.category||''):'';
     var r=await fetch('/api/hts-suggest',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({product_name:name,description:spec,category:catName})});
     var d=await r.json().catch(function(){return{error:true};});
-    if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';var _hp=g('ax-hts-result');if(_hp)_hp.style.display='block';}
+    if(!r.ok||!d||d.error||!d.hts_code){if(desc&&!auto){desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';var _hp=g('ax-hts-result');if(_hp)_hp.style.display='block';}}
     else{
       if(g('rfq-est-hts'))g('rfq-est-hts').value=d.hts_code;
-      // BUG 4: show the full HTS description (from hts-suggest) below the field.
+      // Show the full HTS description (from hts-suggest) below the field.
       if(desc)desc.innerHTML='<small>'+esc(d.hts_code)+(d.description?' — '+esc(d.description):'')+'</small>'+(d.reasoning?'<div style="margin-top:2px;">✨ '+esc(d.reasoning)+(d.confidence?' · '+esc(d.confidence)+' confidence':'')+'</div>':'');
       var _hpok=g('ax-hts-result');if(_hpok)_hpok.style.display='block';
-      if(btn){btn.textContent=orig;btn.disabled=false;}
       axHtsLookup(true);
-      return;
     }
-  }catch(e){if(desc)desc.textContent='Could not suggest a code — enter manually';var _hp2=g('ax-hts-result');if(_hp2)_hp2.style.display='block';}
-  if(btn){btn.textContent=orig;btn.disabled=false;}
+  }catch(e){if(desc&&!auto){desc.textContent='Could not suggest a code — enter manually';var _hp2=g('ax-hts-result');if(_hp2)_hp2.style.display='block';}}
+  finally{ if(spin)spin.style.display='none'; if(btn){btn.textContent=orig;btn.disabled=false;} }
 }
 
 // FIX 5: CBP rulings search by product description + country of manufacture (read live).

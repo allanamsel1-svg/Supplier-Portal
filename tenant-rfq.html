@@ -169,7 +169,7 @@
             <input id="nr-unit-other" placeholder="Specify unit type" style="display:none;margin-top:6px;width:100%;padding:8px 11px;border:1px solid var(--border,#e0e0d8);border-radius:7px;font-size:13px;box-sizing:border-box;background:var(--bg);color:var(--text);">
           </div>
         </div>
-        <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused"></div>
+        <div class="nr-field"><label>Item description *</label><input id="nr-desc" placeholder="e.g. Facial Serum — Apple Infused" onblur="nrHtsSuggest(true)"></div>
         <div class="nr-field"><label>Basic specifications</label><textarea id="nr-spec" placeholder="Materials, formula, packaging, claims…"></textarea></div>
         <div class="nr-field" id="nr-factory-note-wrap" style="display:none;"><div style="font-size:12.5px;color:var(--text2);background:var(--bg2);border:1px solid var(--border,#334155);border-radius:8px;padding:8px 10px;">🏭 Recommended factory: <span id="nr-factory-note-text"></span></div></div>
         <div class="nr-grid">
@@ -302,6 +302,7 @@
           <label>HTS Code</label>
           <div style="display:flex;gap:8px;">
             <input id="nr-hts-code" placeholder="e.g. 3304.99.5000" style="flex:1;padding:9px 11px;border:1px solid var(--border,#334155);border-radius:7px;font-size:13px;background:var(--bg);color:var(--text);">
+            <span class="nr-img-spinner" id="nr-hts-spinner" style="display:none;align-self:center;flex-shrink:0;" title="Suggesting HTS code…"></span>
             <button type="button" class="nr-btn alt" id="nr-hts-suggest-btn" onclick="nrHtsSuggest()">✨ Suggest</button>
             <button type="button" class="nr-btn" id="nr-hts-btn" onclick="nrHtsLookup()">Look Up →</button>
           </div>
@@ -309,16 +310,16 @@
           <div id="nr-hts-rulings" style="font-size:11px;margin-top:4px;"></div>
         </div>
 
-        <!-- Duty rates -->
-        <div class="nr-grid">
+        <!-- Duty rates (FIX 1: responsive columns ≥200px so the 301/122 labels never char-wrap) -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
           <div class="nr-field"><label>General duty rate (%)</label><input id="nr-duty-general" type="number" min="0" step="0.01" placeholder="auto from HTS"></div>
           <div class="nr-field">
             <label>Section 301 (25%)</label>
-            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;"><input type="checkbox" id="nr-duty-301"> Apply 25% Section 301</label>
+            <label style="display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:visible;margin-top:8px;cursor:pointer;"><input type="checkbox" id="nr-duty-301"><span>Apply 25% Section 301</span></label>
           </div>
           <div class="nr-field">
             <label>Section 122 (10%) <span style="color:#f59e0b;font-size:10px;">⚠ expires Jul 24 2026</span></label>
-            <label style="display:flex;align-items:center;gap:6px;margin-top:8px;"><input type="checkbox" id="nr-duty-122"> Apply 10% Section 122</label>
+            <label style="display:flex;align-items:center;gap:8px;min-width:0;white-space:nowrap;overflow:visible;margin-top:8px;cursor:pointer;"><input type="checkbox" id="nr-duty-122"><span>Apply 10% Section 122</span></label>
           </div>
         </div>
         <div class="nr-grid">
@@ -497,6 +498,7 @@ function nrCategoryChange() {
   const fs = nrg('nr-factory-status'); if (fs) fs.textContent = cat ? 'Click "Find Matching Factories" to see suppliers for ' + cat + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
   nrLoadCerts(cat);   // BUG 7: refresh certifications for the selected category
+  if (cat) nrHtsSuggest(true);   // FIX 2: auto-suggest HTS once a category is chosen and a description exists
 }
 
 // ── Section 3 packaging dropdowns (kit_packaging_types + "Other" manual entry) ──
@@ -988,17 +990,30 @@ async function nrHtsLookup(keepDesc) {
 }
 
 // AI HTS code suggestion from the product name + description.
-async function nrHtsSuggest() {
+// FIX 2: pass auto=true for the automatic trigger (onblur of description / category change).
+// Auto mode is silent (no alert), never clobbers an existing code, and dedupes repeat calls.
+let _nrHtsLastKey = '';
+async function nrHtsSuggest(auto) {
   const name = ((document.getElementById('nr-desc')||{}).value || '').trim();
   const spec = ((document.getElementById('nr-spec')||{}).value || '').trim();
-  if (!name && !spec) { alert('Enter product name and description first'); return; }
+  const cat = nrCurrentCategory();
+  if (auto) {
+    if (name.length < 5) return;                                                   // need a real description
+    if (((document.getElementById('nr-hts-code')||{}).value || '').trim()) return; // don't overwrite an existing/typed code
+    const key = name + '|' + spec + '|' + cat;
+    if (key === _nrHtsLastKey) return;                                             // already auto-suggested for this input
+    _nrHtsLastKey = key;
+  } else if (!name && !spec) {
+    alert('Enter product name and description first'); return;
+  }
   const btn = document.getElementById('nr-hts-suggest-btn');
   const desc = document.getElementById('nr-hts-desc');
+  const spin = document.getElementById('nr-hts-spinner');
   const orig = btn ? btn.textContent : '✨ Suggest';
-  if (btn) { btn.textContent = 'Thinking...'; btn.disabled = true; }
+  if (btn) { if (!auto) btn.textContent = 'Thinking...'; btn.disabled = true; }
+  if (spin) spin.style.display = 'inline-block';
   try {
     const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
-    const cat = nrCurrentCategory();
     const r = await fetch('/api/hts-suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
@@ -1006,18 +1021,19 @@ async function nrHtsSuggest() {
     });
     const d = await r.json().catch(() => ({ error: true }));
     if (!r.ok || !d || d.error || !d.hts_code) {
-      if (desc) desc.textContent = (d && d.message) || 'Could not suggest a code — enter manually';
+      if (desc && !auto) desc.textContent = (d && d.message) || 'Could not suggest a code — enter manually';
     } else {
       document.getElementById('nr-hts-code').value = d.hts_code;
-      // BUG 4: show the full HTS description (from hts-suggest) below the field, in a <small> tag.
+      // Show the full HTS description (from hts-suggest) below the field, in a <small> tag.
       if (desc) desc.innerHTML = '<small>' + esc(d.hts_code) + (d.description ? ' — ' + esc(d.description) : '') + '</small>'
         + (d.reasoning ? '<div style="margin-top:2px;color:var(--text2);">✨ ' + esc(d.reasoning) + (d.confidence ? ' · ' + esc(d.confidence) + ' confidence' : '') + '</div>' : '');
-      if (btn) { btn.textContent = orig; btn.disabled = false; }
       nrHtsLookup(true);   // refresh duty + rulings link, but keep the description above
-      return;
     }
-  } catch (e) { if (desc) desc.textContent = 'Could not suggest a code — enter manually'; }
-  if (btn) { btn.textContent = orig; btn.disabled = false; }
+  } catch (e) { if (desc && !auto) desc.textContent = 'Could not suggest a code — enter manually'; }
+  finally {
+    if (spin) spin.style.display = 'none';
+    if (btn) { btn.textContent = orig; btn.disabled = false; }
+  }
 }
 
 let _nrFreightWired = false;
