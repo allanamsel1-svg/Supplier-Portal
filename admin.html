@@ -1108,6 +1108,8 @@
         #rfq-form-view input, #rfq-form-view select, #rfq-form-view textarea { max-width: 100%; }
         #rfq-form-view label, #rfq-form-view .mgr-card-title { overflow-wrap: break-word; word-break: break-word; }
         #rfq-form-view .mf, #rfq-form-view [style*="grid"] > * { min-width: 0; }
+        /* FIX 2: read-only calculated fields render light with dark text */
+        #rfq-form-view input[readonly] { background: #f5f5f5 !important; color: #1a1a2e !important; }
       </style>
       <div id="rfq-form-view" style="display:none;padding:1.25rem 1.5rem;max-width:800px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
@@ -1430,6 +1432,10 @@
               <div class="mf"><label>Height (cm)</label><input type="number" id="rfq-unit-h" step="0.1" placeholder="cm" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label>Unit CBM (auto)</label><input type="text" id="rfq-unit-cbm" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
+            <div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:4px;">
+              <div class="mf"><label>Unit Weight (kg)</label><input type="number" id="rfq-unit-weight" step="0.001" placeholder="e.g. 0.25" style="border-color:#c8b8f0;" /></div>
+              <div></div>
+            </div>
 
             <!-- ROW 4: Case pack + CBMs -->
             <div style="font-size:11px;font-weight:600;color:#5522aa;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;">Case Pack</div>
@@ -1440,11 +1446,21 @@
               <div class="mf"><label>Master CBM (auto)</label><input type="text" id="rfq-master-cbm" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
 
-            <!-- ROW 5: Container -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div class="mf"><label>Units per 40HC FCL (auto)</label><input type="text" id="rfq-units-per-fcl" readonly style="background:#f5f0ff;border-color:#c8b8f0;font-weight:600;" /></div>
-              <div class="mf"><label>Container Cost ($)</label><input type="number" id="rfq-container-cost" step="1" placeholder="e.g. 6000" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
-              <div class="mf"><label>Est. Freight/Unit (auto)</label><input type="text" id="rfq-est-freight" readonly style="background:#f5f0ff;border-color:#c8b8f0;font-weight:600;" /></div>
+            <!-- ROW 5: Destination warehouse + container (FIX 3: cost auto from freight_rates) -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:4px;">
+              <div class="mf"><label>Destination Warehouse</label>
+                <select id="rfq-dest-warehouse" onchange="axLoadDestRate()" style="border-color:#c8b8f0;width:100%;padding:8px;font-size:13px;border-radius:6px;font-family:inherit;background:#fff;">
+                  <option value="">Select destination…</option>
+                  <option value="LA">LA Warehouse (West Coast)</option>
+                  <option value="NJ">NJ Warehouse (East Coast)</option>
+                </select>
+              </div>
+              <div class="mf"><label>Container Cost ($ per 40HC, auto)</label><input type="text" id="rfq-container-cost" readonly placeholder="select destination" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>Est. Freight/Unit (auto)</label><input type="text" id="rfq-est-freight" readonly style="border-color:#c8b8f0;font-weight:600;" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-bottom:10px;align-items:center;">
+              <div class="mf"><label>Units per 40HC FCL (auto)</label><input type="text" id="rfq-units-per-fcl" readonly style="border-color:#c8b8f0;font-weight:600;" /></div>
+              <div id="rfq-dest-transit" style="font-size:11px;color:#888;">Est. transit: 21 days (LA) / 28 days (NJ)</div>
             </div>
             <div id="rfq-freight-est" style="display:none;background:#eef7f0;border:1px solid #a9d8b8;border-radius:8px;padding:9px 12px;font-size:12px;color:#1a3a28;margin-bottom:10px;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap;">
               <div><span style="font-weight:700;color:#1a7a3a;">📦 Estimated 40&#39;HQ FCL freight:</span> <span id="rfq-freight-est-text"></span></div>
@@ -6340,7 +6356,8 @@ async function populateRFQEditForm(rfq){
   if(g('rfq-unit-h'))g('rfq-unit-h').value=rfq.est_unit_height_cm||'';
   if(g('rfq-calc-inner'))g('rfq-calc-inner').value=rfq.inner_case_pack||'';
   if(g('rfq-calc-master'))g('rfq-calc-master').value=rfq.master_case_pack||'';
-  if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
+  if(g('rfq-dest-warehouse')){g('rfq-dest-warehouse').value=rfq.destination_warehouse||'';axLoadDestRate();}
+  if(g('rfq-unit-weight'))g('rfq-unit-weight').value=rfq.est_unit_weight_kg||'';
   if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
   if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
   if(g('rfq-est-hts'))g('rfq-est-hts').value=rfq.est_hts_code||'';
@@ -6446,7 +6463,8 @@ async function openRFQForm(id){
   if(g('rfq-unit-h'))g('rfq-unit-h').value=rfq.est_unit_height_cm||'';
   if(g('rfq-calc-inner'))g('rfq-calc-inner').value=rfq.inner_case_pack||'';
   if(g('rfq-calc-master'))g('rfq-calc-master').value=rfq.master_case_pack||'';
-  if(g('rfq-container-cost'))g('rfq-container-cost').value=rfq.container_cost_usd||6000;
+  if(g('rfq-dest-warehouse')){g('rfq-dest-warehouse').value=rfq.destination_warehouse||'';axLoadDestRate();}
+  if(g('rfq-unit-weight'))g('rfq-unit-weight').value=rfq.est_unit_weight_kg||'';
   if(g('rfq-est-duty'))g('rfq-est-duty').value=rfq.est_duty_pct||0;
   if(g('rfq-est-tariff'))g('rfq-est-tariff').value=rfq.est_tariff_pct||0;
   if(g('rfq-est-hts'))g('rfq-est-hts').value=rfq.est_hts_code||'';
@@ -6527,7 +6545,9 @@ function resetRFQForm(){
   // Clear user-override flag so new RFQs auto-set from category
   var cosCb=g('rfq-is-cosmetic');if(cosCb){cosCb.checked=false;cosCb.dataset.userOverride='false';}
   var p65=g('rfq-prop65-strategy');if(p65)p65.value='';
-  ['rfq-proposed-retail','rfq-retailer-margin','rfq-implied-wholesale','rfq-tbg-gross'].forEach(function(id){if(g(id))g(id).value='';});
+  ['rfq-proposed-retail','rfq-retailer-margin','rfq-implied-wholesale','rfq-tbg-gross','rfq-container-cost','rfq-unit-weight'].forEach(function(id){if(g(id))g(id).value='';});
+  if(g('rfq-dest-warehouse'))g('rfq-dest-warehouse').value='';
+  if(g('rfq-dest-transit'))g('rfq-dest-transit').textContent='Est. transit: 21 days (LA) / 28 days (NJ)';
   g('rfq-inci-notice').style.display='none';
   g('factory-match-list').innerHTML='';
   g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
@@ -7858,9 +7878,25 @@ async function axHtsSuggest(){
   if(btn){btn.textContent=orig;btn.disabled=false;}
 }
 
-// BUG 3: CBP rulings open with the current HTS field value (or the rulings home if empty).
-function axCbpRulings(e){ if(e&&e.preventDefault)e.preventDefault(); var el=g('rfq-est-hts'); var code=((el&&el.value)||'').trim().replace(/\./g,''); var url=code?('https://rulings.cbp.gov/search?term='+encodeURIComponent(code)):'https://rulings.cbp.gov'; window.open(url,'_blank','noopener'); }
+// FIX 5: CBP rulings search by product description + country of manufacture (read live).
+function axCbpRulings(e){ if(e&&e.preventDefault)e.preventDefault(); var desc=((g('rfq-description')&&g('rfq-description').value)||'').trim(); var country=((g('rfq-country-mfg')&&g('rfq-country-mfg').value)||'China').trim(); var term=desc?(desc+' made in '+country):''; var url=term?('https://rulings.cbp.gov/search?term='+encodeURIComponent(term).replace(/%20/g,'+')):'https://rulings.cbp.gov'; window.open(url,'_blank','noopener'); }
 function axCbpRulingsLink(){ return '<a href="#" onclick="axCbpRulings(event)" style="color:#5522aa;font-weight:600;">View CBP Rulings →</a>'; }
+
+// FIX 3: pull the 40HC container rate for the chosen destination warehouse from freight_rates.
+var AX_DEST = { LA: { code:'US-LAX', transit:21 }, NJ: { code:'US-EWR', transit:28 } };
+async function axLoadDestRate(){
+  var sel=(g('rfq-dest-warehouse')&&g('rfq-dest-warehouse').value)||'';
+  var cc=g('rfq-container-cost'), t=g('rfq-dest-transit');
+  if(!sel||!AX_DEST[sel]){if(cc)cc.value='';if(t)t.textContent='Est. transit: 21 days (LA) / 28 days (NJ)';if(typeof calcMargins==='function')calcMargins();return;}
+  var dest=AX_DEST[sel],cost=null;
+  try{
+    var r=await fetch(SB+'/rest/v1/freight_rates?origin_country=eq.China&destination_code=eq.'+dest.code+'&container_type=eq.40HC&is_active=eq.true&select=rate_per_container&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){var rows=await r.json();if(rows&&rows[0]&&rows[0].rate_per_container!=null)cost=parseFloat(rows[0].rate_per_container);}
+  }catch(e){console.log('dest rate error:',e);}
+  if(cc)cc.value=cost!=null?cost:'';
+  if(t)t.textContent='Est. transit: '+dest.transit+' days ('+sel+')';
+  if(typeof calcMargins==='function')calcMargins();
+}
 
 async function axHtsLookup(keepDesc){
   var el=g('rfq-est-hts'); if(!el)return;
@@ -7967,6 +8003,8 @@ async function saveRFQ(action){
     est_freight_per_unit:parseFloat((g('rfq-est-freight')?g('rfq-est-freight').value||'0':'0').replace('$',''))||null,
     likely_country_of_manufacture:g('rfq-country-mfg').value||null,
     fob_port:g('rfq-fob-port')?g('rfq-fob-port').value.trim()||null:null,
+    destination_warehouse:(g('rfq-dest-warehouse')&&g('rfq-dest-warehouse').value)||null,
+    est_unit_weight_kg:parseFloat(g('rfq-unit-weight')?g('rfq-unit-weight').value:0)||null,
     est_duty_pct:parseFloat(g('rfq-est-duty').value)||null,
     est_tariff_pct:parseFloat(g('rfq-est-tariff').value)||null,
     est_hts_code:(g('rfq-est-hts')&&g('rfq-est-hts').value.trim())||null,
@@ -8138,7 +8176,7 @@ async function sendRFQEmails(rfq){
       'Portal: '+portalUrl+'\n\n'+
       'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
     try{
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team','['+rfq.project_number+'] '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
+      await sendEmail(f.sales_email,f.sales_contact_name||'Team','['+rfq.project_number+'] RFQ: '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
       sent++;
     }catch(ex){
       failed.push(f.factory_name_english);
