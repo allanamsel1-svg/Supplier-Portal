@@ -191,6 +191,7 @@ const TENANT_NAV = [
   { section: 'RFQ & Products', items: [
     { icon: '📋', label: 'RFQs', href: 'tenant-rfq.html#rfq', feature: 'rfq' },
     { icon: '🧪', label: 'Product Development', href: 'tenant-rfq.html#pd', feature: 'product_development' },
+    { icon: '🎨', label: 'Designer Queue', href: '/designer-portal.html', feature: 'product_development' },
     { icon: '📦', label: 'SKU Library', href: 'tenant-rfq.html#skus', feature: 'sku_library' },
     { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup', feature: 'sku_library' },
   ]},
