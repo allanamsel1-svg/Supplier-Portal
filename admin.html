@@ -2213,40 +2213,6 @@
 </div>
 
 <!-- Reject Quote Modal -->
-<div class="modal-overlay" id="reject-modal">
-  <div class="modal" style="max-width:680px;">
-    <h2>Not Approved — Send Reply to Factory</h2>
-    <div class="modal-to" id="reject-to">—</div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Reason (template will pre-fill)</label>
-      <select id="reject-reason" onchange="rejectReasonChanged()" style="width:100%;padding:9px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;background:#fff;color:#1a1a2e;">
-        <option value="price_too_high">Price too high</option>
-        <option value="specs_mismatch">Specifications do not match</option>
-        <option value="certs_missing">Certifications missing</option>
-        <option value="incomplete_quote">Quote is incomplete (missing required fields)</option>
-        <option value="another_supplier">Going with another supplier</option>
-        <option value="moq_too_high">MOQ too high</option>
-        <option value="lead_time_too_long">Lead time too long</option>
-        <option value="discontinued">Product discontinued / no longer needed</option>
-        <option value="other">Other (custom)</option>
-      </select>
-    </div>
-    <div style="margin-bottom:6px;">
-      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Email subject</label>
-      <input type="text" id="reject-subject" style="width:100%;padding:9px 10px;font-size:13px;border:1px solid #ddd;border-radius:7px;font-family:inherit;color:#1a1a2e;" />
-    </div>
-    <div style="margin-bottom:6px;">
-      <label style="font-size:12px;color:#888;display:block;margin-bottom:4px;">Email body (edit freely before sending)</label>
-    </div>
-    <textarea id="reject-body" placeholder="Email body..."></textarea>
-    <div style="font-size:11px;color:#888;margin-top:-6px;margin-bottom:10px;">Internal note saved with rejection: <strong id="reject-internal-note">—</strong></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeRejectModal()">Cancel</button>
-      <button class="btn-send" id="reject-send-btn" onclick="confirmRejectQuote()">Reject &amp; Send Email ✉</button>
-    </div>
-    <div class="modal-msg" id="reject-msg">✓ Quote rejected. Email sent.</div>
-  </div>
-</div>
 
 <!-- ── AI Email Draft Review Modal (quote-response + follow-up) ── -->
 <div class="modal-overlay" id="qem-modal">
@@ -5157,7 +5123,7 @@ async function openSendFeedbackModal(quoteId){
     }
 
     draft+='Please review and let us know your thoughts. We are happy to discuss any of these items.\n\n';
-    draft+='Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+    draft+='Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
 
     // Build modal
     var overlay=document.createElement('div');
@@ -6096,7 +6062,7 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
         'Once all assets are submitted and packaging artwork is finalized, the item will go live and we can place orders.\n\n'+
         'Log in here: https://portal.tbgsourcing.net\n\n'+
         'We look forward to working with you on this project.\n\n'+
-        'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+        'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
 
       // Use the reviewed AI draft when provided; the template above remains the fallback.
       var sendSubject=(override&&override.subject)?override.subject:('['+rfq.project_number+'] '+rfq.item_description);
@@ -6112,55 +6078,6 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
   }catch(e){alert('Error: '+e.message);}
 }
 
-// ── Reject Quote Modal ──
-var rejectCtx={quoteId:null,rfqId:null,quote:null,factory:null,rfq:null};
-var REJECT_TEMPLATES={
-  price_too_high:{
-    subject:'Quote not approved — price',
-    label:'Price too high',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter review, the unit pricing exceeds our target for this program. We are unable to move forward with this option at the current price level. If you are able to revisit your costing — particularly on the FOB unit price and packaging — we would welcome a revised quote.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  specs_mismatch:{
-    subject:'Quote not approved — specifications',
-    label:'Specifications do not match',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter review, the product specifications you have quoted do not match the requirements of this RFQ. Please review the original specifications carefully — if you can produce to the exact requirements, you are welcome to submit a revised quote.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  certs_missing:{
-    subject:'Quote not approved — certifications',
-    label:'Certifications missing',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThis program requires certifications that were not confirmed in your submission. Without those certifications in place, we are unable to move forward with this quote. If you can obtain the required certifications, please let us know and we can revisit.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  incomplete_quote:{
-    subject:'Quote not approved — incomplete submission',
-    label:'Quote is incomplete',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nUnfortunately your submission is missing several required fields'+(c.missingList?' ('+c.missingList+')':'')+'. We are unable to evaluate the quote without this information. Please resubmit with the complete details and we will gladly review.\n\nWe value our relationship with '+c.factoryName+' and look forward to future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  another_supplier:{
-    subject:'RFQ update',
-    label:'Going with another supplier',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter careful review of all submissions, we have decided to move forward with another supplier for this particular program. We appreciate the time and effort you put into your quote and look forward to working with '+c.factoryName+' on future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  moq_too_high:{
-    subject:'Quote not approved — MOQ',
-    label:'MOQ too high',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThe minimum order quantity quoted exceeds the volume our customer is committing to for this program. If you can offer a lower MOQ — or pricing tiers at a smaller quantity — we would be glad to reconsider.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  lead_time_too_long:{
-    subject:'Quote not approved — lead time',
-    label:'Lead time too long',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nThe production lead time you quoted does not meet our customer\'s in-store deadline for this program. If you can compress the timeline, we would welcome a revised quote.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  discontinued:{
-    subject:'RFQ withdrawn',
-    label:'Product discontinued / not needed',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nOur customer has decided not to move forward with this product at this time. The RFQ has been withdrawn. We appreciate the work you put into your quote and look forward to future opportunities with '+c.factoryName+'.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  },
-  other:{
-    subject:'Quote not approved',
-    label:'Other',
-    body:function(c){return 'Dear '+c.firstName+',\n\nThank you for your quote on '+c.itemDesc+' ('+c.proj+').\n\nAfter careful review, we are unable to proceed with this quote at this time.\n\nWe value our relationship with '+c.factoryName+' and look forward to working together on future opportunities.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';}
-  }
-};
 async function rejectQuote(quoteId,rfqId,override){
   // INTERCEPT: review/edit the AI-drafted decline email before any send/status change.
   if(!override){
@@ -6184,54 +6101,6 @@ async function rejectQuote(quoteId,rfqId,override){
     openRFQDetail(rfqId);
     toast('Quote rejected. Email sent to '+(f.sales_email||'factory')+'.');
   }catch(e){alert('Error: '+e.message);}
-}
-function rejectReasonChanged(){
-  var key=g('reject-reason').value;
-  var t=REJECT_TEMPLATES[key]||REJECT_TEMPLATES.other;
-  var rfq=rejectCtx.rfq||{};
-  var f=rejectCtx.factory||{};
-  var q=rejectCtx.quote||{};
-  var missing=getMissingFields(q,rfq);
-  var ctx={
-    firstName:(f.sales_contact_name||'Team').split(' ')[0],
-    factoryName:f.factory_name_english||'your team',
-    itemDesc:rfq.item_description||'this product',
-    proj:rfq.project_number||'',
-    missingList:missing.join(', ')
-  };
-  g('reject-subject').value='['+ctx.proj+'] '+t.subject+' — '+ctx.itemDesc;
-  g('reject-body').value=t.body(ctx);
-  g('reject-internal-note').textContent=t.label;
-}
-function closeRejectModal(){g('reject-modal').classList.remove('on');}
-async function confirmRejectQuote(){
-  var btn=g('reject-send-btn');
-  if(btn.disabled)return;
-  btn.disabled=true;btn.textContent='Sending...';
-  var quoteId=rejectCtx.quoteId,rfqId=rejectCtx.rfqId;
-  var f=rejectCtx.factory||{};
-  var reasonKey=g('reject-reason').value;
-  var reasonLabel=(REJECT_TEMPLATES[reasonKey]||REJECT_TEMPLATES.other).label;
-  var subject=g('reject-subject').value.trim();
-  var body=g('reject-body').value.trim();
-  try{
-    await fetch(SB+'/rest/v1/rfq_quotes?id=eq.'+quoteId,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'rejected',admin_notes:reasonLabel})});
-    updateFactoryScorecard(rejectCtx.quote.factory_id,'quote_rejected');
-    if(f.sales_email){
-      await sendEmail(f.sales_email,f.sales_contact_name||'Team',subject,body,'sourcing@tbgsourcing.net');
-    }
-    g('reject-msg').textContent='✓ Quote rejected. Email sent to '+(f.sales_email||'factory')+'.';
-    g('reject-msg').style.display='block';
-    btn.textContent='Reject & Send Email ✉';btn.disabled=false;
-    setTimeout(function(){
-      closeRejectModal();
-      loadRFQs();
-      openRFQDetail(rfqId);
-    },1200);
-  }catch(e){
-    btn.disabled=false;btn.textContent='Reject & Send Email ✉';
-    alert('Error: '+e.message);
-  }
 }
 
 // Compute missing required fields on a quote, given the RFQ context
@@ -8221,7 +8090,7 @@ async function sendRFQEmails(rfq){
       'Product: '+rfq.item_description+'\n\n'+
       'Please log into our supplier portal to review the full specifications and submit your quote.\n\n'+
       'Portal: '+portalUrl+'\n\n'+
-      'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+      'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
     try{
       await sendEmail(f.sales_email,f.sales_contact_name||'Team','['+rfq.project_number+'] '+rfq.item_description,emailBody,myEmail||'sourcing@tbgsourcing.net');
       sent++;
@@ -9865,7 +9734,7 @@ async function submitEvaluation(){
           fetch('/api/send-email',{
             method:'POST',
             headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({to:f.sales_email,toName:f.sales_contact_name||'',subject:subject,body:feedbackText+'\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net'})
+            body:JSON.stringify({to:f.sales_email,toName:f.sales_contact_name||'',subject:subject,body:feedbackText+'\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net'})
           }).catch(function(){});
         }
       }catch(e){console.log('email send (non-fatal):',e);}
@@ -12721,7 +12590,7 @@ async function reqPDDimConfAll(){
     '  • Packaging die lines\n\n'+
     'Once confirmed, please save. We will be unable to issue a Purchase Order until these values are confirmed by you.\n\n'+
     'Portal: https://portal.tbgsourcing.net\n\n'+
-    'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+    'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
   try{
     await sendEmail(fac.sales_email,fac.sales_contact_name,subject,body,'sourcing@tbgsourcing.net');
     alert('✓ Confirmation request sent to '+fac.sales_email+'\n\nThe email is now in your Sourcing → Sent folder.');
@@ -12838,7 +12707,7 @@ async function reqPDDimConf(level){
     'For our Product Development item '+(p.item_number||p.pd_number)+' ('+(p.item_description||rfq.item_description)+'), we need your confirmation of '+levelLabel+' dimensions.\n\n'+
     'Please log into the supplier portal, go to the "Product Development" tab, and confirm the exact L × W × H (cm) and weight for the '+levelLabel+'.\n\n'+
     'Portal: https://portal.tbgsourcing.net\n\n'+
-    'Best regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+    'Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
   try{
     await sendEmail(fac.sales_email,fac.sales_contact_name,subject,body,'sourcing@tbgsourcing.net');
     alert('✓ Confirmation request sent to '+fac.sales_email);
@@ -13429,7 +13298,7 @@ async function sendRFQFollowup(assignmentId,factoryName,email,contactName,projec
   if(!email){alert('No email address for this factory.');return;}
   var myEmail=localStorage.getItem('from_email')||'';
   var firstName=(contactName||'').split(' ')[0]||'Team';
-  var body='Dear '+firstName+',\n\nThis is a friendly reminder that we sent you a Request for Quotation ('+projectNum+') for '+itemDesc+'.\n\nWe have not yet received your quote. Please log into our supplier portal at your earliest convenience to review and submit your quote.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+  var body='Dear '+firstName+',\n\nThis is a friendly reminder that we sent you a Request for Quotation ('+projectNum+') for '+itemDesc+'.\n\nWe have not yet received your quote. Please log into our supplier portal at your earliest convenience to review and submit your quote.\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
   try{
     await sendEmail(
       email,
@@ -13485,10 +13354,10 @@ async function doSendInvite(f){
       '\nContact name: '+(f.sales_contact_name||'Factory Team')+
       '\nCountry: '+(f.country||'')+
       '\nProducts: '+(f.product_categories||[]).join(', ');
-    var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Tyler Durden at a US-based product sourcing company to a factory contact, inviting them to register on our supplier portal.\n\n'+
+    var prompt='Write a short, warm '+(isFollowUp?'follow-up ':'')+'invitation email from Sarah Lindburg at a US-based product sourcing company to a factory contact, inviting them to register on our supplier portal.\n\n'+
       factoryInfo+'\n\nRules:\n'+
       '- Address the contact by their first name if available\n'+
-      '- Sign off as Tyler Durden, Sourcing Manager, TBG Sourcing, sourcing@tbgsourcing.net\n'+
+      '- Sign off as Sarah Lindburg, Sourcing Manager, TBG Sourcing, sourcing@tbgsourcing.net\n'+
       '- DO NOT include any placeholder text like [Your Name] or [Company Name]\n'+
       '- DO NOT include the invitation link — it will be added separately\n'+
       '- Keep it to 3-4 short paragraphs\n'+
@@ -13506,10 +13375,10 @@ async function doSendInvite(f){
   if(!emailBody){
     var firstName=(f.sales_contact_name||'').split(' ')[0]||'there';
     emailBody='Dear '+firstName+',\n\n'+
-      'I hope this message finds you well. My name is Tyler Durden and I represent a US-based product sourcing company.\n\n'+
+      'I hope this message finds you well. My name is Sarah Lindburg and I represent a US-based product sourcing company.\n\n'+
       'We are actively building our supplier network and would love to include '+(f.factory_name_english||'your company')+' as one of our preferred suppliers.\n\n'+
       'Please take a few minutes to register on our supplier portal using your unique invitation link below. Once registered, you can upload your product catalog, certifications, and quote sheets to be considered for upcoming orders.\n\n'+
-      'We look forward to working with you.\n\nBest regards,\nTyler Durden\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
+      'We look forward to working with you.\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\nsourcing@tbgsourcing.net';
   }
 
   var subject=(isFollowUp?'Following Up — ':'')+'Invitation to Join Our Supplier Portal — '+(f.factory_name_english||'');
@@ -13601,6 +13470,8 @@ function renderFollowUps(){
 })();
 // ── SendGrid Email ──
 
+// Persona display name derived from the sending mailbox.
+function senderName(email){ return /compliance@/i.test(email||'') ? 'Tyler Durden' : 'Sarah Lindburg'; }
 async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
   if(!toEmail||!toEmail.trim()){throw new Error('No recipient email address provided');}
   var fromEmail=replyTo||'sourcing@tbgsourcing.net';
@@ -13631,11 +13502,11 @@ async function sendEmail(toEmail,toName,subject,body,replyTo,cc,bcc){
     if(threadId){
       await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{method:'PATCH',headers:Object.assign({},hdr,{'Prefer':'return=minimal'}),body:JSON.stringify({last_message_at:now,status:'read'})});
     }else{
-      var tr=await fetch(SB+'/rest/v1/email_threads',{method:'POST',headers:hdr,body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:'Tyler Durden',to_email:toEmail,direction:'outbound',status:'read',department:dept,last_message_at:now})});
+      var tr=await fetch(SB+'/rest/v1/email_threads',{method:'POST',headers:hdr,body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:senderName(fromEmail),to_email:toEmail,direction:'outbound',status:'read',department:dept,last_message_at:now})});
       if(tr.ok){var trrows=await tr.json();if(trrows&&trrows[0])threadId=trrows[0].id;}
     }
     if(threadId){
-      await fetch(SB+'/rest/v1/email_messages',{method:'POST',headers:Object.assign({},hdr,{'Prefer':'return=minimal'}),body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:'Tyler Durden',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:now})});
+      await fetch(SB+'/rest/v1/email_messages',{method:'POST',headers:Object.assign({},hdr,{'Prefer':'return=minimal'}),body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:senderName(fromEmail),to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:now})});
     }
   }catch(logErr){console.log('inbox log error (non-fatal):',logErr);}
 
@@ -13819,7 +13690,7 @@ async function sendReply(threadId,toEmail,subject){
     await fetch(SB+'/rest/v1/email_messages',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-      body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:'Tyler Durden',to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+      body:JSON.stringify({thread_id:threadId,from_email:fromEmail,from_name:senderName(fromEmail),to_email:toEmail,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
     });
     await fetch(SB+'/rest/v1/email_threads?id=eq.'+threadId,{
       method:'PATCH',
@@ -13872,7 +13743,7 @@ async function sendComposedEmail(){
     var r=await fetch(SB+'/rest/v1/email_threads',{
       method:'POST',
       headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},
-      body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:'Tyler Durden',to_email:to,direction:'outbound',status:'read',last_message_at:new Date().toISOString()})
+      body:JSON.stringify({subject:subject,from_email:fromEmail,from_name:senderName(fromEmail),to_email:to,direction:'outbound',status:'read',last_message_at:new Date().toISOString()})
     });
     var threads=await r.json();
     var thread=Array.isArray(threads)?threads[0]:threads;
@@ -13880,7 +13751,7 @@ async function sendComposedEmail(){
       await fetch(SB+'/rest/v1/email_messages',{
         method:'POST',
         headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({thread_id:thread.id,from_email:fromEmail,from_name:'Tyler Durden',to_email:to,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
+        body:JSON.stringify({thread_id:thread.id,from_email:fromEmail,from_name:senderName(fromEmail),to_email:to,subject:subject,body_text:body,direction:'outbound',is_read:true,sent_at:new Date().toISOString()})
       });
     }
     g('compose-modal').style.display='none';

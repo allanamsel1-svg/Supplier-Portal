@@ -6,7 +6,9 @@
 // for a quote-response action, so the admin can review/edit before sending.
 //
 // POST { quote_id, rfq_id, factory_id, action }
-//   action ∈ 'approved' | 'rejected' | 'more_info' | 'followup'
+//   action ∈ 'approved' | 'rejected' | 'more_info' | 'followup' | 'document_request'
+//   approved/rejected/more_info/followup → signed Sarah Lindburg (Sourcing)
+//   document_request → signed Tyler Durden (Compliance), Sarah CC'd
 //   quote_id may be null (e.g. for 'followup' before any quote exists)
 //   → { subject, body }
 //
@@ -23,10 +25,20 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUP
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const MODEL = process.env.DRAFT_EMAIL_MODEL || 'claude-sonnet-4-20250514';
 
-const SYSTEM_PROMPT =
+const SOURCING_SYSTEM_PROMPT =
   'You are Sarah Lindburg, Sourcing Manager at TBG Sourcing. Write professional, ' +
   'concise sourcing emails. Never mention AI or scoring. Always use subject format: ' +
   '[PRJ-XXXX] Product Description';
+
+const COMPLIANCE_SYSTEM_PROMPT =
+  'You are Tyler Durden, Compliance Manager at TBG Sourcing. Write professional, ' +
+  'concise compliance and document-request emails. Never mention AI or scoring. ' +
+  'Always use subject format: [PRJ-XXXX] Product Description. ' +
+  'Sarah Lindburg (Sourcing) is copied on this email.';
+
+function systemPromptFor(action) {
+  return action === 'document_request' ? COMPLIANCE_SYSTEM_PROMPT : SOURCING_SYSTEM_PROMPT;
+}
 
 // ── Supabase REST helper (service key) ──────────────────────
 async function sb(path) {
@@ -104,12 +116,30 @@ function buildUserPrompt(action, ctx) {
   } else if (action === 'followup') {
     lines.push('# Action: FOLLOW UP');
     lines.push('Send a friendly, short reminder that we are still awaiting their quote on this RFQ. Reference the project number. Keep it brief and encouraging.');
+  } else if (action === 'document_request') {
+    lines.push('# Action: DOCUMENT REQUEST (Compliance)');
+    lines.push('Request the outstanding compliance documents and certifications needed for this product. List the specific items below in plain business language (do NOT mention scores or internal evaluation systems). Note politely that Sarah Lindburg (Sourcing) is copied on this email.');
+    if (quote && Array.isArray(quote.compliance_flags) && quote.compliance_flags.length) {
+      lines.push('Documents / compliance items needed:');
+      quote.compliance_flags.forEach(f => {
+        const label = (f && (f.label || f.message || f.code)) || (typeof f === 'string' ? f : JSON.stringify(f));
+        lines.push(`- ${label}`);
+      });
+    } else if (quote && quote.compliance_flags && typeof quote.compliance_flags === 'object' && !Array.isArray(quote.compliance_flags)) {
+      lines.push(`Documents / compliance items needed: ${JSON.stringify(quote.compliance_flags)}`);
+    } else {
+      lines.push('Documents / compliance items needed: the required product compliance documentation, certifications, and test reports for this category.');
+    }
   } else {
     throw new Error(`Unknown action: ${action}`);
   }
 
   lines.push('');
-  lines.push('Sign as: Sarah Lindburg, Sourcing Manager, TBG Sourcing, sourcing@tbgsourcing.net');
+  if (action === 'document_request') {
+    lines.push('Sign as: Tyler Durden, Compliance Manager, TBG Sourcing, compliance@tbgsourcing.net (Sarah Lindburg, Sourcing, is copied).');
+  } else {
+    lines.push('Sign as: Sarah Lindburg, Sourcing Manager, TBG Sourcing, sourcing@tbgsourcing.net');
+  }
   return lines.join('\n');
 }
 
@@ -137,7 +167,7 @@ async function handler(req, res) {
   if (!rfq_id || !factory_id || !action) {
     return res.status(400).json({ error: 'Missing rfq_id, factory_id, or action.' });
   }
-  if (['approved', 'rejected', 'more_info', 'followup'].indexOf(action) < 0) {
+  if (['approved', 'rejected', 'more_info', 'followup', 'document_request'].indexOf(action) < 0) {
     return res.status(400).json({ error: `Invalid action: ${action}` });
   }
 
@@ -178,7 +208,7 @@ async function handler(req, res) {
     const msg = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 500,
-      system: SYSTEM_PROMPT,
+      system: systemPromptFor(action),
       messages: [{ role: 'user', content: userPrompt }]
     });
 
