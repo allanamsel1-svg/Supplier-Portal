@@ -150,6 +150,12 @@ function renderHeader(user) {
 // Each item carries a `feature` key matched against the tenant's features JSONB.
 // feature:null = always shown (Dashboard). Intel is intentionally absent (admin-only for now).
 const TENANT_NAV = [
+  // ============================================================
+  // ⛔ CRITICAL — NEVER MODIFY THIS OVERVIEW SECTION ⛔
+  // Buyline Brands Overview MUST always contain exactly these 3 items: Dashboard, Financials, Settings
+  // DO NOT add Intel Daily, Tenants, Upload Files, or System — those are TBG admin only.
+  // Any prompt that touches tenant-shared.js MUST preserve this block verbatim.
+  // ============================================================
   { section: 'Overview', items: [
     { icon: '⊞', label: 'Dashboard', href: 'tenant-dashboard.html', feature: null },
     { icon: '💰', label: 'Financials', href: 'tenant-financials.html', feature: 'financials' },
@@ -196,6 +202,15 @@ const TENANT_NAV = [
     { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup', feature: 'sku_library' },
   ]},
 ];
+
+// Runtime assertion — fails loudly in the console if the locked Overview items ever go missing.
+// (Adapted to this file's actual sidebar array `TENANT_NAV` / section name 'Overview'.)
+const _REQUIRED_TENANT_OVERVIEW = ['Dashboard','Financials','Settings'];
+const _tenantOverview = TENANT_NAV.find(s => (s.section || s.title || '').toUpperCase() === 'OVERVIEW');
+if (_tenantOverview) {
+  const _missingT = _REQUIRED_TENANT_OVERVIEW.filter(l => !_tenantOverview.items.some(i => i.label === l));
+  if (_missingT.length > 0) console.error('⛔ CRITICAL: Missing tenant Overview items:', _missingT);
+}
 
 // Tenant feature flags (set in renderSidebar from the validated user).
 let TENANT_FEATURES = {};

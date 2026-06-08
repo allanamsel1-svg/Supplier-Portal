@@ -8,14 +8,20 @@
   var STORE_KEY = 'admin_sidebar_sections';
 
   var NAV = [
+    // ============================================================
+    // ⛔ CRITICAL — NEVER MODIFY THIS OVERVIEW SECTION ⛔
+    // This section MUST always contain exactly these 7 items.
+    // Any prompt that touches admin-shared.js MUST preserve this block verbatim.
+    // DO NOT add, remove, or reorder items here under any circumstances.
+    // ============================================================
     { section: 'Overview', items: [
-      { icon: '▦',  label: 'Dashboard',        panel: 'dashboard' },
-      { icon: '💰', label: 'Financials',        href: 'financials.html' },
-      { icon: '🎯', label: 'Intel Daily',       href: 'intel_daily.html' },
+      { icon: '▦',  label: 'Dashboard',    panel: 'dashboard' },
+      { icon: '💰', label: 'Financials',   href: 'financials.html' },
+      { icon: '🎯', label: 'Intel Daily',  href: 'intel_daily.html' },
       { icon: '👥', label: 'Tenants',      href: 'tenant-admin.html' },
       { icon: '📤', label: 'Upload Files', panel: 'upload' },
+      { icon: '🗺', label: 'System',       href: 'roadmap.html' },
       { icon: '⚙',  label: 'Settings',     panel: 'settings' },
-      { icon: '🗺', label: 'System',            href: 'roadmap.html' },
     ]},
     { section: 'Operations', items: [
       { icon: '📋', label: 'Open Orders',    href: 'tenant-operations.html#orders' },
@@ -57,6 +63,15 @@
       { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup' },
     ]},
   ];
+
+  // Runtime assertion — fails loudly in the console if the locked Overview items ever go missing.
+  // (Adapted to this file's actual sidebar array `NAV` / section name 'Overview'.)
+  const _REQUIRED_ADMIN_OVERVIEW = ['Dashboard','Financials','Intel Daily','Tenants','Upload Files','System','Settings'];
+  const _adminOverview = NAV.find(s => (s.section || s.title || '').toUpperCase() === 'OVERVIEW');
+  if (_adminOverview) {
+    const _missing = _REQUIRED_ADMIN_OVERVIEW.filter(l => !_adminOverview.items.some(i => i.label === l));
+    if (_missing.length > 0) console.error('⛔ CRITICAL: Missing admin Overview items:', _missing);
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
