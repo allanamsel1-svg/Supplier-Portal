@@ -63,7 +63,7 @@ function parseJson(text) {
   return null;
 }
 
-const SYSTEM = "You are a US customs classification expert. Given a product description, suggest the most appropriate 10-digit HTS code for import into the United States. Return ONLY valid JSON with no markdown: { hts_code: '3304.99.5000', confidence: 'high', reasoning: 'one sentence', alternative_codes: ['xxxx.xx.xxxx'] }";
+const SYSTEM = "You are a US customs classification expert. Given a product description, suggest the most appropriate 10-digit HTS code for import into the United States. Return ONLY valid JSON with no markdown: { hts_code: '3304.99.5000', description: 'the official tariff description for that heading, e.g. Vacuum cleaners with self-contained electric motor of a power not exceeding 1,500 W', confidence: 'high', reasoning: 'one sentence', alternative_codes: ['xxxx.xx.xxxx'] }";
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');

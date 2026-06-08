@@ -1101,6 +1101,14 @@
       </div>
 
       <!-- RFQ Create/Edit Form -->
+      <style>
+        /* BUG 5: keep all RFQ-modal content inside its borders */
+        #rfq-form-view, #rfq-form-view * { box-sizing: border-box; }
+        #rfq-form-view { overflow-x: hidden; }
+        #rfq-form-view input, #rfq-form-view select, #rfq-form-view textarea { max-width: 100%; }
+        #rfq-form-view label, #rfq-form-view .mgr-card-title { overflow-wrap: break-word; word-break: break-word; }
+        #rfq-form-view .mf, #rfq-form-view [style*="grid"] > * { min-width: 0; }
+      </style>
       <div id="rfq-form-view" style="display:none;padding:1.25rem 1.5rem;max-width:800px;">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;">
           <button onclick="hideRFQForm()" style="background:none;border:none;font-size:22px;color:#999;cursor:pointer;">←</button>
@@ -1388,6 +1396,16 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
               <div class="mf"><label style="color:#5522aa;">Target Retail Price ($)</label><input type="number" id="rfq-target-retail" step="0.01" placeholder="e.g. 4.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
               <div class="mf"><label style="color:#5522aa;">Customer Margin %</label><input type="number" id="rfq-cust-margin" step="0.1" placeholder="e.g. 55" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+
+            <!-- BUG 6: Retailer economics -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label style="color:#5522aa;">Proposed Retail Price ($)</label><input type="number" id="rfq-proposed-retail" step="0.01" placeholder="e.g. 9.99" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+              <div class="mf"><label style="color:#5522aa;">Retailer Margin (%)</label><input type="number" id="rfq-retailer-margin" step="0.1" placeholder="e.g. 40" oninput="calcMargins()" style="border-color:#c8b8f0;" /></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+              <div class="mf"><label>Implied Wholesale (auto)</label><input type="text" id="rfq-implied-wholesale" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
+              <div class="mf"><label>TBG Gross Margin (auto)</label><input type="text" id="rfq-tbg-gross" readonly style="background:#f5f0ff;border-color:#c8b8f0;" /></div>
             </div>
 
             <!-- ROW 2: Customer + Brand -->
@@ -6313,6 +6331,8 @@ async function populateRFQEditForm(rfq){
   document.querySelectorAll('#cert-req-card input[type=checkbox]').forEach(function(cb){cb.checked=certs.includes(cb.value);});
   if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
   if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
+  if(g('rfq-proposed-retail'))g('rfq-proposed-retail').value=rfq.proposed_retail_price||'';
+  if(g('rfq-retailer-margin'))g('rfq-retailer-margin').value=rfq.retailer_margin_pct||'';
   if(g('rfq-customer-id')&&rfq.customer_id)g('rfq-customer-id').value=rfq.customer_id;
   if(g('rfq-brand-id')&&rfq.brand_id)g('rfq-brand-id').value=rfq.brand_id;
   if(g('rfq-unit-w'))g('rfq-unit-w').value=rfq.est_unit_length_cm||'';
@@ -6419,6 +6439,8 @@ async function openRFQForm(id){
   // Fill margin calculator fields
   if(g('rfq-target-retail'))g('rfq-target-retail').value=rfq.target_retail_price||'';
   if(g('rfq-cust-margin'))g('rfq-cust-margin').value=rfq.customer_margin_pct||'';
+  if(g('rfq-proposed-retail'))g('rfq-proposed-retail').value=rfq.proposed_retail_price||'';
+  if(g('rfq-retailer-margin'))g('rfq-retailer-margin').value=rfq.retailer_margin_pct||'';
   if(g('rfq-unit-w'))g('rfq-unit-w').value=rfq.est_unit_length_cm||'';
   if(g('rfq-unit-d'))g('rfq-unit-d').value=rfq.est_unit_width_cm||'';
   if(g('rfq-unit-h'))g('rfq-unit-h').value=rfq.est_unit_height_cm||'';
@@ -6505,6 +6527,7 @@ function resetRFQForm(){
   // Clear user-override flag so new RFQs auto-set from category
   var cosCb=g('rfq-is-cosmetic');if(cosCb){cosCb.checked=false;cosCb.dataset.userOverride='false';}
   var p65=g('rfq-prop65-strategy');if(p65)p65.value='';
+  ['rfq-proposed-retail','rfq-retailer-margin','rfq-implied-wholesale','rfq-tbg-gross'].forEach(function(id){if(g(id))g(id).value='';});
   g('rfq-inci-notice').style.display='none';
   g('factory-match-list').innerHTML='';
   g('factory-match-status').textContent='Click "Find Matching Factories" to see which suppliers match this category.';
@@ -7559,8 +7582,8 @@ function calcMargins(){
   // TARGET GROSS MARGIN (default 80%)
   var targetGross=parseFloat(g('rfq-target-gross')?g('rfq-target-gross').value:80)||80;
 
-  if(!wholesale){if(g('rfq-margin-results'))g('rfq-margin-results').style.display='none';return;}
-  if(!g('rfq-margin-results'))return;
+  if(!wholesale){if(g('rfq-margin-results'))g('rfq-margin-results').style.display='none';calcRetailerEconomics(null);return;}
+  if(!g('rfq-margin-results')){calcRetailerEconomics(null);return;}
 
   // TARGET FOB
   // landed = FOB*(1+duty%+tariff%) + freight
@@ -7587,6 +7610,20 @@ function calcMargins(){
   if(g('res-tariff-cost'))g('res-tariff-cost').textContent=tariffAmt?'$'+tariffAmt.toFixed(4):'$0.00';
   if(g('res-gross-margin')){g('res-gross-margin').textContent=grossPct.toFixed(1)+'%';g('res-gross-margin').style.color=grossPct>=targetGross?'#60ff60':'#ff6060';}
   if(g('res-net-margin')){g('res-net-margin').textContent=netPct.toFixed(1)+'%';g('res-net-margin').style.color=netPct>=(targetGross-20)?'#60ff60':'#ff6060';}
+  calcRetailerEconomics(landed);   // BUG 6: ELC = landed cost at target FOB
+}
+
+// BUG 6: implied wholesale + TBG gross margin from proposed retail & retailer margin.
+function calcRetailerEconomics(elc){
+  var pr=parseFloat(g('rfq-proposed-retail')?g('rfq-proposed-retail').value:0)||0;
+  var rm=parseFloat(g('rfq-retailer-margin')?g('rfq-retailer-margin').value:0)||0;
+  var iw=(pr>0&&rm>0)?pr*(1-rm/100):0;
+  if(g('rfq-implied-wholesale'))g('rfq-implied-wholesale').value=iw>0?'$'+iw.toFixed(2):'';
+  var t=g('rfq-tbg-gross');
+  if(t){
+    if(iw>0&&elc!=null&&elc>0){var gm=(iw-elc)/iw*100;t.value=gm.toFixed(1)+'%';t.style.color=gm>=0?'#1a7a1a':'#b00';}
+    else{t.value='';t.style.color='';}
+  }
 }
 
 
@@ -7810,22 +7847,30 @@ async function axHtsSuggest(){
     if(!r.ok||!d||d.error||!d.hts_code){if(desc)desc.textContent=(d&&d.message)||'Could not suggest a code — enter manually';var _hp=g('ax-hts-result');if(_hp)_hp.style.display='block';}
     else{
       if(g('rfq-est-hts'))g('rfq-est-hts').value=d.hts_code;
-      if(desc)desc.textContent='✨ AI suggested: '+(d.reasoning||'')+(d.confidence?' · '+d.confidence+' confidence':'');
+      // BUG 4: show the full HTS description (from hts-suggest) below the field.
+      if(desc)desc.innerHTML='<small>'+esc(d.hts_code)+(d.description?' — '+esc(d.description):'')+'</small>'+(d.reasoning?'<div style="margin-top:2px;">✨ '+esc(d.reasoning)+(d.confidence?' · '+esc(d.confidence)+' confidence':'')+'</div>':'');
+      var _hpok=g('ax-hts-result');if(_hpok)_hpok.style.display='block';
       if(btn){btn.textContent=orig;btn.disabled=false;}
-      axHtsLookup();
+      axHtsLookup(true);
       return;
     }
   }catch(e){if(desc)desc.textContent='Could not suggest a code — enter manually';var _hp2=g('ax-hts-result');if(_hp2)_hp2.style.display='block';}
   if(btn){btn.textContent=orig;btn.disabled=false;}
 }
 
-async function axHtsLookup(){
+// BUG 3: CBP rulings open with the current HTS field value (or the rulings home if empty).
+function axCbpRulings(e){ if(e&&e.preventDefault)e.preventDefault(); var el=g('rfq-est-hts'); var code=((el&&el.value)||'').trim().replace(/\./g,''); var url=code?('https://rulings.cbp.gov/search?term='+encodeURIComponent(code)):'https://rulings.cbp.gov'; window.open(url,'_blank','noopener'); }
+function axCbpRulingsLink(){ return '<a href="#" onclick="axCbpRulings(event)" style="color:#5522aa;font-weight:600;">View CBP Rulings →</a>'; }
+
+async function axHtsLookup(keepDesc){
   var el=g('rfq-est-hts'); if(!el)return;
   var code=(el.value||'').trim().replace(/\./g,'');
+  var rulings=g('ax-hts-rulings');
+  if(rulings)rulings.innerHTML=axCbpRulingsLink();
   if(!code)return;
-  var btn=g('ax-hts-btn'), desc=g('ax-hts-desc'), rulings=g('ax-hts-rulings');
+  var btn=g('ax-hts-btn'), desc=g('ax-hts-desc');
   if(btn){btn.disabled=true;btn.textContent='Looking up...';}
-  if(desc)desc.textContent='';
+  if(!keepDesc&&desc)desc.textContent='';
   try{
     var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
     var r=await fetch('/api/hts-lookup',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({hts_code:code})});
@@ -7838,13 +7883,12 @@ async function axHtsLookup(){
         if(!isNaN(pct)&&g('rfq-est-duty'))g('rfq-est-duty').value=pct;
         else if((''+rate).indexOf('%')>-1){var m=(''+rate).match(/([\d.]+)%/);if(m&&g('rfq-est-duty'))g('rfq-est-duty').value=parseFloat(m[1]);}
       }
-      if(desc)desc.innerHTML='<div><span style="color:#7a7290;">HTS code:</span> <strong>'+esc((el.value||'').trim())+'</strong></div>'+
+      if(!keepDesc&&desc)desc.innerHTML='<div><span style="color:#7a7290;">HTS code:</span> <strong>'+esc((el.value||'').trim())+'</strong></div>'+
         '<div><span style="color:#7a7290;">Description:</span> '+esc(item.description||item.brief_description||'—')+'</div>'+
         (rate?'<div><span style="color:#7a7290;">General duty:</span> <strong>'+esc(''+rate)+'</strong> &nbsp;<span style="color:#7a7290;">(applied to Duty % above)</span></div>':'<div style="color:#7a7290;">No published general-duty rate — enter the duty manually.</div>');
       if(typeof calcMargins==='function')calcMargins();
-    }else if(desc){desc.innerHTML='HTS code not found — enter the duty rate manually.';}
-  }catch(e){if(desc)desc.innerHTML='Lookup failed — enter the duty rate manually.';}
-  if(rulings)rulings.innerHTML='<a href="https://rulings.cbp.dhs.gov/search?term='+encodeURIComponent(code)+'&type=ALL" target="_blank" style="color:#5522aa;font-weight:600;">View CBP Rulings →</a>';
+    }else if(!keepDesc&&desc){desc.innerHTML='HTS code not found — enter the duty rate manually.';}
+  }catch(e){if(!keepDesc&&desc)desc.innerHTML='Lookup failed — enter the duty rate manually.';}
   var _htsPanel=g('ax-hts-result'); if(_htsPanel)_htsPanel.style.display='block';
   if(btn){btn.disabled=false;btn.textContent='Look Up →';}
 }
@@ -7912,6 +7956,8 @@ async function saveRFQ(action){
     comp_retail_price:null,
     target_retail_price:parseFloat(g('rfq-target-retail').value)||null,
     customer_margin_pct:parseFloat(g('rfq-cust-margin').value)||null,
+    proposed_retail_price:parseFloat(g('rfq-proposed-retail')?g('rfq-proposed-retail').value:0)||null,
+    retailer_margin_pct:parseFloat(g('rfq-retailer-margin')?g('rfq-retailer-margin').value:0)||null,
     target_wholesale_price:parseFloat(g('res-wholesale').textContent.replace('$',''))||null,
     est_unit_length_cm:parseFloat(g('rfq-unit-w')?g('rfq-unit-w').value:0)||null,
     est_unit_width_cm:parseFloat(g('rfq-unit-d')?g('rfq-unit-d').value:0)||null,

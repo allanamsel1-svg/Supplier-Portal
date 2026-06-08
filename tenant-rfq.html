@@ -100,6 +100,16 @@
   </div>
 </div>
 
+<style>
+/* BUG 5: keep all RFQ-modal content inside its borders */
+.rfq-drawer-body, .rfq-drawer-body * { box-sizing: border-box; }
+.rfq-drawer-body { overflow-x: hidden; }
+.rfq-drawer-body input, .rfq-drawer-body select, .rfq-drawer-body textarea { max-width: 100%; }
+.rfq-drawer-body label, .rfq-drawer-body h3, .rfq-drawer-body .rfq-sec-title, .rfq-drawer-body .nr-field { overflow-wrap: break-word; word-break: break-word; }
+.rfq-drawer-body .nr-grid > * { min-width: 0; }
+.fmatch-row { display:flex; align-items:center; gap:8px; padding:7px 9px; border:1px solid var(--border,#334155); border-radius:7px; margin-bottom:5px; cursor:pointer; font-size:13px; overflow-wrap:break-word; }
+.nr-cert-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 9px; border:1px solid var(--border,#334155); border-radius:7px; margin-bottom:5px; font-size:13px; flex-wrap:wrap; }
+</style>
 <div class="rfq-drawer-bg" id="rfqDrawerBg">
   <div class="rfq-drawer" id="rfqDrawer">
     <div class="rfq-drawer-head">
@@ -350,19 +360,54 @@
             <div style="text-align:center"><input id="nr-elc-check-ec" readonly style="width:100%;text-align:center;background:transparent;border:none;font-size:12px;font-weight:600;"></div>
           </div>
         </div>
+
+        <!-- BUG 8: estimated cartonization + 40HC qty + freight/unit (read-only estimates) -->
+        <div style="background:var(--bg2,#0d1424);border:1px solid var(--border,#334155);border-radius:10px;padding:14px;margin-top:12px;max-width:100%;">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Estimated Cartonization &amp; Freight</div>
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px;overflow-wrap:break-word;">Estimated from unit dimensions + case packs. Factory confirms actual dims on quote submission — these are estimates only.</div>
+          <div class="nr-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="nr-field"><label>Container cost ($ per 40HC)</label><input id="nr-container-cost" type="number" min="0" step="1" placeholder="e.g. 5256" oninput="nrCbmCalc()"></div>
+            <div class="nr-field"><label>Est. inner carton (L×W×H cm)</label><input id="nr-est-inner-dims" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+          </div>
+          <div class="nr-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="nr-field"><label>Est. inner CBM</label><input id="nr-est-inner-cbm" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+            <div class="nr-field"><label>Est. master carton (L×W×H cm)</label><input id="nr-est-master-dims" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+          </div>
+          <div class="nr-grid" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="nr-field"><label>Est. master CBM</label><input id="nr-est-master-cbm" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+            <div class="nr-field"><label>Units per 40HC FCL</label><input id="nr-est-units-40hc" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+            <div class="nr-field"><label>Freight per unit</label><input id="nr-est-freight-unit" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+          </div>
+        </div>
+
+        <!-- BUG 6: retailer economics -->
+        <div style="background:var(--bg2,#0d1424);border:1px solid var(--border,#334155);border-radius:10px;padding:14px;margin-top:12px;max-width:100%;">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Retailer Economics</div>
+          <div class="nr-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="nr-field"><label>Proposed Retail Price ($)</label><input id="nr-proposed-retail" type="number" min="0" step="0.01" placeholder="e.g. 9.99" oninput="nrRetailerCalc()"></div>
+            <div class="nr-field"><label>Retailer Margin (%)</label><input id="nr-retailer-margin" type="number" min="0" step="0.1" placeholder="e.g. 40" oninput="nrRetailerCalc()"></div>
+          </div>
+          <div class="nr-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="nr-field"><label>Implied Wholesale</label><input id="nr-implied-wholesale" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+            <div class="nr-field"><label>TBG Gross Margin</label><input id="nr-tbg-gross" readonly style="background:var(--bg3,#0a0f1c)" placeholder="auto"></div>
+          </div>
+        </div>
       </div>
 
       <div class="rfq-sec"><h3>4 · Compliance</h3>
         <label class="nr-check"><input type="checkbox" id="nr-cosmetic"> Cosmetic product</label>
         <div class="nr-field"><label>CA Prop 65 strategy</label><select id="nr-prop65">
-          <option value="">Not specified</option>
-          <option>Not applicable</option>
-          <option>No listed chemicals present</option>
-          <option>Warning label required</option>
-          <option>Reformulate to avoid listed chemicals</option>
-          <option>Testing required to confirm</option>
+          <option value="">— Not specified —</option>
+          <option value="conform">Must conform</option>
+          <option value="warning_label">Warning label acceptable</option>
+          <option value="either">Either</option>
         </select></div>
-        <div class="nr-field"><label>Product documents required/preferred</label><input id="nr-docs" placeholder="e.g. SDS, COA, Prop 65 statement, allergen disclosure"></div>
+        <!-- BUG 7: certifications required/optional (loaded from compliance_requirements by category) -->
+        <div class="nr-field"><label>Certifications</label>
+          <div id="nr-cert-status" style="font-size:12px;color:var(--text2);">Select a category to load its certifications.</div>
+          <div id="nr-cert-rows" style="margin-top:6px;"></div>
+        </div>
+        <div class="nr-field"><label>Product documents (additional, comma-separated)</label><input id="nr-docs" placeholder="e.g. SDS, COA, allergen disclosure"></div>
       </div>
 
       <div class="rfq-sec"><h3>5 · Factory Matching</h3>
@@ -446,6 +491,7 @@ function nrCategoryChange() {
   const fl = nrg('nr-factory-list'); if (fl) fl.innerHTML = '';
   const fs = nrg('nr-factory-status'); if (fs) fs.textContent = cat ? 'Click "Find Matching Factories" to see suppliers for ' + cat + '.' : 'Select a category, then find suppliers that match it.';
   nrSelectedFactories = [];
+  nrLoadCerts(cat);   // BUG 7: refresh certifications for the selected category
 }
 
 // ── Section 3 packaging dropdowns (kit_packaging_types + "Other" manual entry) ──
@@ -864,15 +910,55 @@ function nrCbmCalc() {
   };
   coast('wc', rates.wc);
   coast('ec', rates.ec);
+
+  // ── BUG 8: estimated cartonization (stack units/inners along the longest dimension) ──
+  (function () {
+    const setE = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    const clearAll = () => ['nr-est-inner-dims','nr-est-inner-cbm','nr-est-master-dims','nr-est-master-cbm','nr-est-units-40hc','nr-est-freight-unit'].forEach(id => setE(id, ''));
+    const toCm = (v, u) => u === 'in' ? v * 2.54 : u === 'mm' ? v / 10 : v;
+    const upi = parseFloat((document.getElementById('nr-units-inner') || {}).value);
+    const ipm = parseFloat((document.getElementById('nr-inners-master') || {}).value);
+    window.nrEst = {};
+    if (isNaN(w) || isNaN(h) || isNaN(l)) { clearAll(); return; }
+    const fmt = a => a.map(x => x.toFixed(1)).join(' × ');
+    const uc = [toCm(l, dimU), toCm(w, dimU), toCm(h, dimU)];   // [L, W, H] cm
+    // Inner carton: stack units along the unit's longest dimension × units_per_inner.
+    let innerDims = uc.slice();
+    if (!isNaN(upi) && upi > 0) { const i = uc.indexOf(Math.max(...uc)); innerDims[i] = uc[i] * upi; }
+    const innerCbm = innerDims[0] * innerDims[1] * innerDims[2] / 1e6;
+    setE('nr-est-inner-dims', fmt(innerDims));
+    setE('nr-est-inner-cbm', innerCbm.toFixed(6));
+    // Master carton: stack inners along the inner carton's longest dimension × inners_per_master.
+    let masterDims = innerDims.slice();
+    if (!isNaN(ipm) && ipm > 0) { const j = innerDims.indexOf(Math.max(...innerDims)); masterDims[j] = innerDims[j] * ipm; }
+    const masterCbmEst = masterDims[0] * masterDims[1] * masterDims[2] / 1e6;
+    setE('nr-est-master-dims', fmt(masterDims));
+    setE('nr-est-master-cbm', masterCbmEst.toFixed(6));
+    // Units per 40HC FCL = floor(67.3 / master_CBM) × units_per_master.
+    const upm = (!isNaN(upi) && !isNaN(ipm) && upi > 0 && ipm > 0) ? upi * ipm
+      : (parseFloat((document.getElementById('nr-units-master') || {}).value) || 0);
+    let units40 = null, freightUnit = null;
+    if (masterCbmEst > 0 && upm > 0) {
+      units40 = Math.floor(67.3 / masterCbmEst) * upm;
+      setE('nr-est-units-40hc', units40 > 0 ? units40.toLocaleString() : '0');
+      const contCost = parseFloat((document.getElementById('nr-container-cost') || {}).value);
+      if (!isNaN(contCost) && contCost > 0 && units40 > 0) { freightUnit = contCost / units40; setE('nr-est-freight-unit', '$' + freightUnit.toFixed(4)); }
+      else setE('nr-est-freight-unit', '');
+    } else { setE('nr-est-units-40hc', ''); setE('nr-est-freight-unit', ''); }
+    window.nrEst = { innerDims, innerCbm, masterDims, masterCbm: masterCbmEst, units40, freightUnit };
+  })();
+  nrRetailerCalc();   // BUG 6: keep TBG gross margin in sync with ELC
 }
 
-async function nrHtsLookup() {
+async function nrHtsLookup(keepDesc) {
   const code = (document.getElementById('nr-hts-code').value || '').trim().replace(/\./g,'');
+  const rulings = document.getElementById('nr-hts-rulings');
+  if (rulings) rulings.innerHTML = cbpRulingsLink();   // BUG 3: dynamic cbp.gov link from current field
   if (!code) return;
   const btn = document.getElementById('nr-hts-btn');
   const desc = document.getElementById('nr-hts-desc');
-  const rulings = document.getElementById('nr-hts-rulings');
-  btn.disabled = true; btn.textContent = 'Looking up...'; desc.textContent = '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking up...'; }
+  if (!keepDesc && desc) desc.textContent = '';
   try {
     const token = localStorage.getItem('tenant_token') || localStorage.getItem('admin_session') || '';
     const r = await fetch('/api/hts-lookup', {
@@ -883,19 +969,17 @@ async function nrHtsLookup() {
     const d = await r.json();
     const item = d && !d.error && (d[0] || d.data && d.data[0] || d.results && d.results[0]);
     if (item) {
-      desc.textContent = item.description || item.brief_description || '';
       const rate = item.general || item.duty_rate || '';
       if (rate) {
         const pct = parseFloat(rate);
         if (!isNaN(pct)) document.getElementById('nr-duty-general').value = pct;
         else if (rate.includes('%')) { const m = rate.match(/([\d.]+)%/); if (m) document.getElementById('nr-duty-general').value = parseFloat(m[1]); }
-        desc.textContent += ' | General duty: ' + rate;
       }
+      if (!keepDesc && desc) desc.innerHTML = '<small>' + esc(item.description || item.brief_description || '') + (rate ? ' | General duty: ' + esc(rate) : '') + '</small>';
       nrCbmCalc();
-    } else { desc.textContent = 'HTS code not found — enter duty rate manually'; }
-  } catch(e) { desc.textContent = 'Lookup failed — enter duty rate manually'; }
-  if (rulings) rulings.innerHTML = '<a href="https://rulings.cbp.dhs.gov/search?term=' + encodeURIComponent(code) + '&type=ALL" target="_blank" style="color:var(--accent,#2244cc);">View CBP Rulings →</a>';
-  btn.disabled = false; btn.textContent = 'Look Up →';
+    } else if (!keepDesc && desc) { desc.textContent = 'HTS code not found — enter duty rate manually'; }
+  } catch(e) { if (!keepDesc && desc) desc.textContent = 'Lookup failed — enter duty rate manually'; }
+  if (btn) { btn.disabled = false; btn.textContent = 'Look Up →'; }
 }
 
 // AI HTS code suggestion from the product name + description.
@@ -920,9 +1004,11 @@ async function nrHtsSuggest() {
       if (desc) desc.textContent = (d && d.message) || 'Could not suggest a code — enter manually';
     } else {
       document.getElementById('nr-hts-code').value = d.hts_code;
-      if (desc) desc.textContent = '✨ AI suggested: ' + (d.reasoning || '') + (d.confidence ? ' · ' + d.confidence + ' confidence' : '');
+      // BUG 4: show the full HTS description (from hts-suggest) below the field, in a <small> tag.
+      if (desc) desc.innerHTML = '<small>' + esc(d.hts_code) + (d.description ? ' — ' + esc(d.description) : '') + '</small>'
+        + (d.reasoning ? '<div style="margin-top:2px;color:var(--text2);">✨ ' + esc(d.reasoning) + (d.confidence ? ' · ' + esc(d.confidence) + ' confidence' : '') + '</div>' : '');
       if (btn) { btn.textContent = orig; btn.disabled = false; }
-      nrHtsLookup();
+      nrHtsLookup(true);   // refresh duty + rulings link, but keep the description above
       return;
     }
   } catch (e) { if (desc) desc.textContent = 'Could not suggest a code — enter manually'; }
@@ -981,8 +1067,11 @@ function openNewRfqModal(prefill) {
   // Freight & landed cost reset
   ['nr-units-inner','nr-inners-master','nr-units-master','nr-ctn-w','nr-ctn-h','nr-ctn-l','nr-cbm-unit','nr-cbm-master','nr-cbm-total','nr-hts-code','nr-duty-general','nr-duty-total','nr-duty-unit','nr-elc-retail',
    'nr-elc-fob-wc','nr-elc-freight-wc','nr-elc-duty-wc','nr-elc-total-wc','nr-elc-margin-wc','nr-elc-check-wc',
-   'nr-elc-fob-ec','nr-elc-freight-ec','nr-elc-duty-ec','nr-elc-total-ec','nr-elc-margin-ec','nr-elc-check-ec'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
-  { const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const hr = nrg('nr-hts-rulings'); if (hr) hr.innerHTML = ''; }
+   'nr-elc-fob-ec','nr-elc-freight-ec','nr-elc-duty-ec','nr-elc-total-ec','nr-elc-margin-ec','nr-elc-check-ec',
+   'nr-container-cost','nr-est-inner-dims','nr-est-inner-cbm','nr-est-master-dims','nr-est-master-cbm','nr-est-units-40hc','nr-est-freight-unit',
+   'nr-proposed-retail','nr-retailer-margin','nr-implied-wholesale','nr-tbg-gross'].forEach(id => { const el = nrg(id); if (el) el.value = ''; });
+  window.nrEst = {};
+  { const cu = nrg('nr-ctn-unit'); if (cu) cu.value = 'cm'; const d301 = nrg('nr-duty-301'); if (d301) d301.checked = false; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = false; const hd = nrg('nr-hts-desc'); if (hd) hd.textContent = ''; const hr = nrg('nr-hts-rulings'); if (hr) hr.innerHTML = cbpRulingsLink(); }
   { const oc = nrg('nr-origin-country'); if (oc) oc.value = 'China'; const sm = nrg('nr-ship-mode'); if (sm) sm.value = 'ocean_fcl'; const ft = nrg('nr-fcl-type'); if (ft) ft.value = '40HC'; const fw = nrg('nr-fcl-type-wrap'); if (fw) fw.style.display = ''; }
   nrFreightWire();
   nrLoadFreightRates();
@@ -1019,15 +1108,95 @@ async function findMatchingFactories() {
   const cat = nrCurrentCategory();
   const status = nrg('nr-factory-status'), listEl = nrg('nr-factory-list');
   if (!cat) { status.textContent = 'Please select a category first.'; return; }
-  status.textContent = 'Searching…'; listEl.innerHTML = '';
-  const facs = await supa(`factories?tenant_id=eq.${TID}&product_categories=cs.${encodeURIComponent('{"' + cat.replace(/"/g, '') + '"}')}&select=id,factory_name_english,country,city&order=factory_name_english.asc`);
+  status.textContent = 'Searching…'; listEl.innerHTML = ''; nrSelectedFactories = [];
+  let facs = [];
+  // Primary match: factory_categories joined to this tenant's factories (by category name).
+  try {
+    const sub = nrCatL2Value(), subsub = nrCatL3Value();
+    let fcPath = 'factory_categories?select=factory_id&category=eq.' + encodeURIComponent(cat);
+    if (sub) fcPath += '&sub_category=eq.' + encodeURIComponent(sub);
+    if (subsub) fcPath += '&sub_sub_category=eq.' + encodeURIComponent(subsub);
+    const fcRows = await supa(fcPath);
+    const ids = [...new Set(fcRows.map(r => r.factory_id).filter(Boolean))];
+    if (ids.length) {
+      facs = await supa(`factories?tenant_id=eq.${TID}&id=in.(${ids.join(',')})&select=id,factory_name_english,country,city,sales_email&order=factory_name_english.asc`);
+    }
+  } catch (e) { console.error('factory_categories match', e); }
+  // Fallback: product_categories free-text containment.
+  if (!facs.length) {
+    facs = await supa(`factories?tenant_id=eq.${TID}&product_categories=cs.${encodeURIComponent('{"' + cat.replace(/"/g, '') + '"}')}&select=id,factory_name_english,country,city,sales_email&order=factory_name_english.asc`);
+  }
   if (!facs.length) { status.textContent = 'No factories in your network match "' + cat + '". You can still submit — your sourcing manager will source suppliers.'; return; }
-  status.textContent = facs.length + ' matching factor' + (facs.length === 1 ? 'y' : 'ies') + ' — select who to send to:';
-  listEl.innerHTML = facs.map(f => `<label class="fmatch-row"><input type="checkbox" class="nr-fac" value="${esc(f.id)}" onchange="nrToggleFactory()"> ${esc(f.factory_name_english || 'Factory')}${f.city || f.country ? ' <span style="color:var(--text2);font-size:11px;">· ' + esc([f.city, f.country].filter(Boolean).join(', ')) + '</span>' : ''}</label>`).join('');
+  nrSelectedFactories = facs.map(f => f.id);   // ALL pre-checked by default
+  status.innerHTML = '<strong>' + facs.length + ' matching factor' + (facs.length === 1 ? 'y' : 'ies') + '</strong> — all selected, uncheck any to exclude.';
+  listEl.innerHTML = facs.map(f => `<label class="fmatch-row"><input type="checkbox" class="nr-fac" value="${esc(f.id)}" checked onchange="nrToggleFactory()"> ${esc(f.factory_name_english || 'Factory')}${f.city || f.country ? ' <span style="color:var(--text2);font-size:11px;">· ' + esc([f.city, f.country].filter(Boolean).join(', ')) + '</span>' : ''}${f.sales_email ? '' : ' <span style="color:#e08800;font-size:10px;">⚠ no email</span>'}</label>`).join('');
 }
 function nrToggleFactory() {
   nrSelectedFactories = Array.prototype.slice.call(document.querySelectorAll('.nr-fac:checked')).map(c => c.value);
 }
+
+// ── BUG 7: certifications required/optional, loaded from compliance_requirements ──
+let nrCertState = {};   // { certName: 'required' | 'optional' }
+async function nrLoadCerts(cat) {
+  const statusEl = nrg('nr-cert-status'), rowsEl = nrg('nr-cert-rows');
+  if (!rowsEl) return;
+  nrCertState = {};
+  if (!cat) { if (statusEl) statusEl.textContent = 'Select a category to load its certifications.'; rowsEl.innerHTML = ''; return; }
+  if (statusEl) statusEl.textContent = 'Loading certifications…';
+  let rows = [];
+  try { rows = await supa('compliance_requirements?category=eq.' + encodeURIComponent(cat) + '&select=required_factory_certs,preferred_factory_certs&limit=1'); }
+  catch (e) { console.error('compliance_requirements', e); }
+  const row = rows && rows[0] || {};
+  (row.required_factory_certs || []).forEach(c => { if (c) nrCertState[c] = 'required'; });
+  (row.preferred_factory_certs || []).forEach(c => { if (c && !nrCertState[c]) nrCertState[c] = 'optional'; });
+  nrRenderCerts();
+  if (statusEl) statusEl.textContent = Object.keys(nrCertState).length
+    ? 'Defaults from this category — toggle Required / Optional per cert.'
+    : 'No category certifications on file. Add product docs below if needed.';
+}
+function nrRenderCerts() {
+  const rowsEl = nrg('nr-cert-rows'); if (!rowsEl) return;
+  const names = Object.keys(nrCertState);
+  rowsEl.innerHTML = names.map(name => {
+    const st = nrCertState[name];
+    return `<div class="nr-cert-row"><span style="flex:1;min-width:0;overflow-wrap:break-word;">${esc(name)}</span>`
+      + `<span style="display:flex;gap:4px;flex-shrink:0;">`
+      + `<button type="button" onclick="nrSetCert('${esc(name).replace(/'/g, "\\'")}','required')" style="padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${st === 'required' ? '#16a34a' : 'var(--border,#334155)'};background:${st === 'required' ? '#16a34a' : 'transparent'};color:${st === 'required' ? '#fff' : 'var(--text2)'};">Required</button>`
+      + `<button type="button" onclick="nrSetCert('${esc(name).replace(/'/g, "\\'")}','optional')" style="padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid ${st === 'optional' ? '#2563eb' : 'var(--border,#334155)'};background:${st === 'optional' ? '#2563eb' : 'transparent'};color:${st === 'optional' ? '#fff' : 'var(--text2)'};">Optional</button>`
+      + `</span></div>`;
+  }).join('');
+}
+function nrSetCert(name, state) { nrCertState[name] = state; nrRenderCerts(); }
+function nrReadCerts() {
+  const required = [], preferred = [];
+  Object.keys(nrCertState).forEach(n => { (nrCertState[n] === 'optional' ? preferred : required).push(n); });
+  return { required, preferred };
+}
+
+// ── BUG 6: retailer economics (implied wholesale + TBG gross margin) ──
+function nrRetailerCalc() {
+  const setV = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  const retail = parseFloat((document.getElementById('nr-proposed-retail') || {}).value);
+  const rm = parseFloat((document.getElementById('nr-retailer-margin') || {}).value);
+  let wholesale = null;
+  if (!isNaN(retail) && !isNaN(rm)) { wholesale = retail * (1 - rm / 100); setV('nr-implied-wholesale', '$' + wholesale.toFixed(2)); }
+  else setV('nr-implied-wholesale', '—');
+  const elc = parseFloat(((document.getElementById('nr-elc-total-wc') || {}).value || '').replace(/[$,]/g, ''));
+  const gEl = document.getElementById('nr-tbg-gross');
+  if (wholesale && wholesale > 0 && !isNaN(elc) && elc > 0) {
+    const gm = (wholesale - elc) / wholesale * 100;
+    if (gEl) { gEl.value = gm.toFixed(1) + '%'; gEl.style.color = gm >= 0 ? '' : '#dc2626'; }
+  } else if (gEl) { gEl.value = '—'; gEl.style.color = ''; }
+}
+
+// CBP rulings — opens with the current HTS field value (or the rulings home if empty).
+function cbpRulings(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const code = ((document.getElementById('nr-hts-code') || {}).value || '').trim().replace(/\./g, '');
+  const url = code ? ('https://rulings.cbp.gov/search?term=' + encodeURIComponent(code)) : 'https://rulings.cbp.gov';
+  window.open(url, '_blank', 'noopener');
+}
+function cbpRulingsLink() { return '<a href="#" onclick="cbpRulings(event)" style="color:var(--accent,#2244cc);">View CBP Rulings →</a>'; }
 async function saveNewRfq(status) {
  try {
   const desc = (nrg('nr-desc').value || '').trim();
@@ -1037,6 +1206,9 @@ async function saveNewRfq(status) {
   const txt = id => { const v = (nrg(id).value || '').trim(); return v || null; };
   const pint = id => { const v = parseInt((nrg(id) || {}).value, 10); return isNaN(v) ? null : v; };
   const pflt = id => { const n = parseFloat(((nrg(id) || {}).value || '').replace(/[$,%]/g, '')); return isNaN(n) ? null : n; };
+  const nrCerts = nrReadCerts();            // BUG 7
+  const nrE = window.nrEst || {};           // BUG 8 estimates
+  const round1 = v => (v == null ? null : Math.round(v * 10) / 10);
   let spec = (nrg('nr-spec').value || '').trim();
   const ptype = (document.querySelector('input[name="nr-ptype"]:checked') || {}).value || 'single';
   const extras = [];
@@ -1070,15 +1242,20 @@ async function saveNewRfq(status) {
     packaging_finish: nrSelOrOther('nr-pkg-finish') || null,
     packaging_color: txt('nr-pkg-color'), packaging_notes: txt('nr-pkg-notes'),
     is_cosmetic: !!nrg('nr-cosmetic').checked, prop65_strategy: nrg('nr-prop65').value || null,
-    product_docs_required: txt('nr-docs'),
+    product_docs_required: (txt('nr-docs') ? txt('nr-docs').split(',').map(s => s.trim()).filter(Boolean) : null),
+    certifications_required: (nrCerts.required.length ? nrCerts.required : null),   // BUG 7
+    certifications_preferred: (nrCerts.preferred.length ? nrCerts.preferred : null),
     units_per_inner: pint('nr-units-inner'),
     inners_per_master: pint('nr-inners-master'),
     units_per_master: pint('nr-units-master'),
-    master_carton_w_cm: nrDimToNum('nr-ctn-w', 'nr-ctn-unit'),
-    master_carton_h_cm: nrDimToNum('nr-ctn-h', 'nr-ctn-unit'),
-    master_carton_l_cm: nrDimToNum('nr-ctn-l', 'nr-ctn-unit'),
+    // BUG 8: master carton dims — manual override if entered, else the stacking estimate
+    master_carton_l_cm: nrDimToNum('nr-ctn-l', 'nr-ctn-unit') ?? (nrE.masterDims ? round1(nrE.masterDims[0]) : null),
+    master_carton_w_cm: nrDimToNum('nr-ctn-w', 'nr-ctn-unit') ?? (nrE.masterDims ? round1(nrE.masterDims[1]) : null),
+    master_carton_h_cm: nrDimToNum('nr-ctn-h', 'nr-ctn-unit') ?? (nrE.masterDims ? round1(nrE.masterDims[2]) : null),
     total_cbm: pflt('nr-cbm-total'),
-    freight_per_unit: pflt('nr-elc-freight-wc'),   // West Coast = primary stored value
+    freight_per_unit: (nrE.freightUnit != null ? Math.round(nrE.freightUnit * 10000) / 10000 : pflt('nr-elc-freight-wc')),
+    proposed_retail_price: pflt('nr-proposed-retail'),   // BUG 6
+    retailer_margin_pct: pflt('nr-retailer-margin'),
     hts_code: txt('nr-hts-code'),
     duty_rate_general: pflt('nr-duty-general'),
     duty_section_301: !!(nrg('nr-duty-301') && nrg('nr-duty-301').checked),
@@ -1150,6 +1327,21 @@ async function saveNewRfq(status) {
         alert('Image save error: ' + (e && e.message ? e.message : e));
       }
     }
+  }
+  // BUG 2: on submit, create rfq_factory_assignments for only the checked factories.
+  const savedRfqId = newId || nrEditId;
+  if (savedRfqId && status === 'pending_review' && nrSelectedFactories.length) {
+    try {
+      await fetch(SUPA_URL + '/rest/v1/rfq_factory_assignments?rfq_id=eq.' + encodeURIComponent(savedRfqId), {
+        method: 'DELETE', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY },
+      });
+      const now = new Date().toISOString();
+      const rows = nrSelectedFactories.map(fid => ({ rfq_id: savedRfqId, factory_id: fid, status: 'sent', sent_at: now, tenant_id: TID }));
+      await fetch(SUPA_URL + '/rest/v1/rfq_factory_assignments', {
+        method: 'POST', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify(rows),
+      });
+    } catch (e) { console.error('rfq_factory_assignments create', e); }
   }
   closeNewRfqModal();
   await loadRFQs();
@@ -1290,10 +1482,19 @@ async function openRFQ(id) {
     setV('nr-hts-code', r.hts_code);
     setV('nr-duty-general', r.duty_rate_general);
     setV('nr-elc-retail', r.target_retail_price);
+    setV('nr-proposed-retail', r.proposed_retail_price);   // BUG 6
+    setV('nr-retailer-margin', r.retailer_margin_pct);
     { const d301 = nrg('nr-duty-301'); if (d301) d301.checked = !!r.duty_section_301; const d122 = nrg('nr-duty-122'); if (d122) d122.checked = !!r.duty_section_122; }
     { const c = nrg('nr-cosmetic'); if (c) { c.checked = !!r.is_cosmetic; c.dataset.userOverride = 'true'; } }
     { const p = nrg('nr-prop65'); if (p && r.prop65_strategy) p.value = r.prop65_strategy; }
     nrCategoryChange();
+    // BUG 7: re-apply this RFQ's saved cert selections over the category defaults (async load).
+    setTimeout(() => {
+      if (!(r.certifications_required || r.certifications_preferred)) return;
+      (r.certifications_required || []).forEach(c => { if (c) nrCertState[c] = 'required'; });
+      (r.certifications_preferred || []).forEach(c => { if (c && nrCertState[c] !== 'required') nrCertState[c] = 'optional'; });
+      nrRenderCerts();
+    }, 450);
     nrCbmCalc();
     { const dB = nrg('nr-draft'), sB = nrg('nr-submit'); if (dB) dB.textContent = 'Save Changes'; if (sB) sB.textContent = 'Submit for Review'; }
     // Load existing product images for this RFQ as thumbnails.
