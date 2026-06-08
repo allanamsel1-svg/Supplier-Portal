@@ -1788,23 +1788,43 @@ async function tenantApproveQuote(q, factory, ctx) {
     }
   } catch (e) { console.error('product_development_items create', e); }
   // 3. artwork_projects — kick off the asset-collection workflow, deduped by pd_item_id.
-  // assets_required comes from the checked asset list captured in the approval email modal.
+  // assets_required comes from the checked asset list captured in the approval email modal;
+  // falls back to a default cosmetics asset list when the modal produced none.
   try {
-    if (pdItemId) {
+    if (!pdItemId) {
+      console.error('Artwork project NOT created: pdItemId is null (PD-item creation failed above).');
+    } else {
       const existAp = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id&limit=1');
       if (!existAp || !existAp.length) {
-        const assetNames = (qemState && Array.isArray(qemState.assets)) ? qemState.assets : [];
+        // Hardcoded default used whenever the modal didn't capture a usable asset list.
+        const DEFAULT_COSMETIC_ASSETS = [{ name: 'Hi-res product images (white background)', received: false }, { name: 'Hi-res product images (angles)', received: false }, { name: 'Lifestyle images', received: false }, { name: 'Packaging dieline (structural)', received: false }, { name: 'Technical drawing / spec sheet', received: false }, { name: 'Product use video', received: false }, { name: 'Package contents list', received: false }];
+        // qemState.assets is normally an array of asset-name strings; tolerate {name,received} objects too.
+        const rawAssets = (qemState && Array.isArray(qemState.assets)) ? qemState.assets : [];
+        let assetsRequired = rawAssets.map(a => (a && typeof a === 'object') ? { name: a.name, received: a.received === true } : { name: String(a), received: false }).filter(a => a.name);
+        if (!assetsRequired.length) assetsRequired = DEFAULT_COSMETIC_ASSETS.slice();
+        const apTenantId = tid || rfq.tenant_id || TID;
+        if (!apTenantId) console.error('Artwork project: tenant_id is null — insert will fail the NOT NULL constraint.', { rfq_id: ctx.rfq_id });
         const apPayload = {
-          pd_item_id: pdItemId, tenant_id: tid,
-          product_name: rfq.item_description || null,
+          pd_item_id: pdItemId,
+          tenant_id: apTenantId,
+          product_name: rfq.item_description || 'Untitled Product',
           status: 'waiting_for_assets',
-          assets_required: assetNames.map(a => ({ name: a, received: false })),
-          priority: 999, artwork_types: []
+          assets_required: assetsRequired,
+          priority: 999,
+          artwork_types: []
         };
-        await fetch(SUPA_URL + '/rest/v1/artwork_projects', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=minimal' }), body: JSON.stringify(apPayload) });
+        const apRes = await fetch(SUPA_URL + '/rest/v1/artwork_projects', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=representation' }), body: JSON.stringify(apPayload) });
+        if (apRes.ok) {
+          console.log('Artwork project created for PD item ' + pdItemId + ' (' + assetsRequired.length + ' assets)');
+        } else {
+          const apErrText = await apRes.text().catch(() => '(no response body)');
+          console.error('Artwork project insert FAILED (' + apRes.status + ') for PD item ' + pdItemId + ': ' + apErrText, apPayload);
+        }
+      } else {
+        console.log('Artwork project already exists for PD item ' + pdItemId + ', skipping');
       }
     }
-  } catch (e) { console.error('artwork_projects create', e); }
+  } catch (e) { console.error('artwork_projects create threw:', e); }
 }
 
 // Action buttons reuse the existing AI email draft modal (openQuoteEmailModal).

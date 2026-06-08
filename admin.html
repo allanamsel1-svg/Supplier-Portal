@@ -6291,31 +6291,46 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
     // ─── End PD-item auto-create ───
 
     // ─── Auto-create Artwork Project (waiting_for_assets) ───
-    // Uses the asset checklist selected in the email-draft modal (qemState.assets).
+    // Uses the asset checklist selected in the email-draft modal (qemState.assets);
+    // falls back to a default cosmetics asset list when the modal produced none.
     try{
-      if(pdItemId){
+      if(!pdItemId){
+        console.error('Artwork project NOT created: pdItemId is null (PD-item creation failed above).');
+      }else{
         var dupR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdItemId+'&select=id&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
         var dup=dupR.ok?await dupR.json():[];
         if(!dup||!dup.length){
-          var selectedAssets=(qemState&&Array.isArray(qemState.assets))?qemState.assets:computeAssetDefaults(rfq).checked;
+          // Hardcoded default used whenever the modal didn't capture a usable asset list.
+          var DEFAULT_COSMETIC_ASSETS=[{name:'Hi-res product images (white background)',received:false},{name:'Hi-res product images (angles)',received:false},{name:'Lifestyle images',received:false},{name:'Packaging dieline (structural)',received:false},{name:'Technical drawing / spec sheet',received:false},{name:'Product use video',received:false},{name:'Package contents list',received:false}];
+          // qemState.assets is normally an array of asset-name strings; tolerate {name,received} objects too.
+          var rawAssets=(qemState&&Array.isArray(qemState.assets))?qemState.assets:[];
+          var assetsRequired=rawAssets.map(function(a){return (a&&typeof a==='object')?{name:a.name,received:a.received===true}:{name:String(a),received:false};}).filter(function(a){return a.name;});
+          if(!assetsRequired.length)assetsRequired=DEFAULT_COSMETIC_ASSETS.slice();
+          var apTenantId=rfq.tenant_id||(typeof TID!=='undefined'?TID:null);
+          if(!apTenantId)console.error('Artwork project: tenant_id is null — insert will fail the NOT NULL constraint.',{rfq_id:rfqId});
           var apPayload={
             pd_item_id:pdItemId,
-            tenant_id:rfq.tenant_id||null,
+            tenant_id:apTenantId,
             sku_id:null,                 // activated SKU is set later, on PD activation
-            product_name:rfq.item_description||null,
+            product_name:rfq.item_description||'Untitled Product',
             status:'waiting_for_assets',
-            assets_required:selectedAssets.map(function(a){return {name:a,received:false};}),
+            assets_required:assetsRequired,
             priority:999,
             artwork_types:[]
           };
-          await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(apPayload)});
-          console.log('Artwork project created for PD item '+pdItemId);
+          var apRes=await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(apPayload)});
+          if(apRes.ok){
+            console.log('Artwork project created for PD item '+pdItemId+' ('+assetsRequired.length+' assets)');
+          }else{
+            var apErrText=await apRes.text().catch(function(){return '(no response body)';});
+            console.error('Artwork project insert FAILED ('+apRes.status+') for PD item '+pdItemId+': '+apErrText,apPayload);
+          }
         }else{
           console.log('Artwork project already exists for PD item '+pdItemId+', skipping');
         }
       }
     }catch(awErr){
-      console.log('Artwork project creation failed (non-fatal):',awErr);
+      console.error('Artwork project creation threw:',awErr);
     }
     // ─── End Artwork Project auto-create ───
 
