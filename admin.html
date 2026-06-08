@@ -6401,7 +6401,7 @@ async function loadCriticalItems(){
       var days=Math.floor((now-new Date(ap.created_at).getTime())/86400000);
       var dayColor=days>=7?'#b00':(days>=3?'#c87000':'#666');
       var dayWeight=days>=7?'700':'400';
-      var missing=(Array.isArray(ap.assets_required)?ap.assets_required:[]).filter(function(a){return a&&a.received!==true;}).map(function(a){return a.name;});
+      var missing=(Array.isArray(ap.assets_required)?ap.assets_required:[]).filter(function(a){return a&&a.received!==true;}).map(function(a){return (a&&typeof a==='object')?a.name:a;}).filter(Boolean);
       var projName=((rfq.project_number||'')+' · '+(ap.product_name||rfq.item_description||'(unnamed)')).replace(/^ · /,'');
       return '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff;border:1px solid #f0c0c0;border-radius:8px;margin-bottom:8px;">'+
         '<div style="flex:1;min-width:0;">'+
@@ -6427,7 +6427,7 @@ async function followUpAsset(apId){
     var fac=pdi.factories||{};
     var rfq=pdi.rfqs||{};
     if(!fac.sales_email){alert('No factory email on file for this item.');return;}
-    var missing=(Array.isArray(ap.assets_required)?ap.assets_required:[]).filter(function(a){return a&&a.received!==true;}).map(function(a){return a.name;});
+    var missing=(Array.isArray(ap.assets_required)?ap.assets_required:[]).filter(function(a){return a&&a.received!==true;}).map(function(a){return (a&&typeof a==='object')?a.name:a;}).filter(Boolean);
     var pname=ap.product_name||rfq.item_description||'your product';
     if(!confirm('Send a follow-up asset reminder to '+(fac.factory_name_english||'the factory')+' ('+fac.sales_email+')?'))return;
     var firstName=(fac.sales_contact_name||'Team').split(' ')[0];

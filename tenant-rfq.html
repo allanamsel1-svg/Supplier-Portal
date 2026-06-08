@@ -1567,7 +1567,7 @@ async function loadCriticalItems() {
     const days = Math.floor((now - new Date(ap.created_at).getTime()) / 86400000);
     const dayColor = days >= 7 ? '#b00' : (days >= 3 ? '#c87000' : '#666');
     const dayWeight = days >= 7 ? '700' : '400';
-    const missing = (Array.isArray(ap.assets_required) ? ap.assets_required : []).filter(a => a && a.received !== true).map(a => a.name);
+    const missing = (Array.isArray(ap.assets_required) ? ap.assets_required : []).filter(a => a && a.received !== true).map(a => (a && typeof a === 'object') ? a.name : a).filter(Boolean);
     const projName = `${rfq.project_number || ''} · ${ap.product_name || rfq.item_description || '(unnamed)'}`.replace(/^ · /, '');
     return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 12px;background:#fff;border:1px solid #f0c0c0;border-radius:8px;margin-bottom:8px;">
       <div style="flex:1;min-width:0;">
