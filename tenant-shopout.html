@@ -26,9 +26,12 @@
 <div id="sidebar"></div>
 
 <div class="main">
-  <div class="page-header">
-    <div class="page-title">Shop Out</div>
-    <div class="page-sub" id="pageSub">Retail intelligence from store visits</div>
+  <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;">
+    <div>
+      <div class="page-title">Shop Out</div>
+      <div class="page-sub" id="pageSub">Retail intelligence from store visits</div>
+    </div>
+    <button id="video-shopout-btn" onclick="openVideoShopoutModal()" style="background:#2244cc;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">📹 Process Video Shop Out</button>
   </div>
 
   <div class="tabs" id="tabs">
@@ -214,6 +217,55 @@ async function loadPipeline() {
   await loadRuns();
   route();
 })();
+</script>
+
+<!-- 📹 Video Shop Out upload modal -->
+<div id="video-shopout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;max-width:560px;width:90%;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Upload Video Shop Out Results</div>
+      <button onclick="closeVideoShopoutModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;line-height:1;">×</button>
+    </div>
+    <div style="background:#f4f4f0;border-radius:8px;padding:14px 16px;font-family:'SF Mono',Menlo,Monaco,Consolas,monospace;font-size:12px;color:#333;white-space:pre-wrap;line-height:1.6;margin-bottom:16px;">Run this command on your Mac:
+  cd ~/Documents/Supplier-Portal
+  node tools/process_shopout.js your_video.mp4 'Store Name' --fps 1
+Then upload the resulting JSON file below.</div>
+    <input type="file" id="video-shopout-file" accept=".json" onchange="uploadVideoShopout(this)" style="display:block;margin-bottom:14px;font-size:13px;" />
+    <div id="video-shopout-status" style="font-size:13px;min-height:18px;"></div>
+    <div style="margin-top:18px;text-align:right;">
+      <button onclick="closeVideoShopoutModal()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+function openVideoShopoutModal(){var m=document.getElementById('video-shopout-modal');m.style.display='flex';document.getElementById('video-shopout-status').textContent='';document.getElementById('video-shopout-file').value='';}
+function closeVideoShopoutModal(){document.getElementById('video-shopout-modal').style.display='none';}
+function uploadVideoShopout(input){
+  var status=document.getElementById('video-shopout-status');
+  var file=input.files&&input.files[0];
+  if(!file)return;
+  status.style.color='#666';status.textContent='Reading '+file.name+'…';
+  var reader=new FileReader();
+  reader.onload=function(){
+    var payload;
+    try{payload=JSON.parse(reader.result);}catch(e){status.style.color='#cc2222';status.textContent='Invalid JSON file: '+e.message;return;}
+    status.style.color='#666';status.textContent='Uploading…';
+    var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
+    fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(res.ok&&res.d&&res.d.success){
+          var store=(payload.metadata&&payload.metadata.store)||payload.store_name||'store';
+          status.style.color='#1a8a3a';status.textContent='✅ Uploaded '+res.d.count+' products from '+store+' to portal.';
+        }else{
+          status.style.color='#cc2222';status.textContent=(res.d&&res.d.error)||'Upload failed.';
+        }
+      })
+      .catch(function(e){status.style.color='#cc2222';status.textContent=e.message;});
+  };
+  reader.onerror=function(){status.style.color='#cc2222';status.textContent='Could not read file.';};
+  reader.readAsText(file);
+}
 </script>
 </body>
 </html>
