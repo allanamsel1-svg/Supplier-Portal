@@ -482,11 +482,9 @@ async function loadPipeline() {
     return new Promise(function(resolve){
       var img=new Image();
       img.onload=function(){
-        var w=img.width||400,h=img.height||300,scale=Math.min(400/w,300/h,1);
-        var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
-        var c=document.createElement('canvas'); c.width=cw; c.height=ch;
-        c.getContext('2d').drawImage(img,0,0,cw,ch);
-        try{ resolve(c.toDataURL('image/jpeg',0.6).split(',')[1]); }catch(e){ resolve(null); }
+        var c=document.createElement('canvas'); c.width=img.width||1280; c.height=img.height||720;
+        c.getContext('2d').drawImage(img,0,0);
+        try{ resolve(c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ resolve(null); }
       };
       img.onerror=function(){ resolve(null); };
       img.src='data:image/jpeg;base64,'+srcB64;
