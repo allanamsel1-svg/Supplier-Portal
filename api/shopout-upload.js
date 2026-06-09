@@ -69,7 +69,7 @@ module.exports = async (req, res) => {
       const shopRow = {
         store_location_text: store_name || (metadata && metadata.store) || null,
         shop_date: visit_date || new Date().toISOString().split('T')[0],
-        status: 'uploaded',
+        status: 'complete',
         processing_status: 'complete',
         processing_completed_at: new Date().toISOString(),
         total_observations: count || 0,

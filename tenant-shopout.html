@@ -20,6 +20,16 @@
   .obs-photos { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .obs-photos img { width: 160px; height: 160px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
   .back-link { color: #3b82f6; cursor: pointer; font-size: 13px; display: inline-block; margin-bottom: 14px; }
+  /* FIX: keep the observations panel light/readable regardless of theme */
+  .obs-card, .obs-detail, .obs-li { background: #ffffff !important; color: #1a1a2e !important; box-sizing: border-box; overflow-wrap: break-word; }
+  .obs-card *, .obs-detail *, .obs-li * { box-sizing: border-box; overflow-wrap: break-word; }
+  .obs-info { background: #ffffff !important; }
+  .obs-brand, .obs-li .si-title { color: #1a1a2e !important; }
+  .obs-prod, .obs-meta, .obs-li .si-meta { color: #666666 !important; }
+  .obs-thumb-ph { background: #f0f0e8 !important; color: #666666 !important; }
+  .obs-detail .kv dt { color: #666666 !important; }
+  .obs-detail .kv dd { color: #1a1a2e !important; }
+  .obs-detail .back-link { color: #3b82f6 !important; }
 </style>
 </head>
 <body>
@@ -133,8 +143,8 @@ async function showRunDetail(id) {
       const fp = photoPathMap[o.front_photo_id];
       const thumb = fp
         ? `<img src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
-        : `<div style="width:60px;height:60px;border-radius:8px;background:var(--bg2);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:22px;font-weight:700;flex-shrink:0;">${esc(brandLetter(o.brand))}</div>`;
-      return `<div class="sub-item" style="display:flex;gap:10px;align-items:center;">${thumb}<div style="min-width:0;flex:1;">
+        : `<div style="width:60px;height:60px;border-radius:8px;background:#f0f0e8;display:flex;align-items:center;justify-content:center;color:#666666;font-size:22px;font-weight:700;flex-shrink:0;">${esc(brandLetter(o.brand))}</div>`;
+      return `<div class="sub-item obs-li" style="display:flex;gap:10px;align-items:center;">${thumb}<div style="min-width:0;flex:1;">
         <div class="si-title">${esc(o.brand || '—')}${o.product_name ? ' — ' + esc(o.product_name) : ''}</div>
         <div class="si-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
       </div></div>`;
