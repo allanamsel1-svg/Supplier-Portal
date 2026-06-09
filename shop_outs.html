@@ -105,7 +105,7 @@ body.processing .ri-tab,body.processing .ri-top a,body.processing #new-btn { poi
   <div style="display:flex;align-items:center;"><div class="ri-top-title">🎯 Retail Intelligence</div><a class="dash-back" href="admin.html" style="margin-left:24px;color:#888;font-size:13px;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">← Dashboard</a></div>
   <div class="ri-top-actions">
     <button id="adminThemeToggle" onclick="toggleAdminTheme()" title="Toggle dark/light mode" style="background:none;border:1px solid #e0e0d8;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:14px;margin-right:8px;">🌙</button>
-    <button id="video-shopout-btn" class="primary" onclick="openVideoShopoutModal()" style="margin-right:8px;">📹 Process Video Shop Out</button>
+    <button id="video-shopout-btn" class="primary" onclick="openVideoShopoutModal()" style="margin-right:8px;">📹 Upload Video Shop Out</button>
     <button id="new-btn" class="primary">+ New Shop Out</button>  </div>
 </div>
 
@@ -2198,54 +2198,169 @@ document.addEventListener('DOMContentLoaded',function(){
 
 init();
 </script>
-<!-- 📹 Video Shop Out upload modal -->
-<div id="video-shopout-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fff;border-radius:12px;max-width:560px;width:90%;padding:24px;box-shadow:0 10px 40px rgba(0,0,0,0.3);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-      <div style="font-size:18px;font-weight:700;color:#1a1a2e;">Upload Video Shop Out Results</div>
-      <button onclick="closeVideoShopoutModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#888;line-height:1;">×</button>
+<!-- 📹 Video Shop Out processor (browser-side frame extraction + AI analysis) -->
+<div id="vso-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:#fff;border-radius:14px;max-width:900px;width:100%;max-height:90vh;overflow:auto;padding:24px;box-shadow:0 12px 48px rgba(0,0,0,0.35);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div id="vso-title" style="font-size:18px;font-weight:700;color:#1a1a2e;">Video Shop Out</div>
+      <button onclick="vsoClose()" style="background:none;border:none;font-size:26px;cursor:pointer;color:#888;line-height:1;">×</button>
     </div>
-    <div style="background:#f4f4f0;border-radius:8px;padding:14px 16px;font-family:'SF Mono',Menlo,Monaco,Consolas,monospace;font-size:12px;color:#333;white-space:pre-wrap;line-height:1.6;margin-bottom:16px;">Run this command on your Mac:
-  cd ~/Documents/Supplier-Portal
-  node tools/process_shopout.js your_video.mp4 'Store Name' --fps 1
-Then upload the resulting JSON file below.</div>
-    <input type="file" id="video-shopout-file" accept=".json" onchange="uploadVideoShopout(this)" style="display:block;margin-bottom:14px;font-size:13px;" />
-    <div id="video-shopout-status" style="font-size:13px;min-height:18px;"></div>
-    <div style="margin-top:18px;text-align:right;">
-      <button onclick="closeVideoShopoutModal()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Close</button>
+    <div id="vso-setup">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Store name *</label>
+          <input id="vso-store" type="text" oninput="vsoTitle()" placeholder="e.g. Five Below — Brooklyn" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:7px;font-size:13px;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Visit date</label>
+          <input id="vso-date" type="date" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:7px;font-size:13px;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Video file</label>
+          <input id="vso-file" type="file" accept="video/*" style="width:100%;font-size:13px;"></div>
+        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Frames per second</label>
+          <select id="vso-fps" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:7px;font-size:13px;"><option value="0.5">0.5</option><option value="1" selected>1</option><option value="2">2</option></select></div>
+      </div>
+      <div style="margin-top:18px;text-align:right;">
+        <button onclick="vsoClose()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-right:8px;">Cancel</button>
+        <button onclick="vsoStart()" style="background:#2244cc;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Start Processing</button>
+      </div>
+    </div>
+    <div id="vso-progress" style="display:none;">
+      <div id="vso-status" style="font-size:14px;color:#333;margin-bottom:12px;">Extracting frames…</div>
+      <div style="background:#eee;border-radius:8px;height:14px;overflow:hidden;"><div id="vso-bar" style="background:#2244cc;height:100%;width:0%;transition:width 0.2s;"></div></div>
+    </div>
+    <div id="vso-results" style="display:none;">
+      <div id="vso-summary" style="font-size:13px;color:#444;margin-bottom:12px;"></div>
+      <div style="overflow:auto;max-height:50vh;border:1px solid #eee;border-radius:8px;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f6f6f0;">
+            <th style="padding:8px;text-align:left;">Product</th><th style="padding:8px;text-align:left;">Brand</th>
+            <th style="padding:8px;text-align:left;">Category</th><th style="padding:8px;text-align:left;">Price</th>
+            <th style="padding:8px;text-align:left;">Packaging</th><th style="padding:8px;text-align:left;">Qty on Shelf</th>
+            <th style="padding:8px;text-align:left;">Notes</th>
+          </tr></thead>
+          <tbody id="vso-tbody"></tbody>
+        </table>
+      </div>
+      <div id="vso-save-status" style="font-size:13px;min-height:18px;margin-top:10px;"></div>
+      <div style="margin-top:14px;display:flex;justify-content:space-between;">
+        <button onclick="vsoDownloadCsv()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">⬇ Download CSV</button>
+        <div>
+          <button onclick="vsoClose()" style="background:#f0f0e8;color:#444;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;margin-right:8px;">Close</button>
+          <button id="vso-save-btn" onclick="vsoSave()" style="background:#1a8a3a;color:#fff;border:none;border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Save to Portal</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 <script>
-function openVideoShopoutModal(){var m=document.getElementById('video-shopout-modal');m.style.display='flex';document.getElementById('video-shopout-status').textContent='';document.getElementById('video-shopout-file').value='';}
-function closeVideoShopoutModal(){document.getElementById('video-shopout-modal').style.display='none';}
-function uploadVideoShopout(input){
-  var status=document.getElementById('video-shopout-status');
-  var file=input.files&&input.files[0];
-  if(!file)return;
-  status.style.color='#666';status.textContent='Reading '+file.name+'…';
-  var reader=new FileReader();
-  reader.onload=function(){
-    var payload;
-    try{payload=JSON.parse(reader.result);}catch(e){status.style.color='#cc2222';status.textContent='Invalid JSON file: '+e.message;return;}
-    status.style.color='#666';status.textContent='Uploading…';
-    var token=localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||'';
-    fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(payload)})
-      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
-      .then(function(res){
-        if(res.ok&&res.d&&res.d.success){
-          var store=(payload.metadata&&payload.metadata.store)||payload.store_name||'store';
-          status.style.color='#1a8a3a';status.textContent='✅ Uploaded '+res.d.count+' products from '+store+' to portal.';
-          if(typeof init==='function'){try{init();}catch(e){}}
-        }else{
-          status.style.color='#cc2222';status.textContent=(res.d&&res.d.error)||'Upload failed.';
-        }
-      })
-      .catch(function(e){status.style.color='#cc2222';status.textContent=e.message;});
+(function(){
+  // Admin portal config: admin token, no tenant scoping, refresh the admin list.
+  var VSO = {
+    token: function(){ return localStorage.getItem('admin_session')||localStorage.getItem('tenant_token')||''; },
+    tenantId: function(){ return null; },
+    refresh: function(){ if(typeof loadShops==='function') loadShops(); }
   };
-  reader.onerror=function(){status.style.color='#cc2222';status.textContent='Could not read file.';};
-  reader.readAsText(file);
-}
+  var frames=[], products=[], storeName='', visitDate='', objUrl=null;
+  function gid(id){ return document.getElementById(id); }
+  function setStatus(t){ gid('vso-status').textContent=t; }
+  function setBar(pct){ gid('vso-bar').style.width=Math.max(0,Math.min(100,pct))+'%'; }
+  function esc2(s){ return String(s==null?'':s).replace(/[<>&]/g,function(c){return'&#'+c.charCodeAt(0)+';';}); }
+
+  window.openVideoShopoutModal=function(){
+    gid('vso-setup').style.display=''; gid('vso-progress').style.display='none'; gid('vso-results').style.display='none';
+    gid('vso-store').value=''; gid('vso-file').value=''; gid('vso-fps').value='1'; gid('vso-save-status').textContent='';
+    var d=new Date(); gid('vso-date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    vsoTitle(); gid('vso-modal').style.display='flex';
+  };
+  window.vsoClose=function(){ gid('vso-modal').style.display='none'; if(objUrl){URL.revokeObjectURL(objUrl);objUrl=null;} };
+  window.vsoTitle=function(){ var s=(gid('vso-store').value||'').trim(); gid('vso-title').textContent='Video Shop Out'+(s?' — '+s:''); };
+
+  window.vsoStart=async function(){
+    storeName=(gid('vso-store').value||'').trim();
+    if(!storeName){ alert('Store name is required.'); return; }
+    visitDate=gid('vso-date').value||new Date().toISOString().split('T')[0];
+    var file=gid('vso-file').files[0];
+    if(!file){ alert('Please choose a video file.'); return; }
+    var fps=parseFloat(gid('vso-fps').value)||1;
+    gid('vso-setup').style.display='none'; gid('vso-progress').style.display=''; setBar(0); setStatus('Extracting frames…');
+    try { frames=await extractFrames(file,fps); }
+    catch(e){ setStatus('❌ '+(e.message||'Could not read video.')); return; }
+    if(!frames.length){ setStatus('❌ No frames extracted.'); return; }
+    var batches=[]; for(var i=0;i<frames.length;i+=5) batches.push(frames.slice(i,i+5));
+    var all=[];
+    for(var b=0;b<batches.length;b++){
+      setStatus('Analyzing with AI… (batch '+(b+1)+' of '+batches.length+')'); setBar(Math.round((b/batches.length)*100));
+      try{
+        var r=await fetch('/api/analyze-shopout-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({frames:batches[b],store_name:storeName,batch_index:b,total_batches:batches.length})});
+        var d=await r.json(); if(d&&Array.isArray(d.products)) all=all.concat(d.products);
+      }catch(e){}
+    }
+    setBar(100); products=dedup(all); renderResults();
+  };
+
+  function extractFrames(file,fps){
+    return new Promise(function(resolve,reject){
+      var video=document.createElement('video'); video.preload='auto'; video.muted=true; video.playsInline=true;
+      objUrl=URL.createObjectURL(file); video.src=objUrl;
+      var canvas=document.createElement('canvas'); var ctx=canvas.getContext('2d');
+      var out=[]; var idx=0; var total=0; var MAXF=300;
+      video.onloadedmetadata=function(){
+        var dur=video.duration||0; total=Math.min(MAXF,Math.max(1,Math.floor(dur*fps)));
+        canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720; seek();
+      };
+      function seek(){ if(idx>=total){ resolve(out); return; } var t=idx/fps; video.currentTime=Math.min(t,(video.duration||t)-0.05); }
+      video.onseeked=function(){
+        try{ ctx.drawImage(video,0,0,canvas.width,canvas.height); out.push(canvas.toDataURL('image/jpeg',0.7).split(',')[1]); }catch(e){}
+        idx++; setStatus('Extracted '+idx+' of '+total+' frames'); setBar(Math.round((idx/total)*100)); seek();
+      };
+      video.onerror=function(){ reject(new Error('Could not load video')); };
+    });
+  }
+
+  function dedup(list){
+    var seen={}; var out=[];
+    list.forEach(function(p){ var k=((p.brand||'')+'_'+(p.product_name||'')+'_'+(p.price||'')).toLowerCase(); if(!seen[k]){ seen[k]=1; out.push(p); } });
+    return out;
+  }
+
+  function renderResults(){
+    gid('vso-progress').style.display='none'; gid('vso-results').style.display='';
+    var byCat={}; products.forEach(function(p){var c=p.category||'Uncategorized'; byCat[c]=(byCat[c]||0)+1;});
+    var breakdown=Object.keys(byCat).sort(function(a,b){return byCat[b]-byCat[a];}).map(function(c){return c+': '+byCat[c];}).join(' · ');
+    gid('vso-summary').innerHTML='<b>'+products.length+'</b> products'+(breakdown?' · '+esc2(breakdown):'');
+    gid('vso-save-btn').textContent='Save '+products.length+' Products to Portal';
+    var fields=['product_name','brand','category','price','packaging','quantity_on_shelf','notes'];
+    var tb=gid('vso-tbody'); tb.innerHTML='';
+    products.forEach(function(p,i){
+      var tr=document.createElement('tr'); tr.style.borderTop='1px solid #eee';
+      fields.forEach(function(f){
+        var td=document.createElement('td'); td.contentEditable='true'; td.style.padding='6px 8px'; td.style.outline='none';
+        td.textContent=p[f]==null?'':p[f];
+        td.addEventListener('input',function(){ products[i][f]=td.textContent; });
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  window.vsoDownloadCsv=function(){
+    var headers=['product_name','brand','category','price','price_confidence','packaging','size','upc','quantity_on_shelf','notes'];
+    var rows=[headers.join(',')].concat(products.map(function(p){return headers.map(function(h){var v=p[h]==null?'':p[h]; v=String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}).join(',');}));
+    var blob=new Blob([rows.join('\n')],{type:'text/csv'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='shopout_'+storeName.replace(/[^a-z0-9]+/gi,'_')+'.csv'; a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+  };
+
+  window.vsoSave=async function(){
+    var st=gid('vso-save-status'); var btn=gid('vso-save-btn'); btn.disabled=true;
+    st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
+    var payload={store_name:storeName,visit_date:visitDate,products:products,metadata:{store:storeName,total_products:products.length}};
+    var tid=VSO.tenantId(); if(tid) payload.tenant_id=tid;
+    try{
+      var r=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VSO.token()},body:JSON.stringify(payload)});
+      var d=await r.json();
+      if(r.ok&&d&&d.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+d.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
+      else { st.style.color='#cc2222'; st.textContent=(d&&d.error)||'Save failed.'; btn.disabled=false; }
+    }catch(e){ st.style.color='#cc2222'; st.textContent=e.message; btn.disabled=false; }
+  };
+})();
 </script>
 <script src="admin-shared.js"></script>
 </body>
