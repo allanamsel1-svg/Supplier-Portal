@@ -5899,6 +5899,7 @@ function openQuoteEmailModal(action,ctx,onConfirm,opts){
   opts=opts||{};
   return new Promise(async function(resolve){
     qemState={action:action,ctx:ctx,onConfirm:onConfirm,aiSubject:'',aiBody:'',resolve:resolve,resolved:false};
+    qemState.customSubject=opts.customSubject||null;qemState.customBody=opts.customBody||null;
     var meta=QEM_ACTION_META[action]||{label:action,bg:'#eee',color:'#555'};
     await qemResolveFactory(ctx);
     g('qem-title').textContent='Review Email to '+(ctx.factoryName||'Factory');
@@ -5937,6 +5938,13 @@ async function qemDraft(){
   var s=qemState;
   var sub=g('qem-subject'),bod=g('qem-body'),send=g('qem-send'),regen=g('qem-regen'),msg=g('qem-msg');
   sub.value='';bod.value='Drafting…';sub.disabled=true;bod.disabled=true;send.disabled=true;regen.disabled=true;msg.style.display='none';
+  // Pre-filled custom draft (e.g. asset request) — skip the AI call and use the supplied subject/body.
+  if(s.customBody){
+    s.aiSubject=s.customSubject||'';s.aiBody=s.customBody;
+    sub.value=s.aiSubject;bod.value=s.aiBody;
+    sub.disabled=false;bod.disabled=false;send.disabled=false;regen.disabled=false;
+    return;
+  }
   try{
     var r=await fetch('/api/draft-quote-email',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({quote_id:s.ctx.quote_id||null,rfq_id:s.ctx.rfq_id,factory_id:s.ctx.factory_id,action:s.action})});
     var d=await r.json().catch(function(){return{};});
@@ -11250,6 +11258,23 @@ async function openPDDetail(pdId){
       pdCurrentDetail._technical_drawings_count = 0;
       pdCurrentDetail._compliance_overall = 'yellow';
     }
+    // ── Asset checklist: artwork_projects.assets_required (by pd_item_id = linked PDI id) ──
+    pdCurrentDetail._artworkProject=null;pdCurrentDetail._artworkAssets=[];
+    try{
+      var apiId=pdCurrentDetail._pdi?pdCurrentDetail._pdi.id:null;
+      if(apiId){
+        var apR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+apiId+'&select=id,assets_required,status,factory_link_token,product_name&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var apRows=apR.ok?await apR.json():[];
+        if(apRows&&apRows[0]){
+          var ap=apRows[0];
+          // Normalise assets_required to an array of {name,received} objects (tolerate plain strings).
+          ap.assets_required=(Array.isArray(ap.assets_required)?ap.assets_required:[]).map(function(a){return (a&&typeof a==='object')?{name:a.name||'',received:a.received===true}:{name:String(a||''),received:false};});
+          pdCurrentDetail._artworkProject=ap;
+          var aaR=await fetch(SB+'/rest/v1/artwork_assets?artwork_project_id=eq.'+ap.id+'&select=asset_type,file_name,file_url&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+          pdCurrentDetail._artworkAssets=aaR.ok?await aaR.json():[];
+        }
+      }
+    }catch(e){console.log('asset checklist load failed (non-fatal):',e);}
     // If no factory sources yet but PD has a factory_id from quote, auto-create primary
     if(pdCurrentDetail._sources.length===0 && pdCurrentDetail.factory_id){
       try{
@@ -11710,6 +11735,9 @@ function renderPDDetail(){
       );
     })()+
 
+    // ── 9.5 ASSETS CHECKLIST (artwork_projects.assets_required) ──
+    pdAssetsCardHtml()+
+
     // ── 10. READINESS GATES (Sub-batch 2G) ──
     // All 8 gates must pass before this PD can be activated as a Live SKU.
     // 5 are auto-computed from data, 3 are admin-confirmed checkboxes with optional notes.
@@ -11842,6 +11870,114 @@ function renderPDDetail(){
     });
     updatePDSaveIndicator('saved');
   },100);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PD ASSET CHECKLIST — artwork_projects.assets_required ({name,received}[])
+// Surfaced on the PD detail panel; mirrored in tenant-rfq.html.
+// ════════════════════════════════════════════════════════════════════
+var pdAssetEditIndex=-1;
+function pdaEscAttr(v){return (v==null?'':String(v)).replace(/"/g,'&quot;');}
+function pdAssetsList(){var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;return ap&&Array.isArray(ap.assets_required)?ap.assets_required:[];}
+// Match a received checklist item to its uploaded artwork_asset (by asset_type ≈ name) to expose file_url.
+function pdAssetFile(name){
+  var assets=(pdCurrentDetail&&pdCurrentDetail._artworkAssets)||[];
+  var lc=(name||'').toLowerCase().trim();if(!lc)return null;
+  for(var i=0;i<assets.length;i++){
+    var at=(assets[i].asset_type||'').toLowerCase().trim();
+    if(assets[i].file_url&&(at===lc||(at&&(at.indexOf(lc)>=0||lc.indexOf(at)>=0))))return assets[i];
+  }
+  return null;
+}
+function pdAssetsCardHtml(){
+  var wrap=function(body){return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📦 Assets</div>'+body+'</div>';};
+  if(!(pdCurrentDetail&&pdCurrentDetail._artworkProject)){
+    return wrap('<div style="font-size:12px;color:#888;">No asset checklist yet. It is created automatically when a quote is accepted for this item.</div>');
+  }
+  return wrap('<div id="pd-assets-section">'+pdAssetsInner()+'</div>');
+}
+function pdAssetsInner(){
+  var list=pdAssetsList();
+  var total=list.length,got=list.filter(function(a){return a&&a.received===true;}).length;
+  var pct=total?Math.round(got/total*100):0,allDone=total>0&&got===total;
+  var h='';
+  h+='<div style="margin-bottom:10px;">'+
+       '<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:4px;"><span><strong>'+got+'</strong> of <strong>'+total+'</strong> assets received</span><span>'+pct+'%</span></div>'+
+       '<div style="height:8px;background:#ececec;border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(allDone?'#1a7a1a':'#2244cc')+';transition:width 0.2s;"></div></div>'+
+     '</div>';
+  if(allDone)h+='<div style="margin-bottom:10px;padding:9px 12px;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;font-size:13px;font-weight:600;color:#1a7a1a;">✓ All assets received — ready for design brief</div>';
+  h+=total?list.map(function(a,i){return pdAssetRow(a,i);}).join(''):'<div style="font-size:12px;color:#bbb;padding:6px 0;">No assets in the checklist yet.</div>';
+  h+='<div id="pd-asset-add-row" style="margin-top:8px;"><button class="btn-edit" onclick="pdAssetAddShow()" style="font-size:12px;">+ Add Asset</button></div>';
+  var pending=list.filter(function(a){return a&&a.received!==true;}).length;
+  h+='<div style="margin-top:12px;border-top:1px solid #f0f0e8;padding-top:10px;">'+
+       '<button onclick="pdRequestMissingAssets()" '+(pending?'':'disabled ')+'style="padding:9px 16px;background:'+(pending?'#2244cc':'#bbb')+';color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:'+(pending?'pointer':'not-allowed')+';">✉ Request Missing Assets'+(pending?' ('+pending+')':'')+'</button>'+
+     '</div>';
+  return h;
+}
+function pdAssetRow(a,i){
+  var name=(a&&a.name)||'',received=a&&a.received===true;
+  if(i===pdAssetEditIndex){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:5px;">'+
+      '<input type="checkbox" '+(received?'checked':'')+' disabled style="width:16px;height:16px;flex:0 0 auto;" />'+
+      '<input id="pd-asset-edit-input" type="text" value="'+pdaEscAttr(name)+'" onblur="pdAssetEditCommit('+i+',this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){pdAssetEditCancel();}" style="flex:1;min-width:0;padding:5px 7px;font-size:13px;border:1px solid #2244cc;border-radius:6px;font-family:inherit;" />'+
+    '</div>';
+  }
+  var fileObj=received?pdAssetFile(name):null;
+  var right=received
+    ? (fileObj?'<a href="'+pdaEscAttr(fileObj.file_url)+'" target="_blank" rel="noopener" title="Download '+pdaEscAttr(fileObj.file_name||name)+'" style="text-decoration:none;font-size:16px;flex:0 0 auto;">⬇️</a>':'<span style="font-size:11px;color:#1a7a1a;flex:0 0 auto;">received</span>')
+    : '<span style="font-size:11px;color:#aa6600;white-space:nowrap;flex:0 0 auto;">⏳ Awaiting from factory</span>';
+  return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:'+(received?'#f3faf3':'#fafaf6')+';border:1px solid '+(received?'#cfe8cf':'#e8e8e0')+';border-radius:7px;margin-bottom:5px;">'+
+    '<input type="checkbox" '+(received?'checked':'')+' onchange="pdAssetToggle('+i+',this.checked)" style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
+    '<span onclick="pdAssetEdit('+i+')" title="Click to rename" style="flex:1;min-width:0;font-size:13px;color:'+(received?'#1a7a1a':'#555')+';cursor:text;overflow-wrap:break-word;word-break:break-word;">'+esc(name)+'</span>'+
+    right+
+    '<button onclick="pdAssetRemove('+i+')" title="Remove" style="background:none;border:none;color:#c00;font-size:17px;cursor:pointer;line-height:1;flex:0 0 auto;">×</button>'+
+  '</div>';
+}
+function pdAssetsRerender(){var el=g('pd-assets-section');if(el)el.innerHTML=pdAssetsInner();}
+async function pdAssetsPersist(){
+  var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;
+  if(!ap||!pdCurrentDetail._pdi){toast('Cannot save — no artwork project.');return;}
+  try{
+    var r=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdCurrentDetail._pdi.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({assets_required:ap.assets_required,updated_at:new Date().toISOString()})});
+    if(r.ok)toast('Asset checklist saved.');else toast('Save failed ('+r.status+').');
+  }catch(e){toast('Save failed: '+e.message);}
+}
+function pdAssetToggle(i,checked){var l=pdAssetsList();if(!l[i])return;l[i].received=!!checked;pdAssetsRerender();pdAssetsPersist();}
+function pdAssetRemove(i){var l=pdAssetsList();if(!l[i])return;if(!confirm('Remove "'+(l[i].name||'')+'" from the checklist?'))return;l.splice(i,1);pdAssetEditIndex=-1;pdAssetsRerender();pdAssetsPersist();}
+function pdAssetAddShow(){
+  var row=g('pd-asset-add-row');if(!row)return;
+  row.innerHTML='<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="pd-asset-add-input" placeholder="New asset name…" style="flex:1;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /><button class="btn-edit" onclick="pdAssetAddCommit()">Add</button><button class="btn-edit" onclick="pdAssetsRerender()">Cancel</button></div>';
+  var inp=g('pd-asset-add-input');if(inp){inp.focus();inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();pdAssetAddCommit();}});}
+}
+function pdAssetAddCommit(){
+  var inp=g('pd-asset-add-input');if(!inp)return;var name=(inp.value||'').trim();if(!name){inp.focus();return;}
+  pdAssetsList().push({name:name,received:false});pdAssetsRerender();pdAssetsPersist();
+}
+function pdAssetEdit(i){pdAssetEditIndex=i;pdAssetsRerender();var inp=g('pd-asset-edit-input');if(inp){inp.focus();inp.select();}}
+function pdAssetEditCommit(i,val){
+  var l=pdAssetsList(),nv=(val||'').trim();pdAssetEditIndex=-1;
+  if(l[i]&&nv&&nv!==l[i].name){l[i].name=nv;pdAssetsRerender();pdAssetsPersist();return;}
+  pdAssetsRerender();
+}
+function pdAssetEditCancel(){pdAssetEditIndex=-1;pdAssetsRerender();}
+async function pdRequestMissingAssets(){
+  var p=pdCurrentDetail;if(!p)return;
+  var pending=pdAssetsList().filter(function(a){return a&&a.received!==true;}).map(function(a){return a.name;}).filter(Boolean);
+  if(!pending.length){toast('No missing assets.');return;}
+  if(!p.factory_id){toast('No factory linked to this item.');return;}
+  var fac=p.factories||{};
+  var product=p.item_description||(p._artworkProject&&p._artworkProject.product_name)||'this item';
+  var listText=pending.map(function(n,i){return (i+1)+'. '+n;}).join('\n');
+  var subject='Outstanding assets needed — '+product;
+  var body='Dear '+(fac.factory_name_english||'Team')+',\n\nWe are preparing the packaging design for '+product+' and are still missing the following assets from your team:\n\n'+listText+'\n\nCould you please upload these at your earliest convenience so we can proceed?\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  await openQuoteEmailModal('followup',{quote_id:p.quote_id||null,rfq_id:p.rfq_id||null,factory_id:p.factory_id,factoryName:fac.factory_name_english,salesEmail:fac.sales_email},function(subj,bod){
+    return pdSendAssetRequest(fac.sales_email,fac.sales_contact_name,subj,bod);
+  },{customSubject:subject,customBody:body});
+}
+async function pdSendAssetRequest(email,name,subject,body){
+  if(!email){toast('No factory email on file.');return;}
+  await sendEmail(email,name||'Team',subject,body,'sourcing@tbgsourcing.net');
+  toast('Asset request sent to '+email+'.');
 }
 
 async function loadPDAssets(pdId){

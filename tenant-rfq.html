@@ -2063,6 +2063,7 @@ function openQuoteEmailModal(action, ctx, onConfirm, opts) {
   opts = opts || {};
   return new Promise(async (resolve) => {
     qemState = { action, ctx, onConfirm, aiSubject: '', aiBody: '', resolve, resolved: false };
+    qemState.customSubject = opts.customSubject || null; qemState.customBody = opts.customBody || null;
     const meta = QEM_ACTION_META[action] || { label: action, bg: '#334155', color: '#cbd5e1' };
     await qemResolveFactory(ctx);
     qemEl('qem-title').textContent = 'Review Email to ' + (ctx.factoryName || 'Factory');
@@ -2126,6 +2127,13 @@ async function qemDraft() {
   const s = qemState;
   const sub = qemEl('qem-subject'), bod = qemEl('qem-body'), send = qemEl('qem-send'), regen = qemEl('qem-regen'), msg = qemEl('qem-msg');
   sub.value = ''; bod.value = 'Drafting…'; sub.disabled = true; bod.disabled = true; send.disabled = true; regen.disabled = true; msg.style.display = 'none';
+  // Pre-filled custom draft (e.g. asset request) — skip the AI call and use the supplied subject/body.
+  if (s.customBody) {
+    s.aiSubject = s.customSubject || ''; s.aiBody = s.customBody;
+    sub.value = s.aiSubject; bod.value = s.aiBody;
+    sub.disabled = false; bod.disabled = false; send.disabled = false; regen.disabled = false;
+    return;
+  }
   try {
     const r = await fetch('/api/draft-quote-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ quote_id: s.ctx.quote_id || null, rfq_id: s.ctx.rfq_id, factory_id: s.ctx.factory_id, action: s.action }) });
     const d = await r.json().catch(() => ({}));
@@ -2356,6 +2364,24 @@ async function openPD(id) {
   openPanel(pdTitle(p), [p.category, p.status].filter(Boolean).join(' · '), '<div class="loading">Loading details…</div>');
   const items = await supa(`product_development_items?product_development_id=eq.${id}&order=created_at.desc`);
 
+  // ── Asset checklist: artwork_projects.assets_required (by pd_item_id = linked PDI id) ──
+  tAssetProject = null; tAssetAssets = []; tAssetPdItemId = null; tAssetFactory = {}; tAssetEditIndex = -1;
+  try {
+    const pdItemId = (items && items[0]) ? items[0].id : null;
+    if (pdItemId) {
+      tAssetPdItemId = pdItemId;
+      const aps = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id,assets_required,status,product_name&order=created_at.desc&limit=1');
+      if (aps && aps[0]) {
+        const ap = aps[0];
+        ap.assets_required = (Array.isArray(ap.assets_required) ? ap.assets_required : []).map(a => (a && typeof a === 'object') ? { name: a.name || '', received: a.received === true } : { name: String(a || ''), received: false });
+        tAssetProject = ap;
+        tAssetAssets = (await supa('artwork_assets?artwork_project_id=eq.' + ap.id + '&select=asset_type,file_name,file_url&order=created_at.desc')) || [];
+        const fid = items[0].factory_id;
+        if (fid) { const fr = await supa('factories?id=eq.' + fid + '&select=factory_name_english,sales_email,sales_contact_name&limit=1'); tAssetFactory = (fr && fr[0]) || {}; }
+      }
+    }
+  } catch (e) { console.log('asset checklist load (non-fatal)', e); }
+
   const details = kv([
     ['PD #', p.pd_number],
     ['Item #', p.item_number],
@@ -2388,9 +2414,110 @@ async function openPD(id) {
   document.getElementById('panelBody').innerHTML = `
     <div class="panel-section"><h3>Details</h3>${details}</div>
     ${pdActionSection(p)}
+    ${tAssetsSectionHtml()}
     <div class="panel-section"><h3>Description</h3><div class="sub-list">${desc}</div></div>
     <div class="panel-section"><h3>Items &amp; Sample Status (${items.length})</h3><div class="sub-list">${itemRows}</div></div>
   `;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// PD ASSET CHECKLIST — artwork_projects.assets_required ({name,received}[])
+// Mirrors admin.html. Surfaced on the tenant PD detail panel.
+// ════════════════════════════════════════════════════════════════════
+let tAssetProject = null, tAssetAssets = [], tAssetPdItemId = null, tAssetFactory = {}, tAssetEditIndex = -1;
+function tAssetsList() { return (tAssetProject && Array.isArray(tAssetProject.assets_required)) ? tAssetProject.assets_required : []; }
+// Match a received checklist item to its uploaded artwork_asset (by asset_type ≈ name) to expose file_url.
+function tAssetFile(name) {
+  const lc = (name || '').toLowerCase().trim(); if (!lc) return null;
+  for (const a of (tAssetAssets || [])) {
+    const at = (a.asset_type || '').toLowerCase().trim();
+    if (a.file_url && (at === lc || (at && (at.indexOf(lc) >= 0 || lc.indexOf(at) >= 0)))) return a;
+  }
+  return null;
+}
+function tAssetsSectionHtml() {
+  if (!tAssetProject) {
+    return '<div class="panel-section"><h3>Assets</h3><div style="font-size:12px;color:var(--text2,#94a3b8);">No asset checklist yet. It is created automatically when a quote is accepted for this item.</div></div>';
+  }
+  return '<div class="panel-section"><h3>Assets</h3><div id="t-assets-section">' + tAssetsInner() + '</div></div>';
+}
+function tAssetsInner() {
+  const list = tAssetsList();
+  const total = list.length, got = list.filter(a => a && a.received === true).length;
+  const pct = total ? Math.round(got / total * 100) : 0, allDone = total > 0 && got === total;
+  let h = '';
+  h += `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2,#94a3b8);margin-bottom:4px;"><span><strong>${got}</strong> of <strong>${total}</strong> assets received</span><span>${pct}%</span></div>
+      <div style="height:8px;background:rgba(148,163,184,0.25);border-radius:5px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${allDone ? '#22c55e' : '#2563eb'};transition:width 0.2s;"></div></div>
+    </div>`;
+  if (allDone) h += '<div style="margin-bottom:10px;padding:9px 12px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.4);border-radius:8px;font-size:13px;font-weight:600;color:#22c55e;">✓ All assets received — ready for design brief</div>';
+  h += total ? list.map((a, i) => tAssetRow(a, i)).join('') : '<div style="font-size:12px;color:var(--text2,#94a3b8);padding:6px 0;">No assets in the checklist yet.</div>';
+  h += '<div id="t-asset-add-row" style="margin-top:8px;"><button class="nr-btn alt" style="font-size:12px;padding:6px 12px;" onclick="tAssetAddShow()">+ Add Asset</button></div>';
+  const pending = list.filter(a => a && a.received !== true).length;
+  h += `<div style="margin-top:12px;border-top:1px solid var(--border,#334155);padding-top:10px;">
+      <button onclick="tRequestMissingAssets()" ${pending ? '' : 'disabled'} style="padding:9px 16px;background:${pending ? '#2563eb' : '#475569'};color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:${pending ? 'pointer' : 'not-allowed'};font-family:inherit;">✉ Request Missing Assets${pending ? ' (' + pending + ')' : ''}</button>
+    </div>`;
+  return h;
+}
+function tAssetRow(a, i) {
+  const name = (a && a.name) || '', received = a && a.received === true;
+  if (i === tAssetEditIndex) {
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg2,#0d1424);border:1px solid var(--border,#334155);border-radius:7px;margin-bottom:5px;">
+      <input type="checkbox" ${received ? 'checked' : ''} disabled style="width:16px;height:16px;flex:0 0 auto;" />
+      <input id="t-asset-edit-input" type="text" value="${esc(name)}" onblur="tAssetEditCommit(${i},this.value)" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){tAssetEditCancel();}" style="flex:1;min-width:0;padding:5px 7px;font-size:13px;border:1px solid #2563eb;border-radius:6px;font-family:inherit;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);" />
+    </div>`;
+  }
+  const fileObj = received ? tAssetFile(name) : null;
+  const right = received
+    ? (fileObj ? `<a href="${esc(fileObj.file_url)}" target="_blank" rel="noopener" title="Download ${esc(fileObj.file_name || name)}" style="text-decoration:none;font-size:16px;flex:0 0 auto;">⬇️</a>` : '<span style="font-size:11px;color:#22c55e;flex:0 0 auto;">received</span>')
+    : '<span style="font-size:11px;color:#eab308;white-space:nowrap;flex:0 0 auto;">⏳ Awaiting from factory</span>';
+  return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${received ? 'rgba(34,197,94,0.08)' : 'var(--bg2,#0d1424)'};border:1px solid ${received ? 'rgba(34,197,94,0.3)' : 'var(--border,#334155)'};border-radius:7px;margin-bottom:5px;">
+    <input type="checkbox" ${received ? 'checked' : ''} onchange="tAssetToggle(${i},this.checked)" style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:#22c55e;" />
+    <span onclick="tAssetEdit(${i})" title="Click to rename" style="flex:1;min-width:0;font-size:13px;color:${received ? '#22c55e' : 'var(--text,#e2e8f0)'};cursor:text;overflow-wrap:break-word;word-break:break-word;">${esc(name)}</span>
+    ${right}
+    <button onclick="tAssetRemove(${i})" title="Remove" style="background:none;border:none;color:#ef4444;font-size:17px;cursor:pointer;line-height:1;flex:0 0 auto;">×</button>
+  </div>`;
+}
+function tAssetsRerender() { const el = document.getElementById('t-assets-section'); if (el) el.innerHTML = tAssetsInner(); }
+async function tAssetsPersist() {
+  if (!tAssetProject || !tAssetPdItemId) { toast('Cannot save — no artwork project.'); return; }
+  try {
+    const r = await fetch(SUPA_URL + '/rest/v1/artwork_projects?pd_item_id=eq.' + encodeURIComponent(tAssetPdItemId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ assets_required: tAssetProject.assets_required, updated_at: new Date().toISOString() }) });
+    if (r.ok) toast('Asset checklist saved.'); else toast('Save failed (' + r.status + ').');
+  } catch (e) { toast('Save failed: ' + (e && e.message || e)); }
+}
+function tAssetToggle(i, checked) { const l = tAssetsList(); if (!l[i]) return; l[i].received = !!checked; tAssetsRerender(); tAssetsPersist(); }
+function tAssetRemove(i) { const l = tAssetsList(); if (!l[i]) return; if (!confirm('Remove "' + (l[i].name || '') + '" from the checklist?')) return; l.splice(i, 1); tAssetEditIndex = -1; tAssetsRerender(); tAssetsPersist(); }
+function tAssetAddShow() {
+  const row = document.getElementById('t-asset-add-row'); if (!row) return;
+  row.innerHTML = '<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="t-asset-add-input" placeholder="New asset name…" style="flex:1;padding:6px 8px;font-size:13px;border:1px solid var(--border,#334155);border-radius:6px;font-family:inherit;background:var(--bg,#0f172a);color:var(--text,#e2e8f0);" /><button class="nr-btn" style="font-size:12px;padding:6px 12px;" onclick="tAssetAddCommit()">Add</button><button class="nr-btn alt" style="font-size:12px;padding:6px 12px;" onclick="tAssetsRerender()">Cancel</button></div>';
+  const inp = document.getElementById('t-asset-add-input'); if (inp) { inp.focus(); inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tAssetAddCommit(); } }); }
+}
+function tAssetAddCommit() {
+  const inp = document.getElementById('t-asset-add-input'); if (!inp) return; const name = (inp.value || '').trim(); if (!name) { inp.focus(); return; }
+  tAssetsList().push({ name, received: false }); tAssetsRerender(); tAssetsPersist();
+}
+function tAssetEdit(i) { tAssetEditIndex = i; tAssetsRerender(); const inp = document.getElementById('t-asset-edit-input'); if (inp) { inp.focus(); inp.select(); } }
+function tAssetEditCommit(i, val) {
+  const l = tAssetsList(), nv = (val || '').trim(); tAssetEditIndex = -1;
+  if (l[i] && nv && nv !== l[i].name) { l[i].name = nv; tAssetsRerender(); tAssetsPersist(); return; }
+  tAssetsRerender();
+}
+function tAssetEditCancel() { tAssetEditIndex = -1; tAssetsRerender(); }
+async function tRequestMissingAssets() {
+  const pending = tAssetsList().filter(a => a && a.received !== true).map(a => a.name).filter(Boolean);
+  if (!pending.length) { toast('No missing assets.'); return; }
+  const fac = tAssetFactory || {};
+  if (!fac.sales_email && !fac.factory_name_english) { toast('No factory linked to this item.'); return; }
+  const product = (tAssetProject && tAssetProject.product_name) || 'this item';
+  const listText = pending.map((n, i) => (i + 1) + '. ' + n).join('\n');
+  const subject = 'Outstanding assets needed — ' + product;
+  const body = 'Dear ' + (fac.factory_name_english || 'Team') + ',\n\nWe are preparing the packaging design for ' + product + ' and are still missing the following assets from your team:\n\n' + listText + '\n\nCould you please upload these at your earliest convenience so we can proceed?\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  await openQuoteEmailModal('followup', { quote_id: null, rfq_id: null, factory_id: null, factoryName: fac.factory_name_english, salesEmail: fac.sales_email }, async (subj, bod) => {
+    if (!fac.sales_email) { toast('No factory email on file.'); return; }
+    await tenantSendEmail(fac.sales_email, fac.sales_contact_name || 'Team', subj, bod, null, null);
+    toast('Asset request sent to ' + fac.sales_email + '.');
+  }, { customSubject: subject, customBody: body });
 }
 
 // ── Part 1/2: Create Live SKU + Design Brief (gated on the 4 readiness gates) ──
