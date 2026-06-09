@@ -54,7 +54,8 @@ let TID = null;
 let runs = [], observations = [], photoMap = {};
 let editingMeta = false;
 const loaded = {};
-function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+function photoUrl(fp) { if (/^https?:\/\//.test(fp)) return fp; return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+function brandLetter(b) { return ((b || '?').trim().charAt(0).toUpperCase()) || '?'; }
 
 function route() {
   const h = location.hash || '#runs';
@@ -100,6 +101,13 @@ async function showRunDetail(id) {
     supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
     supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
   ]);
+  // Resolve front-photo paths for thumbnails in the observation list.
+  const photoPathMap = {};
+  const frontIds = [...new Set(obs.map(o => o.front_photo_id).filter(Boolean))];
+  if (frontIds.length) {
+    const photos = await supa(`shop_out_photos?id=in.(${frontIds.join(',')})&select=id,file_path`);
+    photos.forEach(p => { photoPathMap[p.id] = p.file_path; });
+  }
   const metaHeader = !r ? '' : (editingMeta
     ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
          <input id="meta-name-input" type="text" value="${esc(r.store_location_text || '')}" placeholder="Store name" style="font-size:15px;font-weight:600;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);min-width:220px;">
@@ -120,10 +128,16 @@ async function showRunDetail(id) {
       <div class="si-title">${esc(s.department || s.category_detected || 'Section')}</div>
       <div class="si-meta">${[s.brand_summary && preview(s.brand_summary, 120), s.estimated_linear_feet && s.estimated_linear_feet + ' ft'].filter(Boolean).map(esc).join(' · ') || '—'}</div>
     </div>`).join('') : '<div class="empty" style="padding:12px;">No sections.</div>';
-  const obsList = obs.length ? obs.map(o => `<div class="sub-item">
-      <div class="si-title">${esc(o.brand || '—')}${o.product_name ? ' — ' + esc(o.product_name) : ''}</div>
-      <div class="si-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
-    </div>`).join('') : '<div class="empty" style="padding:12px;">No observations.</div>';
+  const obsList = obs.length ? obs.map(o => {
+      const fp = photoPathMap[o.front_photo_id];
+      const thumb = fp
+        ? `<img src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'" style="width:60px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0;">`
+        : `<div style="width:60px;height:60px;border-radius:8px;background:var(--bg2);display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:22px;font-weight:700;flex-shrink:0;">${esc(brandLetter(o.brand))}</div>`;
+      return `<div class="sub-item" style="display:flex;gap:10px;align-items:center;">${thumb}<div style="min-width:0;flex:1;">
+        <div class="si-title">${esc(o.brand || '—')}${o.product_name ? ' — ' + esc(o.product_name) : ''}</div>
+        <div class="si-meta">${[o.retail_price != null && money(o.retail_price), o.upc && 'UPC ' + o.upc].filter(v => v || v === 0).map(esc).join(' · ')}</div>
+      </div></div>`;
+    }).join('') : '<div class="empty" style="padding:12px;">No observations.</div>';
   box.innerHTML = `<span class="back-link" id="backToRuns">← All runs</span>
     <div class="panel-section"><h3>Run</h3>${head}</div>
     <div class="panel-section"><h3>Sections (${sections.length})</h3><div class="sub-list">${secList}</div></div>
@@ -187,7 +201,7 @@ function renderObservations() {
   if (!rows.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🔍</span>No observations found.</div>'; return; }
   box.innerHTML = '<div class="obs-grid">' + rows.map(o => {
     const fp = photoMap[o.front_photo_id];
-    const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : '<div class="obs-thumb-ph">📷</div>';
+    const thumb = fp ? `<img class="obs-thumb" src="${esc(photoUrl(fp))}" loading="lazy" onerror="this.style.display='none'">` : `<div class="obs-thumb-ph">${esc(brandLetter(o.brand))}</div>`;
     const store = o.shop_outs && o.shop_outs.store_location_text;
     return `<div class="obs-card" data-id="${esc(o.id)}">
       ${thumb}
@@ -415,16 +429,60 @@ async function loadPipeline() {
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
   };
 
+  // Convert raw base64 → Blob for the R2 upload body.
+  function b64ToBlob(b64,type){ var bin=atob(b64),len=bin.length,arr=new Uint8Array(len); for(var i=0;i<len;i++)arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:type||'image/jpeg'}); }
+  // Downscale a full-res frame (base64) to a ≤400x300 JPEG thumbnail, return base64.
+  function makeThumb(srcB64){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.width||400,h=img.height||300,scale=Math.min(400/w,300/h,1);
+        var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
+        var c=document.createElement('canvas'); c.width=cw; c.height=ch;
+        c.getContext('2d').drawImage(img,0,0,cw,ch);
+        try{ resolve(c.toDataURL('image/jpeg',0.6).split(',')[1]); }catch(e){ resolve(null); }
+      };
+      img.onerror=function(){ resolve(null); };
+      img.src='data:image/jpeg;base64,'+srcB64;
+    });
+  }
+  async function uploadThumb(shopOutId,index,b64){
+    var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+index+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
+    var r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+VSO.token(),'Content-Type':'image/jpeg'},body:b64ToBlob(b64,'image/jpeg')});
+    var d=await r.json().catch(function(){return null;});
+    return (d&&d.success&&(d.url||d.file_url))?(d.url||d.file_url):null;
+  }
+
   window.vsoSave=async function(){
     var st=gid('vso-save-status'); var btn=gid('vso-save-btn'); btn.disabled=true;
-    st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
-    var payload={store_name:storeName,visit_date:visitDate,products:products,metadata:{store:storeName,total_products:products.length}};
-    var tid=VSO.tenantId(); if(tid) payload.tenant_id=tid;
+    var token=VSO.token(); var tid=VSO.tenantId();
+    var meta={store:storeName,total_products:products.length};
     try{
-      var r=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VSO.token()},body:JSON.stringify(payload)});
-      var d=await r.json();
-      if(r.ok&&d&&d.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+d.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
-      else { st.style.color='#cc2222'; st.textContent=(d&&d.error)||'Save failed.'; btn.disabled=false; }
+      // 1. Create the shop-out record first so thumbnails can be keyed to its id.
+      st.style.color='#666'; st.textContent='Creating shop out…';
+      var createBody={phase:'create',store_name:storeName,visit_date:visitDate,metadata:meta};
+      if(tid)createBody.tenant_id=tid;
+      var cr=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(createBody)});
+      var cd=await cr.json();
+      if(!cr.ok||!cd||!cd.success){ st.style.color='#cc2222'; st.textContent=(cd&&cd.error)||'Create failed.'; btn.disabled=false; return; }
+      var shopOutId=cd.shop_out_id;
+
+      // 2. Save a representative frame per product to R2, attach thumbnail_url.
+      for(var i=0;i<products.length;i++){
+        st.style.color='#666'; st.textContent='Saving thumbnails '+(i+1)+' of '+products.length+'…';
+        var fr=parseInt(products[i].frame,10);
+        var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
+        if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
+        var srcB64=frames[idx]; if(!srcB64)continue;
+        try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,i,thumb); if(u)products[i].thumbnail_url=u; } }catch(e){}
+      }
+
+      // 3. Insert observations (+ shop_out_photos) for the created shop-out.
+      st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
+      var fr2=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({phase:'finalize',shop_out_id:shopOutId,products:products})});
+      var fd=await fr2.json();
+      if(fr2.ok&&fd&&fd.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+fd.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
+      else { st.style.color='#cc2222'; st.textContent=(fd&&fd.error)||'Save failed.'; btn.disabled=false; }
     }catch(e){ st.style.color='#cc2222'; st.textContent=e.message; btn.disabled=false; }
   };
 })();

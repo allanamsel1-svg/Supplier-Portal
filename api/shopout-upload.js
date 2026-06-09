@@ -61,67 +61,118 @@ module.exports = async (req, res) => {
     let body = req.body;
     if (typeof body === 'string') { try { body = JSON.parse(body); } catch { body = {}; } }
     body = body || {};
-    const { store_name, visit_date, products, metadata, customer_id } = body;
-    if (!products || !Array.isArray(products)) return res.status(400).json({ error: 'Invalid products array' });
-
+    const { phase, store_name, visit_date, products, metadata, customer_id } = body;
     const tenantId = sessionTenantId || body.tenant_id || null;
 
-    // 1. Create the shop_outs record (note: store→store_location_text, visit_date→shop_date).
-    const shopRow = {
-      store_location_text: store_name || (metadata && metadata.store) || null,
-      shop_date: visit_date || new Date().toISOString().split('T')[0],
-      status: 'uploaded',
-      processing_status: 'complete',
-      processing_completed_at: new Date().toISOString(),
-      total_observations: products.length,
-      captured_by: 'video',
-      description: metadata && metadata.video_file ? ('Video shop out: ' + metadata.video_file) : 'Video shop out',
-    };
-    if (tenantId) shopRow.tenant_id = tenantId;
-    if (customer_id) shopRow.customer_id = customer_id;
-
-    const { data: shop, error: shopError } = await supabase
-      .from('shop_outs')
-      .insert(shopRow)
-      .select()
-      .single();
-    if (shopError) return res.status(500).json({ error: shopError.message });
-
-    // 2. Insert each product as a shop_out_observations record. Columns that have no
-    //    dedicated table column (packaging / size / quantity / notes / confidence) are
-    //    preserved in ai_extraction_json so nothing is lost.
-    const items = products.map(p => {
-      const row = {
-        shop_out_id: shop.id,
-        brand: p.brand || null,
-        product_name: p.product_name || null,
-        retail_price: numOrNull(p.price),
-        upc: p.upc || null,
-        ai_suggested_category: p.category || null,
-        ai_confidence: p.price_confidence === 'high' ? 0.9 : (p.price_confidence === 'low' ? 0.5 : 0.7),
-        review_status: 'pending',
-        is_category_gap: false,
-        ai_extraction_json: {
-          packaging: p.packaging || null,
-          size: p.size || null,
-          quantity_on_shelf: p.quantity_on_shelf != null ? p.quantity_on_shelf : null,
-          notes: p.notes || null,
-          price_confidence: p.price_confidence || null,
-          source: 'video_ai',
-        },
+    // ── Helpers ───────────────────────────────────────────────────────
+    async function createShop(count) {
+      const shopRow = {
+        store_location_text: store_name || (metadata && metadata.store) || null,
+        shop_date: visit_date || new Date().toISOString().split('T')[0],
+        status: 'uploaded',
+        processing_status: 'complete',
+        processing_completed_at: new Date().toISOString(),
+        total_observations: count || 0,
+        captured_by: 'video',
+        description: metadata && metadata.video_file ? ('Video shop out: ' + metadata.video_file) : 'Video shop out',
       };
-      if (tenantId) row.tenant_id = tenantId;
-      return row;
-    });
-
-    let inserted = 0;
-    for (let i = 0; i < items.length; i += 50) {
-      const { error } = await supabase.from('shop_out_observations').insert(items.slice(i, i + 50));
-      if (error) console.error('Batch insert error:', error.message);
-      else inserted += Math.min(50, items.length - i);
+      if (tenantId) shopRow.tenant_id = tenantId;
+      if (customer_id) shopRow.customer_id = customer_id;
+      return supabase.from('shop_outs').insert(shopRow).select().single();
     }
 
-    return res.status(200).json({ success: true, shop_out_id: shop.id, count: inserted });
+    // Insert photos (for products with thumbnail_url) then observations linked via front_photo_id.
+    async function insertObservations(shopId, prods) {
+      // 1. Photos — one per product that captured a thumbnail.
+      const photoRows = [];
+      prods.forEach((p, idx) => {
+        if (!p.thumbnail_url) return;
+        photoRows.push({
+          shop_out_id: shopId,
+          file_path: p.thumbnail_url,
+          file_name: 'shopout_' + idx + '.jpg',
+          photo_type: 'front',
+          photo_sequence_number: idx,
+          upload_status: 'complete',
+          exif_camera_make: 'Meta Ray-Ban Glasses',
+          ai_processed_at: new Date().toISOString(),
+        });
+      });
+      const photoIdByIndex = {};
+      if (photoRows.length) {
+        const { data: insertedPhotos, error: photoErr } = await supabase
+          .from('shop_out_photos').insert(photoRows).select('id, photo_sequence_number');
+        if (photoErr) console.error('Photo insert error:', photoErr.message);
+        else (insertedPhotos || []).forEach(ph => { photoIdByIndex[ph.photo_sequence_number] = ph.id; });
+      }
+
+      // 2. Observations — extra fields preserved in ai_extraction_json.
+      const items = prods.map((p, idx) => {
+        const row = {
+          shop_out_id: shopId,
+          brand: p.brand || null,
+          product_name: p.product_name || null,
+          retail_price: numOrNull(p.price),
+          upc: p.upc || null,
+          ai_suggested_category: p.category || null,
+          ai_confidence: p.price_confidence === 'high' ? 0.9 : (p.price_confidence === 'low' ? 0.5 : 0.7),
+          review_status: 'pending',
+          is_category_gap: false,
+          ai_extraction_json: {
+            packaging: p.packaging || null,
+            size: p.size || null,
+            quantity_on_shelf: p.quantity_on_shelf != null ? p.quantity_on_shelf : null,
+            notes: p.notes || null,
+            price_confidence: p.price_confidence || null,
+            source: 'video_ai',
+          },
+        };
+        if (photoIdByIndex[idx]) row.front_photo_id = photoIdByIndex[idx];
+        if (tenantId) row.tenant_id = tenantId;
+        return row;
+      });
+
+      let inserted = 0;
+      for (let i = 0; i < items.length; i += 50) {
+        const { error } = await supabase.from('shop_out_observations').insert(items.slice(i, i + 50));
+        if (error) console.error('Batch insert error:', error.message);
+        else inserted += Math.min(50, items.length - i);
+      }
+      // Keep the run's observation count accurate.
+      await supabase.from('shop_outs').update({ total_observations: inserted }).eq('id', shopId);
+      return inserted;
+    }
+
+    // Tenant context may only finalize its own shop-outs.
+    async function assertOwnsShop(shopId) {
+      if (!sessionTenantId) return true; // admin
+      const { data } = await supabase.from('shop_outs').select('tenant_id').eq('id', shopId).maybeSingle();
+      return !!(data && data.tenant_id === sessionTenantId);
+    }
+
+    // ── PHASE 1: create the shop_outs record only, return its id ───────
+    if (phase === 'create') {
+      const { data: shop, error: shopError } = await createShop(0);
+      if (shopError) return res.status(500).json({ error: shopError.message });
+      return res.status(200).json({ success: true, shop_out_id: shop.id });
+    }
+
+    // ── PHASE 2: insert photos + observations for an existing shop-out ─
+    if (phase === 'finalize') {
+      const shopId = body.shop_out_id;
+      if (!shopId) return res.status(400).json({ error: 'shop_out_id required' });
+      if (!Array.isArray(products)) return res.status(400).json({ error: 'Invalid products array' });
+      if (!(await assertOwnsShop(shopId))) return res.status(403).json({ error: 'Forbidden' });
+      const count = await insertObservations(shopId, products);
+      return res.status(200).json({ success: true, shop_out_id: shopId, count });
+    }
+
+    // ── DEFAULT: single-shot create + observations (back-compat) ───────
+    if (!Array.isArray(products)) return res.status(400).json({ error: 'Invalid products array' });
+    const { data: shop, error: shopError } = await createShop(products.length);
+    if (shopError) return res.status(500).json({ error: shopError.message });
+    const count = await insertObservations(shop.id, products);
+    return res.status(200).json({ success: true, shop_out_id: shop.id, count });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }

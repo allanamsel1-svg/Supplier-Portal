@@ -41,14 +41,16 @@ module.exports = async (req, res) => {
   const { frames, store_name, batch_index, total_batches } = body;
   if (!Array.isArray(frames) || !frames.length) return res.status(400).json({ error: 'No frames provided' });
 
+  const baseFrame = (Number(batch_index) || 0) * 5; // global frame offset (batches of 5)
   const store = store_name || 'Unknown Store';
-  const userPrompt = `These are ${frames.length} consecutive frames from a retail shelf walkthrough at ${store}. For each clearly visible product extract: product_name, brand, category, price (read from shelf price signs — at Five Below prices are $1/$3/$5/$7/$10), price_confidence (high/medium/low), packaging, size, upc (if visible), quantity_on_shelf, notes. Associate each product with the nearest price sign. List each unique product ONCE even if visible in multiple frames. Respond ONLY with a JSON array.`;
+  const userPrompt = `These are ${frames.length} consecutive frames from a retail shelf walkthrough at ${store}. Each image is labeled "Frame N:" — use that number. For each clearly visible product extract: product_name, brand, category, price (read from shelf price signs — at Five Below prices are $1/$3/$5/$7/$10), price_confidence (high/medium/low), packaging, size, upc (if visible), quantity_on_shelf, notes, and frame (the Frame number where the product is most clearly visible). Associate each product with the nearest price sign. List each unique product ONCE even if visible in multiple frames. Respond ONLY with a JSON array, e.g. [{"product_name":"Garnier Shampoo","brand":"Garnier","category":"Hair Care","price":5.00,"price_confidence":"high","packaging":"bottle","size":"12oz","upc":null,"quantity_on_shelf":6,"notes":"Green apple","frame":3}].`;
 
   const content = [{ type: 'text', text: userPrompt }];
-  for (const f of frames) {
+  frames.forEach((f, i) => {
     const data = typeof f === 'string' && f.indexOf(',') !== -1 ? f.split(',')[1] : f; // strip data: URL prefix if present
+    content.push({ type: 'text', text: `Frame ${baseFrame + i + 1}:` });
     content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } });
-  }
+  });
 
   try {
     const aiResp = await fetch('https://api.anthropic.com/v1/messages', {

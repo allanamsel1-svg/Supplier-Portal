@@ -1396,9 +1396,15 @@ async function loadObservations(id){
     }
     var path=pathById[o.front_photo_id];
     var thumbId='ml-thumb-'+o.id;
-    if(path)thumbs.push({thumbId:thumbId,path:path});
+    // R2 thumbnails (video shop outs) are stored as full URLs; Supabase storage paths need signing.
+    var isUrl=path && /^https?:\/\//.test(path);
+    if(path && !isUrl)thumbs.push({thumbId:thumbId,path:path});
     var canOpen=(typeof openViewer==='function') && (viewerIdxById[o.front_photo_id]!=null);
     var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[o.front_photo_id]+')" style="cursor:pointer;"':'';
+    var thumbLetter=esc((o.brand||'?').trim().charAt(0).toUpperCase()||'?');
+    var thumbInner=path
+      ?'<img id="'+thumbId+'"'+(isUrl?' src="'+esc(path)+'"':'')+thumbClick+' style="width:84px;height:84px;object-fit:cover;display:block;" onerror="this.style.display=\'none\';" />'
+      :'<div style="width:84px;height:84px;display:flex;align-items:center;justify-content:center;color:#999;font-size:30px;font-weight:700;">'+thumbLetter+'</div>';
 
     var optsHtml=statusOpts.map(function(opt){
       var label=opt===''?'— status —':opt.charAt(0).toUpperCase()+opt.slice(1);
@@ -1412,7 +1418,7 @@ async function loadObservations(id){
 
     return '<div style="display:flex;gap:12px;padding:12px 0;border-bottom:0.5px solid #f0f0e8;">'+
       '<div style="flex-shrink:0;width:84px;height:84px;border-radius:8px;overflow:hidden;background:#f0f0e8;">'+
-        '<img id="'+thumbId+'"'+thumbClick+' style="width:84px;height:84px;object-fit:cover;display:block;" />'+
+        thumbInner+
       '</div>'+
       '<div style="flex:1;min-width:0;">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'+
@@ -2397,16 +2403,60 @@ init();
     setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
   };
 
+  // Convert raw base64 → Blob for the R2 upload body.
+  function b64ToBlob(b64,type){ var bin=atob(b64),len=bin.length,arr=new Uint8Array(len); for(var i=0;i<len;i++)arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:type||'image/jpeg'}); }
+  // Downscale a full-res frame (base64) to a ≤400x300 JPEG thumbnail, return base64.
+  function makeThumb(srcB64){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var w=img.width||400,h=img.height||300,scale=Math.min(400/w,300/h,1);
+        var cw=Math.max(1,Math.round(w*scale)),ch=Math.max(1,Math.round(h*scale));
+        var c=document.createElement('canvas'); c.width=cw; c.height=ch;
+        c.getContext('2d').drawImage(img,0,0,cw,ch);
+        try{ resolve(c.toDataURL('image/jpeg',0.6).split(',')[1]); }catch(e){ resolve(null); }
+      };
+      img.onerror=function(){ resolve(null); };
+      img.src='data:image/jpeg;base64,'+srcB64;
+    });
+  }
+  async function uploadThumb(shopOutId,index,b64){
+    var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+index+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
+    var r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+VSO.token(),'Content-Type':'image/jpeg'},body:b64ToBlob(b64,'image/jpeg')});
+    var d=await r.json().catch(function(){return null;});
+    return (d&&d.success&&(d.url||d.file_url))?(d.url||d.file_url):null;
+  }
+
   window.vsoSave=async function(){
     var st=gid('vso-save-status'); var btn=gid('vso-save-btn'); btn.disabled=true;
-    st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
-    var payload={store_name:storeName,visit_date:visitDate,products:products,metadata:{store:storeName,total_products:products.length}};
-    var tid=VSO.tenantId(); if(tid) payload.tenant_id=tid;
+    var token=VSO.token(); var tid=VSO.tenantId();
+    var meta={store:storeName,total_products:products.length};
     try{
-      var r=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VSO.token()},body:JSON.stringify(payload)});
-      var d=await r.json();
-      if(r.ok&&d&&d.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+d.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
-      else { st.style.color='#cc2222'; st.textContent=(d&&d.error)||'Save failed.'; btn.disabled=false; }
+      // 1. Create the shop-out record first so thumbnails can be keyed to its id.
+      st.style.color='#666'; st.textContent='Creating shop out…';
+      var createBody={phase:'create',store_name:storeName,visit_date:visitDate,metadata:meta};
+      if(tid)createBody.tenant_id=tid;
+      var cr=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(createBody)});
+      var cd=await cr.json();
+      if(!cr.ok||!cd||!cd.success){ st.style.color='#cc2222'; st.textContent=(cd&&cd.error)||'Create failed.'; btn.disabled=false; return; }
+      var shopOutId=cd.shop_out_id;
+
+      // 2. Save a representative frame per product to R2, attach thumbnail_url.
+      for(var i=0;i<products.length;i++){
+        st.style.color='#666'; st.textContent='Saving thumbnails '+(i+1)+' of '+products.length+'…';
+        var fr=parseInt(products[i].frame,10);
+        var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
+        if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
+        var srcB64=frames[idx]; if(!srcB64)continue;
+        try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,i,thumb); if(u)products[i].thumbnail_url=u; } }catch(e){}
+      }
+
+      // 3. Insert observations (+ shop_out_photos) for the created shop-out.
+      st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
+      var fr2=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({phase:'finalize',shop_out_id:shopOutId,products:products})});
+      var fd=await fr2.json();
+      if(fr2.ok&&fd&&fd.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+fd.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
+      else { st.style.color='#cc2222'; st.textContent=(fd&&fd.error)||'Save failed.'; btn.disabled=false; }
     }catch(e){ st.style.color='#cc2222'; st.textContent=e.message; btn.disabled=false; }
   };
 })();
