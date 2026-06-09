@@ -138,8 +138,12 @@ module.exports = async (req, res) => {
         if (error) console.error('Batch insert error:', error.message);
         else inserted += Math.min(50, items.length - i);
       }
-      // Keep the run's observation count accurate.
-      await supabase.from('shop_outs').update({ total_observations: inserted }).eq('id', shopId);
+      // Recount so appends are additive (set to the true row count, not just this batch).
+      const { count } = await supabase
+        .from('shop_out_observations')
+        .select('id', { count: 'exact', head: true })
+        .eq('shop_out_id', shopId);
+      await supabase.from('shop_outs').update({ total_observations: (count != null ? count : inserted) }).eq('id', shopId);
       return inserted;
     }
 

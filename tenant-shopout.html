@@ -118,6 +118,7 @@ async function showRunDetail(id) {
     : `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
          <span style="font-size:16px;font-weight:700;color:var(--text);">${esc((r.store_location_text && r.store_location_text.trim()) ? r.store_location_text : 'Unnamed Shop Out')}</span>
          <span style="cursor:pointer;font-size:14px;" title="Edit store name & date" onclick="editShopMeta('${esc(id)}')">✏️</span>
+         <button title="Add a video to this shop out" style="background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;padding:3px 9px;color:var(--text);" onclick="openVideoShopoutAppend('${esc(id)}')">📹 Add Video</button>
          <span style="color:var(--text2);font-size:13px;">· ${fmtDate(r.shop_date)}</span>
        </div>`);
   const head = r ? (metaHeader + kv([
@@ -288,9 +289,9 @@ async function loadPipeline() {
     </div>
     <div id="vso-setup">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Store name *</label>
+        <div id="vso-field-store"><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Store name *</label>
           <input id="vso-store" type="text" oninput="vsoTitle()" placeholder="e.g. Five Below — Brooklyn" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:7px;font-size:13px;"></div>
-        <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Visit date</label>
+        <div id="vso-field-date"><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Visit date</label>
           <input id="vso-date" type="date" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d8d8d0;border-radius:7px;font-size:13px;"></div>
         <div><label style="display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:4px;">Video file</label>
           <input id="vso-file" type="file" accept="video/*" style="width:100%;font-size:13px;"></div>
@@ -336,27 +337,50 @@ async function loadPipeline() {
   var VSO = {
     token: function(){ return localStorage.getItem('tenant_token')||localStorage.getItem('admin_session')||''; },
     tenantId: function(){ return (typeof TID!=='undefined') ? TID : null; },
-    refresh: function(){ if(typeof loadRuns==='function') loadRuns(); }
+    refresh: function(){ if(typeof loadRuns==='function') loadRuns(); },
+    refreshDetail: function(id){ if(typeof loadRuns==='function') loadRuns(); if(typeof showRunDetail==='function') showRunDetail(id); },
+    fetchExisting: async function(id){
+      try{ return await supa('shop_out_observations?shop_out_id=eq.'+id+'&tenant_id=eq.'+(typeof TID!=='undefined'?TID:'')+'&select=brand,product_name,retail_price'); }
+      catch(e){ return []; }
+    }
   };
-  var frames=[], products=[], storeName='', visitDate='', objUrl=null;
+  var frames=[], products=[], storeName='', visitDate='', objUrl=null, appendShopOutId=null;
   function gid(id){ return document.getElementById(id); }
   function setStatus(t){ gid('vso-status').textContent=t; }
   function setBar(pct){ gid('vso-bar').style.width=Math.max(0,Math.min(100,pct))+'%'; }
   function esc2(s){ return String(s==null?'':s).replace(/[<>&]/g,function(c){return'&#'+c.charCodeAt(0)+';';}); }
+  function priceKey(v){ var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?'':String(n); }
+  function dedupKey(brand,product,price){ return (brand||'').toLowerCase().trim()+'|'+(product||'').toLowerCase().trim()+'|'+priceKey(price); }
 
-  window.openVideoShopoutModal=function(){
+  function resetModal(){
     gid('vso-setup').style.display=''; gid('vso-progress').style.display='none'; gid('vso-results').style.display='none';
-    gid('vso-store').value=''; gid('vso-file').value=''; gid('vso-fps').value='1'; gid('vso-save-status').textContent='';
+    gid('vso-file').value=''; gid('vso-fps').value='1'; gid('vso-save-status').textContent='';
+  }
+  window.openVideoShopoutModal=function(){
+    appendShopOutId=null;
+    resetModal();
+    gid('vso-field-store').style.display=''; gid('vso-field-date').style.display='';
+    gid('vso-store').value='';
     var d=new Date(); gid('vso-date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
     vsoTitle(); gid('vso-modal').style.display='flex';
   };
+  // Append mode: add a video to an existing shop-out (no new record; skip name/date fields).
+  window.openVideoShopoutAppend=function(id){
+    appendShopOutId=id;
+    resetModal();
+    gid('vso-field-store').style.display='none'; gid('vso-field-date').style.display='none';
+    gid('vso-title').textContent='Add Video to Shop Out';
+    gid('vso-modal').style.display='flex';
+  };
   window.vsoClose=function(){ gid('vso-modal').style.display='none'; if(objUrl){URL.revokeObjectURL(objUrl);objUrl=null;} };
-  window.vsoTitle=function(){ var s=(gid('vso-store').value||'').trim(); gid('vso-title').textContent='Video Shop Out'+(s?' — '+s:''); };
+  window.vsoTitle=function(){ if(appendShopOutId)return; var s=(gid('vso-store').value||'').trim(); gid('vso-title').textContent='Video Shop Out'+(s?' — '+s:''); };
 
   window.vsoStart=async function(){
-    storeName=(gid('vso-store').value||'').trim();
-    if(!storeName){ alert('Store name is required.'); return; }
-    visitDate=gid('vso-date').value||new Date().toISOString().split('T')[0];
+    if(!appendShopOutId){
+      storeName=(gid('vso-store').value||'').trim();
+      if(!storeName){ alert('Store name is required.'); return; }
+      visitDate=gid('vso-date').value||new Date().toISOString().split('T')[0];
+    }
     var file=gid('vso-file').files[0];
     if(!file){ alert('Please choose a video file.'); return; }
     var fps=parseFloat(gid('vso-fps').value)||1;
@@ -446,42 +470,73 @@ async function loadPipeline() {
       img.src='data:image/jpeg;base64,'+srcB64;
     });
   }
-  async function uploadThumb(shopOutId,index,b64){
-    var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+index+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
+  async function uploadThumb(shopOutId,key,b64){
+    var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+key+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
     var r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+VSO.token(),'Content-Type':'image/jpeg'},body:b64ToBlob(b64,'image/jpeg')});
     var d=await r.json().catch(function(){return null;});
     return (d&&d.success&&(d.url||d.file_url))?(d.url||d.file_url):null;
+  }
+  // Capture a representative frame per product, upload to R2, attach thumbnail_url.
+  // A per-save token keeps filenames unique so repeated appends never overwrite each other in R2.
+  async function attachThumbnails(shopOutId,list){
+    var saveToken=Date.now().toString(36);
+    for(var i=0;i<list.length;i++){
+      gid('vso-save-status').textContent='Saving thumbnails '+(i+1)+' of '+list.length+'…';
+      var fr=parseInt(list[i].frame,10);
+      var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
+      if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
+      var srcB64=frames[idx]; if(!srcB64)continue;
+      try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,saveToken+'_'+i,thumb); if(u)list[i].thumbnail_url=u; } }catch(e){}
+    }
+  }
+  async function finalizeProducts(shopOutId,list){
+    var r=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+VSO.token()},body:JSON.stringify({phase:'finalize',shop_out_id:shopOutId,products:list})});
+    return r.json();
   }
 
   window.vsoSave=async function(){
     var st=gid('vso-save-status'); var btn=gid('vso-save-btn'); btn.disabled=true;
     var token=VSO.token(); var tid=VSO.tenantId();
-    var meta={store:storeName,total_products:products.length};
     try{
-      // 1. Create the shop-out record first so thumbnails can be keyed to its id.
+      // ── APPEND MODE: add this video's products to an existing shop-out ──
+      if(appendShopOutId){
+        var shopId=appendShopOutId;
+        st.style.color='#666'; st.textContent='Checking for duplicates…';
+        var existing=await VSO.fetchExisting(shopId);
+        var seen={}; (existing||[]).forEach(function(o){ seen[dedupKey(o.brand,o.product_name,o.retail_price)]=1; });
+        var newProducts=[]; var dupCount=0;
+        products.forEach(function(p){ if(seen[dedupKey(p.brand,p.product_name,p.price)])dupCount++; else newProducts.push(p); });
+        if(newProducts.length===0){
+          st.style.color='#1a8a3a'; st.textContent='✅ Added 0 new products ('+dupCount+' duplicates skipped).';
+          if(typeof soToast==='function')soToast('Added 0 new products ('+dupCount+' duplicates skipped)');
+          try{VSO.refreshDetail(shopId);}catch(e){}
+          return;
+        }
+        await attachThumbnails(shopId,newProducts);
+        st.style.color='#666'; st.textContent='Saving '+newProducts.length+' products…';
+        var afd=await finalizeProducts(shopId,newProducts);
+        if(afd&&afd.success){
+          var amsg='Added '+afd.count+' new products ('+dupCount+' duplicates skipped)';
+          st.style.color='#1a8a3a'; st.textContent='✅ '+amsg+'.';
+          if(typeof soToast==='function')soToast(amsg);
+          try{VSO.refreshDetail(shopId);}catch(e){}
+        } else { st.style.color='#cc2222'; st.textContent=(afd&&afd.error)||'Save failed.'; btn.disabled=false; }
+        return;
+      }
+
+      // ── NEW SHOP-OUT: create record, thumbnails, observations ──
       st.style.color='#666'; st.textContent='Creating shop out…';
+      var meta={store:storeName,total_products:products.length};
       var createBody={phase:'create',store_name:storeName,visit_date:visitDate,metadata:meta};
       if(tid)createBody.tenant_id=tid;
       var cr=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(createBody)});
       var cd=await cr.json();
       if(!cr.ok||!cd||!cd.success){ st.style.color='#cc2222'; st.textContent=(cd&&cd.error)||'Create failed.'; btn.disabled=false; return; }
-      var shopOutId=cd.shop_out_id;
-
-      // 2. Save a representative frame per product to R2, attach thumbnail_url.
-      for(var i=0;i<products.length;i++){
-        st.style.color='#666'; st.textContent='Saving thumbnails '+(i+1)+' of '+products.length+'…';
-        var fr=parseInt(products[i].frame,10);
-        var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
-        if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
-        var srcB64=frames[idx]; if(!srcB64)continue;
-        try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,i,thumb); if(u)products[i].thumbnail_url=u; } }catch(e){}
-      }
-
-      // 3. Insert observations (+ shop_out_photos) for the created shop-out.
+      var newId=cd.shop_out_id;
+      await attachThumbnails(newId,products);
       st.style.color='#666'; st.textContent='Saving '+products.length+' products…';
-      var fr2=await fetch('/api/shopout-upload',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({phase:'finalize',shop_out_id:shopOutId,products:products})});
-      var fd=await fr2.json();
-      if(fr2.ok&&fd&&fd.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+fd.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
+      var fd=await finalizeProducts(newId,products);
+      if(fd&&fd.success){ st.style.color='#1a8a3a'; st.textContent='✅ Saved '+fd.count+' products from '+storeName+' to portal.'; try{VSO.refresh();}catch(e){} }
       else { st.style.color='#cc2222'; st.textContent=(fd&&fd.error)||'Save failed.'; btn.disabled=false; }
     }catch(e){ st.style.color='#cc2222'; st.textContent=e.message; btn.disabled=false; }
   };
