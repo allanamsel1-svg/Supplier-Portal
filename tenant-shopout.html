@@ -64,7 +64,11 @@ let TID = null;
 let runs = [], observations = [], photoMap = {};
 let editingMeta = false;
 const loaded = {};
-function photoUrl(fp) { if (/^https?:\/\//.test(fp)) return fp; return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
+function photoUrl(fp) {
+  if (!fp) return '';
+  if (/^https?:\/\//i.test(fp)) return fp; // R2 full public URL — use directly, never sign
+  return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + String(fp).replace(/^\/+/, ''); // storage path
+}
 function brandLetter(b) { return ((b || '?').trim().charAt(0).toUpperCase()) || '?'; }
 
 function route() {

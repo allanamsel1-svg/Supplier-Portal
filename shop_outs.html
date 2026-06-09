@@ -290,6 +290,10 @@ async function loadPhotoCounts(){
 }
 
 function getPhotoCount(shopId){return photoCounts[shopId]||0;}
+// R2 thumbnails (video shop outs) are stored as full https URLs and must be used
+// directly — never run through Supabase signing (that double-concatenates → 400).
+// Returns the direct URL for an absolute http(s) path, or null for storage paths to sign.
+function directPhotoUrl(fp){ return (typeof fp==='string' && /^https?:\/\//i.test(fp)) ? fp : null; }
 function getRetailerName(shop){var c=customerMap[shop.customer_id];return c?c.name:'(unknown)';}
 // Display name for the list + detail header: customer name → store location → friendly fallback.
 function displayName(shop){
@@ -1212,13 +1216,15 @@ async function loadPhotos(id){
     await Promise.all(batch.map(async function(i){
       var p=currentPhotos[i];
       if(!p.signed_thumb_url){
-        try {
+        var direct=directPhotoUrl(p.file_path);
+        if(direct){ p.signed_thumb_url=direct; }
+        else { try {
           var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
             method:'POST',headers:{'Content-Type':'application/json'},
             body:JSON.stringify({expiresIn:3600,transform:{width:400,height:400,resize:'contain',format:'origin'}})
           });
           if(sr.ok)p.signed_thumb_url=SB+'/storage/v1'+(await sr.json()).signedURL;
-        } catch(e) {}
+        } catch(e) {} }
       }
       var im=g('grid-img-'+i);if(im && p.signed_thumb_url)im.src=p.signed_thumb_url;
     }));
@@ -1249,6 +1255,8 @@ async function showCurrentPhoto(){
   // in the viewer (it would flash a tiny/narrow image). Clear src while signing
   // so a stale frame doesn't linger.
   if(p.signed_full_url){img.src=p.signed_full_url;return;}
+  var directFull=directPhotoUrl(p.file_path);
+  if(directFull){ p.signed_full_url=directFull; img.src=directFull; return; }
   img.removeAttribute('src');
   try {
     var sr=await h(SB+'/storage/v1/object/sign/'+BUCKET+'/'+p.file_path,{
