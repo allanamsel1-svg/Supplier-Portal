@@ -434,7 +434,7 @@ async function loadPipeline() {
       };
       function seek(){ if(idx>=total){ resolve(out); return; } var t=idx/fps; video.currentTime=Math.min(t,(video.duration||t)-0.05); }
       video.onseeked=function(){
-        try{ ctx.drawImage(video,0,0,canvas.width,canvas.height); out.push(canvas.toDataURL('image/jpeg',0.7).split(',')[1]); }catch(e){}
+        try{ ctx.drawImage(video,0,0,canvas.width,canvas.height); out.push(canvas.toDataURL('image/jpeg',0.9).split(',')[1]); }catch(e){}
         idx++; setStatus('Extracted '+idx+' of '+total+' frames'); setBar(Math.round((idx/total)*100)); seek();
       };
       video.onerror=function(){ reject(new Error('Could not load video')); };
