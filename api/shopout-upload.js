@@ -106,6 +106,27 @@ module.exports = async (req, res) => {
         else (insertedPhotos || []).forEach(ph => { photoIdByIndex[ph.photo_sequence_number] = ph.id; });
       }
 
+      // 1b. Full-resolution photos (sharp detail view), paired to their thumbnails.
+      const fullRows = [];
+      prods.forEach((p, idx) => {
+        if (!p.full_photo_url || !photoIdByIndex[idx]) return;
+        fullRows.push({
+          shop_out_id: shopId,
+          file_path: p.full_photo_url,
+          file_name: 'shopout_' + idx + '_full.jpg',
+          photo_type: 'full',
+          paired_with_photo_id: photoIdByIndex[idx],
+          photo_sequence_number: idx,
+          upload_status: 'complete',
+          exif_camera_make: 'Meta Ray-Ban Glasses',
+          ai_processed_at: new Date().toISOString(),
+        });
+      });
+      if (fullRows.length) {
+        const { error: fullErr } = await supabase.from('shop_out_photos').insert(fullRows);
+        if (fullErr) console.error('Full photo insert error:', fullErr.message);
+      }
+
       // 2. Observations — extra fields preserved in ai_extraction_json.
       const items = prods.map((p, idx) => {
         const row = {

@@ -249,6 +249,14 @@ async function toggleObs(id) {
   if (photoIds.length) {
     const photos = await supa(`shop_out_photos?id=in.(${photoIds.join(',')})&select=id,file_path,photo_type`);
     paths = photos.map(p => p.file_path).filter(Boolean);
+    // Prefer the sharp full-res image for the front photo in the detail viewer; fall back to the thumbnail.
+    if (o.front_photo_id) {
+      const fulls = await supa(`shop_out_photos?paired_with_photo_id=eq.${o.front_photo_id}&photo_type=eq.full&select=file_path&order=created_at.asc&limit=1`);
+      if (fulls && fulls[0] && fulls[0].file_path) {
+        const frontPath = (photos.find(p => p.id === o.front_photo_id) || {}).file_path;
+        paths = paths.map(pp => pp === frontPath ? fulls[0].file_path : pp);
+      }
+    }
   }
   const info = kv([
     ['Brand', o.brand], ['Sub-brand', o.sub_brand], ['Product', o.product_name],
@@ -484,6 +492,19 @@ async function loadPipeline() {
       img.src='data:image/jpeg;base64,'+srcB64;
     });
   }
+  // Full-resolution frame (no scaling) at high quality for the sharp detail view.
+  function makeFull(srcB64){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var c=document.createElement('canvas'); c.width=img.width||1280; c.height=img.height||720;
+        c.getContext('2d').drawImage(img,0,0);
+        try{ resolve(c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ resolve(null); }
+      };
+      img.onerror=function(){ resolve(null); };
+      img.src='data:image/jpeg;base64,'+srcB64;
+    });
+  }
   async function uploadThumb(shopOutId,key,b64){
     var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+key+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
     var r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+VSO.token(),'Content-Type':'image/jpeg'},body:b64ToBlob(b64,'image/jpeg')});
@@ -500,7 +521,10 @@ async function loadPipeline() {
       var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
       if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
       var srcB64=frames[idx]; if(!srcB64)continue;
-      try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,saveToken+'_'+i,thumb); if(u)list[i].thumbnail_url=u; } }catch(e){}
+      try{
+        var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,saveToken+'_'+i,thumb); if(u)list[i].thumbnail_url=u; }
+        var full=await makeFull(srcB64); if(full){ var fu=await uploadThumb(shopOutId,saveToken+'_'+i+'_full',full); if(fu)list[i].full_photo_url=fu; }
+      }catch(e){}
     }
   }
   async function finalizeProducts(shopOutId,list){

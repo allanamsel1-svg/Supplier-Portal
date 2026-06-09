@@ -1197,6 +1197,7 @@ async function loadPhotos(id){
   var container=g('photos-container');if(!container)return;
   container.innerHTML='<div class="photo-grid">'+
     currentPhotos.map(function(p,i){
+      if(p.photo_type==='full')return ''; // hi-res pair — shown only in the viewer, not the grid
       var role=p.photo_type==='item_front'?'front':(p.photo_type==='item_back'?'back':(p.photo_type==='section'?'section':''));
       return '<div class="photo-thumb" onclick="openViewer('+i+')">'+
         '<img id="grid-img-'+i+'" loading="lazy" alt="" />'+
@@ -1419,6 +1420,9 @@ async function loadObservations(id){
   // Build a lookup from photo id → index in currentPhotos so the thumbnail can open the viewer.
   var viewerIdxById={};
   (currentPhotos||[]).forEach(function(p,i){viewerIdxById[p.id]=i;});
+  // Map each thumbnail (front) photo → its paired full-res photo, so clicking opens the sharp image.
+  var fullIdByFront={};
+  (currentPhotos||[]).forEach(function(p){ if(p.photo_type==='full' && p.paired_with_photo_id) fullIdByFront[p.paired_with_photo_id]=p.id; });
 
   var statusOpts=['','agreed','disagreed','refined','ignored'];
   var thumbs=[];
@@ -1434,8 +1438,9 @@ async function loadObservations(id){
     // R2 thumbnails (video shop outs) are stored as full URLs; Supabase storage paths need signing.
     var isUrl=path && /^https?:\/\//.test(path);
     if(path && !isUrl)thumbs.push({thumbId:thumbId,path:path});
-    var canOpen=(typeof openViewer==='function') && (viewerIdxById[o.front_photo_id]!=null);
-    var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[o.front_photo_id]+')" style="cursor:pointer;"':'';
+    var openId=fullIdByFront[o.front_photo_id]||o.front_photo_id; // prefer the full-res pair
+    var canOpen=(typeof openViewer==='function') && (viewerIdxById[openId]!=null);
+    var thumbClick=canOpen?' onclick="openViewer('+viewerIdxById[openId]+')" style="cursor:pointer;"':'';
     var thumbLetter=esc((o.brand||'?').trim().charAt(0).toUpperCase()||'?');
     var thumbInner=path
       ?'<img id="'+thumbId+'"'+(isUrl?' src="'+esc(path)+'"':'')+thumbClick+' style="width:84px;height:84px;object-fit:cover;display:block;" onerror="this.style.display=\'none\';" />'
@@ -2478,6 +2483,19 @@ init();
       img.src='data:image/jpeg;base64,'+srcB64;
     });
   }
+  // Full-resolution frame (no scaling) at high quality for the sharp detail view.
+  function makeFull(srcB64){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        var c=document.createElement('canvas'); c.width=img.width||1280; c.height=img.height||720;
+        c.getContext('2d').drawImage(img,0,0);
+        try{ resolve(c.toDataURL('image/jpeg',0.92).split(',')[1]); }catch(e){ resolve(null); }
+      };
+      img.onerror=function(){ resolve(null); };
+      img.src='data:image/jpeg;base64,'+srcB64;
+    });
+  }
   async function uploadThumb(shopOutId,key,b64){
     var url='/api/r2-upload?folder=shop-out-thumbs&filename='+encodeURIComponent('shopout_'+shopOutId+'_'+key+'.jpg')+'&contentType='+encodeURIComponent('image/jpeg');
     var r=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+VSO.token(),'Content-Type':'image/jpeg'},body:b64ToBlob(b64,'image/jpeg')});
@@ -2494,7 +2512,10 @@ init();
       var idx=(!isNaN(fr)&&fr>=1)?(fr-1):Math.floor(frames.length/2);
       if(idx<0)idx=0; if(idx>frames.length-1)idx=frames.length-1;
       var srcB64=frames[idx]; if(!srcB64)continue;
-      try{ var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,saveToken+'_'+i,thumb); if(u)list[i].thumbnail_url=u; } }catch(e){}
+      try{
+        var thumb=await makeThumb(srcB64); if(thumb){ var u=await uploadThumb(shopOutId,saveToken+'_'+i,thumb); if(u)list[i].thumbnail_url=u; }
+        var full=await makeFull(srcB64); if(full){ var fu=await uploadThumb(shopOutId,saveToken+'_'+i+'_full',full); if(fu)list[i].full_photo_url=fu; }
+      }catch(e){}
     }
   }
   async function finalizeProducts(shopOutId,list){
