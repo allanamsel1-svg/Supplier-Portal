@@ -430,11 +430,12 @@ async function loadPipeline() {
       var out=[]; var idx=0; var total=0; var MAXF=300;
       video.onloadedmetadata=function(){
         var dur=video.duration||0; total=Math.min(MAXF,Math.max(1,Math.floor(dur*fps)));
-        canvas.width=video.videoWidth||1280; canvas.height=video.videoHeight||720; seek();
+        var vw=video.videoWidth||1280,vh=video.videoHeight||720,sc=Math.min(1280/vw,720/vh,1);
+        canvas.width=Math.max(1,Math.round(vw*sc)); canvas.height=Math.max(1,Math.round(vh*sc)); seek();
       };
       function seek(){ if(idx>=total){ resolve(out); return; } var t=idx/fps; video.currentTime=Math.min(t,(video.duration||t)-0.05); }
       video.onseeked=function(){
-        try{ ctx.drawImage(video,0,0,canvas.width,canvas.height); out.push(canvas.toDataURL('image/jpeg',0.9).split(',')[1]); }catch(e){}
+        try{ ctx.drawImage(video,0,0,canvas.width,canvas.height); out.push(canvas.toDataURL('image/jpeg',0.8).split(',')[1]); }catch(e){}
         idx++; setStatus('Extracted '+idx+' of '+total+' frames'); setBar(Math.round((idx/total)*100)); seek();
       };
       video.onerror=function(){ reject(new Error('Could not load video')); };
