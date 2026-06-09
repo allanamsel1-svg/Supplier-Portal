@@ -1,3 +1,12 @@
+/* ⚠️ LAYOUT RULE — NEVER VIOLATE:
+   Every container must use box-sizing: border-box.
+   No element may overflow its parent horizontally.
+   All grid children must have min-width: 0.
+   All inputs must have max-width: 100%.
+   Text must use overflow-wrap: break-word.
+   Violating these rules breaks the portal on narrow viewports and split-panel layouts.
+*/
+
 /* tenant-portal.css — shared theme for tenant portal pages.
    Dark theme is the default; the .light-mode class (on <body> or <html>) flips the CSS variables. */
 :root {
@@ -34,6 +43,45 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Global overflow baseline (applies to all tenant pages loading this stylesheet) ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.main-content, .content, .page-content, main, #main, #content {
+  max-width: 100%;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+.card, .panel, .modal, .detail-panel, .split-panel {
+  max-width: 100%;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+input, textarea, select {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.grid, [class*="grid-"] {
+  min-width: 0;
+}
+
+.grid > *, [class*="grid-"] > * {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+table {
+  max-width: 100%;
+  table-layout: fixed;
+  word-wrap: break-word;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg);

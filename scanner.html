@@ -20,6 +20,17 @@
     /* Overflow safety net: clamp media/form controls so nothing bleeds past its container; wrap long unbroken strings. */
     img, video, table, input, select, textarea { max-width: 100%; }
     body { overflow-wrap: break-word; }
+
+    /* ⚠️ LAYOUT RULE — NEVER VIOLATE: every container box-sizing:border-box; nothing overflows
+       its parent horizontally; grid children min-width:0; inputs max-width:100%; text wraps. */
+    *, *::before, *::after { box-sizing: border-box; }
+    .main-content, .content, .page-content, main, #main, #content { max-width: 100%; overflow-x: hidden; min-width: 0; }
+    .card, .panel, .modal, .detail-panel, .split-panel { max-width: 100%; overflow-x: hidden; min-width: 0; }
+    input, textarea, select { max-width: 100%; box-sizing: border-box; }
+    .grid, [class*="grid-"] { min-width: 0; }
+    .grid > *, [class*="grid-"] > * { min-width: 0; overflow-wrap: break-word; word-break: break-word; }
+    table { max-width: 100%; table-layout: fixed; word-wrap: break-word; }
+
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color:var(--text); min-height: 100vh; }
     .topbar { height: 52px; background: var(--bg2); border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
     .topbar-l { display: flex; align-items: center; gap: 10px; }
@@ -78,7 +89,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* Side-by-side body: image left, form right */
-    .ci-body { display: grid; grid-template-columns: 420px 1fr; gap: 0; }
+    .ci-body { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 0; min-width: 0; }
     @media(max-width:900px) { .ci-body { grid-template-columns: 1fr; } }
 
     .ci-imgcol { background: var(--bg2); padding: 14px; border-right: 1px solid #e0e0d8; position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; }
@@ -104,12 +115,14 @@
     .section-title:first-child { padding-top: 0; }
     .rf { margin-bottom: 8px; }
     .rf label { display: block; font-size: 11px; color: #aaa; margin-bottom: 3px; }
-    .rf input, .rf select, .rf textarea { width: 100%; padding: 7px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color:var(--text); background: var(--bg2); }
+    .rf input, .rf select, .rf textarea { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; padding: 7px 10px; font-size: 13px; border: 1px solid #ddd; border-radius: 7px; font-family: inherit; color:var(--text); background: var(--bg2); }
     .rf input:focus, .rf select:focus, .rf textarea:focus { outline: none; border-color:var(--text); box-shadow: 0 0 0 2px rgba(26,26,46,0.06); }
     .rf textarea { resize: vertical; min-height: 70px; }
-    .rg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .rg3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-    .rg4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    /* Field-row grids shrink below their track size so inputs never overflow the form column. */
+    .rg2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .rg3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .rg4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .rg2 > *, .rg3 > *, .rg4 > * { min-width: 0; }
     @media(max-width:560px) { .rg2,.rg3,.rg4 { grid-template-columns: 1fr; } }
 
     .sec-contact { background: var(--bg2); border: 1px solid #e8e8e0; border-radius: 7px; padding: 8px 10px; margin-bottom: 6px; font-size: 12px; }
@@ -151,8 +164,10 @@
     .lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; }
     .lightbox-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.15); color:rgb(255,255,255); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 22px; cursor: pointer; }
     /* ── Two-column layout: card scanner (left) + RFQ image intake (right) ── */
-    .rfq-cols { display: flex; gap: 24px; align-items: stretch; }
-    .rfq-col { flex: 1; min-width: 0; }
+    /* flex-wrap lets the panels stack instead of overflowing when the viewport
+       (or the available width with the sidebar open) is too narrow for both. */
+    .rfq-cols { display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch; }
+    .rfq-col { flex: 1 1 300px; min-width: 300px; max-width: 100%; }
     @media(max-width:900px){ .rfq-cols { flex-direction: column; } }
     /* Factory from Text (right column) */
     .fx-textarea { width: 100%; min-height: 200px; padding: 12px; border: 1px solid #d0d0c8; border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
