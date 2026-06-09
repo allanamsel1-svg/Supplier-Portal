@@ -222,7 +222,7 @@ function h(url,opts){
 }
 function esc(s){if(s==null)return'';return String(s).replace(/[<>&"]/g,function(c){return'&#'+c.charCodeAt(0)+';';});}
 
-var allShops=[],photoCounts={},customerMap={},customerList=[],currentId=null,confirmFn=null;
+var allShops=[],photoCounts={},customerMap={},customerList=[],currentId=null,confirmFn=null,editingMeta=false;
 var currentPhotos=[],viewerIdx=0;
 var uploadCancelled=false,uploadInProgress=false,processingInProgress=false;
 
@@ -265,6 +265,14 @@ async function loadPhotoCounts(){
 
 function getPhotoCount(shopId){return photoCounts[shopId]||0;}
 function getRetailerName(shop){var c=customerMap[shop.customer_id];return c?c.name:'(unknown)';}
+// Display name for the list + detail header: customer name → store location → friendly fallback.
+function displayName(shop){
+  if(!shop)return 'Unnamed Shop Out';
+  var c=customerMap[shop.customer_id];
+  if(c&&c.name)return c.name;
+  if(shop.store_location_text&&shop.store_location_text.trim())return shop.store_location_text;
+  return 'Unnamed Shop Out';
+}
 // Retailer chain name: explicit column → customer name → location text → fallback.
 function chainName(shop){
   if(!shop)return 'Unknown retailer';
@@ -302,10 +310,11 @@ function renderList(){
     var sel=s.id===currentId?' sel':'';
     var arch=s.archived_at?' archived':'';
     var statClass='b-'+(s.processing_status||'pending');
-    var retailer=getRetailerName(s);
+    var name=displayName(s);
+    var locExtra=(s.store_location_text&&s.store_location_text!==name)?(' · '+esc(s.store_location_text)):'';
     return '<div class="list-item'+sel+arch+'" onclick="selectShop(\''+s.id+'\')">'+
-      '<div class="li-retailer">'+esc(retailer)+'</div>'+
-      '<div class="li-date">'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</div>'+
+      '<div class="li-retailer">'+esc(name)+'</div>'+
+      '<div class="li-date">'+esc(s.shop_date||'date pending')+locExtra+'</div>'+
       '<div class="li-meta">'+
         '<span class="badge '+statClass+'">'+esc(s.processing_status||'pending')+'</span>'+
         '<span>📸 '+getPhotoCount(s.id)+'</span>'+
@@ -414,6 +423,7 @@ function selectShop(id){
     uploadCancelled=true;
   }
   currentId=id;
+  editingMeta=false;
   renderList();
   window.history.replaceState(null,'','?id='+id);
   renderDetail();
@@ -427,15 +437,30 @@ async function renderDetail(){
   var stat=s.processing_status||'pending';
   var photoCount=getPhotoCount(s.id);
 
-  var html='<div id="failed-banner"></div>'+
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
-    '<div>'+
-      '<div style="font-size:22px;font-weight:700;">'+esc(retailer)+'</div>'+
+  var titleBlock;
+  if(editingMeta){
+    titleBlock='<div>'+
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
+        '<input id="meta-name-input" type="text" value="'+esc(s.store_location_text||'')+'" placeholder="Store name" style="font-size:18px;font-weight:700;padding:5px 9px;border:1px solid #c8c8c0;border-radius:6px;min-width:240px;">'+
+        '<input id="meta-date-input" type="date" value="'+esc(s.shop_date||'')+'" style="font-size:14px;padding:5px 9px;border:1px solid #c8c8c0;border-radius:6px;">'+
+        '<button class="btn btn-primary" style="font-size:12px;padding:5px 14px;" onclick="saveShopMeta(\''+s.id+'\')">Save</button>'+
+        '<button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" onclick="cancelShopMeta()">Cancel</button>'+
+      '</div>'+
+    '</div>';
+  } else {
+    titleBlock='<div>'+
+      '<div style="font-size:22px;font-weight:700;display:flex;align-items:center;gap:8px;">'+esc(displayName(s))+
+        '<button title="Edit store name & date" style="background:none;border:none;cursor:pointer;font-size:15px;padding:0;line-height:1;" onclick="editShopMeta()">✏️</button>'+
+      '</div>'+
       '<div style="font-size:12px;color:#888;margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'+
         '<span>'+esc(s.shop_date||'date pending')+(s.store_location_text?' · '+esc(s.store_location_text):'')+'</span>'+
         '<span style="background:#1a1a2e;color:#fff;border-radius:10px;padding:2px 9px;font-size:10px;font-weight:700;letter-spacing:0.02em;">'+esc(chainName(s))+(chainType(s)?' · '+esc(chainType(s)):'')+'</span>'+
       '</div>'+
-    '</div>'+
+    '</div>';
+  }
+  var html='<div id="failed-banner"></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;">'+
+    titleBlock+
     '<span class="badge b-'+stat+'" style="font-size:11px;padding:4px 12px;">'+esc(stat)+'</span>'+
   '</div>';
 
@@ -1013,6 +1038,30 @@ async function assignSectionsToProducts(shopOutId,sections,productPhotos){
       }
     }
   }
+}
+
+// ─── EDIT STORE NAME + DATE (header) ────────────────────────────────
+function editShopMeta(){editingMeta=true;renderDetail();setTimeout(function(){var i=g('meta-name-input');if(i)i.focus();},0);}
+function cancelShopMeta(){editingMeta=false;renderDetail();}
+async function saveShopMeta(id){
+  var nameEl=g('meta-name-input'),dateEl=g('meta-date-input');
+  if(!nameEl||!dateEl)return;
+  var newName=nameEl.value.trim();
+  var newDate=dateEl.value||null;
+  try{
+    var r=await h(SB+'/rest/v1/shop_outs?id=eq.'+id,{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({store_location_text:newName||null,shop_date:newDate})
+    });
+    if(!r.ok){alert('Failed: '+await r.text());return;}
+    var idx=allShops.findIndex(function(x){return x.id===id;});
+    if(idx>=0){allShops[idx].store_location_text=newName||null;allShops[idx].shop_date=newDate;}
+    editingMeta=false;
+    renderDetail();
+    renderList();
+    soToast('Shop out updated');
+  }catch(err){alert('Error: '+err.message);}
 }
 
 // ─── EDIT LOCATION (manual) ─────────────────────────────────────────

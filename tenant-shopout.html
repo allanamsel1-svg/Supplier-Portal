@@ -52,6 +52,7 @@
 <script>
 let TID = null;
 let runs = [], observations = [], photoMap = {};
+let editingMeta = false;
 const loaded = {};
 function photoUrl(fp) { return SUPA_URL + '/storage/v1/object/public/shop-out-photos/' + fp; }
 
@@ -84,7 +85,7 @@ function renderRuns() {
   if (!runs.length) { box.innerHTML = '<div class="empty"><span class="empty-icon">🛍️</span>No shop-out runs yet.</div>'; return; }
   box.innerHTML = `<table class="data-table"><thead><tr><th>Location</th><th>Visit date</th><th>Sections</th><th>Observations</th><th>Status</th></tr></thead><tbody>${
     runs.map(r => `<tr class="clickable" data-id="${esc(r.id)}">
-      <td>${esc(r.store_location_text || 'Unknown location')}</td><td>${fmtDate(r.shop_date)}</td>
+      <td>${esc(r.store_location_text || 'Unnamed Shop Out')}</td><td>${fmtDate(r.shop_date)}</td>
       <td>${cnt(r.shop_out_sections)}</td><td>${r.total_observations != null ? r.total_observations : cnt(r.shop_out_observations)}</td>
       <td>${statusBadge(r.status || r.processing_status)}</td></tr>`).join('')
   }</tbody></table>`;
@@ -99,11 +100,22 @@ async function showRunDetail(id) {
     supa(`shop_out_sections?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=sequence_number.asc`),
     supa(`shop_out_observations?shop_out_id=eq.${id}&tenant_id=eq.${TID}&order=created_at.desc`),
   ]);
-  const head = r ? kv([
-    ['Location', r.store_location_text], ['Visit date', fmtDate(r.shop_date)],
+  const metaHeader = !r ? '' : (editingMeta
+    ? `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+         <input id="meta-name-input" type="text" value="${esc(r.store_location_text || '')}" placeholder="Store name" style="font-size:15px;font-weight:600;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);min-width:220px;">
+         <input id="meta-date-input" type="date" value="${esc(r.shop_date || '')}" style="font-size:13px;padding:6px 9px;border:1px solid var(--border);border-radius:6px;background:var(--card-bg);color:var(--text);">
+         <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="saveShopMeta('${esc(id)}')">Save</button>
+         <button class="btn" style="padding:6px 14px;font-size:13px;" onclick="cancelShopMeta('${esc(id)}')">Cancel</button>
+       </div>`
+    : `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+         <span style="font-size:16px;font-weight:700;color:var(--text);">${esc((r.store_location_text && r.store_location_text.trim()) ? r.store_location_text : 'Unnamed Shop Out')}</span>
+         <span style="cursor:pointer;font-size:14px;" title="Edit store name & date" onclick="editShopMeta('${esc(id)}')">✏️</span>
+         <span style="color:var(--text2);font-size:13px;">· ${fmtDate(r.shop_date)}</span>
+       </div>`);
+  const head = r ? (metaHeader + kv([
     ['Status', statusBadge(r.status || r.processing_status), true],
     ['Photos', r.total_photos], ['Observations', r.total_observations], ['Description', r.description],
-  ]) : '';
+  ])) : '';
   const secList = sections.length ? sections.map(s => `<div class="sub-item">
       <div class="si-title">${esc(s.department || s.category_detected || 'Section')}</div>
       <div class="si-meta">${[s.brand_summary && preview(s.brand_summary, 120), s.estimated_linear_feet && s.estimated_linear_feet + ' ft'].filter(Boolean).map(esc).join(' · ') || '—'}</div>
@@ -119,6 +131,40 @@ async function showRunDetail(id) {
   document.getElementById('backToRuns').addEventListener('click', () => { location.hash = ''; });
 }
 function preview(t, n) { t = (t || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; }
+
+// Edit store name + date on a run.
+function editShopMeta(id) { editingMeta = true; showRunDetail(id); }
+function cancelShopMeta(id) { editingMeta = false; showRunDetail(id); }
+async function saveShopMeta(id) {
+  const nameEl = document.getElementById('meta-name-input'), dateEl = document.getElementById('meta-date-input');
+  if (!nameEl || !dateEl) return;
+  const newName = nameEl.value.trim(), newDate = dateEl.value || null;
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/shop_outs?id=eq.${id}&tenant_id=eq.${TID}`, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ store_location_text: newName || null, shop_date: newDate }),
+    });
+    if (!res.ok) { alert('Failed: ' + await res.text()); return; }
+    const rr = runs.find(x => x.id === id);
+    if (rr) { rr.store_location_text = newName || null; rr.shop_date = newDate; }
+    editingMeta = false;
+    showRunDetail(id);
+    renderRuns();
+    soToast('Shop out updated');
+  } catch (e) { alert('Error: ' + e.message); }
+}
+function soToast(msg) {
+  let t = document.getElementById('so-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'so-toast';
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:11px 18px;border-radius:9px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,0.25);z-index:9999;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
 
 // TAB 2 — Observations
 async function loadObservations() {
