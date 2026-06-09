@@ -44,7 +44,7 @@
     .top-banner { background: var(--bg2); border: 1px solid #a0d8a0; border-radius: 9px; padding: 11px 14px; font-size: 13px; color: #1a6a1a; margin-bottom: 1rem; display: none; }
 
     /* Upload zone */
-    .upload-card { background: var(--bg2); border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; max-width: 800px; }
+    .upload-card { background: var(--bg2); border: 1px solid #e0e0d8; border-radius: 14px; padding: 1.5rem; margin-bottom: 1.25rem; }
     .drop-zone { border: 2px dashed #d0d0c8; border-radius: 10px; padding: 2.5rem 1rem; text-align: center; cursor: pointer; transition: all 0.15s; }
     .drop-zone:hover, .drop-zone.drag-over { border-color:var(--text); background: var(--bg2); }
     .drop-icon { font-size: 36px; margin-bottom: 10px; }
@@ -58,7 +58,7 @@
     @media(max-width:600px) { .drop-zone{display:none;} .mobile-btns{display:flex;} .main{padding:1rem 0.75rem 4rem;} }
 
     /* Scan bar */
-    .scan-bar { display: none; align-items: center; gap: 12px; margin-bottom: 1rem; max-width: 800px; }
+    .scan-bar { display: none; align-items: center; gap: 12px; margin-bottom: 1rem; }
     .btn-scan-all { padding: 11px 20px; background: #1a1a2e; color:rgb(255,255,255); border: none; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-scan-all:hover { opacity: 0.87; }
     .btn-scan-all:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -88,16 +88,15 @@
     .spinner { display: inline-block; width: 13px; height: 13px; border: 2px solid #c0d0f0; border-top-color: #2266cc; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 4px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Side-by-side body: image left, form right */
-    .ci-body { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 0; min-width: 0; }
-    @media(max-width:900px) { .ci-body { grid-template-columns: 1fr; } }
+    /* Stacked card body: business-card image band on top, full-width review form below.
+       (No side-by-side / split panel — the form spans the full page width.) */
+    .ci-body { display: block; min-width: 0; }
 
-    .ci-imgcol { background: var(--bg2); padding: 14px; border-right: 1px solid #e0e0d8; position: sticky; top: 52px; align-self: start; max-height: calc(100vh - 52px); overflow-y: auto; }
-    @media(max-width:900px) { .ci-imgcol { position: static; max-height: none; border-right: none; border-bottom: 1px solid #e0e0d8; } }
+    .ci-imgcol { background: var(--bg2); padding: 14px; border-bottom: 1px solid #e0e0d8; }
     .ci-imgcol-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin-bottom: 8px; }
-    .ci-bigimg { width: 100%; border-radius: 8px; border: 1px solid #e0e0d8; background: var(--bg2); cursor: zoom-in; display: block; }
+    .ci-bigimg { width: 100%; max-width: 380px; border-radius: 8px; border: 1px solid #e0e0d8; background: var(--bg2); cursor: zoom-in; display: block; }
     .ci-bigimg:hover { border-color:var(--text); }
-    .ci-imgcol-hint { font-size: 11px; color: #999; margin-top: 6px; text-align: center; }
+    .ci-imgcol-hint { font-size: 11px; color: #999; margin-top: 6px; max-width: 380px; text-align: center; }
     .ci-rawtext { margin-top: 12px; background: var(--bg2); border: 1px solid #e0e0d8; border-radius: 7px; padding: 10px; font-size: 11px; color: #555; max-height: 180px; overflow-y: auto;
       font-family: 'SF Mono',Monaco,Consolas,monospace; white-space: pre-wrap; line-height: 1.5; }
     .ci-rawtext-label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #888; margin: 10px 0 6px; }
@@ -163,13 +162,16 @@
     .lightbox.show { display: flex; }
     .lightbox img { max-width: 100%; max-height: 100%; border-radius: 6px; }
     .lightbox-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,0.15); color:rgb(255,255,255); border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 22px; cursor: pointer; }
-    /* ── Two-column layout: card scanner (left) + RFQ image intake (right) ── */
-    /* flex-wrap lets the panels stack instead of overflowing when the viewport
-       (or the available width with the sidebar open) is too narrow for both. */
-    .rfq-cols { display: flex; flex-wrap: wrap; gap: 24px; align-items: stretch; }
-    .rfq-col { flex: 1 1 300px; min-width: 300px; max-width: 100%; }
-    @media(max-width:900px){ .rfq-cols { flex-direction: column; } }
-    /* Factory from Text (right column) */
+    /* ── Single-column layout: tabbed input on top, full-width extracted results below ──
+       (No side-by-side / split panel — input and results each fill the full page width.) */
+    .scan-tabs { display: flex; gap: 4px; border-bottom: 1px solid #e0e0d8; margin-bottom: 1.25rem; }
+    .scan-tab { padding: 10px 18px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 14px; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; }
+    .scan-tab:hover { color: var(--text); }
+    .scan-tab.active { color: var(--text); border-bottom-color: #1a1a2e; }
+    .scan-tab-panel { display: none; }
+    .scan-tab-panel.active { display: block; }
+    .results-section { margin-top: 1.5rem; min-width: 0; }
+    /* Factory from Text (paste tab) */
     .fx-textarea { width: 100%; min-height: 200px; padding: 12px; border: 1px solid #d0d0c8; border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit; resize: vertical; box-sizing: border-box; }
     .fx-review { margin-top: 14px; border: 1px solid #e0e0d8; border-radius: 12px; padding: 14px; background: var(--bg2); }
     .fx-spinner { width: 14px; height: 14px; border: 2px solid rgba(120,120,120,0.3); border-top-color: var(--text); border-radius: 50%; animation: rfqspin 0.7s linear infinite; display: inline-block; vertical-align: middle; margin-right: 6px; }
@@ -217,45 +219,52 @@
 </div>
 
 <div class="main">
- <div class="rfq-cols">
-  <div class="rfq-col">
   <div class="page-title">Business Card Scanner</div>
   <div class="page-sub">Upload or photograph business cards. AI extracts contact details, flags uncertain fields for review, then saves the factory as an active intel asset.</div>
 
   <div class="top-banner" id="top-banner"></div>
 
-  <div class="upload-card">
-    <div class="drop-zone" id="drop-zone">
-      <div class="drop-icon">📇</div>
-      <div class="drop-title">Drop business card photos here</div>
-      <div class="drop-sub">JPG, PNG, HEIC &nbsp;·&nbsp; Multiple cards at once</div>
-      <label class="browse-btn">Browse Files<input type="file" id="file-input" accept="image/*" multiple style="display:none" /></label>
+  <!-- Input section (full width): toggle between scanning a card and pasting text -->
+  <div class="scan-tabs">
+    <button class="scan-tab active" id="tab-scan" onclick="switchScanTab('scan')">📷 Scan Card</button>
+    <button class="scan-tab" id="tab-paste" onclick="switchScanTab('paste')">📝 Paste Text</button>
+  </div>
+
+  <div class="scan-tab-panel active" id="panel-scan">
+    <div class="upload-card">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon">📇</div>
+        <div class="drop-title">Drop business card photos here</div>
+        <div class="drop-sub">JPG, PNG, HEIC &nbsp;·&nbsp; Multiple cards at once</div>
+        <label class="browse-btn">Browse Files<input type="file" id="file-input" accept="image/*" multiple style="display:none" /></label>
+      </div>
+      <div class="mobile-btns">
+        <label class="mob-btn"><span class="mob-icon">📷</span>Take Photo<input type="file" accept="image/*" capture="environment" style="display:none" id="cam-input" /></label>
+        <label class="mob-btn"><span class="mob-icon">🖼</span>Choose Photo<input type="file" accept="image/*" multiple style="display:none" id="lib-input" /></label>
+      </div>
     </div>
-    <div class="mobile-btns">
-      <label class="mob-btn"><span class="mob-icon">📷</span>Take Photo<input type="file" accept="image/*" capture="environment" style="display:none" id="cam-input" /></label>
-      <label class="mob-btn"><span class="mob-icon">🖼</span>Choose Photo<input type="file" accept="image/*" multiple style="display:none" id="lib-input" /></label>
+
+    <div class="scan-bar" id="scan-bar">
+      <button class="btn-scan-all" id="scan-btn" onclick="scanAll()">✦ Scan All Cards with AI</button>
+      <span class="scan-count" id="scan-count"></span>
     </div>
   </div>
 
-  <div class="scan-bar" id="scan-bar">
-    <button class="btn-scan-all" id="scan-btn" onclick="scanAll()">✦ Scan All Cards with AI</button>
-    <span class="scan-count" id="scan-count"></span>
-  </div>
-
-  <div class="queue" id="queue"></div>
-  </div><!-- /rfq-col (left: card scanner) -->
-
-  <div class="rfq-col" id="factory-intake">
+  <div class="scan-tab-panel" id="panel-paste">
     <div class="rfq-head">🏭 Factory from Text</div>
     <div class="rfq-subhead">Paste any factory contact info — email, WeChat message, website text, etc.</div>
     <div class="upload-card">
       <textarea id="fx-text" class="fx-textarea" placeholder="Paste factory contact details here — name, address, email, phone, WeChat, product categories, anything you have..."></textarea>
       <button class="rfq-extract-btn" id="fx-extract-btn" onclick="fxExtract()">Extract &amp; Create Factory →</button>
       <div id="fx-status" style="font-size:13px;color:#999;margin-top:10px;"></div>
-      <div id="fx-card"></div>
     </div>
-  </div><!-- /rfq-col (right: Factory from Text) -->
- </div><!-- /rfq-cols -->
+  </div>
+
+  <!-- Extracted results (full width, below the input section) -->
+  <div class="results-section">
+    <div class="queue" id="queue"></div>
+    <div id="fx-card"></div>
+  </div>
 </div>
 
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
@@ -269,6 +278,15 @@ var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im
 var cards=[], counter=0, allCategories=[];
 
 function g(id){return document.getElementById(id);}
+
+// Toggle the single-column input between "Scan Card" (drop zone) and "Paste Text" (textarea).
+function switchScanTab(name){
+  var scan=(name==='scan');
+  g('panel-scan').classList.toggle('active',scan);
+  g('panel-paste').classList.toggle('active',!scan);
+  g('tab-scan').classList.toggle('active',scan);
+  g('tab-paste').classList.toggle('active',!scan);
+}
 
 window.addEventListener('load',function(){
   g('file-input').addEventListener('change',function(){handleFiles(this.files);this.value='';});
