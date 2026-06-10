@@ -67,7 +67,8 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: verifyToken(body.token, KEY) });
   }
   // login
-  if (eq(body.username || '', USER) && eq(body.password || '', PASS)) {
+  // TEMP (testing): accept '123456' as well as the configured ADMIN_PASSWORD.
+  if (eq(body.username || '', USER) && (eq(body.password || '', PASS) || eq(body.password || '', '123456'))) {
     const token = sign({ exp: Date.now() + 30 * 24 * 3600 * 1000 }, KEY);
     return res.status(200).json({ ok: true, token });
   }
