@@ -146,6 +146,17 @@
 (function () {
   'use strict';
 
+  // White-label: on portal.buylinebrands.com pre-populate the Buyline Brands tenant
+  // context and swap the TBG branding for Buyline Brands.
+  var BUYLINE_HOST = 'portal.buylinebrands.com';
+  var BUYLINE_TENANT_ID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+  if (location.hostname === BUYLINE_HOST) {
+    try { localStorage.setItem('tenant_id', BUYLINE_TENANT_ID); } catch (e) {}
+    document.title = 'Buyline Brands — Sign In';
+    var _wm = document.querySelector('.logo-wordmark'); if (_wm) _wm.textContent = 'Buyline Brands';
+    var _sub = document.querySelector('.logo-sub'); if (_sub) _sub.textContent = 'Brand Portal';
+  }
+
   var emailEl = document.getElementById('email');
   var passwordEl = document.getElementById('password');
   var btn = document.getElementById('loginBtn');

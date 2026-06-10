@@ -5,6 +5,21 @@
 const SUPA_URL = 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 
+// ── White-label host: portal.buylinebrands.com → Buyline Brands tenant ──
+// On this domain the portal auto-binds to the Buyline Brands tenant (no tenant
+// selection), shows "Buyline Brands" branding, and only ever bounces to the
+// tenant login (never the admin login).
+const BUYLINE_HOST = 'portal.buylinebrands.com';
+const BUYLINE_TENANT_ID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+const BUYLINE_BRAND_NAME = 'Buyline Brands';
+function isBuylineHost() {
+  try { return location.hostname === BUYLINE_HOST; } catch (e) { return false; }
+}
+// Auto-set the tenant context as soon as this script loads on the Buyline domain.
+if (isBuylineHost()) { try { localStorage.setItem('tenant_id', BUYLINE_TENANT_ID); } catch (e) {} }
+// Brand wordmark shown in the header + sidebar.
+function portalBrandName() { return isBuylineHost() ? BUYLINE_BRAND_NAME : 'TBG Sourcing'; }
+
 async function supa(path) {
   try {
     const res = await fetch(SUPA_URL + '/rest/v1/' + path, {
@@ -48,9 +63,10 @@ async function tenantAuth() {
   if (!token) return window.location.href = 'tenant-login.html';
 
   // Where to send the user if THIS session is invalid (never cross-clear the other portal).
+  // On the Buyline white-label host we NEVER expose admin.html — always the tenant login.
   const bounce = () => {
-    if (isAdmin) { localStorage.removeItem('admin_session'); window.location.href = 'admin.html'; }
-    else { localStorage.removeItem('tenant_token'); window.location.href = 'tenant-login.html'; }
+    if (isAdmin) localStorage.removeItem('admin_session'); else localStorage.removeItem('tenant_token');
+    window.location.href = (isBuylineHost() || !isAdmin) ? 'tenant-login.html' : 'admin.html';
     return undefined;
   };
 
@@ -72,6 +88,8 @@ async function tenantAuth() {
 
 // Portal identity label shown in the header + sidebar so it's always obvious which portal you're in.
 function portalIdentityLabel(user) {
+  // On the Buyline white-label host everything reads "Buyline Brands" (even for admins).
+  if (isBuylineHost()) return BUYLINE_BRAND_NAME;
   if (user && user.isAdmin) return 'TBG Sourcing — Admin';
   return (user && user.tenant && user.tenant.name) || 'Tenant';
 }
@@ -80,7 +98,8 @@ function doLogout() {
   // An admin browsing a shared tenant page signs out of the ADMIN portal (and only that).
   if (localStorage.getItem('admin_session')) {
     localStorage.removeItem('admin_session');
-    window.location.href = 'admin.html';
+    // Never surface admin.html on the Buyline white-label host.
+    window.location.href = isBuylineHost() ? 'tenant-login.html' : 'admin.html';
     return;
   }
   const token = localStorage.getItem('tenant_token');
@@ -126,7 +145,7 @@ function renderHeader(user) {
   const html =
     '<div class="tenant-header" id="tenantHeader">' +
       '<div class="th-left" style="display:flex;align-items:center;">' +
-        '<div class="th-logo">TBG Sourcing</div>' +
+        '<div class="th-logo">' + esc(portalBrandName()) + '</div>' +
         dashLink +
       '</div>' +
       '<div class="th-right">' +
@@ -253,7 +272,7 @@ function renderSidebar(user) {
   const html = `
     <div class="sidebar">
       <div class="sidebar-logo">
-        <div class="wordmark">TBG Sourcing</div>
+        <div class="wordmark">${esc(portalBrandName())}</div>
         <div class="tenant-name">${esc(tenantName)}</div>
       </div>
       <nav class="sidebar-nav">${nav}</nav>

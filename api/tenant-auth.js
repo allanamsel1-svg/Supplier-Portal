@@ -21,6 +21,23 @@ const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': '
 // portal pages (admins hold an admin_session, not a tenant_token / tenant_users row).
 const ADMIN_TENANT_ID = 'f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
 
+// ── White-label host: portal.buylinebrands.com → Buyline Brands ──
+const BUYLINE_HOST = 'portal.buylinebrands.com';
+function isBuylineRequest(req) {
+  try {
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+    if (host.includes(BUYLINE_HOST)) return true;
+    const ref = String(req.headers.referer || req.headers.Referer || '').toLowerCase();
+    return ref.includes(BUYLINE_HOST);
+  } catch (e) { return false; }
+}
+// On the Buyline host, display the buyline tenant as "Buyline Brands" (its DB row is
+// named "Byline Brands"). Only ever relabels the buyline tenant — never anyone else.
+function applyBuylineBranding(tenantObj, req) {
+  if (tenantObj && tenantObj.id === ADMIN_TENANT_ID && isBuylineRequest(req)) tenantObj.name = 'Buyline Brands';
+  return tenantObj;
+}
+
 // Verify an admin session token exactly the way api/admin-auth.js does:
 // token = base64url(payload) + '.' + base64url(HMAC-SHA256(payload, KEY)),
 // KEY = ADMIN_SESSION_SECRET || ADMIN_PASSWORD. Returns false if unconfigured.
@@ -124,6 +141,7 @@ export default async function handler(req, res) {
           const tarr = tr.ok ? await tr.json() : [];
           const tenant = Array.isArray(tarr) ? tarr[0] : null;
           if (tenant) {
+            applyBuylineBranding(tenant, req);
             const adminUser = { id: 'admin', email: 'admin@tbgsourcing.net', full_name: 'Admin', role: 'admin', tenants: tenant };
             return res.status(200).json({ valid: true, user: userPayload(adminUser, tenant.id) });
           }
@@ -147,6 +165,7 @@ export default async function handler(req, res) {
       }
       if (!session.tenant_users.is_active) return res.status(403).json({ error: 'Account inactive' });
 
+      applyBuylineBranding(session.tenant_users.tenants, req);
       return res.status(200).json({ valid: true, user: userPayload(session.tenant_users, session.tenant_id) });
     } catch (e) {
       console.error('tenant-auth validate: unhandled error', e);
@@ -197,6 +216,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({ last_login_at: new Date().toISOString() }),
       }).catch(() => {});
 
+      applyBuylineBranding(user.tenants, req);
       return res.status(200).json({ token: session.token, expires_at: session.expires_at, user: userPayload(user, user.tenant_id) });
     } catch (e) {
       console.error('tenant-auth login: unhandled error', e);
