@@ -63,6 +63,9 @@
       { icon: '📦', label: 'SKU Library',     href: 'tenant-rfq.html#skus' },
       { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup' },
     ]},
+    { section: 'System', items: [
+      { icon: '⚙️', label: 'Setup', href: '/setup.html' },
+    ]},
   ];
 
   // Runtime assertion — fails loudly in the console if the locked Overview items ever go missing.

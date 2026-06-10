@@ -8,6 +8,7 @@
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-W8YDH8LTSB"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-W8YDH8LTSB');</script>
+  <link rel="stylesheet" href="ri_shared.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     /* Overflow safety net: clamp media/form controls so nothing bleeds past its container; wrap long unbroken strings. */
@@ -171,6 +172,11 @@
     .cb-it input { width: 13px; height: 13px; cursor: pointer; }
   </style></head>
 <body>
+<script>
+(function(){
+  if(localStorage.getItem('adminDarkMode')==='true') document.body.classList.add('admin-dark');
+})();
+</script>
 
 <div class="topbar">
   <div class="topbar-l">
@@ -2541,7 +2547,11 @@ async function initPage(){
     switchTab('skus');
     await loadSkuFromQuote(fromQuote,fromRfq);
   }else{
-    loadCats();
+    // Default view: activate the Categories tab and preload the core datasets so the
+    // page never renders empty (categories, brands, and freight rates all load on open).
+    switchTab('categories');
+    try{ loadBrands(); }catch(e){}
+    try{ loadFreightTab(); }catch(e){}
   }
 }
 initPage();
