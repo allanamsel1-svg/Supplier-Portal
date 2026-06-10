@@ -2277,112 +2277,21 @@
       </div>
     </div>
 
-    <div class="panel" id="panel-settings">
-      <div class="ph"><div class="ph-title">Settings</div><div class="ph-sub">Configure your admin dashboard</div></div>
-      <div class="set-tabs">
-        <button class="set-tab on" data-stab="company" onclick="setTab('company')">🏢 Company Info</button>
-        <button class="set-tab" data-stab="apikeys" onclick="setTab('apikeys')">🔑 API Keys</button>
-        <button class="set-tab" data-stab="users" onclick="setTab('users')">👥 Users</button>
-        <button class="set-tab" data-stab="personas" onclick="setTab('personas')">✉️ Personas</button>
-        <button class="set-tab" data-stab="prefs" onclick="setTab('prefs')">⚙️ Preferences</button>
-      </div>
-
-      <!-- TAB 1: Company Info -->
-      <div class="set-pane on" id="setpane-company">
-        <div class="set-section">
-          <h3>Company Information</h3>
-          <div class="set-grid">
-            <div class="set-field"><label>Company Name</label><input id="ci-name" placeholder="TBG Sourcing Inc." /></div>
-            <div class="set-field"><label>EIN</label><input id="ci-ein" placeholder="42-2911499" /></div>
-          </div>
-          <div class="set-field"><label>Address Line 1</label><input id="ci-addr1" /></div>
-          <div class="set-field"><label>Address Line 2</label><input id="ci-addr2" /></div>
-          <div class="set-grid">
-            <div class="set-field"><label>City</label><input id="ci-city" /></div>
-            <div class="set-field"><label>State / Province</label><input id="ci-state" /></div>
-          </div>
-          <div class="set-grid">
-            <div class="set-field"><label>ZIP / Postal</label><input id="ci-zip" /></div>
-            <div class="set-field"><label>Country</label><input id="ci-country" /></div>
-          </div>
-          <div class="set-grid">
-            <div class="set-field"><label>Phone</label><input id="ci-phone" /></div>
-            <div class="set-field"><label>Website</label><input id="ci-website" placeholder="https://" /></div>
-          </div>
-          <button class="set-btn" onclick="saveCompanyInfo()">Save Company Info</button>
-          <span class="saved" id="ci-saved">Saved!</span>
+    <div id="panel-settings" class="panel">
+      <div style="padding:2rem;max-width:900px;">
+        <h2 style="margin-bottom:1.5rem;font-size:1.4rem;">⚙️ Settings</h2>
+        <div style="display:flex;gap:8px;margin-bottom:1.5rem;border-bottom:2px solid #e0e0d8;padding-bottom:0;">
+          <button onclick="setTab('company')" id="set-tab-company" style="padding:8px 18px;border:none;border-bottom:3px solid #1a2e44;background:none;cursor:pointer;font-weight:600;color:#1a2e44;">Company Info</button>
+          <button onclick="setTab('apikeys')" id="set-tab-apikeys" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">API Keys</button>
+          <button onclick="setTab('users')" id="set-tab-users" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">User Management</button>
+          <button onclick="setTab('personas')" id="set-tab-personas" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">Email Personas</button>
+          <button onclick="setTab('prefs')" id="set-tab-prefs" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">Portal Preferences</button>
         </div>
-      </div>
-
-      <!-- TAB 2: API Key Management -->
-      <div class="set-pane" id="setpane-apikeys">
-        <div class="set-section">
-          <h3>API Keys</h3>
-          <p>Keys live in Vercel environment variables and are shown masked here. They are read-only — manage them in Vercel.</p>
-          <div id="apikeys-list" style="margin-top:10px;"><div style="color:#999;font-size:13px;">Loading…</div></div>
-        </div>
-      </div>
-
-      <!-- TAB 3: User Management -->
-      <div class="set-pane" id="setpane-users">
-        <div class="set-section">
-          <h3>Add User</h3>
-          <div class="set-grid">
-            <div class="set-field"><label>Email</label><input id="usr-email" type="email" placeholder="user@company.com" /></div>
-            <div class="set-field"><label>Password</label><input id="usr-pass" type="text" placeholder="initial password" /></div>
-          </div>
-          <div class="set-grid">
-            <div class="set-field"><label>Role</label><select id="usr-role" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="member">Member</option><option value="admin">Admin</option><option value="designer">Designer</option></select></div>
-            <div class="set-field"><label>Tenant</label><select id="usr-tenant" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"></select></div>
-          </div>
-          <button class="set-btn" onclick="addTenantUser()">Add User</button>
-          <span class="saved" id="usr-saved">Added!</span>
-        </div>
-        <div class="set-section">
-          <h3>Users</h3>
-          <div id="users-list"><div style="color:#999;font-size:13px;">Loading…</div></div>
-        </div>
-      </div>
-
-      <!-- TAB 4: Email / Persona Management -->
-      <div class="set-pane" id="setpane-personas">
-        <div class="set-section">
-          <h3>Sarah Lindburg — Sourcing</h3>
-          <div class="set-grid">
-            <div class="set-field"><label>Email</label><input id="per-sarah-email" placeholder="sourcing@tbgsourcing.net" /></div>
-            <div class="set-field"><label>Display Name</label><input id="per-sarah-name" placeholder="Sarah Lindburg" /></div>
-          </div>
-          <div class="set-field"><label>Signature</label><textarea id="per-sarah-sig" rows="4"></textarea></div>
-          <button class="set-btn" onclick="savePersona('sarah')">Save Sarah</button>
-          <span class="saved" id="per-sarah-saved">Saved!</span>
-        </div>
-        <div class="set-section">
-          <h3>Tyler Durden — Compliance</h3>
-          <div class="set-grid">
-            <div class="set-field"><label>Email</label><input id="per-tyler-email" placeholder="compliance@tbgsourcing.net" /></div>
-            <div class="set-field"><label>Display Name</label><input id="per-tyler-name" placeholder="Tyler Durden" /></div>
-          </div>
-          <div class="set-field"><label>Signature</label><textarea id="per-tyler-sig" rows="4"></textarea></div>
-          <button class="set-btn" onclick="savePersona('tyler')">Save Tyler</button>
-          <span class="saved" id="per-tyler-saved">Saved!</span>
-        </div>
-      </div>
-
-      <!-- TAB 5: Portal Preferences -->
-      <div class="set-pane" id="setpane-prefs">
-        <div class="set-section">
-          <h3>Portal Preferences</h3>
-          <div class="set-grid">
-            <div class="set-field"><label>Default Language</label><select id="pref-lang" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="en">English</option><option value="es" disabled>Spanish (coming soon)</option><option value="zh" disabled>Chinese (coming soon)</option></select></div>
-            <div class="set-field"><label>Default Timezone</label><select id="pref-tz" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="America/New_York">America/New_York (ET)</option><option value="America/Chicago">America/Chicago (CT)</option><option value="America/Denver">America/Denver (MT)</option><option value="America/Los_Angeles">America/Los_Angeles (PT)</option><option value="UTC">UTC</option><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Hong_Kong">Asia/Hong_Kong</option></select></div>
-          </div>
-          <div class="set-grid">
-            <div class="set-field"><label>Date Format</label><select id="pref-datefmt" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
-            <div class="set-field"><label>Dark Mode Default</label><select id="pref-dark" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="off">Off</option><option value="on">On</option></select></div>
-          </div>
-          <button class="set-btn" onclick="savePrefs()">Save Preferences</button>
-          <span class="saved" id="pref-saved">Saved!</span>
-        </div>
+        <div id="set-pane-company" class="set-pane"></div>
+        <div id="set-pane-apikeys" class="set-pane" style="display:none;"></div>
+        <div id="set-pane-users" class="set-pane" style="display:none;"></div>
+        <div id="set-pane-personas" class="set-pane" style="display:none;"></div>
+        <div id="set-pane-prefs" class="set-pane" style="display:none;"></div>
       </div>
     </div>
   </div>
@@ -15057,11 +14966,106 @@ async function rejectPendingCert(btn){
 // Uses globals SB, KEY, g, esc, toast from the main script above.
 // ════════════════════════════════════════════════════════════════════
 function setTab(name){
-  document.querySelectorAll('#panel-settings .set-tab').forEach(function(t){t.classList.toggle('on',t.getAttribute('data-stab')===name);});
-  document.querySelectorAll('#panel-settings .set-pane').forEach(function(p){p.classList.remove('on');});
-  var pane=g('setpane-'+name);if(pane)pane.classList.add('on');
+  var tabs=['company','apikeys','users','personas','prefs'];
+  tabs.forEach(function(t){
+    var btn=g('set-tab-'+t);
+    if(btn){ btn.style.borderBottom='3px solid '+(t===name?'#1a2e44':'transparent'); btn.style.color=(t===name?'#1a2e44':'#666'); btn.style.fontWeight=(t===name?'600':'400'); }
+    var pane=g('set-pane-'+t);
+    if(pane)pane.style.display=(t===name?'block':'none');
+  });
   if(name==='apikeys')loadApiKeys();
   if(name==='users')loadUsers();
+}
+// Render the 5 settings forms into the (empty) panes. Inner field IDs match the save/load helpers.
+function renderSettingsForms(){
+  var c=g('set-pane-company');
+  if(c)c.innerHTML=`
+    <div class="set-section">
+      <h3>Company Information</h3>
+      <div class="set-grid">
+        <div class="set-field"><label>Company Name</label><input id="ci-name" placeholder="TBG Sourcing Inc." /></div>
+        <div class="set-field"><label>EIN</label><input id="ci-ein" placeholder="42-2911499" /></div>
+      </div>
+      <div class="set-field"><label>Address Line 1</label><input id="ci-addr1" /></div>
+      <div class="set-field"><label>Address Line 2</label><input id="ci-addr2" /></div>
+      <div class="set-grid">
+        <div class="set-field"><label>City</label><input id="ci-city" /></div>
+        <div class="set-field"><label>State / Province</label><input id="ci-state" /></div>
+      </div>
+      <div class="set-grid">
+        <div class="set-field"><label>ZIP / Postal</label><input id="ci-zip" /></div>
+        <div class="set-field"><label>Country</label><input id="ci-country" /></div>
+      </div>
+      <div class="set-grid">
+        <div class="set-field"><label>Phone</label><input id="ci-phone" /></div>
+        <div class="set-field"><label>Website</label><input id="ci-website" placeholder="https://" /></div>
+      </div>
+      <button class="set-btn" onclick="saveCompanyInfo()">Save Company Info</button>
+      <span class="saved" id="ci-saved">Saved!</span>
+    </div>`;
+  var a=g('set-pane-apikeys');
+  if(a)a.innerHTML=`
+    <div class="set-section">
+      <h3>API Keys</h3>
+      <p>Keys live in Vercel environment variables and are shown masked here. They are read-only — manage them in Vercel.</p>
+      <div id="apikeys-list" style="margin-top:10px;"><div style="color:#999;font-size:13px;">Loading…</div></div>
+    </div>`;
+  var u=g('set-pane-users');
+  if(u)u.innerHTML=`
+    <div class="set-section">
+      <h3>Add User</h3>
+      <div class="set-grid">
+        <div class="set-field"><label>Email</label><input id="usr-email" type="email" placeholder="user@company.com" /></div>
+        <div class="set-field"><label>Password</label><input id="usr-pass" type="text" placeholder="initial password" /></div>
+      </div>
+      <div class="set-grid">
+        <div class="set-field"><label>Role</label><select id="usr-role" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="member">Member</option><option value="admin">Admin</option><option value="designer">Designer</option></select></div>
+        <div class="set-field"><label>Tenant</label><select id="usr-tenant" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"></select></div>
+      </div>
+      <button class="set-btn" onclick="addTenantUser()">Add User</button>
+      <span class="saved" id="usr-saved">Added!</span>
+    </div>
+    <div class="set-section">
+      <h3>Users</h3>
+      <div id="users-list"><div style="color:#999;font-size:13px;">Loading…</div></div>
+    </div>`;
+  var pn=g('set-pane-personas');
+  if(pn)pn.innerHTML=`
+    <div class="set-section">
+      <h3>Sarah Lindburg — Sourcing</h3>
+      <div class="set-grid">
+        <div class="set-field"><label>Email</label><input id="per-sarah-email" placeholder="sourcing@tbgsourcing.net" /></div>
+        <div class="set-field"><label>Display Name</label><input id="per-sarah-name" placeholder="Sarah Lindburg" /></div>
+      </div>
+      <div class="set-field"><label>Signature</label><textarea id="per-sarah-sig" rows="4"></textarea></div>
+      <button class="set-btn" onclick="savePersona('sarah')">Save Sarah</button>
+      <span class="saved" id="per-sarah-saved">Saved!</span>
+    </div>
+    <div class="set-section">
+      <h3>Tyler Durden — Compliance</h3>
+      <div class="set-grid">
+        <div class="set-field"><label>Email</label><input id="per-tyler-email" placeholder="compliance@tbgsourcing.net" /></div>
+        <div class="set-field"><label>Display Name</label><input id="per-tyler-name" placeholder="Tyler Durden" /></div>
+      </div>
+      <div class="set-field"><label>Signature</label><textarea id="per-tyler-sig" rows="4"></textarea></div>
+      <button class="set-btn" onclick="savePersona('tyler')">Save Tyler</button>
+      <span class="saved" id="per-tyler-saved">Saved!</span>
+    </div>`;
+  var pf=g('set-pane-prefs');
+  if(pf)pf.innerHTML=`
+    <div class="set-section">
+      <h3>Portal Preferences</h3>
+      <div class="set-grid">
+        <div class="set-field"><label>Default Language</label><select id="pref-lang" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="en">English</option><option value="es" disabled>Spanish (coming soon)</option><option value="zh" disabled>Chinese (coming soon)</option></select></div>
+        <div class="set-field"><label>Default Timezone</label><select id="pref-tz" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="America/New_York">America/New_York (ET)</option><option value="America/Chicago">America/Chicago (CT)</option><option value="America/Denver">America/Denver (MT)</option><option value="America/Los_Angeles">America/Los_Angeles (PT)</option><option value="UTC">UTC</option><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Hong_Kong">Asia/Hong_Kong</option></select></div>
+      </div>
+      <div class="set-grid">
+        <div class="set-field"><label>Date Format</label><select id="pref-datefmt" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
+        <div class="set-field"><label>Dark Mode Default</label><select id="pref-dark" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="off">Off</option><option value="on">On</option></select></div>
+      </div>
+      <button class="set-btn" onclick="savePrefs()">Save Preferences</button>
+      <span class="saved" id="pref-saved">Saved!</span>
+    </div>`;
 }
 function gvS(id){var el=g(id);return el?el.value.trim():'';}
 function _setSaved(id){var el=g(id);if(!el)return;el.style.display='inline';setTimeout(function(){el.style.display='none';},2500);}
@@ -15084,6 +15088,7 @@ async function csUpsert(key,obj){
 }
 
 async function loadSettings(){
+  renderSettingsForms();
   var cs=await csGetAll();
   function sv(id,v){var el=g(id);if(el)el.value=(v==null?'':v);}
   var ci=cs.company_info||{};
@@ -15095,6 +15100,7 @@ async function loadSettings(){
   var pp=cs.portal_prefs||{};
   sv('pref-lang',pp.language||'en');sv('pref-tz',pp.timezone||'America/New_York');sv('pref-datefmt',pp.date_format||'MM/DD/YYYY');sv('pref-dark',pp.dark_mode||'off');
   loadTenantsForUsers();
+  setTab('company');
 }
 
 // ── TAB 1: Company Info ──
