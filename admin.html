@@ -2896,9 +2896,12 @@ function togglePw(inputId,btnId){
 }
 
 function showPanel(name){
-  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
+  // Hide every panel via inline display:none (beats any inline style on the panel div), then
+  // show the active one with inline display:flex so it ALWAYS becomes visible — not reliant on
+  // the .panel.on CSS rule, which an inline style attribute on the panel could otherwise shadow.
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');p.style.display='none';});
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
-  var _pnl=g('panel-'+name);if(_pnl)_pnl.classList.add('on');
+  var _pnl=g('panel-'+name);if(_pnl){_pnl.classList.add('on');_pnl.style.display='flex';}
   var _nav=g('nav-'+name);if(_nav)_nav.classList.add('on');
   // Embedded tool panels (inspections / factory audits / artwork) — lazy-load their iframe once.
   if(name==='inspections'||name==='factory-audits'||name==='artwork'){
