@@ -5895,7 +5895,8 @@ var QEM_ACTION_META={
   approved:{label:'Approved',bg:'#edfaed',color:'#1a7a1a'},
   rejected:{label:'Rejected',bg:'#fff0f0',color:'#b00'},
   more_info:{label:'More Information',bg:'#fff8e0',color:'#886600'},
-  followup:{label:'Follow-Up',bg:'#eef4ff',color:'#2244cc'}
+  followup:{label:'Follow-Up',bg:'#eef4ff',color:'#2244cc'},
+  asset_request:{label:'Outstanding Items',bg:'#eef4ff',color:'#2244cc'}
 };
 var qemState={action:null,ctx:null,onConfirm:null,aiSubject:'',aiBody:'',resolve:null,resolved:false};
 
@@ -11303,13 +11304,26 @@ async function openPDDetail(pdId){
     try{
       var apiId=pdCurrentDetail._pdi?pdCurrentDetail._pdi.id:null;
       if(apiId){
-        var apR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+apiId+'&select=id,assets_required,status,factory_link_token,factory_link_expires_at,product_name&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var apR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+apiId+'&select=id,assets_required,dims_required,certs_required,status,factory_link_token,factory_link_expires_at,product_name&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
         var apRows=apR.ok?await apR.json():[];
         if(apRows&&apRows[0]){
           var ap=apRows[0];
-          // Normalise assets_required to an array of {name,received} objects (tolerate plain strings).
-          ap.assets_required=(Array.isArray(ap.assets_required)?ap.assets_required:[]).map(function(a){return (a&&typeof a==='object')?{name:a.name||'',received:a.received===true}:{name:String(a||''),received:false};});
+          // Normalise the three checklists to arrays of {name,received,file_url} (tolerate plain strings).
+          var _normCl=function(v){return (Array.isArray(v)?v:[]).map(function(a){return (a&&typeof a==='object')?{name:a.name||'',received:a.received===true,file_url:a.file_url||null}:{name:String(a||''),received:false,file_url:null};}).filter(function(a){return a.name;});};
+          ap.assets_required=_normCl(ap.assets_required);
+          ap.dims_required=_normCl(ap.dims_required);
+          ap.certs_required=_normCl(ap.certs_required);
+          // Pre-populate Dimensions & Certificates checklists when empty (defaults / RFQ certs).
+          var _patchFill={};
+          if(!ap.dims_required.length){ ap.dims_required=PD_DIMS_DEFAULT.map(function(n){return {name:n,received:false,file_url:null};}); _patchFill.dims_required=ap.dims_required; }
+          if(!ap.certs_required.length){
+            var rfqCerts=(pdCurrentDetail.rfqs&&Array.isArray(pdCurrentDetail.rfqs.certifications_required))?pdCurrentDetail.rfqs.certifications_required.filter(Boolean):[];
+            var certNames=rfqCerts.length?rfqCerts:PD_CERTS_DEFAULT;
+            ap.certs_required=certNames.map(function(n){return {name:String(n),received:false,file_url:null};});
+            _patchFill.certs_required=ap.certs_required;
+          }
           pdCurrentDetail._artworkProject=ap;
+          if(Object.keys(_patchFill).length){ try{await fetch(SB+'/rest/v1/artwork_projects?id=eq.'+ap.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(_patchFill)});}catch(e){} }
           var aaR=await fetch(SB+'/rest/v1/artwork_assets?artwork_project_id=eq.'+ap.id+'&select=asset_type,file_name,file_url&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
           pdCurrentDetail._artworkAssets=aaR.ok?await aaR.json():[];
           // Auto-tick the Assets gate if every required asset is already received.
@@ -11781,7 +11795,10 @@ function renderPDDetail(){
     })()+
 
     // ── 9.5 ASSETS CHECKLIST (artwork_projects.assets_required) ──
-    pdAssetsCardHtml()+
+    pdChecklistCardHtml('assets')+
+    pdChecklistCardHtml('dims')+
+    pdChecklistCardHtml('certs')+
+    pdOutstandingCardHtml()+
 
     // ── 10. GATES → CREATE LIVE SKU ──
     pdGatesCardHtml()+
@@ -11816,10 +11833,21 @@ function renderPDDetail(){
 // PD ASSET CHECKLIST — artwork_projects.assets_required ({name,received}[])
 // Surfaced on the PD detail panel; mirrored in tenant-rfq.html.
 // ════════════════════════════════════════════════════════════════════
-var pdAssetEditIndex=-1;
 function pdaEscAttr(v){return (v==null?'':String(v)).replace(/"/g,'&quot;');}
-function pdAssetsList(){var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;return ap&&Array.isArray(ap.assets_required)?ap.assets_required:[];}
-// Match a received checklist item to its uploaded artwork_asset (by asset_type ≈ name) to expose file_url.
+// Default checklist contents (pre-populated on load when the stored array is empty).
+var PD_DIMS_DEFAULT=['Unit dimensions confirmed (L/W/H/weight)','Inner carton dimensions confirmed (L/W/H/weight)','Master carton dimensions confirmed (L/W/H/weight/CBM)','Units per inner confirmed','Units per master confirmed','Pallet configuration confirmed'];
+var PD_CERTS_DEFAULT=['INCI List','Certificate of Analysis','GMP Certificate','Safety Assessment Report','California Prop 65 Statement'];
+
+// ── Generic outstanding-items checklists (assets / dims / certs) — same UI pattern ──
+var PD_CL={
+  assets:{col:'assets_required',sec:'pd-cl-assets',title:'📦 Assets',word:'assets received',addLabel:'+ Add Asset',emailHdr:'ASSETS NEEDED:'},
+  dims:{col:'dims_required',sec:'pd-cl-dims',title:'📐 Dimensions & Measurements',word:'dimensions confirmed',addLabel:'+ Add Item',emailHdr:'DIMENSIONS NEEDED:'},
+  certs:{col:'certs_required',sec:'pd-cl-certs',title:'🧪 Compliance Certificates',word:'certificates received',addLabel:'+ Add Certificate',emailHdr:'COMPLIANCE CERTIFICATES NEEDED:'}
+};
+var pdClEditIndex={assets:-1,dims:-1,certs:-1};
+function pdClList(kind){var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;if(!ap)return [];var col=PD_CL[kind].col;if(!Array.isArray(ap[col]))ap[col]=[];return ap[col];}
+function pdAssetsList(){return pdClList('assets');}
+// Match a received item to a file: dims/certs store file_url inline; assets also match artwork_assets by name.
 function pdAssetFile(name){
   var assets=(pdCurrentDetail&&pdCurrentDetail._artworkAssets)||[];
   var lc=(name||'').toLowerCase().trim();if(!lc)return null;
@@ -11829,98 +11857,133 @@ function pdAssetFile(name){
   }
   return null;
 }
-function pdAssetsCardHtml(){
-  var wrap=function(body){return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">📦 Assets</div>'+body+'</div>';};
-  if(!(pdCurrentDetail&&pdCurrentDetail._artworkProject)){
-    return wrap('<div style="font-size:12px;color:#888;">No asset checklist yet. It is created automatically when a quote is accepted for this item.</div>');
-  }
-  return wrap('<div id="pd-assets-section">'+pdAssetsInner()+'</div>');
+function pdClFile(kind,item,name){
+  if(item&&item.file_url)return {file_url:item.file_url,file_name:item.file_name||name};
+  if(kind==='assets')return pdAssetFile(name);
+  return null;
 }
-function pdAssetsInner(){
-  var list=pdAssetsList();
+function pdChecklistCardHtml(kind){
+  var cfg=PD_CL[kind];
+  var wrap=function(body){return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">'+cfg.title+'</div>'+body+'</div>';};
+  if(!(pdCurrentDetail&&pdCurrentDetail._artworkProject)){
+    return wrap('<div style="font-size:12px;color:#888;">No checklist yet. It is created automatically when a quote is accepted for this item.</div>');
+  }
+  return wrap('<div id="'+cfg.sec+'">'+pdClInner(kind)+'</div>');
+}
+function pdClInner(kind){
+  var cfg=PD_CL[kind],list=pdClList(kind);
   var total=list.length,got=list.filter(function(a){return a&&a.received===true;}).length;
   var pct=total?Math.round(got/total*100):0,allDone=total>0&&got===total;
   var h='';
   h+='<div style="margin-bottom:10px;">'+
-       '<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:4px;"><span><strong>'+got+'</strong> of <strong>'+total+'</strong> assets received</span><span>'+pct+'%</span></div>'+
+       '<div style="display:flex;justify-content:space-between;font-size:12px;color:#666;margin-bottom:4px;"><span><strong>'+got+'</strong> of <strong>'+total+'</strong> '+cfg.word+'</span><span>'+pct+'%</span></div>'+
        '<div style="height:8px;background:#ececec;border-radius:5px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(allDone?'#1a7a1a':'#2244cc')+';transition:width 0.2s;"></div></div>'+
      '</div>';
-  if(allDone)h+='<div style="margin-bottom:10px;padding:9px 12px;background:#edfaed;border:1px solid #a0d8a0;border-radius:8px;font-size:13px;font-weight:600;color:#1a7a1a;">✓ All assets received — ready for design brief</div>';
-  h+=total?list.map(function(a,i){return pdAssetRow(a,i);}).join(''):'<div style="font-size:12px;color:#bbb;padding:6px 0;">No assets in the checklist yet.</div>';
-  h+='<div id="pd-asset-add-row" style="margin-top:8px;"><button class="btn-edit" onclick="pdAssetAddShow()" style="font-size:12px;">+ Add Asset</button></div>';
-  var pending=list.filter(function(a){return a&&a.received!==true;}).length;
-  h+='<div style="margin-top:12px;border-top:1px solid #f0f0e8;padding-top:10px;">'+
-       '<button onclick="pdRequestMissingAssets()" '+(pending?'':'disabled ')+'style="padding:9px 16px;background:'+(pending?'#2244cc':'#bbb')+';color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:600;cursor:'+(pending?'pointer':'not-allowed')+';">✉ Request Missing Assets'+(pending?' ('+pending+')':'')+'</button>'+
-     '</div>';
+  h+=total?list.map(function(a,i){return pdClRow(kind,a,i);}).join(''):'<div style="font-size:12px;color:#bbb;padding:6px 0;">Nothing in this checklist yet.</div>';
+  h+='<div id="'+cfg.sec+'-add" style="margin-top:8px;"><button class="btn-edit" onclick="pdClAddShow(\''+kind+'\')" style="font-size:12px;">'+cfg.addLabel+'</button></div>';
   return h;
 }
-function pdAssetRow(a,i){
-  var name=(a&&a.name)||'',received=a&&a.received===true;
-  if(i===pdAssetEditIndex){
+function pdClRow(kind,a,i){
+  var cfg=PD_CL[kind],name=(a&&a.name)||'',received=a&&a.received===true;
+  if(i===pdClEditIndex[kind]){
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafaf6;border:1px solid #e8e8e0;border-radius:7px;margin-bottom:5px;">'+
       '<input type="checkbox" '+(received?'checked':'')+' disabled style="width:16px;height:16px;flex:0 0 auto;" />'+
-      '<input id="pd-asset-edit-input" type="text" value="'+pdaEscAttr(name)+'" onblur="pdAssetEditCommit('+i+',this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){pdAssetEditCancel();}" style="flex:1;min-width:0;padding:5px 7px;font-size:13px;border:1px solid #2244cc;border-radius:6px;font-family:inherit;" />'+
+      '<input id="'+cfg.sec+'-edit" type="text" value="'+pdaEscAttr(name)+'" onblur="pdClEditCommit(\''+kind+'\','+i+',this.value)" onkeydown="if(event.key===\'Enter\'){this.blur();}else if(event.key===\'Escape\'){pdClEditCancel(\''+kind+'\');}" style="flex:1;min-width:0;padding:5px 7px;font-size:13px;border:1px solid #2244cc;border-radius:6px;font-family:inherit;" />'+
     '</div>';
   }
-  var fileObj=received?pdAssetFile(name):null;
+  var fileObj=received?pdClFile(kind,a,name):null;
   var right=received
-    ? (fileObj?'<a href="'+pdaEscAttr(fileObj.file_url)+'" target="_blank" rel="noopener" title="Download '+pdaEscAttr(fileObj.file_name||name)+'" style="text-decoration:none;font-size:16px;flex:0 0 auto;">⬇️</a>':'<span style="font-size:11px;color:#1a7a1a;flex:0 0 auto;">received</span>')
+    ? (fileObj&&fileObj.file_url?'<a href="'+pdaEscAttr(fileObj.file_url)+'" target="_blank" rel="noopener" title="Download '+pdaEscAttr(fileObj.file_name||name)+'" style="text-decoration:none;font-size:16px;flex:0 0 auto;">⬇️</a>':'<span style="font-size:11px;color:#1a7a1a;flex:0 0 auto;">received</span>')
     : '<span style="font-size:11px;color:#aa6600;white-space:nowrap;flex:0 0 auto;">⏳ Awaiting from factory</span>';
   return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:'+(received?'#f3faf3':'#fafaf6')+';border:1px solid '+(received?'#cfe8cf':'#e8e8e0')+';border-radius:7px;margin-bottom:5px;">'+
-    '<input type="checkbox" '+(received?'checked':'')+' onchange="pdAssetToggle('+i+',this.checked)" style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
-    '<span onclick="pdAssetEdit('+i+')" title="Click to rename" style="flex:1;min-width:0;font-size:13px;color:'+(received?'#1a7a1a':'#555')+';cursor:text;overflow-wrap:break-word;word-break:break-word;">'+esc(name)+'</span>'+
+    '<input type="checkbox" '+(received?'checked':'')+' onchange="pdClToggle(\''+kind+'\','+i+',this.checked)" style="width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
+    '<span onclick="pdClEdit(\''+kind+'\','+i+')" title="Click to rename" style="flex:1;min-width:0;font-size:13px;color:'+(received?'#1a7a1a':'#555')+';cursor:text;overflow-wrap:break-word;word-break:break-word;">'+esc(name)+'</span>'+
     right+
-    '<button onclick="pdAssetRemove('+i+')" title="Remove" style="background:none;border:none;color:#c00;font-size:17px;cursor:pointer;line-height:1;flex:0 0 auto;">×</button>'+
+    '<button onclick="pdClRemove(\''+kind+'\','+i+')" title="Remove" style="background:none;border:none;color:#c00;font-size:17px;cursor:pointer;line-height:1;flex:0 0 auto;">×</button>'+
   '</div>';
 }
-function pdAssetsRerender(){var el=g('pd-assets-section');if(el)el.innerHTML=pdAssetsInner();}
-async function pdAssetsPersist(){
+function pdClRerender(kind){var el=g(PD_CL[kind].sec);if(el)el.innerHTML=pdClInner(kind);var o=g('pd-cl-outstanding');if(o)o.outerHTML=pdOutstandingCardHtml();}
+async function pdClPersist(kind){
   var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;
   if(!ap||!pdCurrentDetail._pdi){toast('Cannot save — no artwork project.');return;}
+  var col=PD_CL[kind].col,body={};body[col]=ap[col];body.updated_at=new Date().toISOString();
   try{
-    var r=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdCurrentDetail._pdi.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({assets_required:ap.assets_required,updated_at:new Date().toISOString()})});
-    if(r.ok)toast('Asset checklist saved.');else toast('Save failed ('+r.status+').');
+    var r=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdCurrentDetail._pdi.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(body)});
+    if(r.ok)toast('Checklist saved.');else toast('Save failed ('+r.status+').');
   }catch(e){toast('Save failed: '+e.message);}
 }
-function pdAssetToggle(i,checked){var l=pdAssetsList();if(!l[i])return;l[i].received=!!checked;pdAssetsRerender();pdAssetsPersist();pdSyncAssetsGate();}
-function pdAssetRemove(i){var l=pdAssetsList();if(!l[i])return;if(!confirm('Remove "'+(l[i].name||'')+'" from the checklist?'))return;l.splice(i,1);pdAssetEditIndex=-1;pdAssetsRerender();pdAssetsPersist();}
-function pdAssetAddShow(){
-  var row=g('pd-asset-add-row');if(!row)return;
-  row.innerHTML='<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="pd-asset-add-input" placeholder="New asset name…" style="flex:1;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /><button class="btn-edit" onclick="pdAssetAddCommit()">Add</button><button class="btn-edit" onclick="pdAssetsRerender()">Cancel</button></div>';
-  var inp=g('pd-asset-add-input');if(inp){inp.focus();inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();pdAssetAddCommit();}});}
+function pdClToggle(kind,i,checked){var l=pdClList(kind);if(!l[i])return;l[i].received=!!checked;pdClRerender(kind);pdClPersist(kind);if(kind==='assets')pdSyncAssetsGate();}
+function pdClRemove(kind,i){var l=pdClList(kind);if(!l[i])return;if(!confirm('Remove "'+(l[i].name||'')+'"?'))return;l.splice(i,1);pdClEditIndex[kind]=-1;pdClRerender(kind);pdClPersist(kind);}
+function pdClAddShow(kind){
+  var cfg=PD_CL[kind],row=g(cfg.sec+'-add');if(!row)return;
+  row.innerHTML='<div style="display:flex;gap:6px;align-items:center;"><input type="text" id="'+cfg.sec+'-addinput" placeholder="New item name…" style="flex:1;padding:6px 8px;font-size:13px;border:1px solid #e0e0d8;border-radius:6px;font-family:inherit;" /><button class="btn-edit" onclick="pdClAddCommit(\''+kind+'\')">Add</button><button class="btn-edit" onclick="pdClRerender(\''+kind+'\')">Cancel</button></div>';
+  var inp=g(cfg.sec+'-addinput');if(inp){inp.focus();inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();pdClAddCommit(kind);}});}
 }
-function pdAssetAddCommit(){
-  var inp=g('pd-asset-add-input');if(!inp)return;var name=(inp.value||'').trim();if(!name){inp.focus();return;}
-  pdAssetsList().push({name:name,received:false});pdAssetsRerender();pdAssetsPersist();
+function pdClAddCommit(kind){
+  var inp=g(PD_CL[kind].sec+'-addinput');if(!inp)return;var name=(inp.value||'').trim();if(!name){inp.focus();return;}
+  pdClList(kind).push({name:name,received:false,file_url:null});pdClRerender(kind);pdClPersist(kind);
 }
-function pdAssetEdit(i){pdAssetEditIndex=i;pdAssetsRerender();var inp=g('pd-asset-edit-input');if(inp){inp.focus();inp.select();}}
-function pdAssetEditCommit(i,val){
-  var l=pdAssetsList(),nv=(val||'').trim();pdAssetEditIndex=-1;
-  if(l[i]&&nv&&nv!==l[i].name){l[i].name=nv;pdAssetsRerender();pdAssetsPersist();return;}
-  pdAssetsRerender();
+function pdClEdit(kind,i){pdClEditIndex[kind]=i;pdClRerender(kind);var inp=g(PD_CL[kind].sec+'-edit');if(inp){inp.focus();inp.select();}}
+function pdClEditCommit(kind,i,val){var l=pdClList(kind),nv=(val||'').trim();pdClEditIndex[kind]=-1;if(l[i]&&nv&&nv!==l[i].name){l[i].name=nv;pdClRerender(kind);pdClPersist(kind);return;}pdClRerender(kind);}
+function pdClEditCancel(kind){pdClEditIndex[kind]=-1;pdClRerender(kind);}
+
+// ── Unified "Request Outstanding Items" (assets + dims + certs) ──
+function pdOutstandingTotalPending(){return pdClList('assets').concat(pdClList('dims'),pdClList('certs')).filter(function(a){return a&&a.received!==true;}).length;}
+function pdOutstandingCardHtml(){
+  if(!(pdCurrentDetail&&pdCurrentDetail._artworkProject))return '';
+  var total=pdOutstandingTotalPending();
+  return '<div id="pd-cl-outstanding" style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+    '<button onclick="pdRequestOutstanding()" '+(total?'':'disabled ')+'style="width:100%;padding:11px 16px;background:'+(total?'#2244cc':'#bbb')+';color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:'+(total?'pointer':'not-allowed')+';">📋 Request Outstanding Items'+(total?' ('+total+')':'')+'</button>'+
+  '</div>';
 }
-function pdAssetEditCancel(){pdAssetEditIndex=-1;pdAssetsRerender();}
-async function pdRequestMissingAssets(){
+async function pdRequestOutstanding(){
   var p=pdCurrentDetail;if(!p)return;
-  var pending=pdAssetsList().filter(function(a){return a&&a.received!==true;}).map(function(a){return a.name;}).filter(Boolean);
-  if(!pending.length){toast('No missing assets.');return;}
+  var blocks=[],totalPending=0;
+  ['assets','dims','certs'].forEach(function(kind){
+    var pend=pdClList(kind).filter(function(a){return a&&a.received!==true;}).map(function(a){return a.name;}).filter(Boolean);
+    if(pend.length){totalPending+=pend.length;blocks.push(PD_CL[kind].emailHdr+'\n'+pend.map(function(n,i){return (i+1)+'. '+n;}).join('\n'));}
+  });
+  if(!totalPending){toast('All items received — nothing to request');return;}
   if(!p.factory_id){toast('No factory linked to this item.');return;}
   var fac=p.factories||{};
   var product=p.item_description||(p._artworkProject&&p._artworkProject.product_name)||'this item';
-  var listText=pending.map(function(n,i){return (i+1)+'. '+n;}).join('\n');
-  var subject='Outstanding assets needed — '+product;
+  var subject='Outstanding items needed — '+product;
   var ap=p._artworkProject||{};
-  var body='Dear '+(fac.factory_name_english||'Team')+',\n\nWe are preparing the packaging design for '+product+' and are still missing the following assets from your team:\n\n'+listText+'\n\nCould you please upload these at your earliest convenience so we can proceed?';
+  var body='Dear '+(fac.factory_name_english||'Team')+',\n\nWe are preparing '+product+' for production and still need the following outstanding items from your team:\n\n'+blocks.join('\n\n')+'\n\nCould you please provide these at your earliest convenience so we can proceed?';
   if(ap.factory_link_token){ body+=await factoryUploadLinkBlockShort(ap.factory_link_token,ap.factory_link_expires_at); }
   body+='\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
-  await openQuoteEmailModal('followup',{quote_id:p.quote_id||null,rfq_id:p.rfq_id||null,factory_id:p.factory_id,factoryName:fac.factory_name_english,salesEmail:fac.sales_email},function(subj,bod){
-    return pdSendAssetRequest(fac.sales_email,fac.sales_contact_name,subj,bod);
+  await openQuoteEmailModal('asset_request',{quote_id:p.quote_id||null,rfq_id:p.rfq_id||null,factory_id:p.factory_id,factoryName:fac.factory_name_english,salesEmail:fac.sales_email},function(subj,bod){
+    return pdSendAssetRequest(fac.sales_email,fac.sales_contact_name,subj,bod,p.rfq_id,p.factory_id);
   },{customSubject:subject,customBody:body});
 }
-async function pdSendAssetRequest(email,name,subject,body){
+async function pdSendAssetRequest(email,name,subject,body,rfqId,factoryId){
   if(!email){toast('No factory email on file.');return;}
   await sendEmail(email,name||'Team',subject,body,'sourcing@tbgsourcing.net');
-  toast('Asset request sent to '+email+'.');
+  // Increment the factory follow-up counter (best-effort).
+  if(rfqId&&factoryId){
+    try{
+      var ar=await fetch(SB+'/rest/v1/rfq_factory_assignments?rfq_id=eq.'+rfqId+'&factory_id=eq.'+factoryId+'&select=id,followup_count',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      var arows=ar.ok?await ar.json():[];
+      for(var i=0;i<arows.length;i++){await fetch(SB+'/rest/v1/rfq_factory_assignments?id=eq.'+arows[i].id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({followup_count:(arows[i].followup_count||0)+1})});}
+    }catch(e){console.log('followup_count bump (non-fatal):',e);}
+  }
+  toast('Request sent to '+email+'.');
+}
+// ── Artwork gate: notify the graphics team ──
+async function pdNotifyGraphics(){
+  var p=pdCurrentDetail;if(!p)return;
+  var product=p.item_description||(p._artworkProject&&p._artworkProject.product_name)||'this item';
+  var model=p.item_number||(p.skus&&p.skus.model_number)||'—';
+  var skuTxt=(p.skus&&p.skus.model_number)||p.unit_upc||(p.sku_id||'—');
+  var subject='Action Required: Artwork Approval Pending — '+product+' '+model;
+  var body='Hi Graphics Team, the artwork for '+product+' (Model: '+model+', SKU: '+skuTxt+') is pending final approval for purchase order. Please submit the final approved artwork files through the portal at your earliest convenience. The PO cannot be issued until artwork is approved. Thank you.';
+  await openQuoteEmailModal('asset_request',{quote_id:null,rfq_id:p.rfq_id||null,factory_id:null,factoryName:'Graphics Team',salesEmail:'graphics@tbgsourcing.net'},function(subj,bod){
+    return pdSendGraphicsNotify(subj,bod);
+  },{customSubject:subject,customBody:body});
+}
+async function pdSendGraphicsNotify(subject,body){
+  await sendEmail('graphics@tbgsourcing.net','Graphics Team',subject,body,'sourcing@tbgsourcing.net');
+  toast('Graphics team notified.');
 }
 
 async function loadPDAssets(pdId){
@@ -12293,10 +12356,12 @@ function pdGatesCardHtml(){
   var allGreen=remaining===0;
   var rows=GATES.map(function(gt){
     var on=!!p[gt.key];
-    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:'+(on?'#edfaed':'#fafaf6')+';border:1px solid '+(on?'#a0d8a0':'#e8e8e0')+';border-radius:7px;margin-bottom:6px;cursor:pointer;">'+
+    var label='<label style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:9px 12px;background:'+(on?'#edfaed':'#fafaf6')+';border:1px solid '+(on?'#a0d8a0':'#e8e8e0')+';border-radius:7px;cursor:pointer;">'+
       '<input type="checkbox" '+(on?'checked':'')+' onchange="togglePDGate(\''+gt.key+'\',this.checked)" style="width:17px;height:17px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
       '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.sub?' <span style="font-weight:400;color:#999;font-size:10px;">— '+esc(gt.sub)+'</span>':'')+'</span>'+
     '</label>';
+    var action=(gt.key==='gate_artwork_ok')?'<button onclick="pdNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🎨 Notify Graphics Team</button>':'';
+    return '<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:6px;">'+label+action+'</div>';
   }).join('');
   var btn;
   if(isLive){

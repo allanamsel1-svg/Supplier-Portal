@@ -83,21 +83,37 @@ function showInvalid(){
     '<p>This upload link is not valid or has expired. Please contact your TBG Sourcing representative for a new link.</p></div>';
 }
 
-function normAssets(ar){
-  // assets_required is a jsonb array of {name, received}. Tolerate plain strings / stringified json.
+// The three outstanding-item categories that share this upload page.
+var CATS = [
+  { key: 'asset',       col: 'assets_required', label: 'Asset',       color: '#2563eb' },
+  { key: 'dimension',   col: 'dims_required',   label: 'Dimension',   color: '#7c3aed' },
+  { key: 'certificate', col: 'certs_required',  label: 'Certificate', color: '#0d9488' }
+];
+var PENDING = [];   // flat list of unreceived items across all categories (rebuilt each render)
+
+function normArr(ar){
+  // jsonb array of {name, received, file_url}. Tolerate plain strings / stringified json.
   var raw = ar;
   if (typeof raw === 'string'){ try { raw = JSON.parse(raw); } catch(e){ raw = []; } }
   if (!Array.isArray(raw)) return [];
   return raw.map(function(a){
-    if (a && typeof a === 'object') return { name: a.name || '', received: a.received === true };
-    return { name: String(a||''), received: false };
+    if (a && typeof a === 'object') return { name: a.name || '', received: a.received === true, file_url: a.file_url || null };
+    return { name: String(a||''), received: false, file_url: null };
   }).filter(function(a){ return a.name; });
+}
+function catCounts(){
+  var total = 0, done = 0;
+  CATS.forEach(function(c){ var arr = normArr(PROJECT[c.col]); total += arr.length; done += arr.filter(function(a){ return a.received; }).length; });
+  return { total: total, done: done };
+}
+function allReceived(){
+  return CATS.every(function(c){ return normArr(PROJECT[c.col]).every(function(a){ return a.received; }); });
 }
 
 async function loadProject(){
   if (!TOKEN){ showInvalid(); return; }
   try {
-    var sel = 'id,product_name,status,assets_required,factory_link_expires_at,factory_download_count';
+    var sel = 'id,product_name,status,assets_required,dims_required,certs_required,factory_link_expires_at,factory_download_count';
     var r = await fetch(SUPA_URL + '/rest/v1/artwork_projects?factory_link_token=eq.' + encodeURIComponent(TOKEN) + '&select=' + encodeURIComponent(sel) + '&limit=1', { headers: H });
     var rows = r.ok ? await r.json() : [];
     var p = Array.isArray(rows) ? rows[0] : null;
@@ -109,51 +125,52 @@ async function loadProject(){
 }
 
 function render(){
-  var assets = normAssets(PROJECT.assets_required);
-  var total = assets.length;
-  var done = assets.filter(function(a){ return a.received; }).length;
-  var pct = total ? Math.round(done/total*100) : 0;
-  var allDone = total > 0 && done === total;
+  var c = catCounts();
+  var pct = c.total ? Math.round(c.done/c.total*100) : 0;
 
-  // FIX 1: once every required asset is in, show a full-page thank-you screen with a
-  // Close Window button — no further action is required from the factory.
-  if (allDone){
+  // Once every required item (asset + dimension + certificate) is in, show the thank-you screen.
+  if (c.total > 0 && allReceived()){
     root().innerHTML = '<div class="center-state">'+
       '<div class="big">✅</div>'+
-      '<h2>All assets submitted successfully! Thank you.</h2>'+
+      '<h2>All items submitted successfully! Thank you.</h2>'+
       '<p>The design team will now begin working on your artwork. You may close this window.</p>'+
       '<button class="btn" style="margin-top:18px;" onclick="window.close()">Close Window</button>'+
       '</div>';
     return;
   }
 
+  // Build the flat list of pending (received=false) items across all three categories.
+  PENDING = [];
+  CATS.forEach(function(cat){
+    normArr(PROJECT[cat.col]).forEach(function(a, idx){
+      if (!a.received) PENDING.push({ cat: cat, arr: cat.col, idx: idx, name: a.name });
+    });
+  });
+
   var html = '';
   html += '<div class="card">';
   html += '<div class="product">'+esc(PROJECT.product_name || 'Your Product')+'</div>';
   html += '<h1>Asset Upload Portal</h1>';
-  html += '<div class="sub">Please upload each required asset below. Files are sent directly to the TBG Sourcing design team.</div>';
+  html += '<div class="sub">Please upload each outstanding item below. Files are sent directly to the TBG Sourcing design team.</div>';
   html += '<div class="progress-wrap"><div class="progress-track"><div class="progress-fill" style="width:'+pct+'%"></div></div>';
-  html += '<div class="progress-label">'+done+' of '+total+' assets submitted</div></div>';
+  html += '<div class="progress-label">'+c.done+' of '+c.total+' items submitted</div></div>';
   html += '</div>';
 
   html += '<div class="card">';
-  if (!total){
-    html += '<div class="sub">No specific assets are listed for this order yet. Please contact your TBG Sourcing representative.</div>';
+  if (!PENDING.length){
+    html += '<div class="sub">No outstanding items are listed for this order yet. Please contact your TBG Sourcing representative.</div>';
   } else {
-    assets.forEach(function(a, i){
+    PENDING.forEach(function(ent, gi){
+      var badge = '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;color:#fff;background:'+ent.cat.color+';margin-right:7px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.03em;">'+esc(ent.cat.label)+'</span>';
       html += '<div class="asset">';
-      html += '<div class="asset-status">'+(a.received ? '✅' : '⬜')+'</div>';
+      html += '<div class="asset-status">⬜</div>';
       html += '<div class="asset-main">';
-      html += '<div class="asset-name">'+esc(a.name)+'</div>';
-      if (a.received){
-        html += '<div class="asset-recv">Received</div>';
-      } else {
-        html += '<div class="asset-actions">';
-        html += '<input type="file" id="file-'+i+'" style="display:none" onchange="onPick('+i+',this)">';
-        html += '<button class="btn" id="btn-'+i+'" onclick="document.getElementById(\'file-'+i+'\').click()">Upload File</button>';
-        html += '</div>';
-        html += '<div class="upmsg" id="msg-'+i+'"></div>';
-      }
+      html += '<div class="asset-name">'+badge+esc(ent.name)+'</div>';
+      html += '<div class="asset-actions">';
+      html += '<input type="file" id="file-'+gi+'" style="display:none" onchange="onPick('+gi+',this)">';
+      html += '<button class="btn" id="btn-'+gi+'" onclick="document.getElementById(\'file-'+gi+'\').click()">Upload File</button>';
+      html += '</div>';
+      html += '<div class="upmsg" id="msg-'+gi+'"></div>';
       html += '</div></div>';
     });
   }
@@ -162,18 +179,17 @@ function render(){
   root().innerHTML = html;
 }
 
-function onPick(i, input){
+function onPick(gi, input){
   var f = input.files && input.files[0];
   input.value = '';
-  if (f) uploadAsset(i, f);
+  if (f) uploadItem(gi, f);
 }
 
-async function uploadAsset(i, file){
-  var assets = normAssets(PROJECT.assets_required);
-  var asset = assets[i];
-  if (!asset) return;
-  var msg = document.getElementById('msg-'+i);
-  var btn = document.getElementById('btn-'+i);
+async function uploadItem(gi, file){
+  var ent = PENDING[gi];
+  if (!ent) return;
+  var msg = document.getElementById('msg-'+gi);
+  var btn = document.getElementById('btn-'+gi);
   if (btn){ btn.disabled = true; }
   if (msg){ msg.style.color = '#6b7280'; msg.textContent = 'Uploading '+file.name+' ('+fileSize(file.size)+')…'; }
   try {
@@ -190,38 +206,41 @@ async function uploadAsset(i, file){
       return;
     }
 
-    // 2) Record the asset in artwork_assets. asset_type must be a constrained code (the raw
-    //    asset name fails the DB CHECK constraint with a 400); the original required-asset name
-    //    is preserved in notes. Check response.ok and surface failures instead of swallowing them.
-    var insRes = await fetch(SUPA_URL + '/rest/v1/artwork_assets', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
-      body: JSON.stringify({ artwork_project_id: PROJECT.id, asset_type: assetTypeCode(asset.name), file_name: file.name, file_url: upj.url, file_size_bytes: file.size, notes: asset.name }) });
-    if (!insRes.ok){
-      var insErr = await insRes.text().catch(function(){ return ''; });
-      console.error('artwork_assets insert failed', insRes.status, insErr);
-      if (msg){ msg.style.color = '#dc2626'; msg.textContent = 'File uploaded but could not be recorded (' + insRes.status + '). Please try again.'; }
-      if (btn){ btn.disabled = false; }
-      return;
+    // 2) For ASSET-category items, also record a row in artwork_assets (constrained asset_type
+    //    code; original name preserved in notes). Dimensions/Certificates store file_url inline.
+    if (ent.cat.key === 'asset'){
+      var insRes = await fetch(SUPA_URL + '/rest/v1/artwork_assets', { method: 'POST', headers: Object.assign({}, H, { Prefer: 'return=minimal' }),
+        body: JSON.stringify({ artwork_project_id: PROJECT.id, asset_type: assetTypeCode(ent.name), file_name: file.name, file_url: upj.url, file_size_bytes: file.size, notes: ent.name }) });
+      if (!insRes.ok){
+        var insErr = await insRes.text().catch(function(){ return ''; });
+        console.error('artwork_assets insert failed', insRes.status, insErr);
+        if (msg){ msg.style.color = '#dc2626'; msg.textContent = 'File uploaded but could not be recorded (' + insRes.status + '). Please try again.'; }
+        if (btn){ btn.disabled = false; }
+        return;
+      }
     }
 
-    // 3) Mark this asset received in assets_required — ONLY after the insert above succeeded.
-    var updated = assets.map(function(a){ return { name: a.name, received: a.received || a.name === asset.name }; });
-    PROJECT.assets_required = updated;
+    // 3) Mark this item received (with its file_url) in its own category array.
+    var updated = normArr(PROJECT[ent.arr]).map(function(a, k){
+      return (k === ent.idx) ? { name: a.name, received: true, file_url: upj.url } : a;
+    });
+    PROJECT[ent.arr] = updated;
 
     // 4) Bump factory download counters.
     var newCount = (Number(PROJECT.factory_download_count) || 0) + 1;
     PROJECT.factory_download_count = newCount;
 
-    var patch = { assets_required: updated, factory_last_download_at: new Date().toISOString(), factory_download_count: newCount };
+    var patch = { factory_last_download_at: new Date().toISOString(), factory_download_count: newCount };
+    patch[ent.arr] = updated;
 
-    // 5) If every asset is now received, move the project into the design queue.
-    var allDone = updated.every(function(a){ return a.received; });
-    if (allDone){ patch.status = 'ready_for_design'; PROJECT.status = 'ready_for_design'; }
+    // 5) If every item across all three categories is now received, move into the design queue.
+    if (allReceived()){ patch.status = 'ready_for_design'; PROJECT.status = 'ready_for_design'; }
 
     await fetch(SUPA_URL + '/rest/v1/artwork_projects?id=eq.' + encodeURIComponent(PROJECT.id), { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify(patch) });
 
-    // 6) Refresh the checklist; surface a transient confirmation (re-render replaced the inline msg DOM).
+    // 6) Refresh the checklist; surface a transient confirmation.
     render();
-    showToast('✅ ' + asset.name + ' uploaded successfully');
+    showToast('✅ ' + ent.name + ' uploaded successfully');
   } catch(e){
     if (msg){ msg.style.color = '#dc2626'; msg.textContent = 'Error: ' + (e && e.message || e); }
     if (btn){ btn.disabled = false; }
