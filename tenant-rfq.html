@@ -1813,12 +1813,12 @@ async function tenantApproveQuote(q, factory, ctx) {
   // assets_required comes from the checked asset list captured in the approval email modal;
   // falls back to a default cosmetics asset list when the modal produced none.
   // factoryLinkToken drives the secure no-login asset-upload link in the approval email; returned to the caller.
-  let factoryLinkToken = null;
+  let factoryLinkToken = null, factoryLinkExpiresAt = null;
   try {
     if (!pdItemId) {
       console.error('Artwork project NOT created: pdItemId is null (PD-item creation failed above).');
     } else {
-      const existAp = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id,factory_link_token&limit=1');
+      const existAp = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id,factory_link_token,factory_link_expires_at&limit=1');
       if (!existAp || !existAp.length) {
         // Hardcoded default used whenever the modal didn't capture a usable asset list.
         const DEFAULT_COSMETIC_ASSETS = [{ name: 'Hi-res product images (white background)', received: false }, { name: 'Hi-res product images (angles)', received: false }, { name: 'Lifestyle images', received: false }, { name: 'Packaging dieline (structural)', received: false }, { name: 'Technical drawing / spec sheet', received: false }, { name: 'Product use video', received: false }, { name: 'Package contents list', received: false }];
@@ -1829,6 +1829,7 @@ async function tenantApproveQuote(q, factory, ctx) {
         const apTenantId = tid || rfq.tenant_id || TID;
         if (!apTenantId) console.error('Artwork project: tenant_id is null — insert will fail the NOT NULL constraint.', { rfq_id: ctx.rfq_id });
         factoryLinkToken = awUUID();
+        factoryLinkExpiresAt = new Date(Date.now() + 90 * 86400000).toISOString();
         const apPayload = {
           pd_item_id: pdItemId,
           tenant_id: apTenantId,
@@ -1838,7 +1839,7 @@ async function tenantApproveQuote(q, factory, ctx) {
           priority: 999,
           artwork_types: [],
           factory_link_token: factoryLinkToken,
-          factory_link_expires_at: new Date(Date.now() + 90 * 86400000).toISOString()
+          factory_link_expires_at: factoryLinkExpiresAt
         };
         const apRes = await fetch(SUPA_URL + '/rest/v1/artwork_projects', { method: 'POST', headers: Object.assign({}, wHead, { Prefer: 'return=representation' }), body: JSON.stringify(apPayload) });
         if (apRes.ok) {
@@ -1850,11 +1851,12 @@ async function tenantApproveQuote(q, factory, ctx) {
         }
       } else {
         factoryLinkToken = existAp[0].factory_link_token || null;
+        factoryLinkExpiresAt = existAp[0].factory_link_expires_at || null;
         console.log('Artwork project already exists for PD item ' + pdItemId + ', skipping');
       }
     }
   } catch (e) { console.error('artwork_projects create threw:', e); }
-  return factoryLinkToken;
+  return { token: factoryLinkToken, expiresAt: factoryLinkExpiresAt };
 }
 
 // UUID v4 for the factory_link_token (secure no-login asset-upload link), native generator with fallback.
@@ -1867,6 +1869,21 @@ function factoryUploadLinkBlock(token) {
   return '\n\nPlease upload all required assets using this secure link: https://portal.tbgsourcing.net/factory-assets.html?token=' + token +
     '\n\nThis link is unique to your order and does not require a login.';
 }
+// Shorten the secure factory upload-link URL via /api/shorten (falls back to the full URL on failure).
+async function factoryUploadShortUrl(token, expiresAt) {
+  const fullUrl = 'https://portal.tbgsourcing.net/factory-assets.html?token=' + token;
+  try {
+    const r = await fetch('/api/shorten', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullUrl, expires_at: expiresAt || null }) });
+    if (r.ok) { const d = await r.json().catch(() => ({})); if (d && d.short_url) return d.short_url; }
+  } catch (e) {}
+  return fullUrl;
+}
+// Upload-link block using a short link (used in approval + asset-request emails).
+async function factoryUploadLinkBlockShort(token, expiresAt) {
+  const url = await factoryUploadShortUrl(token, expiresAt);
+  return '\n\nUpload your assets here: ' + url +
+    '\n\nThis link is unique to your order and does not require a login.';
+}
 
 // Action buttons reuse the existing AI email draft modal (openQuoteEmailModal).
 async function tQuoteAction(action, quoteId) {
@@ -1876,10 +1893,10 @@ async function tQuoteAction(action, quoteId) {
   await openQuoteEmailModal(action, ctx, async (subject, body) => {
     if (action === 'approved') {
       // Full flow: PD + PD-item records, plus status='accepted' & is_selected=true.
-      // Returns the artwork project's factory_link_token for the secure upload link.
-      const factoryLinkToken = await tenantApproveQuote(quote, factory, ctx);
-      if (factoryLinkToken && body.indexOf('factory-assets.html?token=') < 0) {
-        body += factoryUploadLinkBlock(factoryLinkToken);
+      // Returns the artwork project's factory link token + expiry for the secure upload link.
+      const link = await tenantApproveQuote(quote, factory, ctx);
+      if (link && link.token && body.indexOf('factory-assets.html?token=') < 0 && body.indexOf('Upload your assets here:') < 0) {
+        body += await factoryUploadLinkBlockShort(link.token, link.expiresAt);
       }
     } else {
       await fetch(SUPA_URL + '/rest/v1/rfq_quotes?id=eq.' + encodeURIComponent(quoteId), { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ status: statusMap[action] || 'more_info_requested' }) });
@@ -2390,7 +2407,7 @@ async function openPD(id) {
     const pdItemId = (items && items[0]) ? items[0].id : null;
     if (pdItemId) {
       tAssetPdItemId = pdItemId;
-      const aps = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id,assets_required,status,product_name&order=created_at.desc&limit=1');
+      const aps = await supa('artwork_projects?pd_item_id=eq.' + encodeURIComponent(pdItemId) + '&select=id,assets_required,status,product_name,factory_link_token,factory_link_expires_at&order=created_at.desc&limit=1');
       if (aps && aps[0]) {
         const ap = aps[0];
         ap.assets_required = (Array.isArray(ap.assets_required) ? ap.assets_required : []).map(a => (a && typeof a === 'object') ? { name: a.name || '', received: a.received === true } : { name: String(a || ''), received: false });
@@ -2539,7 +2556,10 @@ async function tRequestMissingAssets() {
   const product = (tAssetProject && tAssetProject.product_name) || 'this item';
   const listText = pending.map((n, i) => (i + 1) + '. ' + n).join('\n');
   const subject = 'Outstanding assets needed — ' + product;
-  const body = 'Dear ' + (fac.factory_name_english || 'Team') + ',\n\nWe are preparing the packaging design for ' + product + ' and are still missing the following assets from your team:\n\n' + listText + '\n\nCould you please upload these at your earliest convenience so we can proceed?\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  const ap = tAssetProject || {};
+  let body = 'Dear ' + (fac.factory_name_english || 'Team') + ',\n\nWe are preparing the packaging design for ' + product + ' and are still missing the following assets from your team:\n\n' + listText + '\n\nCould you please upload these at your earliest convenience so we can proceed?';
+  if (ap.factory_link_token) { body += await factoryUploadLinkBlockShort(ap.factory_link_token, ap.factory_link_expires_at); }
+  body += '\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
   await openQuoteEmailModal('followup', { quote_id: null, rfq_id: null, factory_id: null, factoryName: fac.factory_name_english, salesEmail: fac.sales_email }, async (subj, bod) => {
     if (!fac.sales_email) { toast('No factory email on file.'); return; }
     await tenantSendEmail(fac.sales_email, fac.sales_contact_name || 'Team', subj, bod, null, null);

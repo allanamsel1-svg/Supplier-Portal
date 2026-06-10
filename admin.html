@@ -6254,6 +6254,21 @@ function factoryUploadLinkBlock(token){
   return '\n\nPlease upload all required assets using this secure link: https://portal.tbgsourcing.net/factory-assets.html?token='+token+
     '\n\nThis link is unique to your order and does not require a login.';
 }
+// Shorten the secure factory upload-link URL via /api/shorten (falls back to the full URL on failure).
+async function factoryUploadShortUrl(token, expiresAt){
+  var fullUrl='https://portal.tbgsourcing.net/factory-assets.html?token='+token;
+  try{
+    var r=await fetch('/api/shorten',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:fullUrl,expires_at:expiresAt||null})});
+    if(r.ok){var d=await r.json().catch(function(){return{};});if(d&&d.short_url)return d.short_url;}
+  }catch(e){}
+  return fullUrl;
+}
+// Upload-link block using a short link (used in approval + asset-request emails).
+async function factoryUploadLinkBlockShort(token, expiresAt){
+  var url=await factoryUploadShortUrl(token,expiresAt);
+  return '\n\nUpload your assets here: '+url+
+    '\n\nThis link is unique to your order and does not require a login.';
+}
 
 async function acceptQuote(quoteId,rfqId,factoryName,override){
   // INTERCEPT: review/edit the AI-drafted approval email before any send/status change.
@@ -6351,12 +6366,12 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
     // Uses the asset checklist selected in the email-draft modal (qemState.assets);
     // falls back to a default cosmetics asset list when the modal produced none.
     // factoryLinkToken drives the secure no-login asset-upload link in the approval email.
-    var factoryLinkToken=null;
+    var factoryLinkToken=null,factoryLinkExpiresAt=null;
     try{
       if(!pdItemId){
         console.error('Artwork project NOT created: pdItemId is null (PD-item creation failed above).');
       }else{
-        var dupR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdItemId+'&select=id,factory_link_token&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var dupR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+pdItemId+'&select=id,factory_link_token,factory_link_expires_at&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
         var dup=dupR.ok?await dupR.json():[];
         if(!dup||!dup.length){
           // Hardcoded default used whenever the modal didn't capture a usable asset list.
@@ -6368,6 +6383,7 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
           var apTenantId=rfq.tenant_id||(typeof TID!=='undefined'?TID:null);
           if(!apTenantId)console.error('Artwork project: tenant_id is null — insert will fail the NOT NULL constraint.',{rfq_id:rfqId});
           factoryLinkToken=awUUID();
+          factoryLinkExpiresAt=new Date(Date.now()+90*86400000).toISOString();
           var apPayload={
             pd_item_id:pdItemId,
             tenant_id:apTenantId,
@@ -6378,7 +6394,7 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
             priority:999,
             artwork_types:[],
             factory_link_token:factoryLinkToken,
-            factory_link_expires_at:new Date(Date.now()+90*86400000).toISOString()
+            factory_link_expires_at:factoryLinkExpiresAt
           };
           var apRes=await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(apPayload)});
           if(apRes.ok){
@@ -6390,6 +6406,7 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
           }
         }else{
           factoryLinkToken=dup[0].factory_link_token||null;
+          factoryLinkExpiresAt=dup[0].factory_link_expires_at||null;
           console.log('Artwork project already exists for PD item '+pdItemId+', skipping');
         }
       }
@@ -6434,9 +6451,9 @@ async function acceptQuote(quoteId,rfqId,factoryName,override){
       // Use the reviewed AI draft when provided; the template above remains the fallback.
       var sendSubject=(override&&override.subject)?override.subject:('['+rfq.project_number+'] '+rfq.item_description);
       var sendBody=(override&&override.body)?override.body:emailBody;
-      // Append the secure, no-login asset-upload link (unique per order) after the asset list.
-      if(factoryLinkToken&&sendBody.indexOf('factory-assets.html?token=')<0){
-        sendBody+=factoryUploadLinkBlock(factoryLinkToken);
+      // Append the secure, no-login asset-upload link (unique per order, shortened) after the asset list.
+      if(factoryLinkToken&&sendBody.indexOf('factory-assets.html?token=')<0&&sendBody.indexOf('Upload your assets here:')<0){
+        sendBody+=await factoryUploadLinkBlockShort(factoryLinkToken,factoryLinkExpiresAt);
       }
       await sendEmail(f.sales_email,f.sales_contact_name||'Team',sendSubject,sendBody,'sourcing@tbgsourcing.net');
     }
@@ -11286,7 +11303,7 @@ async function openPDDetail(pdId){
     try{
       var apiId=pdCurrentDetail._pdi?pdCurrentDetail._pdi.id:null;
       if(apiId){
-        var apR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+apiId+'&select=id,assets_required,status,factory_link_token,product_name&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+        var apR=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+apiId+'&select=id,assets_required,status,factory_link_token,factory_link_expires_at,product_name&order=created_at.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
         var apRows=apR.ok?await apR.json():[];
         if(apRows&&apRows[0]){
           var ap=apRows[0];
@@ -11892,7 +11909,10 @@ async function pdRequestMissingAssets(){
   var product=p.item_description||(p._artworkProject&&p._artworkProject.product_name)||'this item';
   var listText=pending.map(function(n,i){return (i+1)+'. '+n;}).join('\n');
   var subject='Outstanding assets needed — '+product;
-  var body='Dear '+(fac.factory_name_english||'Team')+',\n\nWe are preparing the packaging design for '+product+' and are still missing the following assets from your team:\n\n'+listText+'\n\nCould you please upload these at your earliest convenience so we can proceed?\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
+  var ap=p._artworkProject||{};
+  var body='Dear '+(fac.factory_name_english||'Team')+',\n\nWe are preparing the packaging design for '+product+' and are still missing the following assets from your team:\n\n'+listText+'\n\nCould you please upload these at your earliest convenience so we can proceed?';
+  if(ap.factory_link_token){ body+=await factoryUploadLinkBlockShort(ap.factory_link_token,ap.factory_link_expires_at); }
+  body+='\n\nBest regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing';
   await openQuoteEmailModal('followup',{quote_id:p.quote_id||null,rfq_id:p.rfq_id||null,factory_id:p.factory_id,factoryName:fac.factory_name_english,salesEmail:fac.sales_email},function(subj,bod){
     return pdSendAssetRequest(fac.sales_email,fac.sales_contact_name,subj,bod);
   },{customSubject:subject,customBody:body});
