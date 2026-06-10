@@ -2376,28 +2376,6 @@
   </div>
 </div>
 
-<!-- ── Create Live SKU Modal ── -->
-<div class="modal-overlay" id="csku-modal">
-  <div class="modal" style="max-width:520px;">
-    <h2 id="csku-title">Create Live SKU</h2>
-    <div style="font-size:12px;color:#888;margin:4px 0 14px;">A UPC has been reserved from the pool. Confirm to create the SKU, or cancel to release it.</div>
-    <div style="margin-bottom:10px;">
-      <label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Model Number (editable)</label>
-      <input type="text" id="csku-model" style="width:100%;padding:8px 10px;font-size:14px;font-family:monospace;font-weight:600;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" />
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Unit UPC-A</label><input type="text" id="csku-unit" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
-      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Inner ITF-14</label><input type="text" id="csku-inner" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
-      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Master ITF-14</label><input type="text" id="csku-master" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
-      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Pallet ITF-14</label><input type="text" id="csku-pallet" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
-    </div>
-    <div class="modal-btns" style="margin-top:16px;">
-      <button class="btn-cancel" type="button" onclick="cskuCancel()">Cancel</button>
-      <button class="btn-send" type="button" id="csku-confirm-btn" onclick="cskuConfirm()">Confirm &amp; Create Design Brief</button>
-    </div>
-    <div class="modal-msg" id="csku-msg"></div>
-  </div>
-</div>
 
 <!-- ── Supplier Detail Drawer ── -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
@@ -11350,7 +11328,14 @@ async function openPDDetail(pdId){
         }
       }catch(e){console.log('auto-source create failed',e);}
     }
+    // Fetch the SKU model number for the read-only SKU section (PART 4).
+    pdCurrentDetail._skuModel=null;
+    if(pdCurrentDetail.sku_id||pdCurrentDetail.activated_sku_id){
+      try{var smR=await fetch(SB+'/rest/v1/skus?id=eq.'+(pdCurrentDetail.sku_id||pdCurrentDetail.activated_sku_id)+'&select=model_number&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});var sm=smR.ok?await smR.json():[];if(sm&&sm[0])pdCurrentDetail._skuModel=sm[0].model_number;}catch(e){}
+    }
     renderPDDetail();
+    // PART 3: silently auto-create the SKU if all items are already received and none exists yet.
+    setTimeout(pdMaybeAutoCreateSku,150);
   }catch(e){content.innerHTML='<div style="padding:2rem;text-align:center;color:#b00;">Error: '+e.message+'</div>';}
 }
 
@@ -11800,8 +11785,9 @@ function renderPDDetail(){
     pdChecklistCardHtml('certs')+
     pdOutstandingCardHtml()+
 
-    // ── 10. GATES → CREATE LIVE SKU ──
+    // ── 10. GATES (read-only status) + SKU (auto-created) ──
     pdGatesCardHtml()+
+    pdSkuCardHtml()+
 
   '</div>';
 
@@ -12341,135 +12327,65 @@ async function pdSyncAssetsGate(){
     renderPDDetail();
   }
 }
+// True when every uploaded item across assets + dims + certs has been received.
+function pdAllItemsReceived(){
+  var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;if(!ap)return false;
+  var all=['assets_required','dims_required','certs_required'].reduce(function(acc,col){return acc.concat(Array.isArray(ap[col])?ap[col]:[]);},[]);
+  if(!all.length)return false;
+  return all.every(function(a){return a&&a.received===true;});
+}
+// Gates are now read-only status indicators. SKU creation happens automatically (api/auto-create-sku).
 function pdGatesCardHtml(){
   var p=pdCurrentDetail;
   var wrap=function(body){return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🚪 Gates</div>'+body+'</div>';};
-  var skuId=p.sku_id||p.activated_sku_id||null;
-  var isLive=(p.sku_lifecycle_status==='live')&&!!skuId;
+  var assetsOn=pdAllItemsReceived();
   var GATES=[
-    {key:'gate_dimensions_ok',label:'Dimensions confirmed'},
-    {key:'gate_compliance_ok',label:'Compliance cleared'},
-    {key:'gate_assets_ok',label:'Assets received',sub:'auto-checks when all assets received'},
-    {key:'gate_artwork_ok',label:'Artwork approved'}
+    {key:'gate_dimensions_ok',label:'Dimensions confirmed',toggle:true},
+    {key:'gate_compliance_ok',label:'Compliance cleared',toggle:true},
+    {key:'gate_assets_ok',label:'Assets received',derived:true},
+    {key:'gate_artwork_ok',label:'Artwork approved',toggle:true,notify:true}
   ];
-  var remaining=GATES.filter(function(gt){return !p[gt.key];}).length;
-  var allGreen=remaining===0;
   var rows=GATES.map(function(gt){
-    var on=!!p[gt.key];
-    var label='<label style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:9px 12px;background:'+(on?'#edfaed':'#fafaf6')+';border:1px solid '+(on?'#a0d8a0':'#e8e8e0')+';border-radius:7px;cursor:pointer;">'+
-      '<input type="checkbox" '+(on?'checked':'')+' onchange="togglePDGate(\''+gt.key+'\',this.checked)" style="width:17px;height:17px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
-      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.sub?' <span style="font-weight:400;color:#999;font-size:10px;">— '+esc(gt.sub)+'</span>':'')+'</span>'+
+    var on=gt.derived?assetsOn:!!p[gt.key];
+    var ctrl=gt.derived
+      ? '<span style="width:17px;height:17px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:14px;">'+(on?'✅':'⬜')+'</span>'
+      : '<input type="checkbox" '+(on?'checked':'')+' onchange="togglePDGate(\''+gt.key+'\',this.checked)" style="width:17px;height:17px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />';
+    var label='<label style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:9px 12px;background:'+(on?'#edfaed':'#fafaf6')+';border:1px solid '+(on?'#a0d8a0':'#e8e8e0')+';border-radius:7px;'+(gt.derived?'':'cursor:pointer;')+'">'+
+      ctrl+
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.derived?' <span style="font-weight:400;color:#999;font-size:10px;">— auto from uploaded items</span>':'')+'</span>'+
     '</label>';
-    var action=(gt.key==='gate_artwork_ok')?'<button onclick="pdNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🎨 Notify Graphics Team</button>':'';
+    var action=(gt.notify)?'<button onclick="pdNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🎨 Notify Graphics Team</button>':'';
     return '<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:6px;">'+label+action+'</div>';
   }).join('');
-  var btn;
-  if(isLive){
-    btn='<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Live SKU created</button>'+
-        '<button onclick="openDesignBriefModal()" style="width:100%;margin-top:8px;padding:12px;background:#5a2db8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🎨 Create Design Brief</button>';
-  }else if(allGreen){
-    btn='<button onclick="openCreateSkuModal()" style="width:100%;padding:13px;background:#1a7a1a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,122,26,0.25);">🎯 Create Live SKU</button>';
-  }else{
-    btn='<button disabled title="Complete all gates to create SKU" style="width:100%;padding:13px;background:#bbb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:not-allowed;">🎯 Create Live SKU</button>';
-  }
   return wrap(
-    '<div style="margin-bottom:12px;padding:9px 12px;background:'+(allGreen?'#edfaed':'#fff8e0')+';border:1px solid '+(allGreen?'#a0d8a0':'#f0d860')+';border-radius:8px;font-size:12px;font-weight:600;color:'+(allGreen?'#1a7a1a':'#886600')+';">'+(allGreen?'✓ All gates green — ready to create the Live SKU':remaining+' of 4 gates remaining')+'</div>'+
-    rows+
-    '<div style="margin-top:12px;">'+btn+'</div>'
+    '<div style="margin-bottom:10px;font-size:11px;color:#888;">Gate status — updates automatically as data lands. The Live SKU is created automatically once all items are received.</div>'+
+    rows
   );
 }
-
-// ── Create Live SKU modal (assign UPC → model number → confirm → SKU → design brief) ──
-var cskuState=null;
-function pdPrefix(s,n,fb){var t=(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');return t?t.slice(0,n||3):(fb||'GEN');}
-async function pdNextSkuSequence(){
-  try{
-    var r=await fetch(SB+'/rest/v1/skus?select=sequence_number&order=sequence_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    if(r.ok){var rows=await r.json();if(rows&&rows[0]&&rows[0].sequence_number!=null)return parseInt(rows[0].sequence_number,10)+1;}
-  }catch(e){}
-  return 1;
+// PART 4: read-only SKU section, shown once a SKU exists.
+function pdSkuCardHtml(){
+  var p=pdCurrentDetail;if(!p||!(p.sku_id||p.activated_sku_id))return '';
+  var model=p._skuModel||p.item_number||'—';
+  var rows=[['Model Number',model],['Unit UPC',p.unit_upc||'—'],['Inner UPC (ITF-14)',p.inner_upc||'—'],['Master UPC (ITF-14)',p.master_upc||'—'],['Pallet UPC (ITF-14)',p.pallet_upc||'—']]
+    .map(function(r){return '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f0f0e8;"><span style="font-size:12px;color:#888;">'+esc(r[0])+'</span><span style="font-size:13px;font-family:monospace;font-weight:600;color:#1a1a2e;">'+esc(r[1])+'</span></div>';}).join('');
+  return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;">'+
+    '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🏷 SKU</div>'+rows+
+    '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;align-items:center;"><span style="font-size:12px;color:#888;">Status</span><span style="font-size:12px;font-weight:700;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;padding:2px 9px;border-radius:9px;">Live</span></div>'+
+  '</div>';
 }
-async function openCreateSkuModal(){
-  if(!pdCurrentDetail)return;
-  var p=pdCurrentDetail;
-  if(!(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_assets_ok&&p.gate_artwork_ok)){alert('Complete all gates to create SKU.');return;}
-  if(p.sku_id||p.activated_sku_id){alert('A SKU already exists for this item.');return;}
-  var msg=g('csku-msg');if(msg){msg.style.display='none';msg.textContent='';}
-  cskuState={claimedUpc:null};
+// PART 3: silently auto-create the SKU when all items are already received (handles pre-existing data).
+async function pdMaybeAutoCreateSku(){
+  var p=pdCurrentDetail;if(!p||!p._pdi||!p._artworkProject)return;
+  if(p.sku_id||p.activated_sku_id)return;
+  if(!pdAllItemsReceived())return;
   try{
-    // Step 1 — assign a unit UPC from the pool (reuse one already claimed by this PD).
-    var unitUpc=p.unit_upc||null;
-    if(!unitUpc){
-      var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-      if(!poolR.ok){alert('Could not query UPC pool.');return;}
-      var avail=await poolR.json();
-      if(!avail.length){alert('No UPCs available in the pool. Upload more in Setup → UPC Pool.');return;}
-      unitUpc=avail[0].upc_code;
-      var asg=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(unitUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_pd_id:p.id,assigned_at:new Date().toISOString()})});
-      if(!asg.ok){var et=await asg.text().catch(function(){return '';});alert('Failed to claim UPC from pool (HTTP '+asg.status+'): '+et.slice(0,200));return;}
-      cskuState.claimedUpc=unitUpc;
+    var r=await fetch('/api/auto-create-sku',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({artwork_project_id:p._artworkProject.id,pd_item_id:p._pdi.id})});
+    var d=await r.json().catch(function(){return{};});
+    if(r.ok&&d&&d.success&&d.model_number){
+      toast('SKU auto-created: '+d.model_number);
+      if(pdCurrentDetail&&pdCurrentDetail.id===p.id)openPDDetail(p.id);
     }
-    var innerUpc=deriveItf14(unitUpc,1),masterUpc=deriveItf14(unitUpc,2),palletUpc=deriveItf14(unitUpc,3);
-    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({unit_upc:unitUpc,inner_upc:innerUpc,master_upc:masterUpc,pallet_upc:palletUpc,updated_at:new Date().toISOString()})});
-    p.unit_upc=unitUpc;p.inner_upc=innerUpc;p.master_upc=masterUpc;p.pallet_upc=palletUpc;
-    // Step 2 — generate model number: BRAND-CAT-SEQ.
-    var brandName=(p.brands&&(p.brands.brand_name||p.brands.brand_code))||'';
-    var brandPfx=pdPrefix(brandName,3,'BRD'),catPfx=pdPrefix(p.category,3,'GEN');
-    var seq=await pdNextSkuSequence();
-    cskuState.brandPfx=brandPfx;cskuState.catPfx=catPfx;cskuState.seq=seq;
-    cskuState.unitUpc=unitUpc;cskuState.innerUpc=innerUpc;cskuState.masterUpc=masterUpc;cskuState.palletUpc=palletUpc;
-    g('csku-model').value=brandPfx+'-'+catPfx+'-'+String(seq).padStart(4,'0');
-    g('csku-unit').value=unitUpc;g('csku-inner').value=innerUpc;g('csku-master').value=masterUpc;g('csku-pallet').value=palletUpc;
-    g('csku-modal').classList.add('on');
-  }catch(e){alert('Error: '+(e&&e.message||e));}
-}
-async function cskuCancel(){
-  // Release a UPC we claimed in THIS session back to the pool.
-  if(cskuState&&cskuState.claimedUpc&&pdCurrentDetail){
-    try{
-      await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.claimedUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:false,assigned_to_pd_id:null,assigned_at:null})});
-      await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({unit_upc:null,inner_upc:null,master_upc:null,pallet_upc:null,updated_at:new Date().toISOString()})});
-      pdCurrentDetail.unit_upc=null;pdCurrentDetail.inner_upc=null;pdCurrentDetail.master_upc=null;pdCurrentDetail.pallet_upc=null;
-    }catch(e){console.log('UPC release (non-fatal):',e);}
-  }
-  cskuState=null;
-  g('csku-modal').classList.remove('on');
-}
-async function cskuConfirm(){
-  if(!pdCurrentDetail||!cskuState)return;
-  var p=pdCurrentDetail,btn=g('csku-confirm-btn');
-  var model=(g('csku-model').value||'').trim();
-  if(!model){alert('Model number is required.');return;}
-  btn.disabled=true;btn.textContent='Creating…';
-  try{
-    // UPC integrity re-check before creating the SKU (guards races / duplicates).
-    var vr=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.unitUpc),{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var vrows=vr.ok?await vr.json():[];
-    if(!vrows.length){alert('UPC integrity check failed: '+cskuState.unitUpc+' is not in the pool.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
-    if(vrows[0].assigned_to_sku){alert('UPC integrity check failed: '+cskuState.unitUpc+' is already assigned to a live SKU.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
-    if(vrows[0].assigned_to_pd_id&&vrows[0].assigned_to_pd_id!==p.id){alert('UPC integrity check failed: '+cskuState.unitUpc+' is claimed by a different PD.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
-    // Step 3 — INSERT the SKU.
-    var skuPayload={
-      model_number:model, brand_prefix:cskuState.brandPfx, category_prefix:cskuState.catPfx, sequence_number:cskuState.seq,
-      description:p.item_description||model, brand_id:p.brand_id||null, category_id:p.category_id||null,
-      status:'active', upc_code:cskuState.unitUpc, tenant_id:p.tenant_id||null, is_kit:false, is_cosmetic:!!p.is_cosmetic
-    };
-    var skuR=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
-    if(!skuR.ok){var t=await skuR.text().catch(function(){return '';});alert('SKU creation failed: '+skuR.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
-    var skuRows=await skuR.json().catch(function(){return[];});var newSku=Array.isArray(skuRows)?skuRows[0]:skuRows;var skuId=newSku&&newSku.id;
-    // Lock the pool UPC to the SKU.
-    try{await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.unitUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({assigned_to_sku:skuId})});}catch(e){}
-    // Step 4 — link SKU + flip lifecycle to live.
-    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:skuId,activated_sku_id:skuId,sku_lifecycle_status:'live',activated_at:new Date().toISOString(),activated_by:'admin',updated_at:new Date().toISOString()})});
-    p.sku_id=skuId;p.activated_sku_id=skuId;p.sku_lifecycle_status='live';
-    cskuState=null;
-    g('csku-modal').classList.remove('on');
-    if(typeof toast==='function')toast('Live SKU '+model+' created.');
-    if(typeof loadPDList==='function')loadPDList();
-    renderPDDetail();
-    // Step 5 — straight into the design brief.
-    setTimeout(function(){try{openDesignBriefModal();}catch(e){}},300);
-  }catch(e){alert('Error: '+(e&&e.message||e));btn.disabled=false;btn.textContent='Confirm & Create Design Brief';}
+  }catch(e){console.log('auto-create-sku (non-fatal):',e);}
 }
 
 async function generatePDUpcs(){

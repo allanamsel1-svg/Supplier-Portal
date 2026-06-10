@@ -113,7 +113,7 @@ function allReceived(){
 async function loadProject(){
   if (!TOKEN){ showInvalid(); return; }
   try {
-    var sel = 'id,product_name,status,assets_required,dims_required,certs_required,factory_link_expires_at,factory_download_count';
+    var sel = 'id,pd_item_id,product_name,status,assets_required,dims_required,certs_required,factory_link_expires_at,factory_download_count';
     var r = await fetch(SUPA_URL + '/rest/v1/artwork_projects?factory_link_token=eq.' + encodeURIComponent(TOKEN) + '&select=' + encodeURIComponent(sel) + '&limit=1', { headers: H });
     var rows = r.ok ? await r.json() : [];
     var p = Array.isArray(rows) ? rows[0] : null;
@@ -234,11 +234,19 @@ async function uploadItem(gi, file){
     patch[ent.arr] = updated;
 
     // 5) If every item across all three categories is now received, move into the design queue.
-    if (allReceived()){ patch.status = 'ready_for_design'; PROJECT.status = 'ready_for_design'; }
+    var nowAllDone = allReceived();
+    if (nowAllDone){ patch.status = 'ready_for_design'; PROJECT.status = 'ready_for_design'; }
 
     await fetch(SUPA_URL + '/rest/v1/artwork_projects?id=eq.' + encodeURIComponent(PROJECT.id), { method: 'PATCH', headers: Object.assign({}, H, { Prefer: 'return=minimal' }), body: JSON.stringify(patch) });
 
-    // 6) Refresh the checklist; surface a transient confirmation.
+    // 6) When the last item lands, trigger automatic SKU creation (internal — no SKU shown to the factory).
+    if (nowAllDone && PROJECT.pd_item_id){
+      try {
+        await fetch('/api/auto-create-sku', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ artwork_project_id: PROJECT.id, pd_item_id: PROJECT.pd_item_id }) });
+      } catch (e) { /* non-fatal — the design team can create it from the PD panel */ }
+    }
+
+    // 7) Refresh the checklist; surface a transient confirmation.
     render();
     showToast('✅ ' + ent.name + ' uploaded successfully');
   } catch(e){

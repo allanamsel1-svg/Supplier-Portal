@@ -38,6 +38,10 @@ async function handler(req, res) {
     ? body.packaging_selections.filter(Boolean)
     : (body.packaging_selections ? [String(body.packaging_selections)] : []);
   const referenceImageUrl = (body.reference_image_url || '').toString().trim();
+  const unitUpc = (body.unit_upc || '').toString().trim();
+  const innerUpc = (body.inner_upc || '').toString().trim();
+  const masterUpc = (body.master_upc || '').toString().trim();
+  const palletUpc = (body.pallet_upc || '').toString().trim();
 
   if (!skuDescription) return res.status(400).json({ error: 'sku_description is required.' });
 
@@ -51,6 +55,11 @@ async function handler(req, res) {
     'and any special notes based on the product type.';
   if (referenceImageUrl) {
     userPrompt += '\n\nReference image provided — see attached for packaging style direction.';
+  }
+  if (unitUpc || innerUpc || masterUpc || palletUpc) {
+    userPrompt += '\n\nInclude at the end of the brief: BARCODE SPECIFICATIONS: Unit UPC-A: ' + (unitUpc || 'N/A') +
+      ' | Inner ITF-14: ' + (innerUpc || 'N/A') + ' | Master ITF-14: ' + (masterUpc || 'N/A') +
+      ' | Pallet ITF-14: ' + (palletUpc || 'N/A') + '. The graphics team must use these exact barcodes on the artwork.';
   }
 
   try {
