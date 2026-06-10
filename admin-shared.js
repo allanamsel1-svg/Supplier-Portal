@@ -65,6 +65,7 @@
     ]},
     { section: 'System', items: [
       { icon: '⚙️', label: 'Setup', href: '/setup.html' },
+      { icon: '🏆', label: 'Competitor Analysis', href: '/competitor-analysis.html' },
     ]},
   ];
 

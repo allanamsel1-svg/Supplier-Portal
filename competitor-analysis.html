@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<!-- POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Competitive Analysis — TBG Sourcing Portal</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  img, table, input, select, textarea { max-width: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; overflow-wrap: break-word; min-height: 100vh; }
+  a { color: #2244cc; }
+  .topbar { height: 52px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
+  .topbar-l { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .tm { width: 28px; height: 28px; background: #1a1a2e; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex: 0 0 auto; }
+  .topbar-title { font-size: 14px; font-weight: 600; }
+  .back-link { font-size: 13px; color: #888; text-decoration: none; }
+  .back-link:hover { color: #1a1a2e; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; }
+  .page-head h1 { font-size: 22px; font-weight: 700; }
+  .page-sub { font-size: 13px; color: #888; margin-top: 4px; }
+
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 1.25rem 0; }
+  .sum-card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .sum-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .sum-value { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-top: 6px; }
+  .sum-value.small { font-size: 15px; }
+  .sum-hero { background: linear-gradient(135deg, #1a1a2e 0%, #4a2266 100%); color: #fff; border: none; }
+  .sum-hero .sum-label { color: rgba(255,255,255,0.7); }
+  .sum-hero .sum-value { color: #fff; }
+  @media(max-width:860px){ .summary { grid-template-columns: 1fr 1fr; } }
+
+  .filterbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; padding: 10px 14px; margin-bottom: 1.25rem; }
+  .fb-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .fb-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .chip { padding: 5px 12px; border: 1px solid #e0e0d8; background: #fff; border-radius: 20px; font-size: 12px; cursor: pointer; font-family: inherit; color: #555; }
+  .chip.on { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+  .fb-sel { padding: 6px 10px; border: 1px solid #e0e0d8; border-radius: 7px; font-size: 13px; font-family: inherit; background: #fff; color: #1a1a2e; }
+  .fb-spacer { flex: 1; }
+  .add-btn { padding: 8px 14px; background: #1a7a1a; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card { background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; padding: 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .card-name { font-size: 16px; font-weight: 700; color: #1a1a2e; }
+  .cat-badge { display: inline-block; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 8px; background: #eef2ff; color: #3344aa; margin-top: 4px; }
+  .score-badge { flex: 0 0 auto; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 9px; white-space: nowrap; }
+  .score-red { background: #fff0f0; color: #b00; border: 1px solid #f0c0c0; }
+  .score-yellow { background: #fff8e0; color: #886600; border: 1px solid #f0d860; }
+  .score-green { background: #edfaed; color: #1a7a1a; border: 1px solid #a0d8a0; }
+  .card-line { font-size: 12px; color: #555; }
+  .card-line b { color: #1a1a2e; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .feat-chip { font-size: 11px; padding: 2px 8px; border-radius: 7px; background: #f0f4ff; color: #2244cc; border: 1px solid #d6e0ff; }
+  .miss-chip { font-size: 11px; padding: 2px 8px; border-radius: 7px; background: #fff0f0; color: #b00; border: 1px solid #f0c0c0; }
+  .adv-chip { font-size: 11px; padding: 2px 8px; border-radius: 7px; background: #edfaed; color: #1a7a1a; border: 1px solid #a0d8a0; }
+  .mini-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-top: 2px; }
+  .card-notes { font-size: 12px; color: #777; font-style: italic; }
+  .card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; padding-top: 8px; border-top: 1px solid #f0f0e8; }
+  .card-date { font-size: 11px; color: #aaa; }
+  .edit-btn { padding: 5px 12px; background: #f5f5f0; border: 1px solid #e0e0d8; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; color: #1a1a2e; }
+  .edit-btn:hover { background: #ececec; }
+
+  .matrix-wrap { margin-top: 2rem; }
+  .matrix-wrap h2 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+  .matrix-scroll { overflow-x: auto; background: #fff; border: 1px solid #e0e0d8; border-radius: 12px; }
+  table.matrix { border-collapse: collapse; width: 100%; min-width: 700px; font-size: 12px; }
+  table.matrix th, table.matrix td { padding: 9px 10px; border-bottom: 1px solid #f0f0e8; text-align: center; }
+  table.matrix th { background: #fafaf8; font-weight: 600; color: #666; position: sticky; top: 0; }
+  table.matrix th.feat-col, table.matrix td.feat-col { text-align: left; font-weight: 600; color: #1a1a2e; white-space: nowrap; }
+  table.matrix th.tbg-col, table.matrix td.tbg-col { background: #f3edff; color: #5a2db8; font-weight: 700; }
+  .yes { color: #1a7a1a; font-size: 14px; }
+  .no { color: #cc3344; font-size: 14px; }
+
+  .empty { padding: 2.5rem; text-align: center; color: #aaa; font-size: 14px; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; display: none; align-items: flex-start; justify-content: center; padding: 30px 16px; overflow-y: auto; }
+  .modal-bg.on { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 620px; padding: 22px; }
+  .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
+  .mf { margin-bottom: 10px; }
+  .mf label { display: block; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .mf input, .mf select, .mf textarea { width: 100%; padding: 8px 10px; font-size: 13px; border: 1px solid #e0e0d8; border-radius: 7px; font-family: inherit; color: #1a1a2e; background: #fff; }
+  .mf textarea { resize: vertical; min-height: 54px; }
+  .mf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mf-hint { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .modal-btns { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+  .btn-cancel { padding: 9px 16px; background: #f5f5f0; border: 1px solid #e0e0d8; border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  .btn-save { padding: 9px 18px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .modal-msg { font-size: 12px; margin-top: 8px; }
+
+  /* Toast */
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: #1a1a2e; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: 0 6px 24px rgba(0,0,0,0.25); z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="tm">T</div>
+    <div class="topbar-title">Competitive Analysis</div>
+    <a class="back-link" href="/admin.html" style="margin-left:18px;">← Dashboard</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="page-head">
+    <h1>Competitive Analysis — TBG Sourcing Portal</h1>
+    <div class="page-sub" id="page-sub">Loading…</div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="filterbar">
+    <div class="fb-group">
+      <span class="fb-label">Category</span>
+      <button class="chip on" data-cat="all" onclick="setCat('all')">All</button>
+      <button class="chip" data-cat="sourcing" onclick="setCat('sourcing')">Sourcing</button>
+      <button class="chip" data-cat="amazon_tools" onclick="setCat('amazon_tools')">Amazon Tools</button>
+      <button class="chip" data-cat="marketplace" onclick="setCat('marketplace')">Marketplace</button>
+      <button class="chip" data-cat="erp" onclick="setCat('erp')">ERP</button>
+    </div>
+    <div class="fb-group">
+      <span class="fb-label">Sort by</span>
+      <select class="fb-sel" id="sort-sel" onchange="setSort(this.value)">
+        <option value="name">Name</option>
+        <option value="price">Monthly Price</option>
+        <option value="score">Score vs TBG</option>
+      </select>
+    </div>
+    <div class="fb-spacer"></div>
+    <button class="add-btn" onclick="openForm()">+ Add Competitor</button>
+  </div>
+
+  <div class="grid" id="grid"><div class="empty">Loading competitors…</div></div>
+
+  <div class="matrix-wrap">
+    <h2>Feature Comparison Matrix</h2>
+    <div class="matrix-scroll"><div id="matrix"></div></div>
+  </div>
+</div>
+
+<!-- Add / Edit modal -->
+<div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeForm()">
+  <div class="modal">
+    <h2 id="modal-title">Add Competitor</h2>
+    <div class="mf"><label>Platform Name *</label><input id="f-name" /></div>
+    <div class="mf-grid">
+      <div class="mf"><label>Category</label><select id="f-category"><option value="sourcing">Sourcing</option><option value="amazon_tools">Amazon Tools</option><option value="marketplace">Marketplace</option><option value="erp">ERP</option></select></div>
+      <div class="mf"><label>Website</label><input id="f-website" placeholder="https://" /></div>
+    </div>
+    <div class="mf-grid">
+      <div class="mf"><label>Setup Fee ($)</label><input id="f-setup" type="number" step="1" /></div>
+      <div class="mf"><label>Target Market</label><input id="f-target" /></div>
+    </div>
+    <div class="mf-grid">
+      <div class="mf"><label>Monthly Price Min ($)</label><input id="f-pmin" type="number" step="1" /></div>
+      <div class="mf"><label>Monthly Price Max ($)</label><input id="f-pmax" type="number" step="1" /></div>
+    </div>
+    <div class="mf-grid">
+      <div class="mf"><label>Score vs TBG (1-10)</label><input id="f-score" type="number" min="1" max="10" step="1" /></div>
+      <div class="mf"><label>Last Updated</label><input id="f-date" type="date" /></div>
+    </div>
+    <div class="mf"><label>Key Features (one per line)</label><textarea id="f-features"></textarea></div>
+    <div class="mf"><label>Missing vs TBG (one per line)</label><textarea id="f-missing"></textarea></div>
+    <div class="mf"><label>Our Advantages (one per line)</label><textarea id="f-advantages"></textarea></div>
+    <div class="mf"><label>Notes</label><textarea id="f-notes"></textarea></div>
+    <div class="modal-msg" id="modal-msg"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeForm()">Cancel</button>
+      <button class="btn-save" id="modal-save" onclick="saveComp()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var SB='https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var H={'apikey':KEY,'Authorization':'Bearer '+KEY};
+var HW={'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
+
+// Auth gate — same admin_session token admin.html uses.
+var adminSession = localStorage.getItem('admin_session');
+if (!adminSession) { window.location.href = '/admin.html'; }
+
+// ── Our pricing (fixed) ──
+var OUR_SETUP = 1500, OUR_MONTHLY = 299;
+
+var COMPS = [];
+var filterCat = 'all';
+var sortBy = 'name';
+
+// Feature matrix: label → regex tested against a competitor's key_features text. TBG always has all of them.
+var MATRIX_FEATURES = [
+  ['RFQ Workflow', /rfq|request for quot/i],
+  ['AI Scoring', /\bai\b.*scor|scor.*\bai\b|factory scor/i],
+  ['Compliance Engine', /complian/i],
+  ['Artwork Pipeline', /artwork|design pipeline|packaging design/i],
+  ['HTS/Duty Calc', /hts|duty|tariff|customs/i],
+  ['Intel Module', /intel|market intel|retail intel/i],
+  ['Shop Outs', /shop.?out/i],
+  ['Multi-tenant', /multi.?tenant|white.?label|tenant/i],
+  ['AI Email Personas', /persona|ai email|automated email/i],
+  ['Inspection Scheduling', /inspection/i],
+  ['Landed Cost', /landed cost|landed-cost/i],
+  ['Multi-language', /multi.?language|multi.?lingual|translation/i]
+];
+
+function g(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function arr(v){ if(Array.isArray(v))return v.filter(function(x){return x!=null&&x!=='';}); if(typeof v==='string'){ try{var p=JSON.parse(v); if(Array.isArray(p))return p;}catch(e){} return v?[v]:[]; } return []; }
+function money(n){ if(n==null||n===''||isNaN(Number(n)))return null; return '$'+Number(n).toLocaleString('en-US'); }
+function catLabel(c){ return ({sourcing:'Sourcing',amazon_tools:'Amazon Tools',marketplace:'Marketplace',erp:'ERP'})[c]||(c||'—'); }
+function toast(msg){ var t=g('toast'); if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);} t.textContent=msg; t.style.opacity='1'; clearTimeout(t._t); t._t=setTimeout(function(){t.style.opacity='0';},3500); }
+function normUrl(u){ u=(u||'').trim(); if(!u)return ''; return /^https?:\/\//i.test(u)?u:('https://'+u); }
+function monthlyMid(c){ var lo=c.monthly_price_min, hi=c.monthly_price_max; lo=(lo==null||lo==='')?null:Number(lo); hi=(hi==null||hi==='')?null:Number(hi); if(lo!=null&&hi!=null)return (lo+hi)/2; if(hi!=null)return hi; if(lo!=null)return lo; return null; }
+
+async function load(){
+  try{
+    var r=await fetch(SB+'/rest/v1/competitor_analysis?select=*&order=platform_name',{headers:H});
+    if(!r.ok){ g('grid').innerHTML='<div class="empty" style="color:#b00;">Could not load competitors ('+r.status+').</div>'; return; }
+    var rows=await r.json();
+    COMPS=(rows||[]).filter(function(c){return c.is_active!==false;});
+    renderHead(); renderSummary(); renderGrid(); renderMatrix();
+  }catch(e){ g('grid').innerHTML='<div class="empty" style="color:#b00;">Error: '+esc(e.message)+'</div>'; }
+}
+
+function renderHead(){
+  var dates=COMPS.map(function(c){return c.last_updated;}).filter(Boolean).sort();
+  var latest=dates.length?dates[dates.length-1]:null;
+  g('page-sub').textContent='Last updated: '+(latest||'—')+' | '+COMPS.length+' platforms tracked';
+}
+
+function renderSummary(){
+  var mids=COMPS.map(monthlyMid).filter(function(v){return v!=null;});
+  var avg=mids.length?Math.round(mids.reduce(function(a,b){return a+b;},0)/mids.length):null;
+  var beat=COMPS.filter(function(c){return arr(c.our_advantages).length>3;}).length;
+  var compliance=COMPS.filter(function(c){return arr(c.key_features).some(function(f){return /complian/i.test(String(f));});}).length;
+  g('summary').innerHTML=
+    card('Our Pricing','$'+OUR_SETUP.toLocaleString()+' setup / $'+OUR_MONTHLY+'/mo','small',true)+
+    card('Avg Competitor Price',(avg!=null?('$'+avg.toLocaleString()+'/mo'):'—'),'',false)+
+    card('We Beat on Features',String(beat)+' platforms','',false)+
+    card('Platforms with Compliance',String(compliance),'',false);
+  function card(label,value,cls,hero){ return '<div class="sum-card'+(hero?' sum-hero':'')+'"><div class="sum-label">'+esc(label)+'</div><div class="sum-value '+(cls||'')+'">'+esc(value)+'</div>'+(hero?'<div class="sum-label" style="margin-top:6px;text-transform:none;letter-spacing:0;">2 users included</div>':'')+'</div>'; }
+}
+
+function setCat(c){ filterCat=c; document.querySelectorAll('.chip[data-cat]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-cat')===c);}); renderGrid(); }
+function setSort(s){ sortBy=s; renderGrid(); }
+
+function scoreClass(s){ s=Number(s)||0; if(s>=8)return 'score-green'; if(s>=5)return 'score-yellow'; return 'score-red'; }
+
+function visibleComps(){
+  var list=COMPS.slice();
+  if(filterCat!=='all')list=list.filter(function(c){return (c.category||'')===filterCat;});
+  list.sort(function(a,b){
+    if(sortBy==='price'){ return (monthlyMid(a)==null?1e9:monthlyMid(a))-(monthlyMid(b)==null?1e9:monthlyMid(b)); }
+    if(sortBy==='score'){ return (Number(b.overall_score)||0)-(Number(a.overall_score)||0); }
+    return String(a.platform_name||'').localeCompare(String(b.platform_name||''));
+  });
+  return list;
+}
+
+function chipsHtml(items,cls,max){ items=arr(items).slice(0,max); if(!items.length)return ''; return '<div class="chips">'+items.map(function(x){return '<span class="'+cls+'">'+esc(x)+'</span>';}).join('')+'</div>'; }
+
+function renderGrid(){
+  var list=visibleComps();
+  if(!list.length){ g('grid').innerHTML='<div class="empty">No competitors in this category.</div>'; return; }
+  g('grid').innerHTML=list.map(function(c){
+    var pmin=money(c.monthly_price_min), pmax=money(c.monthly_price_max);
+    var monthly = (pmin&&pmax)?(pmin+'–'+pmax+'/mo') : (pmax?pmax+'/mo' : (pmin?pmin+'/mo':'—'));
+    var setup = (c.setup_fee!=null&&c.setup_fee!=='')?money(c.setup_fee)+' setup' : 'No setup fee';
+    var url=normUrl(c.website);
+    var score=(c.overall_score!=null)?c.overall_score:'—';
+    var keyF=chipsHtml(c.key_features,'feat-chip',5);
+    var miss=chipsHtml(c.missing_features,'miss-chip',5);
+    var adv=chipsHtml(c.our_advantages,'adv-chip',3);
+    return '<div class="card">'+
+      '<div class="card-top">'+
+        '<div style="min-width:0;"><div class="card-name">'+esc(c.platform_name||'—')+'</div><span class="cat-badge">'+esc(catLabel(c.category))+'</span></div>'+
+        '<span class="score-badge '+scoreClass(c.overall_score)+'" title="Score vs TBG (lower = weaker competitor)">vs TBG: '+esc(score)+'</span>'+
+      '</div>'+
+      (url?'<div class="card-line"><a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(c.website)+'</a></div>':'')+
+      '<div class="card-line"><b>'+esc(setup)+'</b> · '+esc(monthly)+'</div>'+
+      (c.target_market?'<div class="card-line">🎯 '+esc(c.target_market)+'</div>':'')+
+      (keyF?'<div class="mini-label">Key features</div>'+keyF:'')+
+      (miss?'<div class="mini-label">Missing vs TBG</div>'+miss:'')+
+      (adv?'<div class="mini-label">Our advantages</div>'+adv:'')+
+      (c.notes?'<div class="card-notes">'+esc(c.notes)+'</div>':'')+
+      '<div class="card-foot"><span class="card-date">Updated '+esc(c.last_updated||'—')+'</span><button class="edit-btn" onclick="openForm(\''+c.id+'\')">Edit</button></div>'+
+    '</div>';
+  }).join('');
+}
+
+function renderMatrix(){
+  // Top 6 competitors by score (strongest first).
+  var top=COMPS.slice().sort(function(a,b){return (Number(b.overall_score)||0)-(Number(a.overall_score)||0);}).slice(0,6);
+  if(!top.length){ g('matrix').innerHTML='<div class="empty">No competitors to compare.</div>'; return; }
+  var head='<tr><th class="feat-col">Feature</th>'+top.map(function(c){return '<th>'+esc(c.platform_name||'—')+'</th>';}).join('')+'<th class="tbg-col">TBG Sourcing</th></tr>';
+  var body=MATRIX_FEATURES.map(function(f){
+    var label=f[0], re=f[1];
+    var cells=top.map(function(c){
+      var hay=arr(c.key_features).join(' | ');
+      var has=re.test(hay);
+      return '<td>'+(has?'<span class="yes">✅</span>':'<span class="no">❌</span>')+'</td>';
+    }).join('');
+    return '<tr><td class="feat-col">'+esc(label)+'</td>'+cells+'<td class="tbg-col"><span class="yes">✅</span></td></tr>';
+  }).join('');
+  g('matrix').innerHTML='<table class="matrix"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+
+// ── Add / Edit form ──
+var editId=null;
+function openForm(id){
+  editId=id||null;
+  var c=editId?COMPS.find(function(x){return x.id===editId;}):null;
+  g('modal-title').textContent=editId?'Edit Competitor':'Add Competitor';
+  g('modal-save').textContent=editId?'Update':'Add';
+  g('modal-msg').textContent='';
+  function set(id,v){ g(id).value=(v==null?'':v); }
+  set('f-name', c?c.platform_name:'');
+  g('f-category').value=(c&&c.category)||'sourcing';
+  set('f-website', c?c.website:'');
+  set('f-setup', c?c.setup_fee:'');
+  set('f-target', c?c.target_market:'');
+  set('f-pmin', c?c.monthly_price_min:'');
+  set('f-pmax', c?c.monthly_price_max:'');
+  set('f-score', c?c.overall_score:'');
+  set('f-date', c?(c.last_updated||''):new Date().toISOString().slice(0,10));
+  set('f-features', c?arr(c.key_features).join('\n'):'');
+  set('f-missing', c?arr(c.missing_features).join('\n'):'');
+  set('f-advantages', c?arr(c.our_advantages).join('\n'):'');
+  set('f-notes', c?c.notes:'');
+  g('modal-bg').classList.add('on');
+}
+function closeForm(){ g('modal-bg').classList.remove('on'); editId=null; }
+
+function linesToArr(id){ return g(id).value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean); }
+function numOrNull(id){ var v=g(id).value.trim(); return v===''?null:Number(v); }
+
+async function saveComp(){
+  var name=g('f-name').value.trim();
+  if(!name){ g('modal-msg').style.color='#b00'; g('modal-msg').textContent='Platform name is required.'; return; }
+  var payload={
+    platform_name:name,
+    category:g('f-category').value,
+    website:g('f-website').value.trim()||null,
+    setup_fee:numOrNull('f-setup'),
+    target_market:g('f-target').value.trim()||null,
+    monthly_price_min:numOrNull('f-pmin'),
+    monthly_price_max:numOrNull('f-pmax'),
+    overall_score:numOrNull('f-score'),
+    last_updated:g('f-date').value||null,
+    key_features:linesToArr('f-features'),
+    missing_features:linesToArr('f-missing'),
+    our_advantages:linesToArr('f-advantages'),
+    notes:g('f-notes').value.trim()||null
+  };
+  var btn=g('modal-save'); btn.disabled=true; btn.textContent='Saving…';
+  try{
+    var r;
+    if(editId){
+      r=await fetch(SB+'/rest/v1/competitor_analysis?id=eq.'+editId,{method:'PATCH',headers:Object.assign({},HW,{Prefer:'return=minimal'}),body:JSON.stringify(payload)});
+    }else{
+      payload.is_active=true;
+      r=await fetch(SB+'/rest/v1/competitor_analysis',{method:'POST',headers:Object.assign({},HW,{Prefer:'return=minimal'}),body:JSON.stringify(payload)});
+    }
+    if(!r.ok){ var t=await r.text().catch(function(){return '';}); g('modal-msg').style.color='#b00'; g('modal-msg').textContent='Save failed: '+r.status+' '+t.slice(0,160); btn.disabled=false; btn.textContent=editId?'Update':'Add'; return; }
+    toast(editId?'Competitor updated.':'Competitor added.');
+    closeForm();
+    btn.disabled=false; btn.textContent='Save';
+    await load();
+  }catch(e){ g('modal-msg').style.color='#b00'; g('modal-msg').textContent='Error: '+e.message; btn.disabled=false; btn.textContent=editId?'Update':'Add'; }
+}
+
+if (adminSession) load();
+</script>
+</body>
+</html>
