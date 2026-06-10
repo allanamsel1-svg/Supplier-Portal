@@ -2376,6 +2376,29 @@
   </div>
 </div>
 
+<!-- ── Create Live SKU Modal ── -->
+<div class="modal-overlay" id="csku-modal">
+  <div class="modal" style="max-width:520px;">
+    <h2 id="csku-title">Create Live SKU</h2>
+    <div style="font-size:12px;color:#888;margin:4px 0 14px;">A UPC has been reserved from the pool. Confirm to create the SKU, or cancel to release it.</div>
+    <div style="margin-bottom:10px;">
+      <label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Model Number (editable)</label>
+      <input type="text" id="csku-model" style="width:100%;padding:8px 10px;font-size:14px;font-family:monospace;font-weight:600;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" />
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Unit UPC-A</label><input type="text" id="csku-unit" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
+      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Inner ITF-14</label><input type="text" id="csku-inner" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
+      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Master ITF-14</label><input type="text" id="csku-master" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
+      <div><label style="font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:3px;">Pallet ITF-14</label><input type="text" id="csku-pallet" readonly style="width:100%;padding:8px 10px;font-size:13px;font-family:monospace;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:7px;box-sizing:border-box;" /></div>
+    </div>
+    <div class="modal-btns" style="margin-top:16px;">
+      <button class="btn-cancel" type="button" onclick="cskuCancel()">Cancel</button>
+      <button class="btn-send" type="button" id="csku-confirm-btn" onclick="cskuConfirm()">Confirm &amp; Create Design Brief</button>
+    </div>
+    <div class="modal-msg" id="csku-msg"></div>
+  </div>
+</div>
+
 <!-- ── Supplier Detail Drawer ── -->
 <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <div class="drawer" id="supplier-drawer">
@@ -11272,6 +11295,11 @@ async function openPDDetail(pdId){
           pdCurrentDetail._artworkProject=ap;
           var aaR=await fetch(SB+'/rest/v1/artwork_assets?artwork_project_id=eq.'+ap.id+'&select=asset_type,file_name,file_url&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
           pdCurrentDetail._artworkAssets=aaR.ok?await aaR.json():[];
+          // Auto-tick the Assets gate if every required asset is already received.
+          if(pdAllAssetsReceived()&&!pdCurrentDetail.gate_assets_ok){
+            pdCurrentDetail.gate_assets_ok=true;
+            try{await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({gate_assets_ok:true})});}catch(e){}
+          }
         }
       }
     }catch(e){console.log('asset checklist load failed (non-fatal):',e);}
@@ -11738,113 +11766,8 @@ function renderPDDetail(){
     // ── 9.5 ASSETS CHECKLIST (artwork_projects.assets_required) ──
     pdAssetsCardHtml()+
 
-    // ── 10. READINESS GATES (Sub-batch 2G) ──
-    // All 8 gates must pass before this PD can be activated as a Live SKU.
-    // 5 are auto-computed from data, 3 are admin-confirmed checkboxes with optional notes.
-    // The "Activate Live SKU" button enables only when all 8 pass.
-    (function(){
-      var isLive = (p.sku_lifecycle_status === 'live') || (p.status === 'approved');
-
-      // ── Auto-computed gates ──
-      // Gate 1: Golden sample approved (look at linked PDI status)
-      var pdi = p._pdi || null;  // populated by openPdDetail
-      var gateSampleOK = !!(pdi && (pdi.status === 'approved' || pdi.approved_at));
-      // Gate 2: Carton dimensions confirmed
-      var gateCartonsOK = !!(pdi && pdi.cartons_confirmed_at);
-      // Gate 3: Product images uploaded (≥1)
-      var gateImagesOK = !!(p._product_images_count && p._product_images_count > 0);
-      // Gate 4: Technical drawing uploaded (≥1)
-      var gateDrawingOK = !!(p._technical_drawings_count && p._technical_drawings_count > 0);
-      // Gate 5: Compliance docs current (Layer 1/2/3 not red)
-      var gateComplianceOK = (p._compliance_overall === 'green') || (p._compliance_overall === 'yellow');
-
-      // ── Manual confirmation gates ──
-      var gatePackagingOK = !!p.packaging_finalized_at;
-      var gateFreightOK   = !!p.freight_confirmed_at;
-      var gateTariffOK    = !!p.tariff_confirmed_at;
-
-      var allPass = gateSampleOK && gateCartonsOK && gateImagesOK && gateDrawingOK &&
-                    gateComplianceOK && gatePackagingOK && gateFreightOK && gateTariffOK;
-      var passCount = [gateSampleOK,gateCartonsOK,gateImagesOK,gateDrawingOK,
-                       gateComplianceOK,gatePackagingOK,gateFreightOK,gateTariffOK]
-                        .filter(function(x){return x;}).length;
-
-      function gateLine(ok, label, sublabel) {
-        var color = ok ? '#1a7a1a' : '#886600';
-        var bg    = ok ? '#edfaed' : '#fff8e0';
-        var border= ok ? '#c0e0c0' : '#f0d860';
-        var icon  = ok ? '✓' : '○';
-        return '<div style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;background:'+bg+';border:1px solid '+border+';border-radius:7px;">'+
-          '<div style="font-weight:700;color:'+color+';font-size:14px;line-height:1;margin-top:1px;">'+icon+'</div>'+
-          '<div style="flex:1;">'+
-            '<div style="font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(label)+'</div>'+
-            (sublabel ? '<div style="font-size:11px;color:#666;margin-top:2px;">'+esc(sublabel)+'</div>' : '')+
-          '</div>'+
-        '</div>';
-      }
-
-      function manualGateLine(ok, label, gateKey, valueText, notesText) {
-        var color = ok ? '#1a7a1a' : '#886600';
-        var bg    = ok ? '#edfaed' : '#fff8e0';
-        var border= ok ? '#c0e0c0' : '#f0d860';
-        var icon  = ok ? '✓' : '○';
-        return '<div style="padding:10px 12px;background:'+bg+';border:1px solid '+border+';border-radius:7px;">'+
-          '<div style="display:flex;align-items:center;gap:10px;">'+
-            '<div style="font-weight:700;color:'+color+';font-size:14px;">'+icon+'</div>'+
-            '<div style="flex:1;font-size:12px;font-weight:600;color:#1a1a2e;">'+esc(label)+'</div>'+
-            (ok
-              ? '<button onclick="unconfirmGate(\''+gateKey+'\')" style="padding:4px 10px;background:#fff;color:#666;border:1px solid #ccc;border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;">Unconfirm</button>'
-              : '<button onclick="confirmGate(\''+gateKey+'\')" style="padding:5px 12px;background:#1a1a2e;color:#fff;border:none;border-radius:5px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;">Confirm</button>'
-            )+
-          '</div>'+
-          (ok && valueText ? '<div style="font-size:11px;color:#444;margin-top:6px;padding-left:24px;">'+esc(valueText)+'</div>' : '')+
-          (ok && notesText ? '<div style="font-size:11px;color:#666;margin-top:2px;padding-left:24px;font-style:italic;">"'+esc(notesText)+'"</div>' : '')+
-        '</div>';
-      }
-
-      var freightValue = p.freight_cost_per_unit ? '$'+parseFloat(p.freight_cost_per_unit).toFixed(4)+' / unit' : '';
-      var tariffValue  = p.tariff_hts_code ? 'HTS: '+p.tariff_hts_code+(p.tariff_duty_rate_pct?' · '+p.tariff_duty_rate_pct+'% duty':'') : '';
-
-      var headerColor = allPass ? '#1a7a1a' : '#886600';
-      var headerBg    = allPass ? '#edfaed' : '#fff8e0';
-      var headerText  = allPass
-        ? '✓ All 8 gates passed — ready to activate as Live SKU'
-        : passCount+' of 8 gates passed';
-
-      return card('🚪 Readiness Gates — '+passCount+'/8',
-        '<div style="margin-bottom:12px;padding:10px 14px;background:'+headerBg+';border:1px solid '+(allPass?'#c0e0c0':'#f0d860')+';border-radius:8px;font-size:13px;font-weight:600;color:'+headerColor+';">'+headerText+'</div>'+
-
-        '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Auto-computed from data</div>'+
-        '<div style="display:grid;gap:6px;margin-bottom:14px;">'+
-          gateLine(gateSampleOK,    'Golden sample approved',         gateSampleOK ? '' : 'Awaiting sample evaluation from the Sample Approval Queue.')+
-          gateLine(gateCartonsOK,   'Carton dimensions confirmed',    gateCartonsOK ? '' : 'Factory must confirm master case dimensions (qty, L, W, H, weight) in their PD workspace.')+
-          gateLine(gateImagesOK,    'Product images uploaded',        gateImagesOK ? ((p._product_images_count||0) + ' image(s) on file') : 'Factory has not uploaded any product images.')+
-          gateLine(gateDrawingOK,   'Technical drawing uploaded',     gateDrawingOK ? ((p._technical_drawings_count||0) + ' drawing(s) on file') : 'Factory has not uploaded a technical drawing or dieline.')+
-          gateLine(gateComplianceOK,'Compliance docs current',        gateComplianceOK ? 'No blocking compliance flags.' : 'Compliance check has blocking flags (red). Review the Compliance section.')+
-        '</div>'+
-
-        '<div style="font-size:11px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Admin confirmations</div>'+
-        '<div style="display:grid;gap:6px;margin-bottom:14px;">'+
-          manualGateLine(gatePackagingOK, 'Packaging design finalized', 'packaging',
-            p.packaging_finalized_at ? 'Confirmed '+(p.packaging_finalized_at||'').slice(0,10) : '',
-            p.packaging_notes)+
-          manualGateLine(gateFreightOK,   'Freight cost confirmed',     'freight',
-            freightValue || (p.freight_confirmed_at ? 'Confirmed '+(p.freight_confirmed_at||'').slice(0,10) : ''),
-            p.freight_notes)+
-          manualGateLine(gateTariffOK,    'Tariff classification confirmed', 'tariff',
-            tariffValue || (p.tariff_confirmed_at ? 'Confirmed '+(p.tariff_confirmed_at||'').slice(0,10) : ''),
-            p.tariff_notes)+
-        '</div>'+
-
-        (isLive
-          ? '<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Activated as Live SKU '+(p.activated_at?'on '+(p.activated_at||'').slice(0,10):'')+'</button>'+
-            '<button onclick="openDesignBriefModal()" style="width:100%;margin-top:8px;padding:12px;background:#5a2db8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🎨 Create Design Brief</button>'
-          : '<button onclick="activateAsLiveSku()" '+(!allPass?'disabled ':'')+'style="width:100%;padding:12px;background:'+(!allPass?'#bbb':'#1a7a1a')+';color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:'+(!allPass?'not-allowed':'pointer')+';">'+
-              (allPass ? '🚀 Activate as Live SKU' : '🔒 Complete all 8 gates to activate')+
-            '</button>'
-        )
-      );
-    })()+
+    // ── 10. GATES → CREATE LIVE SKU ──
+    pdGatesCardHtml()+
 
   '</div>';
 
@@ -11942,7 +11865,7 @@ async function pdAssetsPersist(){
     if(r.ok)toast('Asset checklist saved.');else toast('Save failed ('+r.status+').');
   }catch(e){toast('Save failed: '+e.message);}
 }
-function pdAssetToggle(i,checked){var l=pdAssetsList();if(!l[i])return;l[i].received=!!checked;pdAssetsRerender();pdAssetsPersist();}
+function pdAssetToggle(i,checked){var l=pdAssetsList();if(!l[i])return;l[i].received=!!checked;pdAssetsRerender();pdAssetsPersist();pdSyncAssetsGate();}
 function pdAssetRemove(i){var l=pdAssetsList();if(!l[i])return;if(!confirm('Remove "'+(l[i].name||'')+'" from the checklist?'))return;l.splice(i,1);pdAssetEditIndex=-1;pdAssetsRerender();pdAssetsPersist();}
 function pdAssetAddShow(){
   var row=g('pd-asset-add-row');if(!row)return;
@@ -12318,6 +12241,152 @@ function deriveItf14(unitUpc, indicator){
   return thirteen+String(check);
 }
 
+// ════════════════════════════════════════════════════════════════════
+// GATES → CREATE LIVE SKU (4-gate model + Create-SKU modal). Mirrored in tenant-rfq.html.
+// ════════════════════════════════════════════════════════════════════
+function pdAllAssetsReceived(){
+  var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;
+  if(!ap||!Array.isArray(ap.assets_required)||!ap.assets_required.length)return false;
+  return ap.assets_required.every(function(a){return a&&a.received===true;});
+}
+// Auto-tick gate_assets_ok once every required asset is received (one-way; manual toggle still allowed).
+async function pdSyncAssetsGate(){
+  if(!pdCurrentDetail)return;
+  if(pdAllAssetsReceived()&&!pdCurrentDetail.gate_assets_ok){
+    pdCurrentDetail.gate_assets_ok=true;
+    try{await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({gate_assets_ok:true,updated_at:new Date().toISOString()})});}catch(e){}
+    renderPDDetail();
+  }
+}
+function pdGatesCardHtml(){
+  var p=pdCurrentDetail;
+  var wrap=function(body){return '<div style="background:#fff;border:1px solid #e8e8e0;border-radius:10px;padding:14px;margin-bottom:14px;"><div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🚪 Gates</div>'+body+'</div>';};
+  var skuId=p.sku_id||p.activated_sku_id||null;
+  var isLive=(p.sku_lifecycle_status==='live')&&!!skuId;
+  var GATES=[
+    {key:'gate_dimensions_ok',label:'Dimensions confirmed'},
+    {key:'gate_compliance_ok',label:'Compliance cleared'},
+    {key:'gate_assets_ok',label:'Assets received',sub:'auto-checks when all assets received'},
+    {key:'gate_artwork_ok',label:'Artwork approved'}
+  ];
+  var remaining=GATES.filter(function(gt){return !p[gt.key];}).length;
+  var allGreen=remaining===0;
+  var rows=GATES.map(function(gt){
+    var on=!!p[gt.key];
+    return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:'+(on?'#edfaed':'#fafaf6')+';border:1px solid '+(on?'#a0d8a0':'#e8e8e0')+';border-radius:7px;margin-bottom:6px;cursor:pointer;">'+
+      '<input type="checkbox" '+(on?'checked':'')+' onchange="togglePDGate(\''+gt.key+'\',this.checked)" style="width:17px;height:17px;flex:0 0 auto;cursor:pointer;accent-color:#1a7a1a;" />'+
+      '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.sub?' <span style="font-weight:400;color:#999;font-size:10px;">— '+esc(gt.sub)+'</span>':'')+'</span>'+
+    '</label>';
+  }).join('');
+  var btn;
+  if(isLive){
+    btn='<button disabled style="width:100%;padding:12px;background:#888;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:not-allowed;">✓ Live SKU created</button>'+
+        '<button onclick="openDesignBriefModal()" style="width:100%;margin-top:8px;padding:12px;background:#5a2db8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">🎨 Create Design Brief</button>';
+  }else if(allGreen){
+    btn='<button onclick="openCreateSkuModal()" style="width:100%;padding:13px;background:#1a7a1a;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,122,26,0.25);">🎯 Create Live SKU</button>';
+  }else{
+    btn='<button disabled title="Complete all gates to create SKU" style="width:100%;padding:13px;background:#bbb;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:not-allowed;">🎯 Create Live SKU</button>';
+  }
+  return wrap(
+    '<div style="margin-bottom:12px;padding:9px 12px;background:'+(allGreen?'#edfaed':'#fff8e0')+';border:1px solid '+(allGreen?'#a0d8a0':'#f0d860')+';border-radius:8px;font-size:12px;font-weight:600;color:'+(allGreen?'#1a7a1a':'#886600')+';">'+(allGreen?'✓ All gates green — ready to create the Live SKU':remaining+' of 4 gates remaining')+'</div>'+
+    rows+
+    '<div style="margin-top:12px;">'+btn+'</div>'
+  );
+}
+
+// ── Create Live SKU modal (assign UPC → model number → confirm → SKU → design brief) ──
+var cskuState=null;
+function pdPrefix(s,n,fb){var t=(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');return t?t.slice(0,n||3):(fb||'GEN');}
+async function pdNextSkuSequence(){
+  try{
+    var r=await fetch(SB+'/rest/v1/skus?select=sequence_number&order=sequence_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(r.ok){var rows=await r.json();if(rows&&rows[0]&&rows[0].sequence_number!=null)return parseInt(rows[0].sequence_number,10)+1;}
+  }catch(e){}
+  return 1;
+}
+async function openCreateSkuModal(){
+  if(!pdCurrentDetail)return;
+  var p=pdCurrentDetail;
+  if(!(p.gate_dimensions_ok&&p.gate_compliance_ok&&p.gate_assets_ok&&p.gate_artwork_ok)){alert('Complete all gates to create SKU.');return;}
+  if(p.sku_id||p.activated_sku_id){alert('A SKU already exists for this item.');return;}
+  var msg=g('csku-msg');if(msg){msg.style.display='none';msg.textContent='';}
+  cskuState={claimedUpc:null};
+  try{
+    // Step 1 — assign a unit UPC from the pool (reuse one already claimed by this PD).
+    var unitUpc=p.unit_upc||null;
+    if(!unitUpc){
+      var poolR=await fetch(SB+'/rest/v1/upc_pool?is_assigned=eq.false&level=eq.unit&order=upc_code&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+      if(!poolR.ok){alert('Could not query UPC pool.');return;}
+      var avail=await poolR.json();
+      if(!avail.length){alert('No UPCs available in the pool. Upload more in Setup → UPC Pool.');return;}
+      unitUpc=avail[0].upc_code;
+      var asg=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(unitUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:true,assigned_to_pd_id:p.id,assigned_at:new Date().toISOString()})});
+      if(!asg.ok){var et=await asg.text().catch(function(){return '';});alert('Failed to claim UPC from pool (HTTP '+asg.status+'): '+et.slice(0,200));return;}
+      cskuState.claimedUpc=unitUpc;
+    }
+    var innerUpc=deriveItf14(unitUpc,1),masterUpc=deriveItf14(unitUpc,2),palletUpc=deriveItf14(unitUpc,3);
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({unit_upc:unitUpc,inner_upc:innerUpc,master_upc:masterUpc,pallet_upc:palletUpc,updated_at:new Date().toISOString()})});
+    p.unit_upc=unitUpc;p.inner_upc=innerUpc;p.master_upc=masterUpc;p.pallet_upc=palletUpc;
+    // Step 2 — generate model number: BRAND-CAT-SEQ.
+    var brandName=(p.brands&&(p.brands.brand_name||p.brands.brand_code))||'';
+    var brandPfx=pdPrefix(brandName,3,'BRD'),catPfx=pdPrefix(p.category,3,'GEN');
+    var seq=await pdNextSkuSequence();
+    cskuState.brandPfx=brandPfx;cskuState.catPfx=catPfx;cskuState.seq=seq;
+    cskuState.unitUpc=unitUpc;cskuState.innerUpc=innerUpc;cskuState.masterUpc=masterUpc;cskuState.palletUpc=palletUpc;
+    g('csku-model').value=brandPfx+'-'+catPfx+'-'+String(seq).padStart(4,'0');
+    g('csku-unit').value=unitUpc;g('csku-inner').value=innerUpc;g('csku-master').value=masterUpc;g('csku-pallet').value=palletUpc;
+    g('csku-modal').classList.add('on');
+  }catch(e){alert('Error: '+(e&&e.message||e));}
+}
+async function cskuCancel(){
+  // Release a UPC we claimed in THIS session back to the pool.
+  if(cskuState&&cskuState.claimedUpc&&pdCurrentDetail){
+    try{
+      await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.claimedUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_assigned:false,assigned_to_pd_id:null,assigned_at:null})});
+      await fetch(SB+'/rest/v1/product_development?id=eq.'+pdCurrentDetail.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({unit_upc:null,inner_upc:null,master_upc:null,pallet_upc:null,updated_at:new Date().toISOString()})});
+      pdCurrentDetail.unit_upc=null;pdCurrentDetail.inner_upc=null;pdCurrentDetail.master_upc=null;pdCurrentDetail.pallet_upc=null;
+    }catch(e){console.log('UPC release (non-fatal):',e);}
+  }
+  cskuState=null;
+  g('csku-modal').classList.remove('on');
+}
+async function cskuConfirm(){
+  if(!pdCurrentDetail||!cskuState)return;
+  var p=pdCurrentDetail,btn=g('csku-confirm-btn');
+  var model=(g('csku-model').value||'').trim();
+  if(!model){alert('Model number is required.');return;}
+  btn.disabled=true;btn.textContent='Creating…';
+  try{
+    // UPC integrity re-check before creating the SKU (guards races / duplicates).
+    var vr=await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.unitUpc),{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var vrows=vr.ok?await vr.json():[];
+    if(!vrows.length){alert('UPC integrity check failed: '+cskuState.unitUpc+' is not in the pool.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
+    if(vrows[0].assigned_to_sku){alert('UPC integrity check failed: '+cskuState.unitUpc+' is already assigned to a live SKU.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
+    if(vrows[0].assigned_to_pd_id&&vrows[0].assigned_to_pd_id!==p.id){alert('UPC integrity check failed: '+cskuState.unitUpc+' is claimed by a different PD.');btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
+    // Step 3 — INSERT the SKU.
+    var skuPayload={
+      model_number:model, brand_prefix:cskuState.brandPfx, category_prefix:cskuState.catPfx, sequence_number:cskuState.seq,
+      description:p.item_description||model, brand_id:p.brand_id||null, category_id:p.category_id||null,
+      status:'active', upc_code:cskuState.unitUpc, tenant_id:p.tenant_id||null, is_kit:false, is_cosmetic:!!p.is_cosmetic
+    };
+    var skuR=await fetch(SB+'/rest/v1/skus',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(skuPayload)});
+    if(!skuR.ok){var t=await skuR.text().catch(function(){return '';});alert('SKU creation failed: '+skuR.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Confirm & Create Design Brief';return;}
+    var skuRows=await skuR.json().catch(function(){return[];});var newSku=Array.isArray(skuRows)?skuRows[0]:skuRows;var skuId=newSku&&newSku.id;
+    // Lock the pool UPC to the SKU.
+    try{await fetch(SB+'/rest/v1/upc_pool?upc_code=eq.'+encodeURIComponent(cskuState.unitUpc),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({assigned_to_sku:skuId})});}catch(e){}
+    // Step 4 — link SKU + flip lifecycle to live.
+    await fetch(SB+'/rest/v1/product_development?id=eq.'+p.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({sku_id:skuId,activated_sku_id:skuId,sku_lifecycle_status:'live',activated_at:new Date().toISOString(),activated_by:'admin',updated_at:new Date().toISOString()})});
+    p.sku_id=skuId;p.activated_sku_id=skuId;p.sku_lifecycle_status='live';
+    cskuState=null;
+    g('csku-modal').classList.remove('on');
+    if(typeof toast==='function')toast('Live SKU '+model+' created.');
+    if(typeof loadPDList==='function')loadPDList();
+    renderPDDetail();
+    // Step 5 — straight into the design brief.
+    setTimeout(function(){try{openDesignBriefModal();}catch(e){}},300);
+  }catch(e){alert('Error: '+(e&&e.message||e));btn.disabled=false;btn.textContent='Confirm & Create Design Brief';}
+}
+
 async function generatePDUpcs(){
   if(!pdCurrentDetail)return;
   if(pdCurrentDetail.unit_upc){
@@ -12543,12 +12612,13 @@ async function activateAsLiveSku() {
 }
 
 // ── Design Brief (Part 2): packaging selections → AI brief → designer queue ──
-var DESIGN_PKG_TYPES = ['Label only','Folding carton / gift box','Inner tray / insert','User manual / instruction sheet','Quick start guide','Belly band','Hang tag','Shrink wrap','Sticker / decal'];
+var DESIGN_PKG_TYPES = ['Bulk/Label only','Folding carton','Bottle with label','Tube with label','Jar with label','Clamshell','Blister pack','Pouch/Bag','Display box/PDQ','Inner tray insert','User manual'];
 var dbriefCtx = null, dbriefRefUrl = '';
 function dbriefDefaults(cat){
   var c=(cat||'').toLowerCase(), on={};
-  if(/skin|hair|beauty|serum|lotion|fragrance/.test(c)) on['Label only']=true;
-  if(/electronic|speaker|headphone|charger|cable|device/.test(c)) on['Folding carton / gift box']=true;
+  if(/cosmetic|skin|hair|beauty|serum|lotion|cream|fragrance|make ?up/.test(c)){ on['Bottle with label']=true; on['Folding carton']=true; }
+  else if(/electronic|speaker|headphone|charger|cable|device|gadget|tech/.test(c)){ on['Folding carton']=true; on['Inner tray insert']=true; on['User manual']=true; }
+  else { on['Folding carton']=true; }
   return on;
 }
 function openDesignBriefModal(){
@@ -12556,7 +12626,7 @@ function openDesignBriefModal(){
   var p=pdCurrentDetail;
   var skuId=p.activated_sku_id||p.sku_id||null;
   if(!skuId){alert('Create the Live SKU first — a design brief attaches to a SKU.');return;}
-  dbriefCtx={sku_id:skuId, pd_id:p.id, product_name:p.item_description||p.item_number||'Product', category:p.category||'', tenant_id:p.tenant_id||null};
+  dbriefCtx={sku_id:skuId, pd_id:p.id, pd_item_id:(p._pdi?p._pdi.id:null), product_name:p.item_description||p.item_number||'Product', category:p.category||'', tenant_id:p.tenant_id||null, aiBrief:''};
   dbriefRefUrl='';
   var on=dbriefDefaults(dbriefCtx.category);
   g('dbrief-title').textContent='Create Design Brief — '+(dbriefCtx.product_name||'');
@@ -12590,22 +12660,41 @@ async function dbriefGenerate(){
     var r=await fetch('/api/generate-design-brief',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sku_description:dbriefCtx.product_name,category:dbriefCtx.category,packaging_selections:dbriefSelections(),reference_image_url:dbriefRefUrl||null})});
     var d=await r.json().catch(function(){return{};});
     if(!r.ok||!d.brief){alert('Could not generate brief: '+(d.error||r.status));}
-    else g('dbrief-text').value=d.brief;
+    else { g('dbrief-text').value=d.brief; if(dbriefCtx)dbriefCtx.aiBrief=d.brief; }
   }catch(e){alert('Error: '+(e&&e.message||e));}
   btn.disabled=false; btn.textContent=orig;
 }
 async function dbriefSave(){
   var sel=dbriefSelections();
-  var dieline=sel.indexOf('Folding carton / gift box')>=0 || sel.indexOf('Inner tray / insert')>=0;
-  var payload={
-    sku_id:dbriefCtx.sku_id, tenant_id:dbriefCtx.tenant_id, product_name:dbriefCtx.product_name,
-    packaging_selections:sel, reference_image_url:dbriefRefUrl||null, ai_brief:g('dbrief-text').value||null,
-    status:'ready_for_design', priority:999, artwork_types:sel, dieline_required:dieline, pd_item_id:dbriefCtx.pd_id
+  var dieline=sel.some(function(s){return /carton|tray|box|clamshell|blister/i.test(s);});
+  var finalBrief=g('dbrief-text').value||'';
+  var pdItemId=dbriefCtx.pd_item_id||null;
+  // Status: ready_for_design only when every required asset is in; otherwise keep collecting.
+  var status=pdAllAssetsReceived()?'ready_for_design':'waiting_for_assets';
+  var fields={
+    ai_brief:finalBrief||null, packaging_selections:sel, artwork_types:sel,
+    reference_image_url:dbriefRefUrl||null, dieline_required:dieline,
+    status:status, sku_id:dbriefCtx.sku_id, updated_at:new Date().toISOString()
   };
   var btn=g('dbrief-save-btn'); btn.disabled=true; btn.textContent='Saving…';
   try{
-    var r=await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)});
-    if(!r.ok){var t=await r.text().catch(function(){return '';});alert('Save failed: '+r.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Save & Send to Designer Queue';return;}
+    var saved=false;
+    // PART 3: UPDATE the existing artwork_projects row (created at quote acceptance) by pd_item_id.
+    if(pdItemId){
+      var ur=await fetch(SB+'/rest/v1/artwork_projects?pd_item_id=eq.'+encodeURIComponent(pdItemId),{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(fields)});
+      if(ur.ok){var urows=await ur.json().catch(function(){return[];});saved=urows&&urows.length>0;}
+    }
+    // Fallback: no existing row → insert a new one.
+    if(!saved){
+      var ins=Object.assign({},fields,{tenant_id:dbriefCtx.tenant_id,product_name:dbriefCtx.product_name,priority:999,pd_item_id:pdItemId});
+      var r=await fetch(SB+'/rest/v1/artwork_projects',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(ins)});
+      if(!r.ok){var t=await r.text().catch(function(){return '';});alert('Save failed: '+r.status+' '+t.slice(0,200));btn.disabled=false;btn.textContent='Save & Send to Designer Queue';return;}
+    }
+    // Log the AI-vs-final edit distance for brief-quality tracking.
+    try{
+      var aiB=(dbriefCtx.aiBrief||'');var dist=Math.abs(aiB.length-finalBrief.length);var pct=aiB.length?Math.round(dist/aiB.length*100):0;
+      await fetch(SB+'/rest/v1/brief_edit_log',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({pd_item_id:pdItemId,sku_id:dbriefCtx.sku_id,ai_brief:aiB,final_brief:finalBrief,edit_distance:dist,pct_changed:pct})});
+    }catch(e){console.log('brief_edit_log (non-fatal):',e);}
     var m=g('dbrief-msg'); m.style.display='block'; m.textContent='✓ Design brief sent to designer queue.';
     if(typeof toast==='function')toast('Design brief sent to designer queue.');
     setTimeout(closeDesignBriefModal,1000);
