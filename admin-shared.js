@@ -1,3 +1,4 @@
+// Last updated: 2026-06-09 — force redeploy
 // admin-shared.js — fixed-position collapsible sidebar for all admin pages.
 // position:fixed left rail + body padding-left:190px — no DOM manipulation.
 (function () {
