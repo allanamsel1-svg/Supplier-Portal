@@ -15053,7 +15053,12 @@ function _csUpsert(key,obj){
 function _setVal(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;}
 
 // Populate the (static-default) fields from saved company_settings, then show the Company tab.
+// IMPORTANT: every fetch here uses the Supabase anon key (ANON), NOT the admin_session
+// HMAC token. The whole body is wrapped so a failed/blocked read can NEVER bubble up,
+// clear the session, or redirect — it just shows a small inline notice. Showing the panel
+// (setTab) happens FIRST so the Settings UI is never left blank on a fetch error.
 async function loadSettings(){
+  try{ setTab('company'); }catch(e){}
   try{
     var r=await fetch(SUPA+'/rest/v1/company_settings?select=key,value',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}});
     var rows=r.ok?await r.json():[];
@@ -15063,18 +15068,28 @@ async function loadSettings(){
     var ps=cs.persona_sarah||{};_setVal('per-sarah-name',ps.name);_setVal('per-sarah-email',ps.email);_setVal('per-sarah-title',ps.title);
     var pt=cs.persona_tyler||{};_setVal('per-tyler-name',pt.name);_setVal('per-tyler-email',pt.email);_setVal('per-tyler-title',pt.title);
     var pp=cs.portal_prefs||{};_setVal('pref-lang',pp.lang);_setVal('pref-tz',pp.tz);_setVal('pref-dark',pp.dark);_setVal('pref-date',pp.date);
-  }catch(e){}
-  setTab('company');
+  }catch(e){
+    // Swallow the error — show a notice in the panel, never redirect/logout.
+    try{
+      var box=document.getElementById('set-pane-company');
+      if(box&&!document.getElementById('ci-load-err')){
+        var n=document.createElement('div');n.id='ci-load-err';n.style.cssText='color:#b00;font-size:0.85rem;margin-top:10px;';
+        n.textContent='Could not load saved settings (showing defaults). Your session is still active.';
+        box.appendChild(n);
+      }
+    }catch(_){}
+  }
 }
 
 function loadUsersList(){
+  // Anon-key read; any failure shows an inline notice — never redirects or clears the session.
   fetch(SUPA+'/rest/v1/tenant_users?select=*&order=created_at',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}})
   .then(function(r){return r.ok?r.json():[];}).then(function(users){
     var el=document.getElementById('users-list');
     if(!el)return;
     if(!users||!users.length){el.innerHTML='<div style="color:#999;font-size:0.85rem;">No users yet.</div>';return;}
     el.innerHTML=users.map(function(u){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #e0e0d8;border-radius:6px;margin-bottom:8px;"><div><strong>'+esc(u.email||'')+'</strong> <span style="background:#e8f4e8;color:#2d7a2d;padding:2px 8px;border-radius:12px;font-size:0.8rem;">'+esc(u.role||'—')+'</span></div><div style="color:#666;font-size:0.85rem;">'+(u.is_active!==false?'✅ Active':'❌ Inactive')+'</div></div>';}).join('');
-  }).catch(function(){});
+  }).catch(function(){ var el=document.getElementById('users-list'); if(el)el.innerHTML='<div style="color:#b00;font-size:0.85rem;">Could not load users right now.</div>'; });
 }
 
 function saveCompanyInfo(){
