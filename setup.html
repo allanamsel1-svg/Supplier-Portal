@@ -781,6 +781,10 @@ var SETUP_BUILD='SETUP-2026-05-25-D'; try{console.log('setup.html build:',SETUP_
 var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
 var allCats=[], allBrands=[], allCusts=[], allDepts=[], currentCustId=null;
 
+// ── Auth gate ── require the same admin_session token admin.html uses; bounce to login otherwise.
+var adminSession = localStorage.getItem('admin_session');
+if (!adminSession) { window.location.href = '/admin.html'; }
+
 function g(id){return document.getElementById(id);}
 function gv(id){var el=g(id);return el?el.value.trim():'';}
 function pf(id){return parseFloat(gv(id))||null;}
@@ -2554,7 +2558,8 @@ async function initPage(){
     try{ loadFreightTab(); }catch(e){}
   }
 }
-initPage();
+// Only initialise once auth has passed.
+if (adminSession) initPage();
 
 // ── SKU state ──
 var allSkus=[];

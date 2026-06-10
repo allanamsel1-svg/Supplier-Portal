@@ -162,6 +162,21 @@
     .set-section p { font-size: 12px; color: #aaa; margin-top: 4px; }
     .save { padding: 8px 16px; background: #1a1a2e; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .saved { font-size: 12px; color: #1a7a1a; margin-left: 10px; display: none; }
+    /* Settings tabs */
+    .set-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e0e0d8; padding: 0 1.5rem; overflow-x: auto; background: #fff; }
+    .set-tab { padding: 11px 14px; background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 13px; font-weight: 600; color: #888; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .set-tab:hover { color: #1a1a2e; }
+    .set-tab.on { color: #1a1a2e; border-bottom-color: #1a1a2e; }
+    .set-pane { display: none; }
+    .set-pane.on { display: block; }
+    .set-field { margin-bottom: 10px; }
+    .set-field label { display: block; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+    .set-field textarea { width: 100%; padding: 9px 12px; background: #f8f8f4; border: 1px solid #e0e0d8; border-radius: 7px; color: #1a1a2e; font-size: 13px; font-family: inherit; resize: vertical; }
+    .set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .set-btn { padding: 9px 16px; background: #1a1a2e; color: #fff; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .set-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f0f0e8; font-size: 13px; }
+    .set-mini { padding: 5px 10px; font-size: 12px; border: 1px solid #e0e0d8; background: #fff; border-radius: 6px; cursor: pointer; font-family: inherit; color: #1a1a2e; }
+    @media(max-width:560px){ .set-grid { grid-template-columns: 1fr; } }
     /* Manager panels shared styles */
     .mgr-wrap { padding: 1.25rem 1.5rem; max-width: 900px; }
     .mgr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -2264,32 +2279,110 @@
 
     <div class="panel" id="panel-settings">
       <div class="ph"><div class="ph-title">Settings</div><div class="ph-sub">Configure your admin dashboard</div></div>
-      <div class="set-section">
-        <h3>Admin Credentials</h3>
-        <input type="text" id="set-user" placeholder="Admin username" />
-        <div style="position:relative;margin-bottom:8px;">
-          <input type="password" id="set-pass" placeholder="New password" style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
-          <button type="button" id="set-pass-toggle" onclick="togglePw('set-pass','set-pass-toggle')" aria-label="Show password" title="Show/hide password" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
-        </div>
-        <button class="save" onclick="saveCreds()">Save</button>
-        <span class="saved" id="cred-saved">Saved!</span>
+      <div class="set-tabs">
+        <button class="set-tab on" data-stab="company" onclick="setTab('company')">🏢 Company Info</button>
+        <button class="set-tab" data-stab="apikeys" onclick="setTab('apikeys')">🔑 API Keys</button>
+        <button class="set-tab" data-stab="users" onclick="setTab('users')">👥 Users</button>
+        <button class="set-tab" data-stab="personas" onclick="setTab('personas')">✉️ Personas</button>
+        <button class="set-tab" data-stab="prefs" onclick="setTab('prefs')">⚙️ Preferences</button>
       </div>
-      <div class="set-section">
-        <h3>Anthropic API Key</h3>
-        <div style="position:relative;margin-bottom:8px;">
-          <input type="password" id="set-apikey" placeholder="sk-ant-..." style="margin-bottom:0;padding-right:40px;box-sizing:border-box;" />
-          <button type="button" id="set-apikey-toggle" onclick="togglePw('set-apikey','set-apikey-toggle')" aria-label="Show API key" title="Show/hide API key" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:4px;color:#888;">👁</button>
+
+      <!-- TAB 1: Company Info -->
+      <div class="set-pane on" id="setpane-company">
+        <div class="set-section">
+          <h3>Company Information</h3>
+          <div class="set-grid">
+            <div class="set-field"><label>Company Name</label><input id="ci-name" placeholder="TBG Sourcing Inc." /></div>
+            <div class="set-field"><label>EIN</label><input id="ci-ein" placeholder="42-2911499" /></div>
+          </div>
+          <div class="set-field"><label>Address Line 1</label><input id="ci-addr1" /></div>
+          <div class="set-field"><label>Address Line 2</label><input id="ci-addr2" /></div>
+          <div class="set-grid">
+            <div class="set-field"><label>City</label><input id="ci-city" /></div>
+            <div class="set-field"><label>State / Province</label><input id="ci-state" /></div>
+          </div>
+          <div class="set-grid">
+            <div class="set-field"><label>ZIP / Postal</label><input id="ci-zip" /></div>
+            <div class="set-field"><label>Country</label><input id="ci-country" /></div>
+          </div>
+          <div class="set-grid">
+            <div class="set-field"><label>Phone</label><input id="ci-phone" /></div>
+            <div class="set-field"><label>Website</label><input id="ci-website" placeholder="https://" /></div>
+          </div>
+          <button class="set-btn" onclick="saveCompanyInfo()">Save Company Info</button>
+          <span class="saved" id="ci-saved">Saved!</span>
         </div>
-        <button class="save" onclick="saveApiKey()">Save</button>
-        <span class="saved" id="api-saved">Saved!</span>
-        <p>Required for AI Assistant and automatic RFQ generation.</p>
       </div>
-      <div class="set-section">
-        <h3>Your Email Address</h3>
-        <input type="email" id="set-email" placeholder="your@outlook.com" />
-        <button class="save" onclick="saveEmail()">Save</button>
-        <span class="saved" id="email-saved">Saved!</span>
-        <p>Used as the From address when sending RFQs via Outlook.</p>
+
+      <!-- TAB 2: API Key Management -->
+      <div class="set-pane" id="setpane-apikeys">
+        <div class="set-section">
+          <h3>API Keys</h3>
+          <p>Keys live in Vercel environment variables and are shown masked here. They are read-only — manage them in Vercel.</p>
+          <div id="apikeys-list" style="margin-top:10px;"><div style="color:#999;font-size:13px;">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: User Management -->
+      <div class="set-pane" id="setpane-users">
+        <div class="set-section">
+          <h3>Add User</h3>
+          <div class="set-grid">
+            <div class="set-field"><label>Email</label><input id="usr-email" type="email" placeholder="user@company.com" /></div>
+            <div class="set-field"><label>Password</label><input id="usr-pass" type="text" placeholder="initial password" /></div>
+          </div>
+          <div class="set-grid">
+            <div class="set-field"><label>Role</label><select id="usr-role" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="member">Member</option><option value="admin">Admin</option><option value="designer">Designer</option></select></div>
+            <div class="set-field"><label>Tenant</label><select id="usr-tenant" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"></select></div>
+          </div>
+          <button class="set-btn" onclick="addTenantUser()">Add User</button>
+          <span class="saved" id="usr-saved">Added!</span>
+        </div>
+        <div class="set-section">
+          <h3>Users</h3>
+          <div id="users-list"><div style="color:#999;font-size:13px;">Loading…</div></div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Email / Persona Management -->
+      <div class="set-pane" id="setpane-personas">
+        <div class="set-section">
+          <h3>Sarah Lindburg — Sourcing</h3>
+          <div class="set-grid">
+            <div class="set-field"><label>Email</label><input id="per-sarah-email" placeholder="sourcing@tbgsourcing.net" /></div>
+            <div class="set-field"><label>Display Name</label><input id="per-sarah-name" placeholder="Sarah Lindburg" /></div>
+          </div>
+          <div class="set-field"><label>Signature</label><textarea id="per-sarah-sig" rows="4"></textarea></div>
+          <button class="set-btn" onclick="savePersona('sarah')">Save Sarah</button>
+          <span class="saved" id="per-sarah-saved">Saved!</span>
+        </div>
+        <div class="set-section">
+          <h3>Tyler Durden — Compliance</h3>
+          <div class="set-grid">
+            <div class="set-field"><label>Email</label><input id="per-tyler-email" placeholder="compliance@tbgsourcing.net" /></div>
+            <div class="set-field"><label>Display Name</label><input id="per-tyler-name" placeholder="Tyler Durden" /></div>
+          </div>
+          <div class="set-field"><label>Signature</label><textarea id="per-tyler-sig" rows="4"></textarea></div>
+          <button class="set-btn" onclick="savePersona('tyler')">Save Tyler</button>
+          <span class="saved" id="per-tyler-saved">Saved!</span>
+        </div>
+      </div>
+
+      <!-- TAB 5: Portal Preferences -->
+      <div class="set-pane" id="setpane-prefs">
+        <div class="set-section">
+          <h3>Portal Preferences</h3>
+          <div class="set-grid">
+            <div class="set-field"><label>Default Language</label><select id="pref-lang" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="en">English</option><option value="es" disabled>Spanish (coming soon)</option><option value="zh" disabled>Chinese (coming soon)</option></select></div>
+            <div class="set-field"><label>Default Timezone</label><select id="pref-tz" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="America/New_York">America/New_York (ET)</option><option value="America/Chicago">America/Chicago (CT)</option><option value="America/Denver">America/Denver (MT)</option><option value="America/Los_Angeles">America/Los_Angeles (PT)</option><option value="UTC">UTC</option><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Hong_Kong">Asia/Hong_Kong</option></select></div>
+          </div>
+          <div class="set-grid">
+            <div class="set-field"><label>Date Format</label><select id="pref-datefmt" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
+            <div class="set-field"><label>Dark Mode Default</label><select id="pref-dark" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="off">Off</option><option value="on">On</option></select></div>
+          </div>
+          <button class="set-btn" onclick="savePrefs()">Save Preferences</button>
+          <span class="saved" id="pref-saved">Saved!</span>
+        </div>
       </div>
     </div>
   </div>
@@ -2837,6 +2930,7 @@ function showPanel(name){
     if(_fr&&!_fr.src&&_fr.dataset.src)_fr.src=_fr.dataset.src;
   }
   if(name==='upload')initAdminUpload();
+  if(name==='settings')loadSettings();
   if(name==='rfq'){loadRFQs();loadCategories();loadCustAndBrandsForRFQ();}
   if(name==='rfq-followup')loadRFQFollowups();
   // Handle department inboxes
@@ -14949,6 +15043,169 @@ async function rejectPendingCert(btn){
     btn.disabled=false;btn.textContent='✕ Reject';
     if(msgEl){msgEl.textContent='Error: '+e.message;msgEl.className='pcat-msg err';msgEl.style.display='block';}
   }
+}
+</script>
+<script>
+// ════════════════════════════════════════════════════════════════════
+// SETTINGS PANEL — 5 tabs: Company Info, API Keys, Users, Personas, Preferences
+// Uses globals SB, KEY, g, esc, toast from the main script above.
+// ════════════════════════════════════════════════════════════════════
+function setTab(name){
+  document.querySelectorAll('#panel-settings .set-tab').forEach(function(t){t.classList.toggle('on',t.getAttribute('data-stab')===name);});
+  document.querySelectorAll('#panel-settings .set-pane').forEach(function(p){p.classList.remove('on');});
+  var pane=g('setpane-'+name);if(pane)pane.classList.add('on');
+  if(name==='apikeys')loadApiKeys();
+  if(name==='users')loadUsers();
+}
+function gvS(id){var el=g(id);return el?el.value.trim():'';}
+function _setSaved(id){var el=g(id);if(!el)return;el.style.display='inline';setTimeout(function(){el.style.display='none';},2500);}
+
+// company_settings (key → JSON value) helpers
+async function csGetAll(){
+  try{
+    var r=await fetch(SB+'/rest/v1/company_settings?select=key,value',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok)return {};
+    var rows=await r.json();var out={};
+    (rows||[]).forEach(function(row){try{out[row.key]=row.value?JSON.parse(row.value):null;}catch(e){out[row.key]=row.value;}});
+    return out;
+  }catch(e){return {};}
+}
+async function csUpsert(key,obj){
+  try{
+    var r=await fetch(SB+'/rest/v1/company_settings?on_conflict=key',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:key,value:JSON.stringify(obj),updated_at:new Date().toISOString()})});
+    return r.ok;
+  }catch(e){return false;}
+}
+
+async function loadSettings(){
+  var cs=await csGetAll();
+  function sv(id,v){var el=g(id);if(el)el.value=(v==null?'':v);}
+  var ci=cs.company_info||{};
+  sv('ci-name',ci.name||'TBG Sourcing Inc.');sv('ci-ein',ci.ein||'42-2911499');
+  sv('ci-addr1',ci.addr1);sv('ci-addr2',ci.addr2);sv('ci-city',ci.city);sv('ci-state',ci.state);sv('ci-zip',ci.zip);sv('ci-country',ci.country);sv('ci-phone',ci.phone);sv('ci-website',ci.website);
+  var ps=cs.persona_sarah||{},pt=cs.persona_tyler||{};
+  sv('per-sarah-email',ps.email||'sourcing@tbgsourcing.net');sv('per-sarah-name',ps.display_name||'Sarah Lindburg');sv('per-sarah-sig',ps.signature);
+  sv('per-tyler-email',pt.email||'compliance@tbgsourcing.net');sv('per-tyler-name',pt.display_name||'Tyler Durden');sv('per-tyler-sig',pt.signature);
+  var pp=cs.portal_prefs||{};
+  sv('pref-lang',pp.language||'en');sv('pref-tz',pp.timezone||'America/New_York');sv('pref-datefmt',pp.date_format||'MM/DD/YYYY');sv('pref-dark',pp.dark_mode||'off');
+  loadTenantsForUsers();
+}
+
+// ── TAB 1: Company Info ──
+async function saveCompanyInfo(){
+  var obj={name:gvS('ci-name'),ein:gvS('ci-ein'),addr1:gvS('ci-addr1'),addr2:gvS('ci-addr2'),city:gvS('ci-city'),state:gvS('ci-state'),zip:gvS('ci-zip'),country:gvS('ci-country'),phone:gvS('ci-phone'),website:gvS('ci-website')};
+  if(await csUpsert('company_info',obj)){_setSaved('ci-saved');toast('Company info saved.');}else toast('Save failed.');
+}
+
+// ── TAB 2: API Keys (masked, read-only) ──
+var _apiKeysData=null;
+async function loadApiKeys(){
+  var box=g('apikeys-list');if(!box)return;
+  box.innerHTML='<div style="color:#999;font-size:13px;">Loading…</div>';
+  try{
+    var r=await fetch('/api/admin-settings');
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok||!d.keys){box.innerHTML='<div style="color:#b00;font-size:13px;">Could not load key info.</div>';return;}
+    _apiKeysData=d.keys;
+    var labels={anthropic:'Anthropic',sendgrid:'SendGrid',supabase:'Supabase (service)'};
+    box.innerHTML=Object.keys(labels).map(function(k){
+      var info=d.keys[k]||{present:false,masked:'— not set —'};
+      return '<div class="set-row">'+
+        '<div style="flex:0 0 140px;font-weight:600;color:#1a1a2e;">'+esc(labels[k])+'</div>'+
+        '<code id="apik-'+k+'" style="flex:1;min-width:0;font-family:monospace;font-size:12px;color:'+(info.present?'#1a1a2e':'#bbb')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(info.present?'••••••••':info.masked)+'</code>'+
+        (info.present?'<button class="set-mini" id="apik-btn-'+k+'" onclick="revealKey(\''+k+'\')">Reveal</button><button class="set-mini" onclick="copyKey(\''+k+'\')">Copy</button>':'')+
+      '</div>';
+    }).join('')+'<p style="margin-top:8px;">Full keys are never exposed here — only the last 4 characters. Edit them in the Vercel dashboard.</p>';
+  }catch(e){box.innerHTML='<div style="color:#b00;font-size:13px;">Error: '+esc(e.message)+'</div>';}
+}
+function revealKey(k){
+  var el=g('apik-'+k),btn=g('apik-btn-'+k);if(!el||!_apiKeysData||!_apiKeysData[k])return;
+  var shown=el.getAttribute('data-shown')==='1';
+  el.textContent=shown?'••••••••':(_apiKeysData[k].masked||'');
+  el.setAttribute('data-shown',shown?'0':'1');
+  if(btn)btn.textContent=shown?'Reveal':'Hide';
+}
+function copyKey(k){
+  if(!_apiKeysData||!_apiKeysData[k])return;
+  var v=_apiKeysData[k].masked||'';
+  if(navigator.clipboard)navigator.clipboard.writeText(v).then(function(){toast('Copied (masked) to clipboard.');},function(){toast('Copy failed.');});
+  else toast('Clipboard unavailable.');
+}
+
+// ── TAB 3: User Management ──
+async function loadTenantsForUsers(){
+  var sel=g('usr-tenant');if(!sel)return;
+  try{
+    var r=await fetch(SB+'/rest/v1/tenants?select=id,name&order=name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    var rows=r.ok?await r.json():[];
+    sel.innerHTML=(rows||[]).map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.name||t.id)+'</option>';}).join('')||'<option value="">No tenants</option>';
+  }catch(e){}
+}
+async function loadUsers(){
+  var box=g('users-list');if(!box)return;
+  box.innerHTML='<div style="color:#999;font-size:13px;">Loading…</div>';
+  try{
+    var r=await fetch(SB+'/rest/v1/tenant_users?select=id,email,full_name,role,is_active,tenant_id,tenants(name)&order=email',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+    if(!r.ok){box.innerHTML='<div style="color:#b00;font-size:13px;">Could not load users ('+r.status+').</div>';return;}
+    var rows=await r.json();
+    if(!rows||!rows.length){box.innerHTML='<div style="color:#999;font-size:13px;">No users yet.</div>';return;}
+    box.innerHTML=rows.map(function(u){
+      var tn=(u.tenants&&u.tenants.name)||'—',active=u.is_active!==false;
+      return '<div class="set-row" style="flex-wrap:wrap;">'+
+        '<div style="flex:1;min-width:160px;"><div style="font-weight:600;color:#1a1a2e;">'+esc(u.email||'—')+'</div><div style="font-size:11px;color:#888;">'+esc(u.role||'—')+' · '+esc(tn)+'</div></div>'+
+        '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:9px;background:'+(active?'#edfaed':'#fff0f0')+';color:'+(active?'#1a7a1a':'#b00')+';">'+(active?'Active':'Inactive')+'</span>'+
+        '<button class="set-mini" onclick="toggleUserActive(\''+u.id+'\','+(!active)+')">'+(active?'Deactivate':'Activate')+'</button>'+
+        '<button class="set-mini" onclick="resetUserPassword(\''+u.id+'\',\''+esc(u.email||'')+'\')">Reset Password</button>'+
+      '</div>';
+    }).join('');
+  }catch(e){box.innerHTML='<div style="color:#b00;font-size:13px;">Error: '+esc(e.message)+'</div>';}
+}
+async function addTenantUser(){
+  var email=gvS('usr-email'),pass=gvS('usr-pass'),role=g('usr-role').value,tenant=g('usr-tenant').value;
+  if(!email||!pass){toast('Email and password required.');return;}
+  if(!tenant){toast('Select a tenant.');return;}
+  try{
+    var r=await fetch('/api/tenant-user-create',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('admin_session')||'')},body:JSON.stringify({tenant_id:tenant,email:email,password:pass,role:role,full_name:email.split('@')[0]})});
+    var d=await r.json().catch(function(){return{};});
+    if(!r.ok||d.error){toast('Add failed: '+(d.error||r.status));return;}
+    _setSaved('usr-saved');toast('User added.');
+    g('usr-email').value='';g('usr-pass').value='';
+    loadUsers();
+  }catch(e){toast('Error: '+e.message);}
+}
+async function toggleUserActive(id,active){
+  try{
+    var r=await fetch(SB+'/rest/v1/tenant_users?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_active:!!active})});
+    if(r.ok){toast('User updated.');loadUsers();}else toast('Update failed ('+r.status+').');
+  }catch(e){toast('Error: '+e.message);}
+}
+async function sha256Hex(str){
+  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.prototype.map.call(new Uint8Array(buf),function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+}
+async function resetUserPassword(id,email){
+  var np=prompt('New password for '+email+':');if(np===null)return;np=np.trim();if(!np){toast('Password cannot be empty.');return;}
+  try{
+    var hash=await sha256Hex(np+'tbg-salt-2026');
+    var r=await fetch(SB+'/rest/v1/tenant_users?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({password_hash:hash})});
+    if(r.ok)toast('Password reset for '+email+'.');else toast('Reset failed ('+r.status+').');
+  }catch(e){toast('Error: '+e.message);}
+}
+
+// ── TAB 4: Personas ──
+async function savePersona(which){
+  var sig=g('per-'+which+'-sig');
+  var obj={email:gvS('per-'+which+'-email'),display_name:gvS('per-'+which+'-name'),signature:sig?sig.value:''};
+  if(await csUpsert('persona_'+which,obj)){_setSaved('per-'+which+'-saved');toast('Persona saved.');}else toast('Save failed.');
+}
+
+// ── TAB 5: Portal Preferences ──
+async function savePrefs(){
+  var obj={language:g('pref-lang').value,timezone:g('pref-tz').value,date_format:g('pref-datefmt').value,dark_mode:g('pref-dark').value};
+  if(await csUpsert('portal_prefs',obj)){
+    try{localStorage.setItem('adminDarkMode',obj.dark_mode==='on'?'true':'false');}catch(e){}
+    _setSaved('pref-saved');toast('Preferences saved.');
+  }else toast('Save failed.');
 }
 </script>
 <script src="/admin-gates-snippet.js"></script>
