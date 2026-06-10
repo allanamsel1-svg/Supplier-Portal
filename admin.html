@@ -2277,23 +2277,89 @@
       </div>
     </div>
 
-    <div id="panel-settings" class="panel">
-      <div style="padding:2rem;max-width:900px;">
-        <h2 style="margin-bottom:1.5rem;font-size:1.4rem;">⚙️ Settings</h2>
-        <div style="display:flex;gap:8px;margin-bottom:1.5rem;border-bottom:2px solid #e0e0d8;padding-bottom:0;">
-          <button onclick="setTab('company')" id="set-tab-company" style="padding:8px 18px;border:none;border-bottom:3px solid #1a2e44;background:none;cursor:pointer;font-weight:600;color:#1a2e44;">Company Info</button>
-          <button onclick="setTab('apikeys')" id="set-tab-apikeys" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">API Keys</button>
-          <button onclick="setTab('users')" id="set-tab-users" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">User Management</button>
-          <button onclick="setTab('personas')" id="set-tab-personas" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">Email Personas</button>
-          <button onclick="setTab('prefs')" id="set-tab-prefs" style="padding:8px 18px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">Portal Preferences</button>
+<div id="panel-settings" class="panel" style="padding:2rem;max-width:960px;">
+  <h2 style="margin-bottom:1.5rem;">⚙️ Settings</h2>
+  <div id="settings-tabs" style="display:flex;gap:0;margin-bottom:2rem;border-bottom:2px solid #e0e0d8;">
+    <button onclick="setTab('company')" id="set-tab-company" style="padding:10px 20px;border:none;border-bottom:3px solid #1a2e44;background:none;cursor:pointer;font-weight:700;color:#1a2e44;margin-bottom:-2px;">🏢 Company Info</button>
+    <button onclick="setTab('apikeys')" id="set-tab-apikeys" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🔑 API Keys</button>
+    <button onclick="setTab('users')" id="set-tab-users" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">👥 Users</button>
+    <button onclick="setTab('personas')" id="set-tab-personas" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">📧 Email Personas</button>
+    <button onclick="setTab('prefs')" id="set-tab-prefs" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🎛️ Preferences</button>
+  </div>
+
+  <div id="set-pane-company">
+    <h3 style="margin-bottom:1rem;">Company Information</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:600px;">
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Company Name</label><input id="ci-name" type="text" value="TBG Sourcing Inc." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">EIN</label><input id="ci-ein" type="text" value="42-2911499" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Address</label><input id="ci-address" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">City, State, ZIP</label><input id="ci-city" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Phone</label><input id="ci-phone" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Website</label><input id="ci-website" type="text" value="tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+    </div>
+    <button onclick="saveCompanyInfo()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Company Info</button>
+  </div>
+
+  <div id="set-pane-apikeys" style="display:none;">
+    <h3 style="margin-bottom:1rem;">API Keys</h3>
+    <p style="color:#666;margin-bottom:1rem;font-size:0.9rem;">API keys are managed in Vercel environment variables. Values shown are masked for security.</p>
+    <div style="display:flex;flex-direction:column;gap:12px;max-width:600px;">
+      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Anthropic API Key</span><span style="font-family:monospace;color:#666;">sk-ant-••••••••••••••••••last4</span></div>
+      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">SendGrid API Key</span><span style="font-family:monospace;color:#666;">SG.••••••••••••••••••last4</span></div>
+      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Supabase URL</span><span style="font-family:monospace;color:#666;">https://mjkjubctswjwjihxjpnd.supabase.co</span></div>
+    </div>
+  </div>
+
+  <div id="set-pane-users" style="display:none;">
+    <h3 style="margin-bottom:1rem;">User Management</h3>
+    <div id="users-list" style="margin-bottom:1.5rem;"></div>
+    <h4 style="margin-bottom:0.5rem;">Add User</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;max-width:600px;">
+      <input id="new-user-email" type="email" placeholder="Email" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+      <input id="new-user-password" type="password" placeholder="Password" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+      <select id="new-user-role" style="padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="admin">Admin</option><option value="user">User</option><option value="readonly">Read Only</option><option value="designer">Designer</option></select>
+    </div>
+    <button onclick="addTenantUser()" style="margin-top:8px;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Add User</button>
+  </div>
+
+  <div id="set-pane-personas" style="display:none;">
+    <h3 style="margin-bottom:1rem;">Email Personas</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:800px;">
+      <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
+        <h4 style="margin-bottom:1rem;">📧 Sarah Lindburg — Sourcing</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-sarah-name" type="text" value="Sarah Lindburg" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+          <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-sarah-email" type="text" value="sourcing@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+          <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-sarah-title" type="text" value="Sourcing Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
         </div>
-        <div id="set-pane-company" class="set-pane"></div>
-        <div id="set-pane-apikeys" class="set-pane" style="display:none;"></div>
-        <div id="set-pane-users" class="set-pane" style="display:none;"></div>
-        <div id="set-pane-personas" class="set-pane" style="display:none;"></div>
-        <div id="set-pane-prefs" class="set-pane" style="display:none;"></div>
+      </div>
+      <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
+        <h4 style="margin-bottom:1rem;">📋 Tyler Durden — Compliance</h4>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-tyler-name" type="text" value="Tyler Durden" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+          <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-tyler-email" type="text" value="compliance@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+          <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-tyler-title" type="text" value="Compliance Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+        </div>
       </div>
     </div>
+    <button onclick="savePersonas()" style="margin-top:1.5rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Personas</button>
+  </div>
+
+  <div id="set-pane-prefs" style="display:none;">
+    <h3 style="margin-bottom:1rem;">Portal Preferences</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:500px;">
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Default Language</label>
+        <select id="pref-lang" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="en">English</option><option value="zh">Mandarin</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Timezone</label>
+        <select id="pref-tz" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="America/New_York">Eastern (NYC)</option><option value="America/Los_Angeles">Pacific (LA)</option><option value="Asia/Shanghai">China (Shanghai)</option><option value="Asia/Tokyo">Japan (Tokyo)</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Dark Mode Default</label>
+        <select id="pref-dark" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="false">Light</option><option value="true">Dark</option></select></div>
+      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Date Format</label>
+        <select id="pref-date" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
+    </div>
+    <button onclick="savePrefs()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Preferences</button>
+  </div>
+</div>
   </div>
 </div>
 
@@ -14962,262 +15028,78 @@ async function rejectPendingCert(btn){
 </script>
 <script>
 // ════════════════════════════════════════════════════════════════════
-// SETTINGS PANEL — 5 tabs: Company Info, API Keys, Users, Personas, Preferences
-// Uses globals SB, KEY, g, esc, toast from the main script above.
+// SETTINGS PANEL — Company Info, API Keys, Users, Personas, Preferences
+// Self-contained. Uses globals SB, KEY, esc, toast from the main script.
 // ════════════════════════════════════════════════════════════════════
+var SUPA=(typeof SB!=='undefined')?SB:'';
+var ANON=(typeof KEY!=='undefined')?KEY:'';
+// Admin (Byline/Buyline) tenant — new users created from the admin Settings panel are attached here.
+var SETTINGS_TENANT_ID='f64c18ac-c0b4-4bba-a3e6-b64ef0fd3bf4';
+
 function setTab(name){
-  var tabs=['company','apikeys','users','personas','prefs'];
-  tabs.forEach(function(t){
-    var btn=g('set-tab-'+t);
-    if(btn){ btn.style.borderBottom='3px solid '+(t===name?'#1a2e44':'transparent'); btn.style.color=(t===name?'#1a2e44':'#666'); btn.style.fontWeight=(t===name?'600':'400'); }
-    var pane=g('set-pane-'+t);
-    if(pane)pane.style.display=(t===name?'block':'none');
+  ['company','apikeys','users','personas','prefs'].forEach(function(t){
+    var tb=document.getElementById('set-tab-'+t);
+    var pn=document.getElementById('set-pane-'+t);
+    if(tb){tb.style.borderBottomColor=t===name?'#1a2e44':'transparent';tb.style.color=t===name?'#1a2e44':'#666';tb.style.fontWeight=t===name?'700':'400';}
+    if(pn)pn.style.display=t===name?'block':'none';
   });
-  if(name==='apikeys')loadApiKeys();
-  if(name==='users')loadUsers();
-}
-// Render the 5 settings forms into the (empty) panes. Inner field IDs match the save/load helpers.
-function renderSettingsForms(){
-  var c=g('set-pane-company');
-  if(c)c.innerHTML=`
-    <div class="set-section">
-      <h3>Company Information</h3>
-      <div class="set-grid">
-        <div class="set-field"><label>Company Name</label><input id="ci-name" placeholder="TBG Sourcing Inc." /></div>
-        <div class="set-field"><label>EIN</label><input id="ci-ein" placeholder="42-2911499" /></div>
-      </div>
-      <div class="set-field"><label>Address Line 1</label><input id="ci-addr1" /></div>
-      <div class="set-field"><label>Address Line 2</label><input id="ci-addr2" /></div>
-      <div class="set-grid">
-        <div class="set-field"><label>City</label><input id="ci-city" /></div>
-        <div class="set-field"><label>State / Province</label><input id="ci-state" /></div>
-      </div>
-      <div class="set-grid">
-        <div class="set-field"><label>ZIP / Postal</label><input id="ci-zip" /></div>
-        <div class="set-field"><label>Country</label><input id="ci-country" /></div>
-      </div>
-      <div class="set-grid">
-        <div class="set-field"><label>Phone</label><input id="ci-phone" /></div>
-        <div class="set-field"><label>Website</label><input id="ci-website" placeholder="https://" /></div>
-      </div>
-      <button class="set-btn" onclick="saveCompanyInfo()">Save Company Info</button>
-      <span class="saved" id="ci-saved">Saved!</span>
-    </div>`;
-  var a=g('set-pane-apikeys');
-  if(a)a.innerHTML=`
-    <div class="set-section">
-      <h3>API Keys</h3>
-      <p>Keys live in Vercel environment variables and are shown masked here. They are read-only — manage them in Vercel.</p>
-      <div id="apikeys-list" style="margin-top:10px;"><div style="color:#999;font-size:13px;">Loading…</div></div>
-    </div>`;
-  var u=g('set-pane-users');
-  if(u)u.innerHTML=`
-    <div class="set-section">
-      <h3>Add User</h3>
-      <div class="set-grid">
-        <div class="set-field"><label>Email</label><input id="usr-email" type="email" placeholder="user@company.com" /></div>
-        <div class="set-field"><label>Password</label><input id="usr-pass" type="text" placeholder="initial password" /></div>
-      </div>
-      <div class="set-grid">
-        <div class="set-field"><label>Role</label><select id="usr-role" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="member">Member</option><option value="admin">Admin</option><option value="designer">Designer</option></select></div>
-        <div class="set-field"><label>Tenant</label><select id="usr-tenant" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"></select></div>
-      </div>
-      <button class="set-btn" onclick="addTenantUser()">Add User</button>
-      <span class="saved" id="usr-saved">Added!</span>
-    </div>
-    <div class="set-section">
-      <h3>Users</h3>
-      <div id="users-list"><div style="color:#999;font-size:13px;">Loading…</div></div>
-    </div>`;
-  var pn=g('set-pane-personas');
-  if(pn)pn.innerHTML=`
-    <div class="set-section">
-      <h3>Sarah Lindburg — Sourcing</h3>
-      <div class="set-grid">
-        <div class="set-field"><label>Email</label><input id="per-sarah-email" placeholder="sourcing@tbgsourcing.net" /></div>
-        <div class="set-field"><label>Display Name</label><input id="per-sarah-name" placeholder="Sarah Lindburg" /></div>
-      </div>
-      <div class="set-field"><label>Signature</label><textarea id="per-sarah-sig" rows="4"></textarea></div>
-      <button class="set-btn" onclick="savePersona('sarah')">Save Sarah</button>
-      <span class="saved" id="per-sarah-saved">Saved!</span>
-    </div>
-    <div class="set-section">
-      <h3>Tyler Durden — Compliance</h3>
-      <div class="set-grid">
-        <div class="set-field"><label>Email</label><input id="per-tyler-email" placeholder="compliance@tbgsourcing.net" /></div>
-        <div class="set-field"><label>Display Name</label><input id="per-tyler-name" placeholder="Tyler Durden" /></div>
-      </div>
-      <div class="set-field"><label>Signature</label><textarea id="per-tyler-sig" rows="4"></textarea></div>
-      <button class="set-btn" onclick="savePersona('tyler')">Save Tyler</button>
-      <span class="saved" id="per-tyler-saved">Saved!</span>
-    </div>`;
-  var pf=g('set-pane-prefs');
-  if(pf)pf.innerHTML=`
-    <div class="set-section">
-      <h3>Portal Preferences</h3>
-      <div class="set-grid">
-        <div class="set-field"><label>Default Language</label><select id="pref-lang" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="en">English</option><option value="es" disabled>Spanish (coming soon)</option><option value="zh" disabled>Chinese (coming soon)</option></select></div>
-        <div class="set-field"><label>Default Timezone</label><select id="pref-tz" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="America/New_York">America/New_York (ET)</option><option value="America/Chicago">America/Chicago (CT)</option><option value="America/Denver">America/Denver (MT)</option><option value="America/Los_Angeles">America/Los_Angeles (PT)</option><option value="UTC">UTC</option><option value="Asia/Shanghai">Asia/Shanghai</option><option value="Asia/Hong_Kong">Asia/Hong_Kong</option></select></div>
-      </div>
-      <div class="set-grid">
-        <div class="set-field"><label>Date Format</label><select id="pref-datefmt" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
-        <div class="set-field"><label>Dark Mode Default</label><select id="pref-dark" style="width:100%;padding:9px 12px;background:#f8f8f4;border:1px solid #e0e0d8;border-radius:7px;font-size:13px;font-family:inherit;color:#1a1a2e;"><option value="off">Off</option><option value="on">On</option></select></div>
-      </div>
-      <button class="set-btn" onclick="savePrefs()">Save Preferences</button>
-      <span class="saved" id="pref-saved">Saved!</span>
-    </div>`;
-}
-function gvS(id){var el=g(id);return el?el.value.trim():'';}
-function _setSaved(id){var el=g(id);if(!el)return;el.style.display='inline';setTimeout(function(){el.style.display='none';},2500);}
-
-// company_settings (key → JSON value) helpers
-async function csGetAll(){
-  try{
-    var r=await fetch(SB+'/rest/v1/company_settings?select=key,value',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    if(!r.ok)return {};
-    var rows=await r.json();var out={};
-    (rows||[]).forEach(function(row){try{out[row.key]=row.value?JSON.parse(row.value):null;}catch(e){out[row.key]=row.value;}});
-    return out;
-  }catch(e){return {};}
-}
-async function csUpsert(key,obj){
-  try{
-    var r=await fetch(SB+'/rest/v1/company_settings?on_conflict=key',{method:'POST',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:key,value:JSON.stringify(obj),updated_at:new Date().toISOString()})});
-    return r.ok;
-  }catch(e){return false;}
+  if(name==='users') loadUsersList();
 }
 
+// company_settings upsert on the UNIQUE key column (key/value JSON store).
+function _csUpsert(key,obj){
+  return fetch(SUPA+'/rest/v1/company_settings?on_conflict=key',{method:'POST',headers:{'apikey':ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({key:key,value:JSON.stringify(obj),updated_at:new Date().toISOString()})});
+}
+function _setVal(id,v){var el=document.getElementById(id);if(el&&v!=null&&v!=='')el.value=v;}
+
+// Populate the (static-default) fields from saved company_settings, then show the Company tab.
 async function loadSettings(){
-  renderSettingsForms();
-  var cs=await csGetAll();
-  function sv(id,v){var el=g(id);if(el)el.value=(v==null?'':v);}
-  var ci=cs.company_info||{};
-  sv('ci-name',ci.name||'TBG Sourcing Inc.');sv('ci-ein',ci.ein||'42-2911499');
-  sv('ci-addr1',ci.addr1);sv('ci-addr2',ci.addr2);sv('ci-city',ci.city);sv('ci-state',ci.state);sv('ci-zip',ci.zip);sv('ci-country',ci.country);sv('ci-phone',ci.phone);sv('ci-website',ci.website);
-  var ps=cs.persona_sarah||{},pt=cs.persona_tyler||{};
-  sv('per-sarah-email',ps.email||'sourcing@tbgsourcing.net');sv('per-sarah-name',ps.display_name||'Sarah Lindburg');sv('per-sarah-sig',ps.signature);
-  sv('per-tyler-email',pt.email||'compliance@tbgsourcing.net');sv('per-tyler-name',pt.display_name||'Tyler Durden');sv('per-tyler-sig',pt.signature);
-  var pp=cs.portal_prefs||{};
-  sv('pref-lang',pp.language||'en');sv('pref-tz',pp.timezone||'America/New_York');sv('pref-datefmt',pp.date_format||'MM/DD/YYYY');sv('pref-dark',pp.dark_mode||'off');
-  loadTenantsForUsers();
+  try{
+    var r=await fetch(SUPA+'/rest/v1/company_settings?select=key,value',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}});
+    var rows=r.ok?await r.json():[];
+    var cs={};(rows||[]).forEach(function(row){try{cs[row.key]=row.value?JSON.parse(row.value):null;}catch(e){cs[row.key]=row.value;}});
+    var ci=cs.company_info||{};
+    _setVal('ci-name',ci.company_name);_setVal('ci-ein',ci.ein);_setVal('ci-address',ci.address);_setVal('ci-city',ci.city);_setVal('ci-phone',ci.phone);_setVal('ci-website',ci.website);
+    var ps=cs.persona_sarah||{};_setVal('per-sarah-name',ps.name);_setVal('per-sarah-email',ps.email);_setVal('per-sarah-title',ps.title);
+    var pt=cs.persona_tyler||{};_setVal('per-tyler-name',pt.name);_setVal('per-tyler-email',pt.email);_setVal('per-tyler-title',pt.title);
+    var pp=cs.portal_prefs||{};_setVal('pref-lang',pp.lang);_setVal('pref-tz',pp.tz);_setVal('pref-dark',pp.dark);_setVal('pref-date',pp.date);
+  }catch(e){}
   setTab('company');
 }
 
-// ── TAB 1: Company Info ──
-async function saveCompanyInfo(){
-  var obj={name:gvS('ci-name'),ein:gvS('ci-ein'),addr1:gvS('ci-addr1'),addr2:gvS('ci-addr2'),city:gvS('ci-city'),state:gvS('ci-state'),zip:gvS('ci-zip'),country:gvS('ci-country'),phone:gvS('ci-phone'),website:gvS('ci-website')};
-  if(await csUpsert('company_info',obj)){_setSaved('ci-saved');toast('Company info saved.');}else toast('Save failed.');
+function loadUsersList(){
+  fetch(SUPA+'/rest/v1/tenant_users?select=*&order=created_at',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}})
+  .then(function(r){return r.ok?r.json():[];}).then(function(users){
+    var el=document.getElementById('users-list');
+    if(!el)return;
+    if(!users||!users.length){el.innerHTML='<div style="color:#999;font-size:0.85rem;">No users yet.</div>';return;}
+    el.innerHTML=users.map(function(u){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid #e0e0d8;border-radius:6px;margin-bottom:8px;"><div><strong>'+esc(u.email||'')+'</strong> <span style="background:#e8f4e8;color:#2d7a2d;padding:2px 8px;border-radius:12px;font-size:0.8rem;">'+esc(u.role||'—')+'</span></div><div style="color:#666;font-size:0.85rem;">'+(u.is_active!==false?'✅ Active':'❌ Inactive')+'</div></div>';}).join('');
+  }).catch(function(){});
 }
 
-// ── TAB 2: API Keys (masked, read-only) ──
-var _apiKeysData=null;
-async function loadApiKeys(){
-  var box=g('apikeys-list');if(!box)return;
-  box.innerHTML='<div style="color:#999;font-size:13px;">Loading…</div>';
-  try{
-    var r=await fetch('/api/admin-settings');
-    var d=await r.json().catch(function(){return{};});
-    if(!r.ok||!d.keys){box.innerHTML='<div style="color:#b00;font-size:13px;">Could not load key info.</div>';return;}
-    _apiKeysData=d.keys;
-    var labels={anthropic:'Anthropic',sendgrid:'SendGrid',supabase:'Supabase (service)'};
-    box.innerHTML=Object.keys(labels).map(function(k){
-      var info=d.keys[k]||{present:false,masked:'— not set —'};
-      return '<div class="set-row">'+
-        '<div style="flex:0 0 140px;font-weight:600;color:#1a1a2e;">'+esc(labels[k])+'</div>'+
-        '<code id="apik-'+k+'" style="flex:1;min-width:0;font-family:monospace;font-size:12px;color:'+(info.present?'#1a1a2e':'#bbb')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(info.present?'••••••••':info.masked)+'</code>'+
-        (info.present?'<button class="set-mini" id="apik-btn-'+k+'" onclick="revealKey(\''+k+'\')">Reveal</button><button class="set-mini" onclick="copyKey(\''+k+'\')">Copy</button>':'')+
-      '</div>';
-    }).join('')+'<p style="margin-top:8px;">Full keys are never exposed here — only the last 4 characters. Edit them in the Vercel dashboard.</p>';
-  }catch(e){box.innerHTML='<div style="color:#b00;font-size:13px;">Error: '+esc(e.message)+'</div>';}
+function saveCompanyInfo(){
+  var data={company_name:document.getElementById('ci-name').value,ein:document.getElementById('ci-ein').value,address:document.getElementById('ci-address').value,city:document.getElementById('ci-city').value,phone:document.getElementById('ci-phone').value,website:document.getElementById('ci-website').value};
+  _csUpsert('company_info',data).then(function(r){toast(r.ok?'Company info saved':'Save failed');});
 }
-function revealKey(k){
-  var el=g('apik-'+k),btn=g('apik-btn-'+k);if(!el||!_apiKeysData||!_apiKeysData[k])return;
-  var shown=el.getAttribute('data-shown')==='1';
-  el.textContent=shown?'••••••••':(_apiKeysData[k].masked||'');
-  el.setAttribute('data-shown',shown?'0':'1');
-  if(btn)btn.textContent=shown?'Reveal':'Hide';
+function savePersonas(){
+  var sarah={name:document.getElementById('per-sarah-name').value,email:document.getElementById('per-sarah-email').value,title:document.getElementById('per-sarah-title').value};
+  var tyler={name:document.getElementById('per-tyler-name').value,email:document.getElementById('per-tyler-email').value,title:document.getElementById('per-tyler-title').value};
+  Promise.all([_csUpsert('persona_sarah',sarah),_csUpsert('persona_tyler',tyler)]).then(function(){toast('Personas saved');});
 }
-function copyKey(k){
-  if(!_apiKeysData||!_apiKeysData[k])return;
-  var v=_apiKeysData[k].masked||'';
-  if(navigator.clipboard)navigator.clipboard.writeText(v).then(function(){toast('Copied (masked) to clipboard.');},function(){toast('Copy failed.');});
-  else toast('Clipboard unavailable.');
+function savePrefs(){
+  var prefs={lang:document.getElementById('pref-lang').value,tz:document.getElementById('pref-tz').value,dark:document.getElementById('pref-dark').value,date:document.getElementById('pref-date').value};
+  _csUpsert('portal_prefs',prefs).then(function(){ try{localStorage.setItem('adminDarkMode',prefs.dark==='true'?'true':'false');}catch(e){} toast('Preferences saved'); });
 }
-
-// ── TAB 3: User Management ──
-async function loadTenantsForUsers(){
-  var sel=g('usr-tenant');if(!sel)return;
-  try{
-    var r=await fetch(SB+'/rest/v1/tenants?select=id,name&order=name',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    var rows=r.ok?await r.json():[];
-    sel.innerHTML=(rows||[]).map(function(t){return '<option value="'+esc(t.id)+'">'+esc(t.name||t.id)+'</option>';}).join('')||'<option value="">No tenants</option>';
-  }catch(e){}
-}
-async function loadUsers(){
-  var box=g('users-list');if(!box)return;
-  box.innerHTML='<div style="color:#999;font-size:13px;">Loading…</div>';
-  try{
-    var r=await fetch(SB+'/rest/v1/tenant_users?select=id,email,full_name,role,is_active,tenant_id,tenants(name)&order=email',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
-    if(!r.ok){box.innerHTML='<div style="color:#b00;font-size:13px;">Could not load users ('+r.status+').</div>';return;}
-    var rows=await r.json();
-    if(!rows||!rows.length){box.innerHTML='<div style="color:#999;font-size:13px;">No users yet.</div>';return;}
-    box.innerHTML=rows.map(function(u){
-      var tn=(u.tenants&&u.tenants.name)||'—',active=u.is_active!==false;
-      return '<div class="set-row" style="flex-wrap:wrap;">'+
-        '<div style="flex:1;min-width:160px;"><div style="font-weight:600;color:#1a1a2e;">'+esc(u.email||'—')+'</div><div style="font-size:11px;color:#888;">'+esc(u.role||'—')+' · '+esc(tn)+'</div></div>'+
-        '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:9px;background:'+(active?'#edfaed':'#fff0f0')+';color:'+(active?'#1a7a1a':'#b00')+';">'+(active?'Active':'Inactive')+'</span>'+
-        '<button class="set-mini" onclick="toggleUserActive(\''+u.id+'\','+(!active)+')">'+(active?'Deactivate':'Activate')+'</button>'+
-        '<button class="set-mini" onclick="resetUserPassword(\''+u.id+'\',\''+esc(u.email||'')+'\')">Reset Password</button>'+
-      '</div>';
-    }).join('');
-  }catch(e){box.innerHTML='<div style="color:#b00;font-size:13px;">Error: '+esc(e.message)+'</div>';}
-}
-async function addTenantUser(){
-  var email=gvS('usr-email'),pass=gvS('usr-pass'),role=g('usr-role').value,tenant=g('usr-tenant').value;
-  if(!email||!pass){toast('Email and password required.');return;}
-  if(!tenant){toast('Select a tenant.');return;}
-  try{
-    var r=await fetch('/api/tenant-user-create',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('admin_session')||'')},body:JSON.stringify({tenant_id:tenant,email:email,password:pass,role:role,full_name:email.split('@')[0]})});
-    var d=await r.json().catch(function(){return{};});
-    if(!r.ok||d.error){toast('Add failed: '+(d.error||r.status));return;}
-    _setSaved('usr-saved');toast('User added.');
-    g('usr-email').value='';g('usr-pass').value='';
-    loadUsers();
-  }catch(e){toast('Error: '+e.message);}
-}
-async function toggleUserActive(id,active){
-  try{
-    var r=await fetch(SB+'/rest/v1/tenant_users?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({is_active:!!active})});
-    if(r.ok){toast('User updated.');loadUsers();}else toast('Update failed ('+r.status+').');
-  }catch(e){toast('Error: '+e.message);}
-}
-async function sha256Hex(str){
-  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return Array.prototype.map.call(new Uint8Array(buf),function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
-}
-async function resetUserPassword(id,email){
-  var np=prompt('New password for '+email+':');if(np===null)return;np=np.trim();if(!np){toast('Password cannot be empty.');return;}
-  try{
-    var hash=await sha256Hex(np+'tbg-salt-2026');
-    var r=await fetch(SB+'/rest/v1/tenant_users?id=eq.'+id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({password_hash:hash})});
-    if(r.ok)toast('Password reset for '+email+'.');else toast('Reset failed ('+r.status+').');
-  }catch(e){toast('Error: '+e.message);}
-}
-
-// ── TAB 4: Personas ──
-async function savePersona(which){
-  var sig=g('per-'+which+'-sig');
-  var obj={email:gvS('per-'+which+'-email'),display_name:gvS('per-'+which+'-name'),signature:sig?sig.value:''};
-  if(await csUpsert('persona_'+which,obj)){_setSaved('per-'+which+'-saved');toast('Persona saved.');}else toast('Save failed.');
-}
-
-// ── TAB 5: Portal Preferences ──
-async function savePrefs(){
-  var obj={language:g('pref-lang').value,timezone:g('pref-tz').value,date_format:g('pref-datefmt').value,dark_mode:g('pref-dark').value};
-  if(await csUpsert('portal_prefs',obj)){
-    try{localStorage.setItem('adminDarkMode',obj.dark_mode==='on'?'true':'false');}catch(e){}
-    _setSaved('pref-saved');toast('Preferences saved.');
-  }else toast('Save failed.');
+function addTenantUser(){
+  var email=document.getElementById('new-user-email').value;
+  var pass=document.getElementById('new-user-password').value;
+  var role=document.getElementById('new-user-role').value;
+  if(!email||!pass){toast('Email and password required');return;}
+  fetch('/api/tenant-user-create',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(localStorage.getItem('admin_session')||'')},body:JSON.stringify({tenant_id:SETTINGS_TENANT_ID,email:email,password:pass,role:role,full_name:email.split('@')[0]})})
+  .then(function(r){return r.json().catch(function(){return{};});}).then(function(d){
+    if(d&&(d.success||d.user_id)){toast('User created');document.getElementById('new-user-email').value='';document.getElementById('new-user-password').value='';loadUsersList();}
+    else{toast('Error: '+((d&&d.error)||'could not create user'));}
+  }).catch(function(e){toast('Error: '+e.message);});
 }
 </script>
 <script src="/admin-gates-snippet.js"></script>
