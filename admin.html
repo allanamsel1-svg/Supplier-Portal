@@ -2923,14 +2923,16 @@ function togglePw(inputId,btnId){
 function showPanel(name){
   document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.sitem').forEach(function(n){n.classList.remove('on');});
-  g('panel-'+name).classList.add('on');g('nav-'+name).classList.add('on');
+  var _pnl=g('panel-'+name);if(_pnl)_pnl.classList.add('on');
+  var _nav=g('nav-'+name);if(_nav)_nav.classList.add('on');
   // Embedded tool panels (inspections / factory audits / artwork) — lazy-load their iframe once.
   if(name==='inspections'||name==='factory-audits'||name==='artwork'){
     var _fr=document.querySelector('#panel-'+name+' iframe');
     if(_fr&&!_fr.src&&_fr.dataset.src)_fr.src=_fr.dataset.src;
   }
   if(name==='upload')initAdminUpload();
-  if(name==='settings')loadSettings();
+  // Settings: show the panel (above) + populate the 5-tab UI. Default to the Company tab.
+  if(name==='settings'){ if(typeof setTab==='function')setTab('company'); if(typeof loadSettings==='function')loadSettings(); }
   if(name==='rfq'){loadRFQs();loadCategories();loadCustAndBrandsForRFQ();}
   if(name==='rfq-followup')loadRFQFollowups();
   // Handle department inboxes
@@ -3041,13 +3043,16 @@ function renderAll(){
     var ff=factoryFiles[f.user_id];
     return ff.catalogs.length||ff.overview.length||ff.quotes.length;
   }).length;
-  g('s-total').textContent=total;g('s-pending').textContent=pending;g('s-approved').textContent=approved;g('s-files').textContent=withFiles;
-  g('cnt-all').textContent=total;g('cnt-pending').textContent=pending;
-  g('total-badge').textContent=total+' '+(total===1?'factory':'factories');
-  g('recent-list').innerHTML=allFactories.slice(0,5).map(factoryCard).join('')||'<div class="empty">No factories yet.</div>';
-  g('all-list').innerHTML=allFactories.map(factoryCard).join('')||'<div class="empty">No factories yet.</div>';
+  // Null-safe setters — some of these elements may not exist depending on the active panel.
+  function _t(id,v){var el=g(id);if(el)el.textContent=v;}
+  function _h(id,v){var el=g(id);if(el)el.innerHTML=v;}
+  _t('s-total',total);_t('s-pending',pending);_t('s-approved',approved);_t('s-files',withFiles);
+  _t('cnt-all',total);_t('cnt-pending',pending);
+  _t('total-badge',total+' '+(total===1?'factory':'factories'));
+  _h('recent-list',allFactories.slice(0,5).map(factoryCard).join('')||'<div class="empty">No factories yet.</div>');
+  _h('all-list',allFactories.map(factoryCard).join('')||'<div class="empty">No factories yet.</div>');
   var pend=allFactories.filter(function(f){return f.status==='pending';});
-  g('pending-list').innerHTML=pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>';
+  _h('pending-list',pend.map(factoryCard).join('')||'<div class="empty">No pending factories.</div>');
   renderFollowUps();
   populateUploadDropdown();
 }
@@ -4260,7 +4265,7 @@ async function loadRFQs(){
     var r=await fetch(SB+'/rest/v1/rfqs?select=*&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
     allRFQs=await r.json();
     renderRFQList();
-    g('cnt-rfq').textContent=allRFQs.length;
+    var _cntRfq=g('cnt-rfq');if(_cntRfq)_cntRfq.textContent=allRFQs.length;
     checkNewQuotes();
   }catch(e){console.log('loadRFQs:',e);}
 }
