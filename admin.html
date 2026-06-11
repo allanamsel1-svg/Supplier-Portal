@@ -823,6 +823,90 @@
       <div class="factory-list" id="recent-list"></div>
     </div>
 
+    <div id="panel-settings" class="panel" style="padding:2rem;max-width:960px;">
+      <h2 style="margin-bottom:1.5rem;">⚙️ Settings</h2>
+      <div id="settings-tabs" style="display:flex;gap:0;margin-bottom:2rem;border-bottom:2px solid #e0e0d8;">
+        <button onclick="setTab('company')" id="set-tab-company" style="padding:10px 20px;border:none;border-bottom:3px solid #1a2e44;background:none;cursor:pointer;font-weight:700;color:#1a2e44;margin-bottom:-2px;">🏢 Company Info</button>
+        <button onclick="setTab('apikeys')" id="set-tab-apikeys" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🔑 API Keys</button>
+        <button onclick="setTab('users')" id="set-tab-users" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">👥 Users</button>
+        <button onclick="setTab('personas')" id="set-tab-personas" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">📧 Email Personas</button>
+        <button onclick="setTab('prefs')" id="set-tab-prefs" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🎛️ Preferences</button>
+      </div>
+
+      <div id="set-pane-company">
+        <h3 style="margin-bottom:1rem;">Company Information</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:600px;">
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Company Name</label><input id="ci-name" type="text" value="TBG Sourcing Inc." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">EIN</label><input id="ci-ein" type="text" value="42-2911499" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Address</label><input id="ci-address" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">City, State, ZIP</label><input id="ci-city" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Phone</label><input id="ci-phone" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Website</label><input id="ci-website" type="text" value="tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
+        </div>
+        <button onclick="saveCompanyInfo()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Company Info</button>
+      </div>
+
+      <div id="set-pane-apikeys" style="display:none;">
+        <h3 style="margin-bottom:1rem;">API Keys</h3>
+        <p style="color:#666;margin-bottom:1rem;font-size:0.9rem;">API keys are managed in Vercel environment variables. Values shown are masked for security.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;max-width:600px;">
+          <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Anthropic API Key</span><span style="font-family:monospace;color:#666;">sk-ant-••••••••••••••••••last4</span></div>
+          <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">SendGrid API Key</span><span style="font-family:monospace;color:#666;">SG.••••••••••••••••••last4</span></div>
+          <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Supabase URL</span><span style="font-family:monospace;color:#666;">https://mjkjubctswjwjihxjpnd.supabase.co</span></div>
+        </div>
+      </div>
+
+      <div id="set-pane-users" style="display:none;">
+        <h3 style="margin-bottom:1rem;">User Management</h3>
+        <div id="users-list" style="margin-bottom:1.5rem;"></div>
+        <h4 style="margin-bottom:0.5rem;">Add User</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;max-width:600px;">
+          <input id="new-user-email" type="email" placeholder="Email" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+          <input id="new-user-password" type="password" placeholder="Password" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
+          <select id="new-user-role" style="padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="admin">Admin</option><option value="user">User</option><option value="readonly">Read Only</option><option value="designer">Designer</option></select>
+        </div>
+        <button onclick="addTenantUser()" style="margin-top:8px;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Add User</button>
+      </div>
+
+      <div id="set-pane-personas" style="display:none;">
+        <h3 style="margin-bottom:1rem;">Email Personas</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:800px;">
+          <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
+            <h4 style="margin-bottom:1rem;">📧 Sarah Lindburg — Sourcing</h4>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-sarah-name" type="text" value="Sarah Lindburg" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+              <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-sarah-email" type="text" value="sourcing@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+              <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-sarah-title" type="text" value="Sourcing Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+            </div>
+          </div>
+          <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
+            <h4 style="margin-bottom:1rem;">📋 Tyler Durden — Compliance</h4>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-tyler-name" type="text" value="Tyler Durden" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+              <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-tyler-email" type="text" value="compliance@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+              <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-tyler-title" type="text" value="Compliance Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
+            </div>
+          </div>
+        </div>
+        <button onclick="savePersonas()" style="margin-top:1.5rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Personas</button>
+      </div>
+
+      <div id="set-pane-prefs" style="display:none;">
+        <h3 style="margin-bottom:1rem;">Portal Preferences</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:500px;">
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Default Language</label>
+            <select id="pref-lang" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="en">English</option><option value="zh">Mandarin</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option></select></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Timezone</label>
+            <select id="pref-tz" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="America/New_York">Eastern (NYC)</option><option value="America/Los_Angeles">Pacific (LA)</option><option value="Asia/Shanghai">China (Shanghai)</option><option value="Asia/Tokyo">Japan (Tokyo)</option></select></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Dark Mode Default</label>
+            <select id="pref-dark" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="false">Light</option><option value="true">Dark</option></select></div>
+          <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Date Format</label>
+            <select id="pref-date" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
+        </div>
+        <button onclick="savePrefs()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Preferences</button>
+      </div>
+    </div>
+
     <div class="panel" id="panel-inspections">
       <iframe data-src="inspections.html?embed=1#psi" style="width:100%;height:calc(100vh - 64px);border:none;background:transparent;"></iframe>
     </div>
@@ -2277,89 +2361,6 @@
       </div>
     </div>
 
-<div id="panel-settings" class="panel" style="padding:2rem;max-width:960px;">
-  <h2 style="margin-bottom:1.5rem;">⚙️ Settings</h2>
-  <div id="settings-tabs" style="display:flex;gap:0;margin-bottom:2rem;border-bottom:2px solid #e0e0d8;">
-    <button onclick="setTab('company')" id="set-tab-company" style="padding:10px 20px;border:none;border-bottom:3px solid #1a2e44;background:none;cursor:pointer;font-weight:700;color:#1a2e44;margin-bottom:-2px;">🏢 Company Info</button>
-    <button onclick="setTab('apikeys')" id="set-tab-apikeys" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🔑 API Keys</button>
-    <button onclick="setTab('users')" id="set-tab-users" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">👥 Users</button>
-    <button onclick="setTab('personas')" id="set-tab-personas" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">📧 Email Personas</button>
-    <button onclick="setTab('prefs')" id="set-tab-prefs" style="padding:10px 20px;border:none;border-bottom:3px solid transparent;background:none;cursor:pointer;color:#666;">🎛️ Preferences</button>
-  </div>
-
-  <div id="set-pane-company">
-    <h3 style="margin-bottom:1rem;">Company Information</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:600px;">
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Company Name</label><input id="ci-name" type="text" value="TBG Sourcing Inc." style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">EIN</label><input id="ci-ein" type="text" value="42-2911499" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Address</label><input id="ci-address" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">City, State, ZIP</label><input id="ci-city" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Phone</label><input id="ci-phone" type="text" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Website</label><input id="ci-website" type="text" value="tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>
-    </div>
-    <button onclick="saveCompanyInfo()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Company Info</button>
-  </div>
-
-  <div id="set-pane-apikeys" style="display:none;">
-    <h3 style="margin-bottom:1rem;">API Keys</h3>
-    <p style="color:#666;margin-bottom:1rem;font-size:0.9rem;">API keys are managed in Vercel environment variables. Values shown are masked for security.</p>
-    <div style="display:flex;flex-direction:column;gap:12px;max-width:600px;">
-      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Anthropic API Key</span><span style="font-family:monospace;color:#666;">sk-ant-••••••••••••••••••last4</span></div>
-      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">SendGrid API Key</span><span style="font-family:monospace;color:#666;">SG.••••••••••••••••••last4</span></div>
-      <div style="padding:12px;border:1px solid #e0e0d8;border-radius:8px;display:flex;justify-content:space-between;align-items:center;"><span style="font-weight:600;">Supabase URL</span><span style="font-family:monospace;color:#666;">https://mjkjubctswjwjihxjpnd.supabase.co</span></div>
-    </div>
-  </div>
-
-  <div id="set-pane-users" style="display:none;">
-    <h3 style="margin-bottom:1rem;">User Management</h3>
-    <div id="users-list" style="margin-bottom:1.5rem;"></div>
-    <h4 style="margin-bottom:0.5rem;">Add User</h4>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;max-width:600px;">
-      <input id="new-user-email" type="email" placeholder="Email" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
-      <input id="new-user-password" type="password" placeholder="Password" style="padding:8px;border:1px solid #ddd;border-radius:6px;">
-      <select id="new-user-role" style="padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="admin">Admin</option><option value="user">User</option><option value="readonly">Read Only</option><option value="designer">Designer</option></select>
-    </div>
-    <button onclick="addTenantUser()" style="margin-top:8px;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Add User</button>
-  </div>
-
-  <div id="set-pane-personas" style="display:none;">
-    <h3 style="margin-bottom:1rem;">Email Personas</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:800px;">
-      <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
-        <h4 style="margin-bottom:1rem;">📧 Sarah Lindburg — Sourcing</h4>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-sarah-name" type="text" value="Sarah Lindburg" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-          <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-sarah-email" type="text" value="sourcing@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-          <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-sarah-title" type="text" value="Sourcing Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-        </div>
-      </div>
-      <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
-        <h4 style="margin-bottom:1rem;">📋 Tyler Durden — Compliance</h4>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-tyler-name" type="text" value="Tyler Durden" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-          <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-tyler-email" type="text" value="compliance@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-          <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-tyler-title" type="text" value="Compliance Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-        </div>
-      </div>
-    </div>
-    <button onclick="savePersonas()" style="margin-top:1.5rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Personas</button>
-  </div>
-
-  <div id="set-pane-prefs" style="display:none;">
-    <h3 style="margin-bottom:1rem;">Portal Preferences</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;max-width:500px;">
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Default Language</label>
-        <select id="pref-lang" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="en">English</option><option value="zh">Mandarin</option><option value="ja">Japanese</option><option value="ko">Korean</option><option value="de">German</option><option value="fr">French</option><option value="es">Spanish</option></select></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Timezone</label>
-        <select id="pref-tz" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="America/New_York">Eastern (NYC)</option><option value="America/Los_Angeles">Pacific (LA)</option><option value="Asia/Shanghai">China (Shanghai)</option><option value="Asia/Tokyo">Japan (Tokyo)</option></select></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Dark Mode Default</label>
-        <select id="pref-dark" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="false">Light</option><option value="true">Dark</option></select></div>
-      <div><label style="display:block;margin-bottom:4px;font-size:0.85rem;color:#666;">Date Format</label>
-        <select id="pref-date" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="DD/MM/YYYY">DD/MM/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
-    </div>
-    <button onclick="savePrefs()" style="margin-top:1rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Preferences</button>
-  </div>
-</div>
   </div>
 </div>
 
