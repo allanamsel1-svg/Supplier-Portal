@@ -88,6 +88,7 @@
 <script src="tenant-shared.js"></script>
 <script>
 var ME = null;
+var isAdminViewing = false;
 function tok(){return localStorage.getItem('tenant_token');}
 function g(id){return document.getElementById(id);}
 function awHeaders(rep){return {apikey:SUPA_KEY,Authorization:'Bearer '+SUPA_KEY,'Content-Type':'application/json',Prefer:rep?'return=representation':'return=minimal'};}
@@ -106,6 +107,11 @@ function pkgList(p){
 function chips(arr){return (arr||[]).map(function(t){var label=(t&&typeof t==='object')?(t.name||''):t;return label?'<span class="chip pk">'+esc(label)+'</span>':'';}).join('');}
 
 async function validateMe(){
+  // Admin override: a TBG admin session grants full designer-portal access with no separate login.
+  if(localStorage.getItem('admin_session')){
+    isAdminViewing=true;
+    return {full_name:'TBG Admin (viewing)',email:'',role:'designer',tenant_id:null};
+  }
   if(!tok()){location.href='designer-login.html';return null;}
   try{
     var r=await fetch('/api/tenant-auth?action=validate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok()}});
