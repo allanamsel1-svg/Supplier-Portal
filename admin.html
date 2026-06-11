@@ -15107,8 +15107,9 @@ function loadPersonas(){
   if(ev)ev.style.display='none'; if(lv)lv.style.display='block';
   var box=document.getElementById('personas-list'); if(box)box.innerHTML='<div style="color:#999;font-size:0.85rem;">Loading…</div>';
   fetch(SUPA+'/rest/v1/personas?select=*&order=created_at',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}})
-  .then(function(r){return r.ok?r.json():[];}).then(function(rows){_personas=Array.isArray(rows)?rows:[];renderPersonaCards();})
-  .catch(function(){ if(box)box.innerHTML='<div style="color:#b00;font-size:0.85rem;">Could not load personas.</div>'; });
+  .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(function(rows){_personas=Array.isArray(rows)?rows:[];renderPersonaCards();})
+  .catch(function(e){ if(box)box.innerHTML='<div style="color:#b00;font-size:0.85rem;">Could not load personas: '+pEsc(e&&e.message||'error')+'</div>'; });
 }
 function renderPersonaCards(){
   var box=document.getElementById('personas-list'); if(!box)return;
