@@ -63,7 +63,7 @@
       { icon: '📦', label: 'SKU Library',     href: 'tenant-rfq.html#skus' },
       { icon: '⚙', label: 'SKU Setup', href: 'tenant-rfq.html#skusetup' },
     ]},
-    { section: 'System', items: [
+    { section: 'Tools', items: [
       { icon: '⚙️', label: 'Setup', href: '/setup.html' },
       { icon: '🏆', label: 'Competitor Analysis', href: '/competitor-analysis.html', sub: true },
     ]},
