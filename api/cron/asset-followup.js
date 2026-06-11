@@ -14,6 +14,8 @@ export const maxDuration = 60;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mjkjubctswjwjihxjpnd.supabase.co';
 const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 const SG_KEY = process.env.SENDGRID_API_KEY;
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+const AI_MODEL = process.env.SARAH_CRON_MODEL || 'claude-sonnet-4-6';
 
 const FROM_EMAIL = 'sourcing@tbgsourcing.net';
 const FROM_NAME = 'Sarah Lindburg';
@@ -110,6 +112,101 @@ async function raiseActionItem(ap, days, missing) {
   }
 }
 
+// Draft ONE consolidated email (as Sarah) covering all of a factory's open action items.
+// Uses the Anthropic API directly; falls back to a plain template if AI is unavailable.
+async function draftConsolidatedEmail(factoryName, items) {
+  const itemsText = items
+    .map(it => `- ${it.title}${it.description ? ': ' + it.description : ''}`)
+    .join('\n');
+  const system =
+    'You are Sarah Lindburg, Sourcing Manager at TBG Sourcing. Write a single professional email ' +
+    'that naturally covers all open items for this factory. Do not use bullet point lists of issues — ' +
+    'weave them into natural paragraphs. Be warm but direct. Never mention AI. Sign as Sarah Lindburg, ' +
+    'Sourcing Manager, TBG Sourcing.';
+  const user =
+    `Factory: ${factoryName}. Open items to address:\n${itemsText}\n\n` +
+    'Write one email covering all of these naturally.';
+
+  if (ANTHROPIC_KEY) {
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': ANTHROPIC_KEY, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: AI_MODEL, max_tokens: 800, system, messages: [{ role: 'user', content: user }] })
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const text = (d && d.content && d.content[0] && d.content[0].text || '').trim();
+        if (text) return text;
+      } else {
+        console.error('anthropic draft failed', r.status, await r.text().catch(() => ''));
+      }
+    } catch (e) { console.error('anthropic draft error', e.message); }
+  }
+
+  // Fallback when AI is unavailable — still a single, natural paragraph (no bullet list of issues).
+  const summary = items.map(it => it.title).filter(Boolean).join('; ');
+  return `Hi ${factoryName} team,\n\n` +
+    `I wanted to check in on a few open items on our side${summary ? ' — ' + summary : ''}. ` +
+    `When you have a moment, could you help us close these out so we can keep everything moving? ` +
+    `Just reply to this email with any updates or questions and I'll take it from there.\n\n` +
+    `Best regards,\nSarah Lindburg\nSourcing Manager, TBG Sourcing\n${FROM_EMAIL}`;
+}
+
+// Consolidated factory follow-up: one email per factory covering all of its open
+// tenant_action_items that are due now (or by tomorrow). Returns summary stats.
+async function consolidatedFactoryFollowUp() {
+  let emailed = 0, factoriesProcessed = 0;
+  const results = [];
+  // due_date <= CURRENT_DATE + 1  (tomorrow, as a date); NULL due_dates are excluded by lte.
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const openItems = await sbGet(
+    `tenant_action_items?status=eq.open&due_date=lte.${tomorrow}&reference_id=not.is.null` +
+    `&select=id,tenant_id,reference_id,title,description,reminder_count&order=reference_id`
+  );
+
+  // Group by reference_id (factory_id).
+  const byFactory = {};
+  for (const it of (Array.isArray(openItems) ? openItems : [])) {
+    (byFactory[it.reference_id] = byFactory[it.reference_id] || []).push(it);
+  }
+  const factoryIds = Object.keys(byFactory);
+  if (!factoryIds.length) return { considered: 0, emailed, factoriesProcessed, results };
+
+  // Resolve which reference_ids are real factories (skip ids that aren't, e.g. artwork projects).
+  const facRows = await sbGet(`factories?id=in.(${factoryIds.join(',')})&select=id,factory_name_english,sales_email,sales_contact_name`);
+  const facMap = {};
+  for (const f of (Array.isArray(facRows) ? facRows : [])) facMap[f.id] = f;
+
+  for (const fid of factoryIds) {
+    const items = byFactory[fid];
+    const fac = facMap[fid];
+    if (!fac) { results.push({ factory_id: fid, items: items.length, skipped: 'not a factory' }); continue; }
+    if (!fac.sales_email) { results.push({ factory_id: fid, items: items.length, skipped: 'no email' }); continue; }
+
+    const factoryName = fac.factory_name_english || 'team';
+    const body = await draftConsolidatedEmail(factoryName, items);
+    const subject = `Following up on open items — ${factoryName}`;
+    const send = await sendEmail(fac.sales_email, fac.sales_contact_name || 'Team', subject, body);
+    factoriesProcessed++;
+
+    if (send.ok) {
+      emailed++;
+      const tenantId = (items.find(i => i.tenant_id) || {}).tenant_id || null;
+      await logToInbox(send, fid, tenantId);
+      // Bump reminder_count + last_reminded_at for every item in this batch.
+      const nowIso = new Date().toISOString();
+      for (const it of items) {
+        await sbPatch(`tenant_action_items?id=eq.${it.id}`, {
+          reminder_count: (it.reminder_count || 0) + 1, last_reminded_at: nowIso
+        });
+      }
+    }
+    results.push({ factory_id: fid, factory: factoryName, items: items.length, sent: send.ok, error: send.error || null });
+  }
+  return { considered: factoryIds.length, emailed, factoriesProcessed, results };
+}
+
 export default async function handler(req, res) {
   if (!SB_KEY) return res.status(500).json({ ok: false, error: 'SUPABASE service key not set' });
   try {
@@ -154,7 +251,18 @@ export default async function handler(req, res) {
       results.push({ id: ap.id, product: productName, days, missing: missing.length, sent: send.ok, error: send.error || null });
     }
 
-    return res.status(200).json({ ok: true, considered: (projects || []).length, emailed, skipped, results });
+    // ── Consolidated factory follow-up from open tenant_action_items ──
+    let consolidated = { considered: 0, emailed: 0, factoriesProcessed: 0, results: [] };
+    try {
+      consolidated = await consolidatedFactoryFollowUp();
+    } catch (e) {
+      console.error('consolidatedFactoryFollowUp error', e.message);
+    }
+
+    return res.status(200).json({
+      ok: true, considered: (projects || []).length, emailed, skipped, results,
+      consolidated
+    });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
