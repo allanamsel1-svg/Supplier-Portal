@@ -869,26 +869,14 @@
       </div>
 
       <div id="set-pane-personas" style="display:none;">
-        <h3 style="margin-bottom:1rem;">Email Personas</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;max-width:800px;">
-          <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
-            <h4 style="margin-bottom:1rem;">📧 Sarah Lindburg — Sourcing</h4>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-sarah-name" type="text" value="Sarah Lindburg" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-              <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-sarah-email" type="text" value="sourcing@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-              <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-sarah-title" type="text" value="Sourcing Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-            </div>
+        <div id="personas-list-view">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <h3 style="margin:0;">Email Personas</h3>
+            <button onclick="addPersona()" style="padding:8px 18px;background:#1a7a1a;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">+ Add Persona</button>
           </div>
-          <div style="padding:1.5rem;border:1px solid #e0e0d8;border-radius:8px;">
-            <h4 style="margin-bottom:1rem;">📋 Tyler Durden — Compliance</h4>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div><label style="font-size:0.85rem;color:#666;">Display Name</label><input id="per-tyler-name" type="text" value="Tyler Durden" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-              <div><label style="font-size:0.85rem;color:#666;">Email</label><input id="per-tyler-email" type="text" value="compliance@tbgsourcing.net" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-              <div><label style="font-size:0.85rem;color:#666;">Title</label><input id="per-tyler-title" type="text" value="Compliance Manager, TBG Sourcing" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;margin-top:4px;"></div>
-            </div>
-          </div>
+          <div id="personas-list"><div style="color:#999;font-size:0.85rem;">Loading…</div></div>
         </div>
-        <button onclick="savePersonas()" style="margin-top:1.5rem;padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Personas</button>
+        <div id="persona-edit-view" style="display:none;"></div>
       </div>
 
       <div id="set-pane-prefs" style="display:none;">
@@ -15048,6 +15036,7 @@ function setTab(name){
     if(pn)pn.style.display=t===name?'block':'none';
   });
   if(name==='users') loadUsersList();
+  if(name==='personas') loadPersonas();
 }
 
 // company_settings upsert on the UNIQUE key column (key/value JSON store).
@@ -15069,8 +15058,6 @@ async function loadSettings(){
     var cs={};(rows||[]).forEach(function(row){try{cs[row.key]=row.value?JSON.parse(row.value):null;}catch(e){cs[row.key]=row.value;}});
     var ci=cs.company_info||{};
     _setVal('ci-name',ci.company_name);_setVal('ci-ein',ci.ein);_setVal('ci-address',ci.address);_setVal('ci-city',ci.city);_setVal('ci-phone',ci.phone);_setVal('ci-website',ci.website);
-    var ps=cs.persona_sarah||{};_setVal('per-sarah-name',ps.name);_setVal('per-sarah-email',ps.email);_setVal('per-sarah-title',ps.title);
-    var pt=cs.persona_tyler||{};_setVal('per-tyler-name',pt.name);_setVal('per-tyler-email',pt.email);_setVal('per-tyler-title',pt.title);
     var pp=cs.portal_prefs||{};_setVal('pref-lang',pp.lang);_setVal('pref-tz',pp.tz);_setVal('pref-dark',pp.dark);_setVal('pref-date',pp.date);
   }catch(e){
     // Swallow the error — show a notice in the panel, never redirect/logout.
@@ -15100,10 +15087,127 @@ function saveCompanyInfo(){
   var data={company_name:document.getElementById('ci-name').value,ein:document.getElementById('ci-ein').value,address:document.getElementById('ci-address').value,city:document.getElementById('ci-city').value,phone:document.getElementById('ci-phone').value,website:document.getElementById('ci-website').value};
   _csUpsert('company_info',data).then(function(r){toast(r.ok?'Company info saved':'Save failed');});
 }
-function savePersonas(){
-  var sarah={name:document.getElementById('per-sarah-name').value,email:document.getElementById('per-sarah-email').value,title:document.getElementById('per-sarah-title').value};
-  var tyler={name:document.getElementById('per-tyler-name').value,email:document.getElementById('per-tyler-email').value,title:document.getElementById('per-tyler-title').value};
-  Promise.all([_csUpsert('persona_sarah',sarah),_csUpsert('persona_tyler',tyler)]).then(function(){toast('Personas saved');});
+// ════════════════════════════════════════════════════════════════════
+// PERSONA MANAGEMENT (Settings → Email Personas tab)
+// Full CRUD against the `personas` table (anon key). Array columns:
+// specialties, languages, hobbies, core_traits.
+// ════════════════════════════════════════════════════════════════════
+var _personas=[];
+var _editingPersonaId=null;
+var PERSONA_ROLES=['sourcing','compliance','sales','graphics','accounting','logistics'];
+function pEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function _paArr(a){return Array.isArray(a)?a.join(', '):(a==null?'':String(a));}
+function _paStr(s){return String(s||'').split(',').map(function(x){return x.trim();}).filter(Boolean);}
+function _paField(label,id,val,type){return '<div style="margin-bottom:10px;"><label style="display:block;font-size:0.8rem;color:#666;margin-bottom:3px;">'+pEsc(label)+'</label><input id="'+id+'" type="'+(type||'text')+'" value="'+pEsc(val)+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;"></div>';}
+function _paTa(label,id,val,rows){return '<div style="margin-bottom:10px;"><label style="display:block;font-size:0.8rem;color:#666;margin-bottom:3px;">'+pEsc(label)+'</label><textarea id="'+id+'" rows="'+(rows||3)+'" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;">'+pEsc(val)+'</textarea></div>';}
+function _paSection(t){return '<h4 style="margin:1.25rem 0 0.6rem;padding-bottom:4px;border-bottom:1px solid #e0e0d8;color:#1a2e44;">'+pEsc(t)+'</h4>';}
+
+function loadPersonas(){
+  var lv=document.getElementById('personas-list-view'),ev=document.getElementById('persona-edit-view');
+  if(ev)ev.style.display='none'; if(lv)lv.style.display='block';
+  var box=document.getElementById('personas-list'); if(box)box.innerHTML='<div style="color:#999;font-size:0.85rem;">Loading…</div>';
+  fetch(SUPA+'/rest/v1/personas?select=*&order=created_at',{headers:{'apikey':ANON,'Authorization':'Bearer '+ANON}})
+  .then(function(r){return r.ok?r.json():[];}).then(function(rows){_personas=Array.isArray(rows)?rows:[];renderPersonaCards();})
+  .catch(function(){ if(box)box.innerHTML='<div style="color:#b00;font-size:0.85rem;">Could not load personas.</div>'; });
+}
+function renderPersonaCards(){
+  var box=document.getElementById('personas-list'); if(!box)return;
+  if(!_personas.length){box.innerHTML='<div style="color:#999;font-size:0.85rem;">No personas yet. Click “+ Add Persona”.</div>';return;}
+  box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">'+_personas.map(function(p){
+    var badge=p.is_virtual?'<span style="background:#eef2ff;color:#3344aa;padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:600;">Virtual</span>':'<span style="background:#e8f4e8;color:#2d7a2d;padding:2px 8px;border-radius:12px;font-size:0.72rem;font-weight:600;">Real</span>';
+    var inactive=p.is_active===false?'<span style="margin-left:6px;color:#b00;font-size:0.72rem;">Inactive</span>':'';
+    return '<div onclick="editPersona(\''+p.id+'\')" style="padding:14px;border:1px solid #e0e0d8;border-radius:8px;cursor:pointer;background:#fff;">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><strong style="font-size:1rem;">'+pEsc(p.name||'Unnamed')+'</strong>'+badge+'</div>'+
+      '<div style="font-size:0.85rem;color:#666;margin-top:3px;">'+pEsc(p.title||'—')+'</div>'+
+      '<div style="font-size:0.8rem;color:#888;margin-top:6px;">'+pEsc(p.department||'—')+' · '+pEsc(p.email||'—')+inactive+'</div>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+function editPersona(id){
+  var p=_personas.find(function(x){return x.id===id;}); if(!p)return;
+  _editingPersonaId=id;
+  var roleOpts=PERSONA_ROLES.map(function(r){return '<option value="'+r+'"'+(p.role===r?' selected':'')+'>'+r+'</option>';}).join('');
+  var grid='display:grid;grid-template-columns:1fr 1fr;gap:0 16px;';
+  var html=
+    '<button onclick="loadPersonas()" style="margin-bottom:12px;padding:6px 14px;background:#f5f5f0;border:1px solid #e0e0d8;border-radius:6px;cursor:pointer;">← Back to list</button>'+
+    '<h3 style="margin-bottom:0.5rem;">'+pEsc(p.name||'Persona')+'</h3>'+
+    _paSection('1 · Identity')+
+    '<div style="'+grid+'">'+_paField('Name','pf-name',p.name)+_paField('Title','pf-title',p.title)+_paField('Department','pf-department',p.department)+_paField('Email','pf-email',p.email)+_paField('Phone','pf-phone',p.phone)+
+      '<div style="margin-bottom:10px;"><label style="display:block;font-size:0.8rem;color:#666;margin-bottom:3px;">Role</label><select id="pf-role" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;">'+roleOpts+'</select></div></div>'+
+    '<div style="display:flex;gap:24px;margin:4px 0 4px;">'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;cursor:pointer;"><input type="checkbox" id="pf-is_virtual"'+(p.is_virtual?' checked':'')+'> Is Virtual</label>'+
+      '<label style="display:flex;align-items:center;gap:6px;font-size:0.9rem;cursor:pointer;"><input type="checkbox" id="pf-is_active"'+(p.is_active!==false?' checked':'')+'> Is Active</label></div>'+
+    _paSection('2 · Professional Background')+
+    '<div style="'+grid+'">'+_paField('Years Experience','pf-years_experience',p.years_experience,'number')+_paField('Specialties (comma-separated)','pf-specialties',_paArr(p.specialties))+_paField('Languages (comma-separated)','pf-languages',_paArr(p.languages))+_paField('Education','pf-education',p.education)+'</div>'+
+    _paTa('Previous Companies','pf-previous_companies',p.previous_companies,2)+
+    _paSection('3 · Personal Life')+
+    '<div style="'+grid+'">'+_paField('Age','pf-age',p.age,'number')+_paField('Hometown','pf-hometown',p.hometown)+_paField('Current City','pf-current_city',p.current_city)+_paField('Marital Status','pf-marital_status',p.marital_status)+_paField('Children','pf-children',p.children)+_paField('Hobbies (comma-separated)','pf-hobbies',_paArr(p.hobbies))+'</div>'+
+    _paTa('Travel Experience','pf-travel_experience',p.travel_experience,2)+_paTa('Fun Facts','pf-fun_facts',p.fun_facts,2)+
+    _paSection('4 · Personality')+
+    _paField('Core Traits (comma-separated)','pf-core_traits',_paArr(p.core_traits))+
+    _paTa('Communication Style','pf-communication_style',p.communication_style)+_paTa('What They Care About','pf-what_they_care_about',p.what_they_care_about)+_paTa('Pet Peeves','pf-pet_peeves',p.pet_peeves)+_paTa('Sense of Humor','pf-sense_of_humor',p.sense_of_humor)+
+    _paSection('5 · AI Behavior Rules')+
+    _paTa('Phrases to Use','pf-phrases_to_use',p.phrases_to_use)+_paTa('Phrases to Avoid','pf-phrases_to_avoid',p.phrases_to_avoid)+_paTa('How Handles Conflict','pf-how_handles_conflict',p.how_handles_conflict)+_paTa('How Follows Up','pf-how_follows_up',p.how_follows_up)+_paTa('Factory Relationship Style','pf-factory_relationship_style',p.factory_relationship_style)+
+    _paSection('6 · Output')+
+    _paTa('Email Signature','pf-email_signature',p.email_signature,3)+
+    '<div style="margin-bottom:10px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;gap:8px;flex-wrap:wrap;"><label style="font-size:0.8rem;color:#666;">AI System Prompt</label><button onclick="generatePersonaPrompt()" id="pf-genbtn" style="padding:5px 12px;background:#5a2db8;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.8rem;">✦ Generate AI System Prompt</button></div><textarea id="pf-ai_system_prompt" rows="10" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:0.78rem;resize:vertical;">'+pEsc(p.ai_system_prompt)+'</textarea></div>'+
+    '<div style="margin-top:1rem;"><button onclick="savePersona()" style="padding:10px 24px;background:#1a2e44;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Save Persona</button></div>';
+  var ev=document.getElementById('persona-edit-view'); if(ev){ev.innerHTML=html;ev.style.display='block';}
+  var lv=document.getElementById('personas-list-view'); if(lv)lv.style.display='none';
+}
+function _pfVal(id){var el=document.getElementById(id);return el?el.value.trim():'';}
+function _pfNum(id){var v=_pfVal(id);return v===''?null:Number(v);}
+function _pfChk(id){var el=document.getElementById(id);return !!(el&&el.checked);}
+function _personaPayload(){
+  return {
+    name:_pfVal('pf-name'),title:_pfVal('pf-title'),department:_pfVal('pf-department'),email:_pfVal('pf-email'),phone:_pfVal('pf-phone'),role:_pfVal('pf-role'),
+    is_virtual:_pfChk('pf-is_virtual'),is_active:_pfChk('pf-is_active'),
+    years_experience:_pfNum('pf-years_experience'),specialties:_paStr(_pfVal('pf-specialties')),languages:_paStr(_pfVal('pf-languages')),education:_pfVal('pf-education'),previous_companies:_pfVal('pf-previous_companies'),
+    age:_pfNum('pf-age'),hometown:_pfVal('pf-hometown'),current_city:_pfVal('pf-current_city'),marital_status:_pfVal('pf-marital_status'),children:_pfVal('pf-children'),hobbies:_paStr(_pfVal('pf-hobbies')),travel_experience:_pfVal('pf-travel_experience'),fun_facts:_pfVal('pf-fun_facts'),
+    core_traits:_paStr(_pfVal('pf-core_traits')),communication_style:_pfVal('pf-communication_style'),what_they_care_about:_pfVal('pf-what_they_care_about'),pet_peeves:_pfVal('pf-pet_peeves'),sense_of_humor:_pfVal('pf-sense_of_humor'),
+    phrases_to_use:_pfVal('pf-phrases_to_use'),phrases_to_avoid:_pfVal('pf-phrases_to_avoid'),how_handles_conflict:_pfVal('pf-how_handles_conflict'),how_follows_up:_pfVal('pf-how_follows_up'),factory_relationship_style:_pfVal('pf-factory_relationship_style'),
+    email_signature:_pfVal('pf-email_signature'),ai_system_prompt:_pfVal('pf-ai_system_prompt'),
+    updated_at:new Date().toISOString()
+  };
+}
+function savePersona(){
+  if(!_editingPersonaId){toast('No persona selected');return;}
+  var payload=_personaPayload();
+  fetch(SUPA+'/rest/v1/personas?id=eq.'+_editingPersonaId,{method:'PATCH',headers:{'apikey':ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(payload)})
+  .then(function(r){ if(r.ok){toast('Persona saved'); var i=_personas.findIndex(function(x){return x.id===_editingPersonaId;}); if(i>=0)_personas[i]=Object.assign({},_personas[i],payload,{id:_editingPersonaId}); } else toast('Save failed ('+r.status+')'); })
+  .catch(function(e){toast('Error: '+e.message);});
+}
+function addPersona(){
+  fetch(SUPA+'/rest/v1/personas',{method:'POST',headers:{'apikey':ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify({name:'New Persona',is_virtual:true,is_active:true})})
+  .then(function(r){return r.ok?r.json():null;}).then(function(rows){
+    var p=Array.isArray(rows)?rows[0]:rows; if(!p){toast('Could not create persona');return;}
+    _personas.push(p); editPersona(p.id);
+  }).catch(function(e){toast('Error: '+e.message);});
+}
+function generatePersonaPrompt(){
+  var apiKey=localStorage.getItem('anthropic_key')||'';
+  if(!apiKey){toast('Set your Anthropic API key in Settings → API Keys first.');return;}
+  var btn=document.getElementById('pf-genbtn'); var orig=btn?btn.textContent:''; if(btn){btn.disabled=true;btn.textContent='Generating…';}
+  var p=_personaPayload();
+  var profile=
+    'Name: '+p.name+'\nTitle: '+p.title+'\nDepartment: '+p.department+'\nRole: '+p.role+'\nEmail: '+p.email+'\nPhone: '+p.phone+
+    '\nVirtual: '+p.is_virtual+'\nYears experience: '+(p.years_experience||'')+'\nSpecialties: '+p.specialties.join(', ')+'\nLanguages: '+p.languages.join(', ')+
+    '\nEducation: '+p.education+'\nPrevious companies: '+p.previous_companies+
+    '\nAge: '+(p.age||'')+'\nHometown: '+p.hometown+'\nCurrent city: '+p.current_city+'\nMarital status: '+p.marital_status+'\nChildren: '+p.children+
+    '\nHobbies: '+p.hobbies.join(', ')+'\nTravel experience: '+p.travel_experience+'\nFun facts: '+p.fun_facts+
+    '\nCore traits: '+p.core_traits.join(', ')+'\nCommunication style: '+p.communication_style+'\nWhat they care about: '+p.what_they_care_about+'\nPet peeves: '+p.pet_peeves+'\nSense of humor: '+p.sense_of_humor+
+    '\nPhrases to use: '+p.phrases_to_use+'\nPhrases to avoid: '+p.phrases_to_avoid+'\nHow handles conflict: '+p.how_handles_conflict+'\nHow follows up: '+p.how_follows_up+'\nFactory relationship style: '+p.factory_relationship_style+
+    '\nEmail signature: '+p.email_signature;
+  var prompt='Using the profile below, write a comprehensive AI system prompt that instructs an AI to write emails AS this person. Capture their voice, professional background, personality, communication style, behavioral rules, and signature so the output is indistinguishable from how they would write. Output ONLY the system prompt text, with no preamble or commentary.\n\nPROFILE:\n'+profile;
+  fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1500,messages:[{role:'user',content:prompt}]})})
+  .then(function(r){return r.json();}).then(function(d){
+    var text=(d&&d.content&&d.content[0]&&d.content[0].text||'').trim();
+    if(!text){toast('Generation failed.');return;}
+    var ta=document.getElementById('pf-ai_system_prompt'); if(ta)ta.value=text;
+    if(_editingPersonaId){ fetch(SUPA+'/rest/v1/personas?id=eq.'+_editingPersonaId,{method:'PATCH',headers:{'apikey':ANON,'Authorization':'Bearer '+ANON,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({ai_system_prompt:text,updated_at:new Date().toISOString()})}); }
+    toast('AI system prompt generated & saved.');
+  }).catch(function(e){toast('Error: '+e.message);})
+  .finally(function(){ if(btn){btn.disabled=false;btn.textContent=orig;} });
 }
 function savePrefs(){
   var prefs={lang:document.getElementById('pref-lang').value,tz:document.getElementById('pref-tz').value,dark:document.getElementById('pref-dark').value,date:document.getElementById('pref-date').value};
