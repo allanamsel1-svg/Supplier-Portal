@@ -157,6 +157,9 @@ function queueCard(p){
       // BUG 2: factory-supplied assets (artwork_assets), loaded lazily on first open.
       '<div class="assets-heading">Assets</div>'+
       '<div class="assets-list" id="assets-'+p.id+'"><div class="loading">Loading assets…</div></div>'+
+      // Read-only review comments from the artwork-review tool (latest version).
+      '<div class="assets-heading">Review Comments</div>'+
+      '<div class="comments-list" id="comments-'+p.id+'"><div class="loading">Loading comments…</div></div>'+
       '<div class="dropzone" id="dz-'+p.id+'" onclick="g(\'awfile-'+p.id+'\').click()">📤 Drag &amp; drop, click, or paste artwork (PDF, AI, JPG, PNG, ZIP)</div>'+
       '<div class="upmsg" id="upmsg-'+p.id+'"></div>'+
     '</div>'+
@@ -169,6 +172,30 @@ function toggleBrief(id){
   b.classList.toggle('open');
   // Load the related artwork_assets the first time the brief is expanded.
   if(opening && b.dataset.assetsLoaded!=='1') loadAssets(id);
+  if(opening && b.dataset.commentsLoaded!=='1') loadComments(id);
+}
+
+// Read-only: show the latest version's review comments (open = red dot, resolved = green check).
+async function loadComments(projectId){
+  var el=g('comments-'+projectId);
+  if(!el)return;
+  var b=g('brief-'+projectId);
+  if(b)b.dataset.commentsLoaded='1';
+  try{
+    var vrows=await supa('artwork_versions?artwork_project_id=eq.'+projectId+'&select=id&order=version_number.desc&limit=1');
+    var vid=vrows&&vrows[0]&&vrows[0].id;
+    if(!vid){ el.innerHTML='<div class="empty">No artwork version yet.</div>'; return; }
+    var rows=await supa('artwork_comments?version_id=eq.'+vid+'&select=page_number,comment_text,status&order=page_number.asc,created_at.asc');
+    if(!rows||!rows.length){ el.innerHTML='<div class="empty">No review comments yet.</div>'; return; }
+    el.innerHTML=rows.map(function(c){
+      var resolved=(c.status==='resolved'||c.status==='wont_fix');
+      var mark=resolved?'<span style="color:#22c55e;">✓</span>':'<span style="color:#ef4444;">●</span>';
+      return '<div class="asset-row" style="'+(resolved?'opacity:.55;':'')+'"><span class="asset-file" style="display:flex;gap:8px;align-items:flex-start;">'+mark+'<span><strong>Page '+esc(c.page_number==null?'?':c.page_number)+':</strong> '+esc(c.comment_text||'')+'</span></span></div>';
+    }).join('');
+  }catch(e){
+    if(b)b.dataset.commentsLoaded='';  // allow retry on next open
+    el.innerHTML='<div class="empty">Could not load comments.</div>';
+  }
 }
 
 // BUG 2: list artwork_assets for a project, grouped by asset_type, with Download links.

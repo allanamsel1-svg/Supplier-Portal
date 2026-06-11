@@ -11368,6 +11368,13 @@ async function openPDDetail(pdId){
           }
           pdCurrentDetail._artworkProject=ap;
           if(Object.keys(_patchFill).length){ try{await fetch(SB+'/rest/v1/artwork_projects?id=eq.'+ap.id,{method:'PATCH',headers:{'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(_patchFill)});}catch(e){} }
+          // Latest artwork version → enables the "Review Artwork" button in the gates card.
+          pdCurrentDetail._latestArtworkVersion=null;
+          try{
+            var avR=await fetch(SB+'/rest/v1/artwork_versions?artwork_project_id=eq.'+ap.id+'&select=id,version_number,status,submitted_at,artwork_project_id&order=version_number.desc&limit=1',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
+            var avRows=avR.ok?await avR.json():[];
+            if(avRows&&avRows[0])pdCurrentDetail._latestArtworkVersion=avRows[0];
+          }catch(e){}
           var aaR=await fetch(SB+'/rest/v1/artwork_assets?artwork_project_id=eq.'+ap.id+'&select=asset_type,file_name,file_url&order=created_at.desc',{headers:{'apikey':KEY,'Authorization':'Bearer '+KEY}});
           pdCurrentDetail._artworkAssets=aaR.ok?await aaR.json():[];
           // Auto-tick the Assets gate if every required asset is already received.
@@ -12421,7 +12428,15 @@ function pdGatesCardHtml(){
       '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.derived?' <span style="font-weight:400;color:#999;font-size:10px;">— auto from uploaded items</span>':'')+'</span>'+
     '</label>';
     var action=(gt.notify)?'<button onclick="pdNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🎨 Notify Graphics Team</button>':'';
-    return '<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:6px;">'+label+action+'</div>';
+    var review='';
+    if(gt.notify){
+      var av=p._latestArtworkVersion;
+      if(av&&av.id){
+        review='<button onclick="window.open(\'/artwork-review.html?version_id='+av.id+'&project_id='+(av.artwork_project_id||'')+'\',\'_blank\')" title="Open the artwork annotation tool" style="flex:0 0 auto;padding:8px 12px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">📄 Review Artwork v'+esc(av.version_number)+'</button>';
+      }
+    }
+    return '<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:'+((gt.notify&&p._latestArtworkVersion)?'2px':'6px')+';">'+label+review+action+'</div>'+
+      ((gt.notify&&p._latestArtworkVersion)?'<div style="font-size:10px;color:#999;margin:0 0 8px 2px;">v'+esc(p._latestArtworkVersion.version_number)+' submitted '+esc((p._latestArtworkVersion.submitted_at||'').slice(0,10)||'—')+' — '+esc(p._latestArtworkVersion.status||'—')+'</div>':'');
   }).join('');
   return wrap(
     '<div style="margin-bottom:10px;font-size:11px;color:#888;">Gate status — updates automatically as data lands. The Live SKU is created automatically once all items are received.</div>'+

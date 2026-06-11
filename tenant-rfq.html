@@ -2384,7 +2384,7 @@ async function openPD(id) {
   const items = await supa(`product_development_items?product_development_id=eq.${id}&order=created_at.desc`);
 
   // ── Asset checklist: artwork_projects.assets_required (by pd_item_id = linked PDI id) ──
-  tAssetProject = null; tAssetAssets = []; tAssetPdItemId = null; tAssetFactory = {}; tAssetEditIndex = -1;
+  tAssetProject = null; tAssetAssets = []; tAssetPdItemId = null; tAssetFactory = {}; tAssetEditIndex = -1; tLatestArtworkVersion = null;
   try {
     const pdItemId = (items && items[0]) ? items[0].id : null;
     if (pdItemId) {
@@ -2409,6 +2409,9 @@ async function openPD(id) {
         }
         tAssetProject = ap;
         if (Object.keys(_patchFill).length) { try { await fetch(SUPA_URL + '/rest/v1/artwork_projects?id=eq.' + ap.id, { method: 'PATCH', headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(_patchFill) }); } catch (e) {} }
+        // Latest artwork version → enables the "Review Artwork" button in the gates section.
+        tLatestArtworkVersion = null;
+        try { const av = await supa('artwork_versions?artwork_project_id=eq.' + ap.id + '&select=id,version_number,status,submitted_at,artwork_project_id&order=version_number.desc&limit=1'); if (av && av[0]) tLatestArtworkVersion = av[0]; } catch (e) {}
         tAssetAssets = (await supa('artwork_assets?artwork_project_id=eq.' + ap.id + '&select=asset_type,file_name,file_url&order=created_at.desc')) || [];
         const fid = items[0].factory_id;
         if (fid) { const fr = await supa('factories?id=eq.' + fid + '&select=factory_name_english,sales_email,sales_contact_name&limit=1'); tAssetFactory = (fr && fr[0]) || {}; }
@@ -2471,7 +2474,7 @@ async function openPD(id) {
 // PD ASSET CHECKLIST — artwork_projects.assets_required ({name,received}[])
 // Mirrors admin.html. Surfaced on the tenant PD detail panel.
 // ════════════════════════════════════════════════════════════════════
-let tAssetProject = null, tAssetAssets = [], tAssetPdItemId = null, tAssetFactory = {}, tAssetEditIndex = -1;
+let tAssetProject = null, tAssetAssets = [], tAssetPdItemId = null, tAssetFactory = {}, tAssetEditIndex = -1, tLatestArtworkVersion = null;
 // Default checklist contents (pre-populated on load when the stored array is empty).
 const T_DIMS_DEFAULT = ['Unit dimensions confirmed (L/W/H/weight)', 'Inner carton dimensions confirmed (L/W/H/weight)', 'Master carton dimensions confirmed (L/W/H/weight/CBM)', 'Units per inner confirmed', 'Units per master confirmed', 'Pallet configuration confirmed'];
 const T_CERTS_DEFAULT = ['INCI List', 'Certificate of Analysis', 'GMP Certificate', 'Safety Assessment Report', 'California Prop 65 Statement'];
@@ -2639,7 +2642,13 @@ function pdActionSection(p) {
       <span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:${on ? '#22c55e' : 'var(--text,#e2e8f0)'};">${on ? '✓ ' : ''}${esc(gt.label)}${gt.derived ? ` <span style="font-weight:400;color:var(--text2,#94a3b8);font-size:10px;">— auto from uploaded items</span>` : ''}</span>
     </label>`;
     const action = (gt.notify) ? `<button onclick="tNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;">🎨 Notify Graphics Team</button>` : '';
-    return `<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:6px;">${label}${action}</div>`;
+    let review = '';
+    if (gt.notify && tLatestArtworkVersion && tLatestArtworkVersion.id) {
+      const av = tLatestArtworkVersion;
+      review = `<button onclick="window.open('/artwork-review.html?version_id=${av.id}&project_id=${av.artwork_project_id || ''}','_blank')" title="Open the artwork annotation tool" style="flex:0 0 auto;padding:8px 12px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;font-family:inherit;">📄 Review Artwork v${esc(av.version_number)}</button>`;
+    }
+    const hist = (gt.notify && tLatestArtworkVersion) ? `<div style="font-size:10px;color:var(--text2,#94a3b8);margin:0 0 8px 2px;">v${esc(tLatestArtworkVersion.version_number)} submitted ${esc((tLatestArtworkVersion.submitted_at || '').slice(0, 10) || '—')} — ${esc(tLatestArtworkVersion.status || '—')}</div>` : '';
+    return `<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:${(gt.notify && tLatestArtworkVersion) ? '2px' : '6px'};">${label}${review}${action}</div>${hist}`;
   }).join('');
   return `<div class="panel-section"><h3>Gates</h3><div style="margin-bottom:10px;font-size:11px;color:var(--text2,#94a3b8);">Gate status — updates automatically as data lands. The Live SKU is created automatically once all items are received.</div>${rows}</div>`;
 }

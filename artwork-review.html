@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<!-- POLICY: Never reference "Claude" or "Anthropic" in any user-facing text, labels, messages, or UI elements. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Artwork Review — TBG Sourcing Portal</title>
+<link rel="stylesheet" href="ri_shared.css" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  img, canvas, input, select, textarea { max-width: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a2e; min-height: 100vh; }
+  a { color: #2244cc; text-decoration: none; }
+
+  .topbar { height: 56px; background: #fff; border-bottom: 1px solid #e0e0d8; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 1.25rem; position: sticky; top: 0; z-index: 50; }
+  .tb-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .back-link { font-size: 13px; color: #888; white-space: nowrap; }
+  .back-link:hover { color: #1a1a2e; }
+  .tb-title { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tb-ver { font-size: 12px; color: #888; font-weight: 500; }
+  .tb-r { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .btn { padding: 8px 16px; border: none; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .btn-approve { background: #1a7a1a; color: #fff; }
+  .btn-approve:disabled { background: #cfe6cf; color: #fff; cursor: not-allowed; }
+  .btn-revision { background: #d97706; color: #fff; }
+
+  .layout { display: flex; gap: 0; align-items: flex-start; }
+  .viewer { flex: 0 0 70%; max-width: 70%; padding: 1.25rem; }
+  .panel { flex: 1; min-width: 0; border-left: 1px solid #e0e0d8; background: #fff; min-height: calc(100vh - 56px); }
+  @media(max-width: 1000px){ .layout { flex-direction: column; } .viewer, .panel { max-width: 100%; flex: 1 1 auto; width: 100%; } .panel { border-left: none; border-top: 1px solid #e0e0d8; } }
+
+  .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #fff; border: 1px solid #e0e0d8; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+  .tool-btn { padding: 6px 12px; border: 1px solid #e0e0d8; background: #fff; border-radius: 6px; font-size: 13px; cursor: pointer; font-family: inherit; color: #333; }
+  .tool-btn:hover { background: #f5f5f0; }
+  .tool-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .tool-info { font-size: 13px; color: #555; font-weight: 600; }
+  .tool-sep { width: 1px; height: 20px; background: #e0e0d8; }
+  .hint { font-size: 11px; color: #999; margin-left: auto; }
+
+  .canvas-shell { background: #525659; border-radius: 10px; padding: 24px; display: flex; justify-content: center; min-height: 300px; overflow: auto; }
+  .canvas-wrap { position: relative; line-height: 0; box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+  #pdf-canvas { display: block; background: #fff; }
+  .pin { position: absolute; width: 24px; height: 24px; border-radius: 50%; background: #ef4444; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); z-index: 5; }
+  .pin.resolved { background: #16a34a; }
+  .pin.wont_fix { background: #888; }
+  .pin-tip { position: absolute; transform: translate(-50%, calc(-100% - 16px)); background: #1a1a2e; color: #fff; font-size: 12px; line-height: 1.4; padding: 8px 10px; border-radius: 8px; max-width: 240px; z-index: 20; box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+  .pin-tip .pt-status { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; margin-top: 4px; }
+  .new-pop { position: absolute; transform: translate(-50%, 12px); background: #fff; border: 1px solid #d8d8d0; border-radius: 10px; padding: 10px; width: 240px; z-index: 30; box-shadow: 0 6px 24px rgba(0,0,0,0.25); }
+  .new-pop textarea { width: 100%; height: 70px; border: 1px solid #d8d8d0; border-radius: 6px; padding: 7px; font-size: 13px; font-family: inherit; resize: vertical; }
+  .new-pop .np-row { display: flex; gap: 6px; margin-top: 8px; }
+  .np-save { flex: 1; padding: 7px; background: #1a7a1a; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .np-cancel { padding: 7px 12px; background: #f0f0ea; color: #555; border: none; border-radius: 6px; font-size: 13px; cursor: pointer; }
+
+  .panel-head { padding: 16px; border-bottom: 1px solid #e8e8e0; position: sticky; top: 56px; background: #fff; z-index: 4; }
+  .panel-head h2 { font-size: 15px; font-weight: 700; }
+  .panel-sub { font-size: 12px; color: #888; margin-top: 3px; }
+  .panel-body { padding: 8px 16px 24px; }
+  .pg-group-title { font-size: 11px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: .05em; margin: 16px 0 6px; }
+  .cmt { display: flex; gap: 10px; padding: 10px; border: 1px solid #ececec; border-radius: 9px; margin-bottom: 8px; }
+  .cmt.done { opacity: .5; }
+  .cmt-badge { width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .cmt.done .cmt-badge { background: #16a34a; }
+  .cmt-main { flex: 1; min-width: 0; }
+  .cmt-meta { font-size: 11px; color: #999; margin-bottom: 2px; }
+  .cmt-text { font-size: 13px; line-height: 1.45; overflow-wrap: break-word; }
+  .cmt-status { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 7px; border-radius: 8px; display: inline-block; margin-top: 5px; }
+  .st-open { background: #fde8e8; color: #c0392b; }
+  .st-resolved { background: #e3f6e3; color: #1a7a1a; }
+  .st-wont_fix { background: #eee; color: #777; }
+  .cmt-acts { display: flex; gap: 6px; margin-top: 7px; }
+  .cmt-acts button { font-size: 11px; padding: 4px 9px; border: 1px solid #d8d8d0; background: #fff; border-radius: 6px; cursor: pointer; font-family: inherit; }
+  .cmt-acts .a-resolve { color: #1a7a1a; border-color: #a0d8a0; }
+  .cmt-acts .a-wont { color: #777; }
+  .empty { color: #aaa; font-size: 13px; padding: 20px 4px; text-align: center; }
+  .viewer-err { background: #fff; border: 1px solid #f0c0c0; color: #b00; border-radius: 10px; padding: 16px; font-size: 13px; }
+
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1a1a2e; color: #fff; padding: 11px 20px; border-radius: 9px; font-size: 13px; z-index: 200; display: none; box-shadow: 0 6px 24px rgba(0,0,0,0.3); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-l">
+    <a class="back-link" href="/admin.html#panel=product-development">← Back to Product Development</a>
+    <div class="tb-title" id="tb-product">Artwork Review</div>
+    <div class="tb-ver" id="tb-version"></div>
+  </div>
+  <div class="tb-r">
+    <button class="btn btn-approve" id="btn-approve" onclick="approveArtwork()" disabled>✅ Approve Artwork</button>
+    <button class="btn btn-revision" id="btn-revision" onclick="requestRevision()">🔄 Request Revision</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="viewer">
+    <div class="toolbar">
+      <button class="tool-btn" id="t-prev" onclick="gotoPage(pageNum-1)">← Prev</button>
+      <span class="tool-info" id="t-page">Page – of –</span>
+      <button class="tool-btn" id="t-next" onclick="gotoPage(pageNum+1)">Next →</button>
+      <span class="tool-sep"></span>
+      <button class="tool-btn" onclick="setZoom(scale-0.2)">−</button>
+      <span class="tool-info" id="t-zoom">100%</span>
+      <button class="tool-btn" onclick="setZoom(scale+0.2)">+</button>
+      <span class="hint">Click anywhere on the artwork to drop a comment pin</span>
+    </div>
+    <div class="canvas-shell" id="canvas-shell">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="pdf-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Comments</h2>
+      <div class="panel-sub" id="cmt-counts">— open, — resolved</div>
+    </div>
+    <div class="panel-body" id="cmt-list"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ── Auth gate (same admin_session token admin.html uses) ──
+var _as = localStorage.getItem('admin_session');
+if (!_as) { window.location.href = '/admin.html'; }
+
+// ── Supabase (anon key, matching admin.html) ──
+var SB = 'https://mjkjubctswjwjihxjpnd.supabase.co';
+var KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qa2p1YmN0c3dqd2ppaHhqcG5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczNjQxNjcsImV4cCI6MjA5Mjk0MDE2N30.cZrD_ymrDsRPyfX_g3hUui5_JXuW6BgE77QkIoGpqHo';
+var H = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY };
+var HW = { 'apikey': KEY, 'Authorization': 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+
+// ── URL params ──
+var _q = new URLSearchParams(location.search);
+var VERSION_ID = _q.get('version_id') || '';
+var PROJECT_ID = _q.get('project_id') || '';
+
+// ── State ──
+var pdfDoc = null, pageNum = 1, numPages = 0, scale = 1.0;
+var comments = [];          // all comments for this version (with computed _num)
+var version = null, project = null;
+var rendering = false, pendingPage = null;
+
+function g(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function toast(t){ var el = g('toast'); if(!el) return; el.textContent = t; el.style.display = 'block'; clearTimeout(window.__t); window.__t = setTimeout(function(){ el.style.display = 'none'; }, 3000); }
+
+async function sbGet(path){ try { var r = await fetch(SB + '/rest/v1/' + path, { headers: H }); return r.ok ? await r.json() : []; } catch(e){ return []; } }
+async function sbPatch(path, body){ try { return (await fetch(SB + '/rest/v1/' + path, { method:'PATCH', headers: Object.assign({}, HW, {Prefer:'return=minimal'}), body: JSON.stringify(body) })).ok; } catch(e){ return false; } }
+
+// ════════════════════════════════ INIT ════════════════════════════════
+async function init(){
+  if (!VERSION_ID){ showViewerError('No version_id supplied in the URL.'); return; }
+  var vrows = await sbGet('artwork_versions?id=eq.' + encodeURIComponent(VERSION_ID) + '&select=id,version_number,file_url,file_type,status,artwork_project_id,product_name&limit=1');
+  version = vrows && vrows[0];
+  if (!version){ showViewerError('Artwork version not found.'); return; }
+  if (!PROJECT_ID) PROJECT_ID = version.artwork_project_id || '';
+  var prows = PROJECT_ID ? await sbGet('artwork_projects?id=eq.' + encodeURIComponent(PROJECT_ID) + '&select=id,product_name,status&limit=1') : [];
+  project = (prows && prows[0]) || {};
+
+  var pname = project.product_name || version.product_name || 'Artwork';
+  g('tb-product').textContent = pname;
+  document.title = pname + ' — Artwork Review';
+  g('tb-version').textContent = 'v' + (version.version_number || '?') + (version.status ? ' · ' + version.status : '');
+
+  await loadComments();
+  loadPdf(version.file_url);
+}
+
+function showViewerError(msg){
+  g('canvas-shell').innerHTML = '<div class="viewer-err">' + esc(msg) + '</div>';
+}
+
+// ════════════════════════════════ PDF ════════════════════════════════
+function loadPdf(url){
+  if (!url){ showViewerError('This version has no file URL on record.'); return; }
+  if (!window.pdfjsLib){ showViewerError('PDF viewer failed to load.'); return; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  pdfjsLib.getDocument(url).promise.then(function(doc){
+    pdfDoc = doc; numPages = doc.numPages; pageNum = 1;
+    renderPage(pageNum);
+  }).catch(function(e){
+    showViewerError('Could not load the PDF (' + esc(e && e.message || 'error') + '). ' +
+      '<a href="' + esc(url) + '" target="_blank" rel="noopener">Open file directly →</a>');
+  });
+}
+
+function renderPage(num){
+  if (!pdfDoc) return;
+  if (rendering){ pendingPage = num; return; }
+  rendering = true;
+  pdfDoc.getPage(num).then(function(page){
+    var viewport = page.getViewport({ scale: scale });
+    var canvas = g('pdf-canvas'), ctx = canvas.getContext('2d');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    g('canvas-wrap').style.width = viewport.width + 'px';
+    g('canvas-wrap').style.height = viewport.height + 'px';
+    return page.render({ canvasContext: ctx, viewport: viewport }).promise;
+  }).then(function(){
+    rendering = false;
+    updatePageInfo();
+    renderPins();
+    if (pendingPage != null){ var p = pendingPage; pendingPage = null; renderPage(p); }
+  }).catch(function(){ rendering = false; });
+}
+
+function updatePageInfo(){
+  g('t-page').textContent = 'Page ' + pageNum + ' of ' + numPages;
+  g('t-zoom').textContent = Math.round(scale * 100) + '%';
+  g('t-prev').disabled = pageNum <= 1;
+  g('t-next').disabled = pageNum >= numPages;
+}
+
+function gotoPage(n){
+  if (!pdfDoc || n < 1 || n > numPages) return;
+  pageNum = n; clearPopups(); renderPage(pageNum);
+}
+function setZoom(z){
+  z = Math.max(0.5, Math.min(2.0, Math.round(z * 100) / 100));
+  if (z === scale) return;
+  scale = z; clearPopups(); renderPage(pageNum);
+}
+
+// ════════════════════════════════ PINS / NEW COMMENT ════════════════════════════════
+function clearPopups(){
+  var w = g('canvas-wrap');
+  Array.prototype.slice.call(w.querySelectorAll('.pin, .pin-tip, .new-pop')).forEach(function(el){ el.remove(); });
+}
+
+function renderPins(){
+  var w = g('canvas-wrap');
+  // Remove existing pins/tips/popups, keep the canvas.
+  Array.prototype.slice.call(w.querySelectorAll('.pin, .pin-tip, .new-pop')).forEach(function(el){ el.remove(); });
+  comments.filter(function(c){ return Number(c.page_number) === pageNum && c.x_pct != null && c.y_pct != null; }).forEach(function(c){
+    var pin = document.createElement('div');
+    pin.className = 'pin' + (c.status === 'resolved' ? ' resolved' : c.status === 'wont_fix' ? ' wont_fix' : '');
+    pin.style.left = c.x_pct + '%';
+    pin.style.top = c.y_pct + '%';
+    pin.textContent = c._num;
+    pin.onclick = function(ev){ ev.stopPropagation(); showTip(c); };
+    w.appendChild(pin);
+  });
+}
+
+function showTip(c){
+  var w = g('canvas-wrap');
+  Array.prototype.slice.call(w.querySelectorAll('.pin-tip')).forEach(function(el){ el.remove(); });
+  var tip = document.createElement('div');
+  tip.className = 'pin-tip';
+  tip.style.left = c.x_pct + '%';
+  tip.style.top = c.y_pct + '%';
+  tip.innerHTML = esc(c.comment_text) + '<div class="pt-status">' + esc(c.status || 'open') + '</div>';
+  tip.onclick = function(ev){ ev.stopPropagation(); tip.remove(); };
+  w.appendChild(tip);
+  setTimeout(function(){ if (tip.parentNode) tip.remove(); }, 5000);
+}
+
+// Click on the canvas (not a pin) → open the new-comment popup at that position.
+g('pdf-canvas').addEventListener('click', function(ev){
+  if (!pdfDoc) return;
+  var canvas = g('pdf-canvas');
+  var rect = canvas.getBoundingClientRect();
+  var xp = ((ev.clientX - rect.left) / rect.width) * 100;
+  var yp = ((ev.clientY - rect.top) / rect.height) * 100;
+  openNewPopup(xp, yp);
+});
+
+function openNewPopup(xp, yp){
+  var w = g('canvas-wrap');
+  Array.prototype.slice.call(w.querySelectorAll('.new-pop, .pin-tip')).forEach(function(el){ el.remove(); });
+  var pop = document.createElement('div');
+  pop.className = 'new-pop';
+  pop.style.left = xp + '%';
+  pop.style.top = yp + '%';
+  pop.innerHTML = '<textarea id="np-text" placeholder="Add a comment for the graphics team…"></textarea>' +
+    '<div class="np-row"><button class="np-save">Save</button><button class="np-cancel">Cancel</button></div>';
+  pop.onclick = function(ev){ ev.stopPropagation(); };
+  w.appendChild(pop);
+  var ta = pop.querySelector('#np-text'); if (ta) ta.focus();
+  pop.querySelector('.np-cancel').onclick = function(){ pop.remove(); };
+  pop.querySelector('.np-save').onclick = function(){ saveNewComment(xp, yp, ta ? ta.value : '', pop); };
+}
+
+async function saveNewComment(xp, yp, text, pop){
+  text = (text || '').trim();
+  if (!text){ toast('Enter a comment first.'); return; }
+  var payload = {
+    version_id: VERSION_ID,
+    artwork_project_id: PROJECT_ID,
+    page_number: pageNum,
+    x_pct: Math.round(xp * 100) / 100,
+    y_pct: Math.round(yp * 100) / 100,
+    comment_text: text,
+    status: 'open',
+    author_type: 'admin',
+    author_name: 'Admin'
+  };
+  try {
+    var r = await fetch(SB + '/rest/v1/artwork_comments', { method:'POST', headers: Object.assign({}, HW, {Prefer:'return=representation'}), body: JSON.stringify(payload) });
+    if (!r.ok){ toast('Save failed (' + r.status + ')'); return; }
+    var rows = await r.json();
+    var row = Array.isArray(rows) ? rows[0] : rows;
+    if (pop) pop.remove();
+    comments.push(row);
+    renumber();
+    renderPins();
+    renderComments();
+    toast('Comment added.');
+  } catch(e){ toast('Error: ' + e.message); }
+}
+
+// ════════════════════════════════ COMMENT PANEL ════════════════════════════════
+async function loadComments(){
+  comments = await sbGet('artwork_comments?version_id=eq.' + encodeURIComponent(VERSION_ID) + '&select=id,page_number,x_pct,y_pct,comment_text,status,created_at&order=page_number.asc,created_at.asc');
+  if (!Array.isArray(comments)) comments = [];
+  renumber();
+  renderComments();
+}
+
+function renumber(){
+  comments.sort(function(a, b){
+    var pa = Number(a.page_number || 0), pb = Number(b.page_number || 0);
+    if (pa !== pb) return pa - pb;
+    return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+  });
+  comments.forEach(function(c, i){ c._num = i + 1; });
+}
+
+function openCount(){ return comments.filter(function(c){ return c.status === 'open'; }).length; }
+function resolvedCount(){ return comments.filter(function(c){ return c.status === 'resolved' || c.status === 'wont_fix'; }).length; }
+
+function renderComments(){
+  var openN = openCount(), resN = resolvedCount();
+  g('cmt-counts').textContent = openN + ' open, ' + resN + ' resolved';
+  // Approve only enabled when there are zero open comments.
+  g('btn-approve').disabled = openN > 0;
+
+  var list = g('cmt-list');
+  if (!comments.length){ list.innerHTML = '<div class="empty">No comments yet. Click on the artwork to add one.</div>'; return; }
+
+  // Group by page number.
+  var groups = {}, order = [];
+  comments.forEach(function(c){ var k = Number(c.page_number || 1); if (!groups[k]){ groups[k] = []; order.push(k); } groups[k].push(c); });
+  order.sort(function(a, b){ return a - b; });
+
+  list.innerHTML = order.map(function(pg){
+    return '<div class="pg-group-title">Page ' + pg + '</div>' + groups[pg].map(commentRow).join('');
+  }).join('');
+}
+
+function commentRow(c){
+  var done = (c.status === 'resolved' || c.status === 'wont_fix');
+  var stCls = c.status === 'resolved' ? 'st-resolved' : c.status === 'wont_fix' ? 'st-wont_fix' : 'st-open';
+  var acts = '';
+  if (!done){
+    acts = '<div class="cmt-acts">' +
+      '<button class="a-resolve" onclick="setStatus(\'' + c.id + '\',\'resolved\')">✓ Resolve</button>' +
+      '<button class="a-wont" onclick="setStatus(\'' + c.id + '\',\'wont_fix\')">✗ Won\'t Fix</button>' +
+    '</div>';
+  }
+  return '<div class="cmt' + (done ? ' done' : '') + '">' +
+    '<div class="cmt-badge">' + c._num + '</div>' +
+    '<div class="cmt-main">' +
+      '<div class="cmt-meta">Page ' + esc(c.page_number) + '</div>' +
+      '<div class="cmt-text">' + esc(c.comment_text) + '</div>' +
+      '<span class="cmt-status ' + stCls + '">' + esc(c.status || 'open') + '</span>' +
+      acts +
+    '</div>' +
+  '</div>';
+}
+
+async function setStatus(id, status){
+  var body = { status: status };
+  if (status === 'resolved'){ body.resolved_at = new Date().toISOString(); body.resolved_by = 'admin'; }
+  var ok = await sbPatch('artwork_comments?id=eq.' + encodeURIComponent(id), body);
+  if (!ok){ toast('Update failed.'); return; }
+  var c = comments.find(function(x){ return x.id === id; });
+  if (c){ c.status = status; }
+  renderComments();
+  renderPins();
+}
+
+// ════════════════════════════════ APPROVE / REVISION ════════════════════════════════
+async function approveArtwork(){
+  if (openCount() > 0){ toast('Resolve all open comments first.'); return; }
+  var b = g('btn-approve'); b.disabled = true;
+  var ok1 = await sbPatch('artwork_versions?id=eq.' + encodeURIComponent(VERSION_ID), { status: 'approved', reviewed_at: new Date().toISOString() });
+  var ok2 = PROJECT_ID ? await sbPatch('artwork_projects?id=eq.' + encodeURIComponent(PROJECT_ID), { gate_artwork_ok: true, status: 'tenant_approved' }) : true;
+  if (!ok1 || !ok2){ toast('Approval failed — please retry.'); b.disabled = false; return; }
+  toast('Artwork approved! Ready for PO.');
+  setTimeout(function(){ window.location.href = '/admin.html#panel=product-development'; }, 2000);
+}
+
+async function requestRevision(){
+  var b = g('btn-revision'); b.disabled = true;
+  await sbPatch('artwork_versions?id=eq.' + encodeURIComponent(VERSION_ID), { status: 'revision_requested' });
+  var open = comments.filter(function(c){ return c.status === 'open'; });
+  var pname = (project && project.product_name) || (version && version.product_name) || 'Artwork';
+  var vnum = version ? version.version_number : '?';
+  var lines = open.length
+    ? open.map(function(c){ return '• [Page ' + c.page_number + '] ' + (c.comment_text || ''); }).join('\n')
+    : '(No open pin comments — see portal for details.)';
+  var body = 'A revision has been requested for the following artwork:\n\n' +
+    'Product: ' + pname + '\nVersion: v' + vnum + '\n\n' +
+    'Outstanding comments (' + open.length + '):\n' + lines + '\n\n' +
+    'Please upload a revised version in the Designer Portal.';
+  try {
+    await fetch('/api/send-email', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      from: 'sourcing@tbgsourcing.net',
+      to: 'graphics@tbgsourcing.net',
+      subject: 'Revision Required: ' + pname + ' v' + vnum,
+      body: body
+    }) });
+  } catch(e){}
+  toast('Revision requested. Graphics team notified.');
+  if (version) version.status = 'revision_requested';
+  g('tb-version').textContent = 'v' + vnum + ' · revision_requested';
+  b.disabled = false;
+}
+
+// Dismiss tips/popups when clicking the dark canvas backdrop.
+g('canvas-shell').addEventListener('click', function(ev){
+  if (ev.target === g('canvas-shell')) clearPopups();
+});
+
+if (_as) init();
+</script>
+<script src="admin-shared.js"></script>
+</body>
+</html>
