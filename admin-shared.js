@@ -21,7 +21,7 @@
       { icon: '🎯', label: 'Intel Daily',  href: 'intel_daily.html' },
       { icon: '👥', label: 'Tenants',      href: 'tenant-admin.html' },
       { icon: '📤', label: 'Upload Files', panel: 'upload' },
-      { icon: '🗺', label: 'System',       href: 'roadmap.html' },
+      { icon: '🗺', label: 'Roadmap',      href: 'roadmap.html' },
       { icon: '⚙',  label: 'Settings',     panel: 'settings' },
     ]},
     { section: 'Operations', items: [
@@ -71,7 +71,7 @@
 
   // Runtime assertion — fails loudly in the console if the locked Overview items ever go missing.
   // (Adapted to this file's actual sidebar array `NAV` / section name 'Overview'.)
-  const _REQUIRED_ADMIN_OVERVIEW = ['Dashboard','Financials','Intel Daily','Tenants','Upload Files','System','Settings'];
+  const _REQUIRED_ADMIN_OVERVIEW = ['Dashboard','Financials','Intel Daily','Tenants','Upload Files','Roadmap','Settings'];
   const _adminOverview = NAV.find(s => (s.section || s.title || '').toUpperCase() === 'OVERVIEW');
   if (_adminOverview) {
     const _missing = _REQUIRED_ADMIN_OVERVIEW.filter(l => !_adminOverview.items.some(i => i.label === l));
