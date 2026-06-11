@@ -12428,14 +12428,15 @@ function pdGatesCardHtml(){
       '<span style="flex:1;min-width:0;font-size:13px;font-weight:600;color:'+(on?'#1a7a1a':'#555')+';">'+(on?'✓ ':'')+esc(gt.label)+(gt.derived?' <span style="font-weight:400;color:#999;font-size:10px;">— auto from uploaded items</span>':'')+'</span>'+
     '</label>';
     var action=(gt.notify)?'<button onclick="pdNotifyGraphics()" title="Email the graphics team" style="flex:0 0 auto;padding:8px 12px;background:#5a2db8;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🎨 Notify Graphics Team</button>':'';
-    var review='';
+    var review='',upload='';
     if(gt.notify){
       var av=p._latestArtworkVersion;
       if(av&&av.id){
         review='<button onclick="window.open(\'/artwork-review.html?version_id='+av.id+'&project_id='+(av.artwork_project_id||'')+'\',\'_blank\')" title="Open the artwork annotation tool" style="flex:0 0 auto;padding:8px 12px;background:#1a7a1a;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">📄 Review Artwork v'+esc(av.version_number)+'</button>';
       }
+      upload='<input type="file" id="pd-art-upload" accept=".pdf,.ai,.jpg,.png,.zip" style="display:none" onchange="pdUploadArtwork(this)"><button onclick="document.getElementById(\'pd-art-upload\').click()" title="Upload artwork directly (skips the designer portal)" style="flex:0 0 auto;padding:8px 12px;background:#2244cc;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">⬆ Upload Artwork</button>';
     }
-    return '<div style="display:flex;align-items:stretch;gap:8px;margin-bottom:'+((gt.notify&&p._latestArtworkVersion)?'2px':'6px')+';">'+label+review+action+'</div>'+
+    return '<div style="display:flex;align-items:stretch;gap:8px;flex-wrap:wrap;margin-bottom:'+((gt.notify&&p._latestArtworkVersion)?'2px':'6px')+';">'+label+upload+review+action+'</div>'+
       ((gt.notify&&p._latestArtworkVersion)?'<div style="font-size:10px;color:#999;margin:0 0 8px 2px;">v'+esc(p._latestArtworkVersion.version_number)+' submitted '+esc((p._latestArtworkVersion.submitted_at||'').slice(0,10)||'—')+' — '+esc(p._latestArtworkVersion.status||'—')+'</div>':'');
   }).join('');
   return wrap(
@@ -12453,6 +12454,35 @@ function pdSkuCardHtml(){
     '<div style="font-size:13px;font-weight:600;color:#1a1a2e;margin-bottom:10px;">🏷 SKU</div>'+rows+
     '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;align-items:center;"><span style="font-size:12px;color:#888;">Status</span><span style="font-size:12px;font-weight:700;color:#1a7a1a;background:#edfaed;border:1px solid #a0d8a0;padding:2px 9px;border-radius:9px;">Live</span></div>'+
   '</div>';
+}
+// Admin direct artwork upload → R2 + artwork_versions (mirrors the designer portal, admin_session auth).
+async function pdUploadArtwork(input){
+  var file=input&&input.files&&input.files[0];if(input)input.value='';
+  if(!file)return;
+  var ap=pdCurrentDetail&&pdCurrentDetail._artworkProject;
+  if(!ap){toast('No artwork project for this item yet.');return;}
+  toast('Uploading '+file.name+'…');
+  try{
+    var exR=await fetch(SB+'/rest/v1/artwork_versions?artwork_project_id=eq.'+ap.id+'&select=version_number&order=version_number.desc&limit=1',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
+    var exr=exR.ok?await exR.json():[];
+    var vnum=(exr[0]&&exr[0].version_number?Number(exr[0].version_number):0)+1;
+    var safeName=Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    var folder='artwork/'+ap.id+'/v'+vnum;
+    var ctype=file.type||'application/octet-stream';
+    var up=await fetch('/api/r2-upload?folder='+encodeURIComponent(folder)+'&filename='+encodeURIComponent(safeName)+'&contentType='+encodeURIComponent(ctype),{method:'POST',headers:{'Authorization':'Bearer '+(localStorage.getItem('admin_session')||''),'Content-Type':ctype},body:file});
+    var upj=await up.json().catch(function(){return{error:true};});
+    if(!up.ok||!upj||upj.error||!upj.url){toast('Upload failed: '+((upj&&upj.message)||up.status));return;}
+    var ins=await fetch(SB+'/rest/v1/artwork_versions',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify({
+      artwork_project_id:ap.id,version_number:vnum,file_name:file.name,file_url:upj.url,file_size_bytes:file.size,
+      file_type:(file.name.split('.').pop()||'').toLowerCase(),submitted_by:null,submitted_at:new Date().toISOString(),
+      status:'pending_review',designer_notes:'Uploaded by admin'
+    })});
+    if(!ins.ok){toast('Could not save the version record ('+ins.status+').');return;}
+    try{await fetch(SB+'/rest/v1/artwork_projects?id=eq.'+ap.id,{method:'PATCH',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({status:'submitted',updated_at:new Date().toISOString()})});}catch(e){}
+    toast('Artwork uploaded. Ready for review.');
+    // Re-render the PD detail so the "📄 Review Artwork" button appears immediately.
+    if(pdCurrentDetail)openPDDetail(pdCurrentDetail.id);
+  }catch(e){toast('Error: '+(e&&e.message||e));}
 }
 // PART 3: silently auto-create the SKU when all items are already received (handles pre-existing data).
 async function pdMaybeAutoCreateSku(){

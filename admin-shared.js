@@ -65,7 +65,7 @@
     ]},
     { section: 'System', items: [
       { icon: '⚙️', label: 'Setup', href: '/setup.html' },
-      { icon: '🏆', label: 'Competitor Analysis', href: '/competitor-analysis.html' },
+      { icon: '🏆', label: 'Competitor Analysis', href: '/competitor-analysis.html', sub: true },
     ]},
   ];
 
@@ -100,6 +100,8 @@
     '#admin-sidebar .sb-item.active,#admin-sidebar .sb-item.on{background:#e8f0ff;color:#2244cc;font-weight:600;}',
     '#admin-sidebar .sb-icon{font-size:13px;width:16px;text-align:center;flex-shrink:0;}',
     '#admin-sidebar .sb-label{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+    '#admin-sidebar .sb-item.sb-nested{margin-left:24px;font-size:12px;color:#888;}',
+    '#admin-sidebar .sb-item.sb-nested .sb-icon{font-size:11px;}',
     '#admin-sidebar .sb-badge{font-size:9px;padding:1px 5px;border-radius:8px;font-weight:600;flex-shrink:0;}',
     '#admin-sidebar .sb-beta{background:#fff8e0;color:#886600;border:1px solid #f0d860;}',
     '#admin-sidebar .sb-new{background:#e8f0ff;color:#2244cc;border:1px solid #b8ccf0;}',
@@ -150,7 +152,7 @@
         ' onclick="return AdminSidebar.go(event,this)">' + inner + '</a>';
     }
 
-    var attrs = 'class="sb-item" href="' + esc(it.href) + '" data-href="' + esc(it.href) + '"';
+    var attrs = 'class="sb-item' + (it.sub ? ' sb-nested' : '') + '" href="' + esc(it.href) + '" data-href="' + esc(it.href) + '"';
     if (it.newtab) attrs += ' target="_blank" rel="noopener"';
     return '<a ' + attrs + '>' + inner + '</a>';
   }
